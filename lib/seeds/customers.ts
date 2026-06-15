@@ -1,0 +1,32 @@
+/* Auto-extracted from index.html — do not edit manually */
+
+export const SEED_CUSTOMERS = [
+  {id:'CUS-26-001',name:'James & Sarah Miller',email:'j.miller@gmail.com',phone:'+1 415 555 0192',country:'USA',nat:'American',source:'Referral',style:'Luxury',lang:'English',notes:'Celebrating 20th wedding anniversary. No shellfish. Prefer boutique properties.',bookings:['BK-2026-001']},
+  {id:'CUS-26-002',name:'Charlotte Dubois',email:'c.dubois@outlook.fr',phone:'+33 6 12 34 56 78',country:'France',nat:'French',source:'Website',style:'Cultural',lang:'French',notes:'Solo traveller and keen photographer. Prefers morning activities.',bookings:[]},
+  {id:'CUS-26-003',name:'Michael & Anna Chen',email:'mchen@corp.com.au',phone:'+61 412 345 678',country:'Australia',nat:'Australian',source:'Agent',style:'Premium',lang:'English',notes:'Family with 2 kids aged 8 and 11. Active pace preferred. Nut allergy.',bookings:['BK-2026-002']},
+  {id:'CUS-26-004',name:'Oliver & Emma Watson',email:'owatson@email.co.uk',phone:'+44 7700 900123',country:'UK',nat:'British',source:'Referral',style:'Adventure',lang:'English',notes:'Keen hikers. Interested in off-the-beaten-path experiences.',bookings:[]},
+  // ── IMPORTED FROM QUOTE & BOOKING TRACKER 2026 (May 8 2026) ──
+  {id:'CUS-26-005',name:'Uma Lerner',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Luxury',lang:'English',notes:'2 Pax. Mar tour. Ref: 230326_TADPV_UMA LERNER_2Pax. Booked — confirmed.',bookings:['BK-2026-T01']},
+  {id:'CUS-26-006',name:'Guests in Hanoi',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Premium',lang:'English',notes:'7 Pax group. Mar tour. Ref: 260326_TADTP. Classic Tour. Booked — confirmed.',bookings:['BK-2026-T02']},
+  {id:'CUS-26-007',name:'Edwin Franken',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Cultural',lang:'English',notes:'4 Pax. Mar tour. Ref: 280326_ICTNH. Cycling. CANCELLED.',bookings:[]},
+  {id:'CUS-26-008',name:'Phuc Vo',email:'',phone:'',country:'Vietnam',nat:'Vietnamese',source:'Direct',style:'Adventure',lang:'Vietnamese',notes:'1 Pax. Internal — Phuc Vo in Long Xuyen. Apr. Ref: 210426_TADTP.',bookings:['BK-2026-T03']},
+  {id:'CUS-26-009',name:'Mr. Tai — Family',email:'',phone:'',country:'Vietnam',nat:'Vietnamese',source:'Direct',style:'Family',lang:'Vietnamese',notes:'Family group, Can Tho. Apr. Ref: 260426_TADTP.',bookings:[]},
+  {id:'CUS-26-010',name:'30 April Tour Group',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Cultural',lang:'Vietnamese',notes:'12 Pax. Tìm Ông Thê event tour. Apr 30. Ref: 300426_TADTP. Booked.',bookings:['BK-2026-T04']},
+  {id:'CUS-26-011',name:'Ms. Mai — Australian Guests',email:'',phone:'',country:'Australia',nat:'Australian',source:'Direct',style:'Luxury',lang:'English',notes:'2 Pax Australian guests. May. Ref: 130526_TADTP.',bookings:[]},
+  {id:'CUS-26-012',name:'Student Group — Nam Cat Tien',email:'',phone:'',country:'Vietnam',nat:'Vietnamese',source:'Direct',style:'Adventure',lang:'Vietnamese',notes:'15 Pax student group, Nam Cat Tien. May. Ref: 150526_TADPV.',bookings:[]},
+  {id:'CUS-26-013',name:'Guests Hanoi — Anh Truong',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Cultural',lang:'English',notes:'Hanoi group, Anh Truong contact. May. Ref: 190526_TADTP.',bookings:[]},
+  {id:'CUS-26-014',name:'Charu (ILV)',email:'',phone:'',country:'',nat:'',source:'Agent',style:'Adventure',lang:'English',notes:'B2B — ILV agent. Cycling tour. Pax TBC. Appears May, Jun, Jul. Ref: 170526_ILV / 140626_ILV / 120726 / 260726.',bookings:[]},
+  {id:'CUS-26-015',name:'Nine Dragons Group',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Cultural',lang:'English',notes:'Cultural tour. Jun. Ref: 070626_TADPV_Cultural_Nine Dragons.',bookings:[]},
+  {id:'CUS-26-016',name:'Nguyen Group — Cycling 60pax',email:'',phone:'',country:'Vietnam',nat:'Vietnamese',source:'Direct',style:'Adventure',lang:'Vietnamese',notes:'60 Pax cycling group. Jun. Ref: 150626_VVMV_Nguyen_60pax_Cycling.',bookings:[]},
+  {id:'CUS-26-017',name:'Con Chim Island Tour',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Adventure',lang:'English',notes:'2D1N island tour. Jun. Ref: 200626_TADTP_Con Chim Island_2d1n.',bookings:[]},
+  {id:'CUS-26-018',name:'Chi My — Hanoi Mongolia',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Adventure',lang:'English',notes:'Outbound tour — Hanoi to Mongolia. Pax TBC. Jul. Ref: 010726_TADPV. Quote stage.',bookings:[]},
+  {id:'CUS-26-019',name:'Dang Khoa',email:'',phone:'',country:'Vietnam',nat:'Vietnamese',source:'Direct',style:'Adventure',lang:'Vietnamese',notes:'Bike renting. Jul. Ref: 010726_TADTP_Dang Khoa Bike Renting.',bookings:[]},
+  {id:'CUS-26-020',name:'TNKTJ — Cu Chi 2 Pax',email:'',phone:'',country:'',nat:'',source:'Agent',style:'Cultural',lang:'English',notes:'B2B — TNKTJ agent. 2 Pax cycling Cu Chi. Jul. Classic Tour. Ref: 010726_TNKTJ. Quote stage.',bookings:[]},
+  {id:'CUS-26-021',name:'Vietnam Inspection Trip',email:'',phone:'',country:'',nat:'',source:'Agent',style:'Luxury',lang:'English',notes:'FAM / inspection trip. Jul. Internal or agent-led. Ref: 130726_TADTP.',bookings:[]},
+  {id:'CUS-26-022',name:'Glass Painting Workshop',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Cultural',lang:'Vietnamese',notes:'Aug activity event. Ref: 080826_TADPV_Glass Painting.',bookings:[]},
+  {id:'CUS-26-023',name:'Tra Vinh Khmer Culture',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Cultural',lang:'English',notes:'2D1N Khmer culture tour, Tra Vinh. Aug. Ref: 220826_TADTP.',bookings:[]},
+  {id:'CUS-26-024',name:'Lantern Making — Mid Autumn',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Cultural',lang:'Vietnamese',notes:'Mid Autumn Festival lantern making, Saigon. Sep. Ref: 190926_TADTP.',bookings:[]},
+  {id:'CUS-26-025',name:'Ox Race — Sense Delta',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Adventure',lang:'Vietnamese',notes:'Ox Race event, An Giang. Oct. Ref: 091026_TADTP_Sense Delta_Ox Race_An Giang.',bookings:[]},
+  {id:'CUS-26-026',name:'Mrs. Thu — Australian Guests',email:'',phone:'',country:'Australia',nat:'Australian',source:'Direct',style:'Luxury',lang:'English',notes:'4 Pax Australian guests. Nov. Ref: 101126_TADTP.',bookings:[]},
+  {id:'CUS-26-027',name:'Ok Om Bok — Tra Vinh',email:'',phone:'',country:'',nat:'',source:'Direct',style:'Cultural',lang:'Vietnamese',notes:'Ok Om Bok festival tour, Tra Vinh. Nov. Ref: 221126_TADTP.',bookings:[]},
+] as const;

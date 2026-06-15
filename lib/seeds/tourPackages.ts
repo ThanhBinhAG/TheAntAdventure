@@ -1,0 +1,1173 @@
+export type TourPackageDay = { n: number; title: string; sub: string; hotel: string; meals: string; body: string };
+export type TourPackage = { id: string; name: string; subtitle: string; route: string; format: string; style: string; hotels: string; tag: string; badge: string; tagline: string; price4pax: string; flights: string[]; days: TourPackageDay[]; incl: string[]; excl: string[]; pricing: { pax: number; peak: number; off: number }[] };
+export const TOUR_PACKAGES: TourPackage[] = [
+  {
+    "id": "PKG-01",
+    "name": "North Vietnam Soft Adventure",
+    "subtitle": "7–9 Days · Gentle Nature & Cultural Encounters",
+    "route": "Hanoi – Ninh Binh – Mai Chau",
+    "format": "7 Nights / 8 Days · Private",
+    "style": "Relaxed · Private · Authentic",
+    "hotels": "La Siesta Classic Ma May (Hanoi) · Ninh Binh Hidden Charm · Mai Chau Ecolodge / Avana Retreat",
+    "tag": "north",
+    "badge": "8D",
+    "tagline": "\"Wander ancient streets, glide through limestone waterways, and rest in an open valley where time moves at the rhythm of the rice fields.\"",
+    "price4pax": "$1,714/pp (4-pax peak)",
+    "flights": [],
+    "days": [
+      {
+        "n": 1,
+        "title": "Arrival in Hanoi",
+        "sub": "Welcome to Vietnam",
+        "hotel": "La Siesta Classic Ma May, Hanoi",
+        "meals": "D",
+        "body": "Your journey begins the moment your guide meets you at Noi Bai International Airport with a warm welcome and a cold towel. You are transferred smoothly to La Siesta Classic Ma May, tucked into the heart of the Old Quarter, where the scent of jasmine and the gentle clatter of street life drift up from the lanes below. This first evening is entirely yours — a slow walk along the edge of Hoan Kiem Lake as the city softens into dusk is the perfect antidote to a long flight. Allow Hanoi to arrive gently."
+      },
+      {
+        "n": 2,
+        "title": "Hanoi – Local Life & Gentle Exploration",
+        "sub": "Culture, stories & daily rhythms",
+        "hotel": "La Siesta Classic Ma May, Hanoi",
+        "meals": "B",
+        "body": "Hanoi rewards those who walk slowly. This morning your guide leads you through the labyrinth of the 36 Streets, past lacquerware shops and bánh mì carts, through hidden courtyards and incense-filled pagodas. You stop where the story is good — a craftsman pressing silk, a grandmother arranging marigolds for the ancestral shrine. A street food moment is woven in naturally, not as a checklist item but as a real encounter with how Hanoians begin their day. The afternoon is yours at your own pace."
+      },
+      {
+        "n": 3,
+        "title": "Hanoi → Ninh Binh",
+        "sub": "Nature & limestone landscapes",
+        "hotel": "Ninh Binh Hidden Charm Hotel",
+        "meals": "B, D",
+        "body": "After a comfortable breakfast you depart for Ninh Binh, arriving in time for a scenic sampan journey through Trang An's cathedral of limestone. Your boat glides silently beneath ancient arches draped in fern and moss, the only sound the dip of oars and distant birdsong. An easy walk through the valley floor reveals rice paddies stitched between the karst formations. The evening settles over the river in shades of copper and amber — one of Vietnam's most quietly spectacular views."
+      },
+      {
+        "n": 4,
+        "title": "Ninh Binh → Mai Chau",
+        "sub": "Into the peaceful countryside",
+        "hotel": "Mai Chau Ecolodge / Avana Retreat",
+        "meals": "B, D",
+        "body": "A gentle morning in Ninh Binh precedes the transfer northwest toward the open arms of Mai Chau Valley. As the road rises and the air cools, the landscape opens into a broad patchwork of rice fields framed by forested ridges. You arrive at your eco-lodge in the early afternoon — time enough for a slow village walk among the stilted houses of the White Thai community, where children chase chickens and women weave on hand-looms in the shade."
+      },
+      {
+        "n": 5,
+        "title": "Mai Chau – Village Life & Soft Adventure",
+        "sub": "Countryside walking & cycling",
+        "hotel": "Mai Chau Ecolodge / Avana Retreat",
+        "meals": "B, D",
+        "body": "The valley is best experienced at bicycle pace. This morning you roll through narrow tracks between the rice paddies, stopping to peer into weaving workshops where geometric patterns emerge thread by thread from tradition. A visit to a local family offers tea, conversation and a glimpse into a way of life that has changed little across generations. The afternoon is completely free — read on your terrace, swim in the pool, or simply sit and watch the light move across the valley."
+      },
+      {
+        "n": 6,
+        "title": "Mai Chau – A Day at Your Own Pace",
+        "sub": "Rest, nature & flexibility",
+        "hotel": "Mai Chau Ecolodge / Avana Retreat",
+        "meals": "B, D",
+        "body": "This day has no agenda, and that is precisely the point. The lodge and its surroundings are yours to explore or to rest within entirely on your terms. A short nature walk, a conversation with your guide, a nap in a hammock — all are equally valid. These unhurried days are among the most remembered by guests who return home and speak of feeling genuinely restored."
+      },
+      {
+        "n": 7,
+        "title": "Mai Chau → Hanoi – Departure or Extension",
+        "sub": "Onwards or farewell",
+        "hotel": "La Siesta Classic Ma May, Hanoi (optional)",
+        "meals": "B",
+        "body": "A leisurely breakfast precedes the return drive to Hanoi, with stops along the way as the mood dictates. For those departing, your guide accompanies you to Noi Bai Airport in comfort and good time. For those continuing south or northward to Sapa, your tour connects seamlessly with the next adventure."
+      },
+      {
+        "n": 8,
+        "title": "Departure",
+        "sub": "Until next time",
+        "hotel": "–",
+        "meals": "B",
+        "body": "A final breakfast before your onward transfer. Safe travels."
+      }
+    ],
+    "incl": [
+      "7 nights boutique & eco-lodge accommodation",
+      "Private air-conditioned vehicle throughout",
+      "English-speaking local guide throughout",
+      "Daily breakfast; dinners as indicated",
+      "All entrance fees to sites visited",
+      "Boat ride at Trang An, Ninh Binh",
+      "Village cycling / walking in Mai Chau",
+      "Purified water in vehicle daily",
+      "All local taxes and service charges"
+    ],
+    "excl": [
+      "International flights",
+      "Vietnam visa and entry fees",
+      "Travel insurance",
+      "Personal expenses & shopping",
+      "Tips for guides and drivers",
+      "Peak season supplement (Oct–Mar: +20%)"
+    ],
+    "pricing": [
+      {
+        "pax": 1,
+        "peak": 4032,
+        "off": 3024
+      },
+      {
+        "pax": 2,
+        "peak": 2688,
+        "off": 2016
+      },
+      {
+        "pax": 3,
+        "peak": 1904,
+        "off": 1428
+      },
+      {
+        "pax": 4,
+        "peak": 1714,
+        "off": 1285
+      },
+      {
+        "pax": 5,
+        "peak": 1599,
+        "off": 1200
+      },
+      {
+        "pax": 6,
+        "peak": 1344,
+        "off": 1008
+      },
+      {
+        "pax": 8,
+        "peak": 1260,
+        "off": 945
+      },
+      {
+        "pax": 10,
+        "peak": 1210,
+        "off": 907
+      }
+    ]
+  },
+  {
+    "id": "PKG-02",
+    "name": "Heritage & Slow Life – Central Vietnam",
+    "subtitle": "6–8 Days · Culture, Craft & Gentle Countryside",
+    "route": "Hue – Hoi An – Countryside Villages",
+    "format": "6 Nights / 7 Days · Private",
+    "style": "Relaxed · Private · Authentic",
+    "hotels": "Medallion Hue Hotel (Hue) · Allegro Hoi An (Hoi An)",
+    "tag": "central",
+    "badge": "7D",
+    "tagline": "\"Step into the quiet grandeur of a former imperial capital, then drift south to a riverside town where lanterns reflect in ancient waterways and time slows to a craft's pace.\"",
+    "price4pax": "$1,349/pp (4-pax peak)",
+    "flights": [],
+    "days": [
+      {
+        "n": 1,
+        "title": "Arrival in Hue",
+        "sub": "Welcome to Central Vietnam",
+        "hotel": "Medallion Hue Hotel",
+        "meals": "D",
+        "body": "You arrive into Phu Bai Airport and are met by your guide for the short transfer to Hue along the Perfume River road. The Medallion Hue Hotel places you at the heart of this graceful city, within walking distance of the river and the lantern-lit night market. As the sun drops behind the Citadel walls, take an evening stroll along the embankment where the perfume of jasmine and lotus drifts across the water — Hue introduces itself gently, like a piece of classical music heard from another room."
+      },
+      {
+        "n": 2,
+        "title": "Hue – Imperial Heritage & Stories",
+        "sub": "History brought to life",
+        "hotel": "Medallion Hue Hotel",
+        "meals": "B",
+        "body": "Hue's imperial past is written in stone, silk and ceremony. Your guide brings it to life with the storytelling depth that no audio guide can replicate — the rise and fall of the Nguyen dynasty, the tragic elegance of the royal tombs, the whispered politics of the forbidden purple city. You visit the Citadel, one or two of the great tombs along the river, and allow the afternoon to slow into café culture and a quiet riverside walk."
+      },
+      {
+        "n": 3,
+        "title": "Hue → Hoi An",
+        "sub": "From imperial city to coastal charm",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "The Hai Van Pass connects Hue and Hoi An across one of Vietnam's most dramatic coastal ridgelines. Your vehicle climbs through cloud into views of impossible blue — the South China Sea curving away to the south, Da Nang shimmering in the bay below. You descend to Hoi An in the golden hour, the ancient town's terracotta rooftops and paper lanterns revealing themselves as the road narrows."
+      },
+      {
+        "n": 4,
+        "title": "Hoi An – Old Town & Craft Traditions",
+        "sub": "Heritage, colour & creativity",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "Hoi An's Ancient Town is a UNESCO-listed masterpiece that rewards slow walking. Your guide leads you through the merchant houses and clan halls of this 15th-century trading port, pausing to explain the Chinese, Japanese and Vietnamese influences layered into every façade and roofline. The afternoon brings a hands-on lantern-making workshop — a favourite for families — where you craft your own silk lantern to carry home."
+      },
+      {
+        "n": 5,
+        "title": "Hoi An – Countryside & Local Life",
+        "sub": "Slow living beyond the old town",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "A bicycle ride into the countryside reveals the Hoi An that most visitors miss. You pedal through Cam Kim Island or Tra Que Organic Village, where farmers tend plots of herbs and vegetables in the same riverside soil they have worked for centuries. A family lunch or an organic cooking class can be woven in naturally."
+      },
+      {
+        "n": 6,
+        "title": "Hoi An – Free Day",
+        "sub": "Your time, your pace",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "Today belongs entirely to you. The beach at An Bang is fifteen minutes by bicycle; the pool at the hotel beckons; the tailors and silk merchants of the Old Quarter await those drawn to bespoke craft. Your guide is available for optional activities or simply to answer questions over coffee."
+      },
+      {
+        "n": 7,
+        "title": "Departure from Central Vietnam",
+        "sub": "Until we meet again",
+        "hotel": "–",
+        "meals": "B",
+        "body": "A final breakfast before your guide transfers you to Da Nang Airport for your onward journey. The lanterns of Hoi An will stay with you longer than you expect."
+      }
+    ],
+    "incl": [
+      "6 nights boutique accommodation",
+      "Private air-conditioned vehicle throughout",
+      "English-speaking local guide throughout",
+      "Daily breakfast; welcome dinner on Day 1",
+      "All entrance fees including Hoi An Ancient Town passes",
+      "Lantern-making workshop (Day 4)",
+      "Hai Van Pass scenic stop",
+      "Purified water in vehicle daily",
+      "All local taxes and service charges"
+    ],
+    "excl": [
+      "International flights",
+      "Vietnam visa",
+      "Travel insurance",
+      "Personal expenses",
+      "Tips for guides and drivers",
+      "Meals not listed",
+      "Peak season supplement"
+    ],
+    "pricing": [
+      {
+        "pax": 1,
+        "peak": 3352,
+        "off": 2514
+      },
+      {
+        "pax": 2,
+        "peak": 2176,
+        "off": 1632
+      },
+      {
+        "pax": 3,
+        "peak": 1516,
+        "off": 1137
+      },
+      {
+        "pax": 4,
+        "peak": 1349,
+        "off": 1012
+      },
+      {
+        "pax": 5,
+        "peak": 1250,
+        "off": 937
+      },
+      {
+        "pax": 6,
+        "peak": 1044,
+        "off": 783
+      },
+      {
+        "pax": 8,
+        "peak": 970,
+        "off": 728
+      },
+      {
+        "pax": 10,
+        "peak": 926,
+        "off": 695
+      }
+    ]
+  },
+  {
+    "id": "PKG-03",
+    "name": "Vietnam Highlights for First-Time Travellers",
+    "subtitle": "10 Days · A Gentle Introduction to Vietnam",
+    "route": "Hanoi – Ninh Binh – Mai Chau – Hoi An – Ho Chi Minh City",
+    "format": "9 Nights / 10 Days · Private",
+    "style": "Relaxed · Private · Authentic",
+    "hotels": "La Siesta Classic Ma May · Ninh Binh Hidden Charm · Mai Chau Ecolodge · Allegro Hoi An · La Siesta Premium Saigon",
+    "tag": "full",
+    "badge": "10D",
+    "tagline": "\"A carefully paced journey through Vietnam's most captivating chapters — from ancient capital to limestone waterways, open valleys to a golden heritage town and the pulse of the south.\"",
+    "price4pax": "$2,006/pp (4-pax peak)",
+    "flights": [
+      "✈ Hanoi (HAN) → Da Nang (DAD) — Day 6 · Approx. 1h 20m · Included"
+    ],
+    "days": [
+      {
+        "n": 1,
+        "title": "Arrival in Hanoi",
+        "sub": "Welcome to Vietnam",
+        "hotel": "La Siesta Classic Ma May, Hanoi",
+        "meals": "D",
+        "body": "Your guide meets you at arrivals with a warm welcome, and the transfer to La Siesta Classic Ma May winds through Hanoi's graceful, tree-lined boulevards. The hotel sits in the heart of the Old Quarter. This evening is unscheduled — a short stroll to Hoan Kiem Lake costs nothing and reveals everything about this city's gentle soul."
+      },
+      {
+        "n": 2,
+        "title": "Hanoi – Culture & Local Life",
+        "sub": "Stories, streets & everyday rhythms",
+        "hotel": "La Siesta Classic Ma May, Hanoi",
+        "meals": "B",
+        "body": "Hanoi is best understood on foot. Your morning guide leads you through the 36 Streets at an unhurried pace — past silk merchants and herb sellers, past the red bridge arching toward Ngoc Son Temple, through a neighbourhood or two that most tourists never find. You stop for a bowl of phở where the broth has been simmering since before dawn."
+      },
+      {
+        "n": 3,
+        "title": "Hanoi → Ninh Binh",
+        "sub": "Nature & limestone landscapes",
+        "hotel": "Ninh Binh Hidden Charm Hotel",
+        "meals": "B, D",
+        "body": "The drive to Ninh Binh takes just over two hours. A sampan ride at Trang An — one of the most serene experiences in all of Vietnam — carries you through limestone corridors and past ancient temples perched on rock faces rising from the water."
+      },
+      {
+        "n": 4,
+        "title": "Ninh Binh → Mai Chau",
+        "sub": "Into the peaceful countryside",
+        "hotel": "Mai Chau Ecolodge / Avana Retreat",
+        "meals": "B, D",
+        "body": "After a morning at leisure, your vehicle curves northwest toward the mountains, climbing into the cloud forest before descending into the wide embrace of Mai Chau Valley. A gentle walk through the White Thai village as the afternoon light softens is the perfect introduction to life in the highlands."
+      },
+      {
+        "n": 5,
+        "title": "Mai Chau – Village Life & Relaxation",
+        "sub": "Soft nature & cultural connection",
+        "hotel": "Mai Chau Ecolodge / Avana Retreat",
+        "meals": "B, D",
+        "body": "Cycling through narrow paths between the paddies, stopping to watch weavers at their looms in the shade of stilted houses, sharing a conversation through your guide with a family who have farmed this land for generations. The afternoon is entirely free: the lodge pool, a hammock, a book, the mountains."
+      },
+      {
+        "n": 6,
+        "title": "Mai Chau → Hanoi → Flight to Central Vietnam",
+        "sub": "Journey south by air",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "A morning drive returns you to Hanoi in time for your short domestic flight south to Da Nang. By early evening you are in Hoi An, the Ancient Town unwrapping itself in the golden hour as you transfer to the Allegro."
+      },
+      {
+        "n": 7,
+        "title": "Hoi An – Old Town & Heritage",
+        "sub": "History, colour & charm",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "The Ancient Town of Hoi An is best experienced slowly, with a guide who knows its stories. In the afternoon, a lantern-making workshop invites you to take home something made by your own hands, lit by silk and bamboo."
+      },
+      {
+        "n": 8,
+        "title": "Hoi An – Countryside or Free Time",
+        "sub": "Your pace, your choice",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "This day is intentionally open. Spend the morning at the beach at An Bang, rent bicycles to explore the rice field villages beyond the town, or simply linger over coffee and watch the boats on the Thu Bon River."
+      },
+      {
+        "n": 9,
+        "title": "Hoi An → Ho Chi Minh City",
+        "sub": "From heritage town to vibrant city",
+        "hotel": "La Siesta Premium Saigon",
+        "meals": "B",
+        "body": "A morning flight carries you to Ho Chi Minh City. The contrast with Hoi An is immediate and exhilarating — the wide boulevards, the surge of motorbikes, the French colonial architecture. Check in to the La Siesta Premium Saigon and take an evening neighbourhood walk into the energy of District 1."
+      },
+      {
+        "n": 10,
+        "title": "Ho Chi Minh City – Departure",
+        "sub": "Until next time",
+        "hotel": "–",
+        "meals": "B",
+        "body": "A final breakfast in Saigon before your guide accompanies you to Tan Son Nhat Airport for your departure."
+      }
+    ],
+    "incl": [
+      "9 nights boutique accommodation",
+      "1 domestic flight: Hanoi (HAN) → Da Nang (DAD)",
+      "Private air-conditioned vehicle throughout",
+      "English-speaking local guide throughout",
+      "Daily breakfast; 3 dinners as indicated",
+      "All entrance fees",
+      "Boat ride at Trang An; village activities in Mai Chau",
+      "Lantern-making workshop in Hoi An",
+      "Purified water daily",
+      "All local taxes and service charges"
+    ],
+    "excl": [
+      "International flights",
+      "Vietnam visa",
+      "Travel insurance",
+      "Personal expenses",
+      "Tips",
+      "Meals not listed",
+      "Peak season supplement (Oct–Mar: +20%)"
+    ],
+    "pricing": [
+      {
+        "pax": 1,
+        "peak": 4880,
+        "off": 3660
+      },
+      {
+        "pax": 2,
+        "peak": 3200,
+        "off": 2400
+      },
+      {
+        "pax": 3,
+        "peak": 2244,
+        "off": 1683
+      },
+      {
+        "pax": 4,
+        "peak": 2006,
+        "off": 1505
+      },
+      {
+        "pax": 5,
+        "peak": 1864,
+        "off": 1398
+      },
+      {
+        "pax": 6,
+        "peak": 1560,
+        "off": 1170
+      },
+      {
+        "pax": 8,
+        "peak": 1455,
+        "off": 1091
+      },
+      {
+        "pax": 10,
+        "peak": 1392,
+        "off": 1044
+      }
+    ]
+  },
+  {
+    "id": "PKG-04",
+    "name": "Tailor-Made Family Journey (Custom)",
+    "subtitle": "Fully Personalised · Any Route · Any Duration",
+    "route": "Any Route · Any Duration · Designed for Your Family",
+    "format": "9 Nights / 10 Days · Private (Flexible)",
+    "style": "Relaxed · Private · Authentic",
+    "hotels": "Carefully selected family-friendly boutique hotels across all regions",
+    "tag": "full",
+    "badge": "Custom",
+    "tagline": "\"A journey designed entirely around your family — your pace, your interests, your children's ages, your natural rhythm of travel. Nothing pre-set, everything purposeful.\"",
+    "price4pax": "$1,985/pp (4-pax peak)",
+    "flights": [
+      "✈ Hanoi (HAN) → Da Nang (DAD) — Day 6 · Included — exact routing confirmed at booking"
+    ],
+    "days": [
+      {
+        "n": 1,
+        "title": "Arrival Day",
+        "sub": "Welcome — your journey begins",
+        "hotel": "Your selected hotel",
+        "meals": "D",
+        "body": "Your journey begins on your terms. Whether you arrive into Hanoi, Da Nang, or Ho Chi Minh City, your private guide and vehicle are waiting with a welcome tailored to the ages and energy levels of your family on arrival day. This first evening is always calm, always unhurried."
+      },
+      {
+        "n": 2,
+        "title": "Cultural Exploration",
+        "sub": "Stories & everyday life",
+        "hotel": "Your selected hotel",
+        "meals": "B",
+        "body": "Each day of a tailor-made journey with The Ant Adventures begins with a conversation — what would suit you best today? Your guide and our operations team are in constant contact, able to adjust the programme based on how your family feels."
+      },
+      {
+        "n": 3,
+        "title": "Nature & Discovery",
+        "sub": "Gentle outdoor experience",
+        "hotel": "Your selected hotel",
+        "meals": "B, D",
+        "body": "Whether nature means a sampan gliding through Ninh Binh's limestone waterways, a gentle cycle in the Mai Chau valley, or a morning walk through rice fields in the highlands — the activity is matched to your children's ages and comfort level."
+      },
+      {
+        "n": 4,
+        "title": "Craft & Community",
+        "sub": "Hands-on family experience",
+        "hotel": "Your selected hotel",
+        "meals": "B",
+        "body": "A lantern workshop in Hoi An, a cooking class in a riverside kitchen, an afternoon learning to weave in a White Thai village — your programme includes age-appropriate craft and community encounters."
+      },
+      {
+        "n": 5,
+        "title": "Rest & Recharge",
+        "sub": "Built-in recovery day",
+        "hotel": "Your selected hotel",
+        "meals": "B, D",
+        "body": "We build rest days into every tailor-made itinerary by design, not as an afterthought. A family pool day, an afternoon with nothing planned — these pauses are where the journey consolidates and the memories begin to form."
+      },
+      {
+        "n": 6,
+        "title": "Journey Onwards",
+        "sub": "New chapter",
+        "hotel": "Your selected hotel",
+        "meals": "B",
+        "body": "Internal transitions by air where appropriate, by private vehicle where the route allows it — we eliminate the stress of logistics and ensure every transfer is comfortable for children and grandparents alike."
+      },
+      {
+        "n": 7,
+        "title": "Deep Immersion",
+        "sub": "Local life & culture",
+        "hotel": "Your selected hotel",
+        "meals": "B",
+        "body": "The deeper days of the itinerary offer the most revealing experiences: a family in their home, a market before dawn, a community project where participation is genuine and welcomed."
+      },
+      {
+        "n": 8,
+        "title": "Free Day",
+        "sub": "Your time, entirely",
+        "hotel": "Your selected hotel",
+        "meals": "B",
+        "body": "The beach, the hotel pool, a wander through the night market, a long lunch — your guide remains available for any spontaneous exploration while the rest of the family recharges."
+      },
+      {
+        "n": 9,
+        "title": "Southern Finale",
+        "sub": "City life & farewell moments",
+        "hotel": "Your selected hotel",
+        "meals": "B",
+        "body": "The southern finale brings city energy, history, and the extraordinary river life of the Mekong Delta. Vietnam in full, seen from a family perspective."
+      },
+      {
+        "n": 10,
+        "title": "Departure",
+        "sub": "Until next time",
+        "hotel": "–",
+        "meals": "B",
+        "body": "Your guide accompanies you to your departure airport. A final cup of Vietnamese coffee, a handshake or embrace, and the quiet satisfaction of a journey well spent together."
+      }
+    ],
+    "incl": [
+      "9 nights carefully selected accommodation",
+      "Private air-conditioned vehicle throughout",
+      "Experienced English-speaking guide throughout",
+      "Daily breakfast; select dinners",
+      "All entrance fees",
+      "Internal domestic flight(s) where needed",
+      "All hands-on activities as discussed",
+      "Flexibility to adjust daily programme on-tour",
+      "24/7 support from The Ant Adventures operations team",
+      "All local taxes and service charges"
+    ],
+    "excl": [
+      "International flights",
+      "Vietnam visa and entry fees",
+      "Travel insurance",
+      "Personal expenses",
+      "Tips",
+      "Meals not listed",
+      "Activities added spontaneously on-tour",
+      "Peak season supplement"
+    ],
+    "pricing": [
+      {
+        "pax": 1,
+        "peak": 4855,
+        "off": 3641
+      },
+      {
+        "pax": 2,
+        "peak": 3175,
+        "off": 2381
+      },
+      {
+        "pax": 3,
+        "peak": 2223,
+        "off": 1667
+      },
+      {
+        "pax": 4,
+        "peak": 1985,
+        "off": 1489
+      },
+      {
+        "pax": 5,
+        "peak": 1842,
+        "off": 1382
+      },
+      {
+        "pax": 6,
+        "peak": 1541,
+        "off": 1156
+      },
+      {
+        "pax": 8,
+        "peak": 1436,
+        "off": 1077
+      },
+      {
+        "pax": 10,
+        "peak": 1373,
+        "off": 1030
+      }
+    ]
+  },
+  {
+    "id": "PKG-05",
+    "name": "Southern Vietnam Discovery",
+    "subtitle": "6 Days · City, History, Street Food & River Life",
+    "route": "Ho Chi Minh City – Cu Chi – Cai Be – Can Tho",
+    "format": "5 Nights / 6 Days · Private",
+    "style": "Relaxed · Private · Authentic",
+    "hotels": "La Siesta Premium Saigon (Ho Chi Minh City) · Charmant Suite Can Tho (Can Tho)",
+    "tag": "south",
+    "badge": "6D",
+    "tagline": "\"From wartime tunnels to motorbike street food nights, from the floating markets of Can Tho to the merchant canals of Cai Be — the south of Vietnam, experienced in full.\"",
+    "price4pax": "$1,071/pp (4-pax peak)",
+    "flights": [],
+    "days": [
+      {
+        "n": 1,
+        "title": "Arrival in Ho Chi Minh City",
+        "sub": "Welcome to Southern Vietnam",
+        "hotel": "La Siesta Premium Saigon",
+        "meals": "D",
+        "body": "Tan Son Nhat Airport is one of Southeast Asia's most energetic arrival halls — which is precisely why your guide's familiar face on the other side of the arrivals gate is such a relief. Transfer through the city's evening surge of motorcycles to the La Siesta Premium Saigon, your boutique base in the heart of District 1."
+      },
+      {
+        "n": 2,
+        "title": "Ho Chi Minh City – Local Life & Modern History",
+        "sub": "Understanding Saigon today",
+        "hotel": "La Siesta Premium Saigon",
+        "meals": "B",
+        "body": "Saigon rewards those who walk it with curiosity rather than a checklist. Your morning guide navigates you through the city's layered character — the Reunification Palace, the Central Post Office, and then into the quieter lanes of Districts 3 and 4, where Vietnamese-owned coffee shops and family pho restaurants define the real texture of this city."
+      },
+      {
+        "n": 3,
+        "title": "Cu Chi Tunnels & Saigon After Dark",
+        "sub": "History by day, flavours by night",
+        "hotel": "La Siesta Premium Saigon",
+        "meals": "B, D",
+        "body": "The morning drive to Cu Chi's Ben Duoc tunnel complex tells the story of the American War from the Vietnamese perspective. Back in Saigon as the evening cools, you board scooters for one of the city's most celebrated experiences: the Saigon After Dark street food ride, weaving through the back lanes of Cholon and District 6."
+      },
+      {
+        "n": 4,
+        "title": "Ho Chi Minh City → Cai Be Village → Can Tho",
+        "sub": "From city to the living waterways",
+        "hotel": "Charmant Suite Can Tho",
+        "meals": "B, D",
+        "body": "A comfortable morning drive southwest from Saigon delivers you to Cai Be, a river town where a private boat exploration of the canals winds past traditional riverside workshops. By mid-afternoon your vehicle continues to Can Tho, the Delta's most graceful city."
+      },
+      {
+        "n": 5,
+        "title": "Can Tho – Floating Market & River Life",
+        "sub": "Dawn on the delta",
+        "hotel": "Charmant Suite Can Tho",
+        "meals": "B, D",
+        "body": "The alarm before dawn is entirely worth it. The Cai Rang Floating Market operates from first light, the wooden boats converging from all directions with produce balanced on long poles. Your private boat moves through the market at close range as the vendors call out in the half-dark."
+      },
+      {
+        "n": 6,
+        "title": "Can Tho → Ho Chi Minh City – Departure",
+        "sub": "A gentle farewell to the south",
+        "hotel": "–",
+        "meals": "B",
+        "body": "A final breakfast by the river before your private vehicle returns you to Ho Chi Minh City. Depending on your flight time, there is space for a last wander, a last bowl of hủ tiếu at a riverside table. The south of Vietnam, once seen this closely, rarely leaves a guest unchanged."
+      }
+    ],
+    "incl": [
+      "5 nights boutique accommodation",
+      "Private air-conditioned vehicle throughout",
+      "English-speaking guide throughout",
+      "Daily breakfast; 3 dinners (incl. street food dinner on Day 3)",
+      "Entrance fees: Cu Chi Tunnels (Ben Duoc premium)",
+      "Saigon After Dark — Street Food by Scooter",
+      "Private boat at Cai Be canals and workshops",
+      "Can Tho Cai Rang Floating Market private boat (dawn)",
+      "Afternoon cycling in Can Tho",
+      "Purified water in vehicle daily",
+      "All local taxes and service charges"
+    ],
+    "excl": [
+      "International flights",
+      "Vietnam visa",
+      "Travel insurance",
+      "Personal expenses",
+      "Tips",
+      "Meals not listed",
+      "Peak season supplement (Oct–Mar: +20%)"
+    ],
+    "pricing": [
+      {
+        "pax": 1,
+        "peak": 2772,
+        "off": 2079
+      },
+      {
+        "pax": 2,
+        "peak": 1764,
+        "off": 1323
+      },
+      {
+        "pax": 3,
+        "peak": 1214,
+        "off": 910
+      },
+      {
+        "pax": 4,
+        "peak": 1071,
+        "off": 803
+      },
+      {
+        "pax": 5,
+        "peak": 985,
+        "off": 739
+      },
+      {
+        "pax": 6,
+        "peak": 819,
+        "off": 614
+      },
+      {
+        "pax": 8,
+        "peak": 756,
+        "off": 567
+      },
+      {
+        "pax": 10,
+        "peak": 718,
+        "off": 539
+      }
+    ]
+  },
+  {
+    "id": "PKG-06",
+    "name": "Vietnam In Depth – Culture, Nature & Family Time",
+    "subtitle": "15–17 Days · Fewer Places, Deeper Experiences",
+    "route": "Hanoi – Ninh Binh – Mai Chau – Hoi An – Mekong Delta – Ho Chi Minh City",
+    "format": "15 Nights / 16 Days · Private",
+    "style": "Relaxed · Private · Authentic",
+    "hotels": "La Siesta Classic Ma May · Ninh Binh Hidden Charm · Avana Retreat · Allegro Hoi An · Charmant Suite Can Tho · La Siesta Premium Saigon",
+    "tag": "full",
+    "badge": "16D",
+    "tagline": "\"Six destinations. Seventeen days. A journey that lingers at each place long enough to truly arrive — designed for families who value depth over distance.\"",
+    "price4pax": "$3,177/pp (4-pax peak)",
+    "flights": [
+      "✈ Hanoi (HAN) → Da Nang (DAD) — Day 8 · Approx. 1h 20m · Included",
+      "✈ Da Nang (DAD) → Ho Chi Minh City (SGN) — Day 12 · Approx. 1h 15m · Included"
+    ],
+    "days": [
+      {
+        "n": 1,
+        "title": "Arrival in Hanoi",
+        "sub": "Welcome to Vietnam",
+        "hotel": "La Siesta Classic Ma May, Hanoi",
+        "meals": "D",
+        "body": "The flight into Noi Bai is always a little thrilling — the patchwork of rice fields and river tributaries visible through the window speaks immediately of a landscape unlike any other. La Siesta Classic Ma May is a natural fit for families — centrally placed, personally managed."
+      },
+      {
+        "n": 2,
+        "title": "Hanoi – Everyday Life & Local Stories",
+        "sub": "Beyond the highlights",
+        "hotel": "La Siesta Classic Ma May, Hanoi",
+        "meals": "B",
+        "body": "This is not a day of monuments but of people. Your guide leads you through the Old Quarter at the pace of discovery — pausing at the craft streets where each lane has been devoted to a single trade for centuries, watching the morning market unfold."
+      },
+      {
+        "n": 3,
+        "title": "Hanoi → Ninh Binh",
+        "sub": "From city to countryside",
+        "hotel": "Ninh Binh Hidden Charm Hotel",
+        "meals": "B, D",
+        "body": "The drive to Ninh Binh transitions you gradually from city to countryside. A sampan ride through the waterways is one of those experiences that stays with guests for years: the silence, the scale of the rock faces above you, the kingfishers, the ancient grottoes."
+      },
+      {
+        "n": 4,
+        "title": "Ninh Binh – A Slower Day",
+        "sub": "Time to pause",
+        "hotel": "Ninh Binh Hidden Charm Hotel",
+        "meals": "B, D",
+        "body": "Ninh Binh earns a second day because it asks for one. This morning you might wander up to the old Hoa Lu citadel, or take a short cycle into the farming villages that surround the Hidden Charm Hotel, or simply sit on your terrace and watch the mist burn off the limestone peaks."
+      },
+      {
+        "n": 5,
+        "title": "Ninh Binh → Mai Chau",
+        "sub": "Into the open valley",
+        "hotel": "Avana Retreat",
+        "meals": "B, D",
+        "body": "The road to Mai Chau climbs into a different Vietnam — pine forests, stilted villages, roadside vegetable sellers, the air noticeably cooler and cleaner. You arrive at the Avana Retreat in the early afternoon."
+      },
+      {
+        "n": 6,
+        "title": "Mai Chau – Village Life & Soft Nature",
+        "sub": "Rural rhythms",
+        "hotel": "Avana Retreat",
+        "meals": "B, D",
+        "body": "Cycling through Mai Chau's valley tracks is effortless and endlessly rewarding. The paths weave between the paddies, through hamlets where weavers sit at their looms. A visit to a White Thai family at home — tea, conversation, a look at beautiful geometric fabrics."
+      },
+      {
+        "n": 7,
+        "title": "Mai Chau – Free Day",
+        "sub": "Nature, rest & family time",
+        "hotel": "Avana Retreat",
+        "meals": "B, D",
+        "body": "Today has no schedule, and guests who have resisted the concept of a free day consistently name it as one of the most important on any long journey. The valley is yours."
+      },
+      {
+        "n": 8,
+        "title": "Mai Chau → Hanoi → Flight to Hoi An",
+        "sub": "Journey south",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "Return to Hanoi for your short domestic flight south to Da Nang, then onward by vehicle to Hoi An. The transition from the cool highlands to the warm coastal air is immediate and pleasurable."
+      },
+      {
+        "n": 9,
+        "title": "Hoi An – Old Town with a Local Lens",
+        "sub": "Heritage at an easy pace",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "Hoi An's Ancient Town is a living museum that functions also as a genuine community. Your morning walk with a guide trained in the town's remarkable multicultural history allows all of this to be understood in layers."
+      },
+      {
+        "n": 10,
+        "title": "Hoi An – Countryside Immersion",
+        "sub": "Life beyond the postcard",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "Beyond the Ancient Town lies the countryside that gives Hoi An its food, its flowers and much of its character. This morning you cycle to Tra Que Organic Village, where a family farm welcomes you for a practical introduction to the herbs that define Vietnamese cuisine."
+      },
+      {
+        "n": 11,
+        "title": "Hoi An – A Day at Your Own Pace",
+        "sub": "Rest & reflection",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "A rest day in Hoi An is never wasted. The beach at An Bang is one of Vietnam's most agreeable — calm water, beach cafés serving proper Vietnamese food. A bicycle ride there and back takes twenty minutes."
+      },
+      {
+        "n": 12,
+        "title": "Hoi An → Mekong Delta",
+        "sub": "Flight south to the river",
+        "hotel": "Charmant Suite Can Tho",
+        "meals": "B, D",
+        "body": "A flight south lands you at Can Tho, and your riverside lodge reveals the Delta's remarkable light — flat, diffuse, golden — as the afternoon deepens."
+      },
+      {
+        "n": 13,
+        "title": "Mekong Delta – River Life & Community",
+        "sub": "Daily rhythms along the water",
+        "hotel": "Charmant Suite Can Tho",
+        "meals": "B, D",
+        "body": "The Delta by sampan is an immersion in one of Asia's great river civilizations. Coconut candy workshops, rice paper factories, a floating fish farm, a women's weaving cooperative."
+      },
+      {
+        "n": 14,
+        "title": "Mekong Delta → Ho Chi Minh City",
+        "sub": "Arriving at the southern capital",
+        "hotel": "La Siesta Premium Saigon",
+        "meals": "B",
+        "body": "A relaxed morning on the Delta before the drive to Ho Chi Minh City. The contrast on arrival is visceral and energizing — the motorcycles, the neon, the French architecture."
+      },
+      {
+        "n": 15,
+        "title": "Ho Chi Minh City – Modern Vietnam",
+        "sub": "Past and present",
+        "hotel": "La Siesta Premium Saigon",
+        "meals": "B",
+        "body": "Saigon rewards those who look beyond its surface energy. Your guide takes you through the Reunification Palace, the War Remnants Museum, and into the Vietnamese-owned coffee shops and street food lanes that reveal the city's real texture."
+      },
+      {
+        "n": 16,
+        "title": "Departure",
+        "sub": "Until next time",
+        "hotel": "–",
+        "meals": "B",
+        "body": "A final breakfast before your airport transfer. The journey is complete — from the misty highlands of Ninh Binh and Mai Chau to the lantern-lit lanes of Hoi An and the river life of the Mekong."
+      }
+    ],
+    "incl": [
+      "15 nights boutique & eco-lodge accommodation",
+      "2 domestic flights: HAN→DAD and DAD→SGN",
+      "Private air-conditioned vehicle throughout",
+      "English-speaking guide throughout",
+      "Daily breakfast; 7 dinners",
+      "All entrance fees",
+      "All signature activities: boat ride Trang An, cycling Mai Chau, lantern workshop Hoi An, Mekong boat journey",
+      "Purified water daily",
+      "All taxes and service charges"
+    ],
+    "excl": [
+      "International flights",
+      "Vietnam visa",
+      "Travel insurance",
+      "Personal expenses",
+      "Tips",
+      "Meals not listed",
+      "Peak season supplement"
+    ],
+    "pricing": [
+      {
+        "pax": 1,
+        "peak": 7770,
+        "off": 5828
+      },
+      {
+        "pax": 2,
+        "peak": 5082,
+        "off": 3812
+      },
+      {
+        "pax": 3,
+        "peak": 3558,
+        "off": 2669
+      },
+      {
+        "pax": 4,
+        "peak": 3177,
+        "off": 2383
+      },
+      {
+        "pax": 5,
+        "peak": 2949,
+        "off": 2212
+      },
+      {
+        "pax": 6,
+        "peak": 2468,
+        "off": 1851
+      },
+      {
+        "pax": 8,
+        "peak": 2300,
+        "off": 1725
+      },
+      {
+        "pax": 10,
+        "peak": 2199,
+        "off": 1649
+      }
+    ]
+  },
+  {
+    "id": "PKG-07",
+    "name": "Grand Vietnam Journey – North to South (Flagship)",
+    "subtitle": "18–21 Days · The Complete Vietnam Experience",
+    "route": "Hanoi – Ninh Binh – Mai Chau – Hue – Hoi An – Mekong Delta – Ho Chi Minh City",
+    "format": "18 Nights / 19 Days · Private",
+    "style": "Relaxed · Private · Authentic",
+    "hotels": "La Siesta Classic Ma May · Ninh Binh Hidden Charm · Avana Retreat · Medallion Hue · Allegro Hoi An · Charmant Suite Can Tho · La Siesta Premium Saigon",
+    "tag": "full",
+    "badge": "19D",
+    "tagline": "\"Vietnam's complete arc — from the ancient capital in the north to the living waterways of the south — experienced without haste, without compromise, and without anything left unseen.\"",
+    "price4pax": "$3,763/pp (4-pax peak)",
+    "flights": [
+      "✈ Hanoi (HAN) → Hue (HUI) — Day 8 · Approx. 1h 10m · Included",
+      "✈ Da Nang (DAD) → Ho Chi Minh City (SGN) — Day 14 · Approx. 1h 15m · Included"
+    ],
+    "days": [
+      {
+        "n": 1,
+        "title": "Arrival in Hanoi",
+        "sub": "Welcome to Vietnam",
+        "hotel": "La Siesta Classic Ma May, Hanoi",
+        "meals": "D",
+        "body": "Your guide meets you at arrivals with Vietnam's warmest welcome — a cold towel, a bottle of water, and a smile that carries genuine pride in what lies ahead. Your first evening is unhurried. Hoan Kiem Lake is five minutes' walk away."
+      },
+      {
+        "n": 2,
+        "title": "Hanoi – Local Life & Cultural Stories",
+        "sub": "An easy introduction",
+        "hotel": "La Siesta Classic Ma May, Hanoi",
+        "meals": "B",
+        "body": "Hanoi's Old Quarter has been the beating commercial heart of this city for a thousand years. Your guide is a storyteller who grew up in this city, who knows which temple to enter at which hour."
+      },
+      {
+        "n": 3,
+        "title": "Hanoi → Ninh Binh",
+        "sub": "From city to nature",
+        "hotel": "Ninh Binh Hidden Charm Hotel",
+        "meals": "B, D",
+        "body": "The transition from Hanoi's urban energy to Ninh Binh's vast limestone silence is one of the great scene changes in Vietnamese travel. A sampan at Trang An carries you through a world of karst and water that has barely changed in centuries."
+      },
+      {
+        "n": 4,
+        "title": "Ninh Binh – A Slower Day",
+        "sub": "Time to pause",
+        "hotel": "Ninh Binh Hidden Charm Hotel",
+        "meals": "B, D",
+        "body": "A rest day in Ninh Binh is not a day off — it is a day in. The hotel's gardens, the view from your terrace, an optional short cycle to the ancient Hoa Lu citadel."
+      },
+      {
+        "n": 5,
+        "title": "Ninh Binh → Mai Chau",
+        "sub": "Into the open valley",
+        "hotel": "Avana Retreat",
+        "meals": "B, D",
+        "body": "The highlands begin gradually as the vehicle climbs northwest from Ninh Binh, pine forests replacing paddy fields, the air cooling, the valley of Mai Chau opening spectacularly ahead of you as the road descends."
+      },
+      {
+        "n": 6,
+        "title": "Mai Chau – Village Life & Soft Adventure",
+        "sub": "Rural rhythms",
+        "hotel": "Avana Retreat",
+        "meals": "B, D",
+        "body": "Village life at bicycle pace through Mai Chau's rice field tracks. White Thai weavers, open-sided houses where generations live together, children returning from school along paths between the paddies."
+      },
+      {
+        "n": 7,
+        "title": "Mai Chau – Free Day",
+        "sub": "Nature, rest & family time",
+        "hotel": "Avana Retreat",
+        "meals": "B, D",
+        "body": "The valley is yours. Everything and nothing. Rest, walk, swim, read, talk, watch. These free days are the ones that families remember most vividly when they return home."
+      },
+      {
+        "n": 8,
+        "title": "Mai Chau → Hanoi → Flight to Hue",
+        "sub": "Journey to the imperial city",
+        "hotel": "Medallion Hue Hotel",
+        "meals": "B",
+        "body": "The return to Hanoi and the domestic flight to Hue is a transition between two of Vietnam's most distinct personalities. An evening walk along the Perfume River as the city lights begin to reflect in the water is the perfect first acquaintance with central Vietnam."
+      },
+      {
+        "n": 9,
+        "title": "Hue – Imperial Heritage & History",
+        "sub": "Understanding Vietnam's past",
+        "hotel": "Medallion Hue Hotel",
+        "meals": "B",
+        "body": "Hue's great monuments — the Citadel, the Royal Tombs of Minh Mang and Tu Duc, the Thien Mu Pagoda — are best understood through a guide who loves this city's complexity."
+      },
+      {
+        "n": 10,
+        "title": "Hue → Hoi An",
+        "sub": "Scenic journey south",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "The Hai Van Pass road to Hoi An is one of Vietnam's most dramatic coastal drives — the cloud often sits at the summit, parting occasionally to reveal infinite views of ocean and bay."
+      },
+      {
+        "n": 11,
+        "title": "Hoi An – Old Town & Craft Traditions",
+        "sub": "Heritage with colour",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "The Ancient Town is introduced at walking pace, with a guide who has grown up in its lanes. Japanese merchant houses, the covered bridge, a clan hall or two — and then the afternoon free. A lantern workshop can be arranged."
+      },
+      {
+        "n": 12,
+        "title": "Hoi An – Countryside & Local Life",
+        "sub": "Beyond the old town",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "The rice field villages beyond the Old Town reveal Hoi An's agricultural soul. Cycling to Cam Kim Island or Tra Que Organic Village, sharing a meal with a farm family."
+      },
+      {
+        "n": 13,
+        "title": "Hoi An – A Day at Your Own Pace",
+        "sub": "Rest & reflection",
+        "hotel": "Allegro Hoi An",
+        "meals": "B",
+        "body": "Hoi An on a free day is one of Vietnam's most agreeable experiences. The beach, the pool, the market, the tailor, the café on the corner — all equally valid."
+      },
+      {
+        "n": 14,
+        "title": "Hoi An → Mekong Delta",
+        "sub": "Flight to the river life",
+        "hotel": "Charmant Suite Can Tho",
+        "meals": "B, D",
+        "body": "A flight south and transfer by private vehicle to the Mekong Delta, where the flat light and the smell of river mud announce an entirely different Vietnam."
+      },
+      {
+        "n": 15,
+        "title": "Mekong Delta – Life Along the River",
+        "sub": "Daily rhythms",
+        "hotel": "Charmant Suite Can Tho",
+        "meals": "B, D",
+        "body": "The Delta by small boat at sunrise. Coconut candy producers, rice paper makers, orchard farmers, women weaving palm leaves — the river is a working civilisation."
+      },
+      {
+        "n": 16,
+        "title": "Mekong Delta → Ho Chi Minh City",
+        "sub": "Arrival at journey's end",
+        "hotel": "La Siesta Premium Saigon",
+        "meals": "B",
+        "body": "A gentle morning on the Delta before the transfer to Ho Chi Minh City. The contrast on arrival — the motorcycles, the towers, the neon, the noise — is bracing and exhilarating after the Delta's stillness."
+      },
+      {
+        "n": 17,
+        "title": "Ho Chi Minh City – Modern Vietnam & History",
+        "sub": "Past and present",
+        "hotel": "La Siesta Premium Saigon",
+        "meals": "B",
+        "body": "A final full day in Vietnam's most energetic city. The Reunification Palace, the War Remnants Museum, the walking streets of Bui Vien, the coffee roasters of District 3 — all available, none obligatory."
+      },
+      {
+        "n": 18,
+        "title": "Departure or Extension",
+        "sub": "The journey continues",
+        "hotel": "As preferred",
+        "meals": "B",
+        "body": "Extensions are available to Phu Quoc Island, the Con Dao Islands, Da Lat or beyond — or this can simply be a day for final shopping and a gentle farewell to Vietnam."
+      },
+      {
+        "n": 19,
+        "title": "Final Departure",
+        "sub": "Until next time, Vietnam",
+        "hotel": "–",
+        "meals": "B",
+        "body": "Your guide accompanies you to Tan Son Nhat Airport. The Grand Journey is complete — north to south, highland to delta, ancient capital to living city."
+      }
+    ],
+    "incl": [
+      "18 nights boutique & eco-lodge accommodation",
+      "2 domestic flights: HAN→HUI and DAD→SGN",
+      "Private air-conditioned vehicle throughout",
+      "English-speaking guide throughout",
+      "Daily breakfast; 9 dinners",
+      "All entrance fees",
+      "All signature activities across 7 destinations",
+      "Purified water daily",
+      "All taxes and service charges"
+    ],
+    "excl": [
+      "International flights",
+      "Vietnam visa",
+      "Travel insurance",
+      "Personal expenses",
+      "Tips",
+      "Meals not listed",
+      "Peak season supplement",
+      "Optional extensions"
+    ],
+    "pricing": [
+      {
+        "pax": 1,
+        "peak": 9215,
+        "off": 6911
+      },
+      {
+        "pax": 2,
+        "peak": 6023,
+        "off": 4517
+      },
+      {
+        "pax": 3,
+        "peak": 4215,
+        "off": 3161
+      },
+      {
+        "pax": 4,
+        "peak": 3763,
+        "off": 2822
+      },
+      {
+        "pax": 5,
+        "peak": 3491,
+        "off": 2619
+      },
+      {
+        "pax": 6,
+        "peak": 2921,
+        "off": 2191
+      },
+      {
+        "pax": 8,
+        "peak": 2722,
+        "off": 2041
+      },
+      {
+        "pax": 10,
+        "peak": 2602,
+        "off": 1951
+      }
+    ]
+  }
+];

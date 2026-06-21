@@ -1,6 +1,6 @@
 import type { BackupData } from '../types';
 
-/** Array tables — one Supabase table per BackupData array field */
+/** v5 relational tables synced from Zustand arrays */
 export const SYNC_ARRAY_TABLES = [
   'customers',
   'comms',
@@ -10,9 +10,9 @@ export const SYNC_ARRAY_TABLES = [
   'guides',
   'products',
   'finance',
-  'ar',
-  'ap',
-  'tax',
+  'accounts_receivable',
+  'accounts_payable',
+  'tax_reports',
   'staff',
   'tasks',
   'feedback',
@@ -23,12 +23,12 @@ export const SYNC_ARRAY_TABLES = [
   'cruises',
   'transport',
   'restaurants',
-  'special_suppliers',
+  'suppliers',
 ] as const;
 
 export type SyncArrayTable = (typeof SYNC_ARRAY_TABLES)[number];
 
-/** Maps Supabase table name → Zustand / BackupData key */
+/** Maps Supabase v5 table name → Zustand / BackupData key */
 export const TABLE_TO_STORE_KEY: Record<SyncArrayTable, keyof BackupData> = {
   customers: 'customers',
   comms: 'comms',
@@ -38,9 +38,9 @@ export const TABLE_TO_STORE_KEY: Record<SyncArrayTable, keyof BackupData> = {
   guides: 'guides',
   products: 'products',
   finance: 'finance',
-  ar: 'ar',
-  ap: 'ap',
-  tax: 'tax',
+  accounts_receivable: 'ar',
+  accounts_payable: 'ap',
+  tax_reports: 'tax',
   staff: 'staff',
   tasks: 'tasks',
   feedback: 'feedback',
@@ -51,11 +51,18 @@ export const TABLE_TO_STORE_KEY: Record<SyncArrayTable, keyof BackupData> = {
   cruises: 'cruises',
   transport: 'transport',
   restaurants: 'restaurants',
-  special_suppliers: 'specialSuppliers',
+  suppliers: 'specialSuppliers',
 };
 
-export const MESSAGES_TABLE = 'crm_messages' as const;
-export const MESSAGES_ROW_ID = 'default' as const;
+export const MESSAGES_TABLE = 'chat_messages' as const;
+
+/** Tables included in health-check row counts */
+export const HEALTH_COUNT_TABLES = [
+  ...SYNC_ARRAY_TABLES,
+  'booking_itinerary',
+  'booking_activities',
+  MESSAGES_TABLE,
+] as const;
 
 export function getRowId(row: Record<string, unknown>, table: SyncArrayTable, index: number): string {
   if (row.id != null && String(row.id).length > 0) return String(row.id);
@@ -70,6 +77,10 @@ export function countBackupRows(backup: BackupData): Record<string, number> {
     const rows = backup[key];
     counts[table] = Array.isArray(rows) ? rows.length : 0;
   }
-  counts[MESSAGES_TABLE] = Object.keys(backup.messages ?? {}).length;
+  let msgCount = 0;
+  for (const list of Object.values(backup.messages ?? {})) {
+    if (Array.isArray(list)) msgCount += list.length;
+  }
+  counts[MESSAGES_TABLE] = msgCount;
   return counts;
 }

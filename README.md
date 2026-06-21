@@ -1,6 +1,6 @@
-# The Ant Adventures CRM v4.3
+# The Ant Adventures CRM
 
-Next.js 14 port of the all-in-one HTML CRM (`index.html`). UI matches the original CSS; data runs on **Zustand + localStorage** by default, with optional **Supabase** sync for all CRM entities.
+Next.js 14 CRM for The Ant Adventures. **Supabase (PostgreSQL v5)** is the production data store with auto-sync.
 
 ## Quick start
 
@@ -20,130 +20,41 @@ Edit **`.env.local`** (gitignored). Template: [`.env.example`](.env.example)
 |----------|----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | When using Supabase | Project URL (Settings → API) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | When using Supabase | Anon/public key |
-| `NEXT_PUBLIC_USE_SUPABASE` | No | `false` = local only (default), `true` = connect to Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | Optional | Server/scripts only — never expose in client code |
+| `NEXT_PUBLIC_USE_SUPABASE` | No | `false` = local only, `true` = Supabase |
+| `NEXT_PUBLIC_SUPABASE_AUTO_SYNC` | No | `true` = auto-push edits to Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Optional | Server/scripts only — never expose in client |
 
 After changing `.env.local`, restart: `npm run dev`.
 
----
+## Database (PostgreSQL v5 on Supabase)
 
-## Migrate local data → Supabase (full guide)
+Full schema documentation: **[`docs/DATABASE.md`](docs/DATABASE.md)**
 
-All CRM tables sync to Supabase: customers, comms, leads, bookings, agents, guides, products, finance, contracts, tasks, team chat, suppliers, etc. (22 array tables + chat channels).
+| File | Purpose |
+|------|---------|
+| [`supabase/schema.sql`](supabase/schema.sql) | **v5.0** — 35+ relational tables |
+| [`supabase/import-v5-data.sql`](supabase/import-v5-data.sql) | Seed data (run after schema) |
+| [`supabase/verify-counts-v5.sql`](supabase/verify-counts-v5.sql) | Verify row counts after import |
+| [`supabase/reset-v5.sql`](supabase/reset-v5.sql) | Drop all CRM tables — clean reinstall |
 
-### Step 1 — Create Supabase tables
+**Supabase setup:** [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md) — run `reset-v5.sql` (if needed) → `schema.sql` → `import-v5-data.sql` → `verify-counts-v5.sql` in SQL Editor.
 
-In [Supabase SQL Editor](https://supabase.com/dashboard), run the full script:
+## Backup / restore
 
-[`supabase/schema.sql`](supabase/schema.sql)
-
-### Step 2 — Configure `.env.local`
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-NEXT_PUBLIC_USE_SUPABASE=true
-```
-
-Restart dev server.
-
-### Step 3 — Export your local data
-
-Choose **one** path:
-
-#### Option A — From the running app (your real local edits)
-
-1. Top bar → **⬇ Backup** → saves `ant-crm-backup-YYYY-MM-DD.json`
-2. Convert to SQL:
-
-```bash
-npm run supabase:sql -- path/to/ant-crm-backup-2026-06-14.json supabase/import-full-data.sql
-```
-
-3. Run `supabase/import-full-data.sql` in Supabase SQL Editor.
-
-#### Option B — Default seed dataset (no browser needed)
-
-```bash
-npm run supabase:export-seeds
-```
-
-Creates:
-
-- `supabase/seed-backup.json` — full JSON snapshot
-- `supabase/import-full-data.sql` — ready to paste in SQL Editor
-
-#### Option C — Push from the app (no SQL file)
-
-1. Open app with `USE_SUPABASE=true`
-2. Click bottom-left **☁ Supabase** banner → open panel
-3. **Test connection** → should show green ✓
-4. **Push full snapshot** → uploads all tables
-5. **Verify counts** → local vs remote must match
-6. **Hoàn tất migration** → clears `localStorage`, reloads from Supabase
-
-### Step 4 — Verify connection
-
-In the app migration panel (☁ banner):
-
-| Action | What it checks |
-|--------|----------------|
-| **Test connection** | URL + anon key, latency, row counts per table |
-| **Verify counts** | Compares browser store vs Supabase row counts |
-| **☁ Supabase loaded** | On reload, data hydrated from remote |
-
-Green dot + `✓ Kết nối OK (XXms)` = connected.
-
-### Step 5 — Remove old local-only cache
-
-After push + verify:
-
-- Click **Hoàn tất migration** in the panel, **or**
-- DevTools → Application → Local Storage → delete `ant-crm-v43`
-
-After migration, localStorage is only a **cache** of Supabase data (Zustand persist), not a separate source.
-
-### What happens to local data?
-
-| Phase | Behaviour |
-|-------|-----------|
-| Before migration | Data in `localStorage` key `ant-crm-v43` |
-| Push snapshot | All entities copied to Supabase |
-| Empty Supabase on load | Keeps local/seeds (safe) |
-| Supabase has rows on load | Remote replaces store, then re-saved to localStorage |
-| After "Hoàn tất migration" | localStorage cleared once, then repopulated from Supabase |
-
-You do **not** need manual CSV import if you use Push snapshot or `import-full-data.sql`.
-
----
-
-## Backup / restore (always useful)
-
-- **⬇ Backup** (top bar) → JSON with full CRM state (all tables).
+- **⬇ Backup** (top bar) → JSON with full CRM state.
 - **⬆ Restore** → replace local store from JSON.
-
-Keep a backup file before migration as safety net.
 
 ## Architecture
 
 ```
-index.html              # Source of truth for CSS & seeds (reference)
-app/globals.css         # Extracted styles
-lib/seeds/              # Seed data extracted from HTML
-lib/store.ts            # Zustand + persist (ant-crm-v43)
-lib/db/sync-config.ts   # Table ↔ store mapping
-lib/db/supabase.ts      # Supabase adapter (all entities)
-lib/db/hydrate.ts       # Load / push / verify / migrate
-supabase/schema.sql     # Create all tables + RLS
-supabase/import-full-data.sql  # Generated import (npm run supabase:export-seeds)
+app/                    # Next.js App Router
 components/             # Page UI (26 routes)
-```
-
-Re-extract after HTML updates:
-
-```bash
-npm run extract
-npm run supabase:export-seeds   # refresh SQL import from seeds
+lib/db/                 # Supabase adapter, mappers, auto-sync
+lib/seeds/              # Local seed data
+lib/store.ts            # Zustand store
+supabase/               # PostgreSQL schema + data
+docs/DATABASE.md        # ER diagram & table reference
+docs/SUPABASE-SETUP.md  # Supabase install & connect
 ```
 
 ## Pages (26 routes)
@@ -156,10 +67,8 @@ npm run supabase:export-seeds   # refresh SQL import from seeds
 |---------|---------|
 | `npm run dev` | Development server |
 | `npm run build` | Production build |
-| `npm run extract` | Re-generate seeds/CSS from `index.html` |
-| `npm run supabase:export-seeds` | Generate `seed-backup.json` + `import-full-data.sql` from seeds |
-| `npm run supabase:sql -- <backup.json> [out.sql]` | Convert app backup JSON → Supabase SQL |
+| `npm run extract` | Re-generate seeds/CSS from HTML source |
 
 ## Logo
 
-`public/Logo-3.svg` (or add `Logo-3.png`).
+`public/Logo-3.svg`

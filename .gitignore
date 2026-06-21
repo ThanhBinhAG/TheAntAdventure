@@ -41,3 +41,6 @@ next-env.d.ts
 # Optional local backups (exports from CRM)
 backups/
 *.backup.json
+
+# Private notes & archives — local only, never commit
+Personal/

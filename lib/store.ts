@@ -1,5 +1,6 @@
-import { create } from 'zustand';
+import { create, type StateCreator } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isRemoteDataEnabled } from './env';
 import * as seeds from './seeds';
 import type {
   Agent,
@@ -88,6 +89,32 @@ interface CRMState {
   resetToSeeds: () => void;
 }
 
+const emptyState = () => ({
+  customers: [] as Customer[],
+  comms: [] as Comm[],
+  leads: [] as Lead[],
+  bookings: [] as Booking[],
+  agents: [] as Agent[],
+  guides: [] as Guide[],
+  products: [] as Product[],
+  finance: [] as unknown[],
+  ar: [] as unknown[],
+  ap: [] as unknown[],
+  tax: [] as unknown[],
+  staff: [] as StaffMember[],
+  tasks: [] as unknown[],
+  feedback: [] as unknown[],
+  contracts: [] as unknown[],
+  photos: [] as unknown[],
+  messages: {} as ChatMessages,
+  calEvents: [] as unknown[],
+  devNotes: [] as unknown[],
+  cruises: [] as unknown[],
+  transport: [] as unknown[],
+  restaurants: [] as unknown[],
+  specialSuppliers: [] as unknown[],
+});
+
 const seedState = () => ({
   customers: [...seeds.SEED_CUSTOMERS] as unknown as Customer[],
   comms: [...seeds.SEED_COMMS] as unknown as Comm[],
@@ -114,10 +141,8 @@ const seedState = () => ({
   specialSuppliers: [...seeds.SEED_SPECIAL_SUPPLIERS],
 });
 
-export const useStore = create<CRMState>()(
-  persist(
-    (set, get) => ({
-      ...seedState(),
+const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
+      ...(isRemoteDataEnabled() ? emptyState() : seedState()),
       language: 'en',
       lastBackup: null,
 
@@ -263,36 +288,39 @@ export const useStore = create<CRMState>()(
           lastBackup: new Date().toLocaleString("en-US"),
         }),
 
-      resetToSeeds: () => set({ ...seedState(), lastBackup: null }),
-    }),
-    {
-      name: 'ant-crm-v43',
-      partialize: (state) => ({
-        customers: state.customers,
-        comms: state.comms,
-        leads: state.leads,
-        bookings: state.bookings,
-        agents: state.agents,
-        guides: state.guides,
-        products: state.products,
-        finance: state.finance,
-        ar: state.ar,
-        ap: state.ap,
-        tax: state.tax,
-        staff: state.staff,
-        tasks: state.tasks,
-        feedback: state.feedback,
-        contracts: state.contracts,
-        photos: state.photos,
-        messages: state.messages,
-        calEvents: state.calEvents,
-        devNotes: state.devNotes,
-        cruises: state.cruises,
-        transport: state.transport,
-        restaurants: state.restaurants,
-        specialSuppliers: state.specialSuppliers,
-        lastBackup: state.lastBackup,
-      }),
-    }
-  )
-);
+      resetToSeeds: () => set({ ...(isRemoteDataEnabled() ? emptyState() : seedState()), lastBackup: null }),
+    });
+
+const persistConfig = {
+  name: 'ant-crm-v43',
+  partialize: (state: CRMState) => ({
+    customers: state.customers,
+    comms: state.comms,
+    leads: state.leads,
+    bookings: state.bookings,
+    agents: state.agents,
+    guides: state.guides,
+    products: state.products,
+    finance: state.finance,
+    ar: state.ar,
+    ap: state.ap,
+    tax: state.tax,
+    staff: state.staff,
+    tasks: state.tasks,
+    feedback: state.feedback,
+    contracts: state.contracts,
+    photos: state.photos,
+    messages: state.messages,
+    calEvents: state.calEvents,
+    devNotes: state.devNotes,
+    cruises: state.cruises,
+    transport: state.transport,
+    restaurants: state.restaurants,
+    specialSuppliers: state.specialSuppliers,
+    lastBackup: state.lastBackup,
+  }),
+};
+
+export const useStore = isRemoteDataEnabled()
+  ? create<CRMState>()(crmStateCreator)
+  : create<CRMState>()(persist(crmStateCreator, persistConfig));

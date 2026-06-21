@@ -6,9 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "extract": "node scripts/extract-from-html.mjs",
-    "supabase:export-seeds": "tsx scripts/export-seed-backup.mjs",
-    "supabase:sql": "node scripts/backup-to-supabase-sql.mjs"
+    "extract": "node scripts/extract-from-html.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

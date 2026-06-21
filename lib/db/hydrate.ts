@@ -94,7 +94,7 @@ export async function hydrateFromSupabase(): Promise<boolean> {
         ...state.exportBackup(),
         ...remote,
         exportedAt: new Date().toISOString(),
-        version: '4.3',
+        version: '5.0',
       });
     });
     return true;

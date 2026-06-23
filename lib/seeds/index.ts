@@ -1,4 +1,5 @@
 export * from './products';
+export * from './product-pricing';
 export * from './hotels';
 export * from './customers';
 export * from './comms';

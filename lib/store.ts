@@ -1,6 +1,8 @@
 import { create, type StateCreator } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isRemoteDataEnabled } from './env';
+import { mergeRequiredProducts } from './ensure-core-products';
+import { mergeProductPricing } from './product-pricing-helpers';
 import * as seeds from './seeds';
 import type {
   Agent,
@@ -12,8 +14,10 @@ import type {
   Guide,
   Lead,
   Product,
+  ProductPricing,
   StaffMember,
 } from './types';
+import { emptyProductPricing, priceLabelFromRow } from './product-pricing-helpers';
 
 interface CRMState {
   customers: Customer[];
@@ -23,6 +27,7 @@ interface CRMState {
   agents: Agent[];
   guides: Guide[];
   products: Product[];
+  productPricing: ProductPricing[];
   finance: unknown[];
   ar: unknown[];
   ap: unknown[];
@@ -72,6 +77,12 @@ interface CRMState {
   addGuide: (guide: Guide) => void;
   updateGuide: (id: string, data: Partial<Guide>) => void;
   setProducts: (products: Product[]) => void;
+  addProduct: (product: Product) => void;
+  updateProduct: (code: string, data: Partial<Product>) => void;
+  deleteProduct: (code: string) => void;
+  setProductPricing: (rows: ProductPricing[]) => void;
+  upsertProductPricing: (row: ProductPricing, syncProductPrice?: boolean) => void;
+  deleteProductPricing: (productCode: string) => void;
   addContract: (contract: Record<string, unknown>) => void;
   updateContract: (id: string, data: Record<string, unknown>) => void;
   addFeedback: (item: Record<string, unknown>) => void;
@@ -97,6 +108,7 @@ const emptyState = () => ({
   agents: [] as Agent[],
   guides: [] as Guide[],
   products: [] as Product[],
+  productPricing: [] as ProductPricing[],
   finance: [] as unknown[],
   ar: [] as unknown[],
   ap: [] as unknown[],
@@ -122,7 +134,8 @@ const seedState = () => ({
   bookings: [...seeds.SEED_BOOKINGS] as unknown as Booking[],
   agents: [...seeds.SEED_AGENTS] as unknown as Agent[],
   guides: [...seeds.SEED_GUIDES] as unknown as Guide[],
-  products: [...seeds.AA_PRODUCTS] as unknown as Product[],
+  products: mergeRequiredProducts([...seeds.AA_PRODUCTS] as unknown as Product[]),
+  productPricing: [...seeds.SEED_PRODUCT_PRICING],
   finance: [...seeds.SEED_FINANCE],
   ar: [...seeds.SEED_AR],
   ap: [...seeds.SEED_AP],
@@ -192,6 +205,41 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           guides: s.guides.map((g) => (g.id === id ? { ...g, ...data } : g)),
         })),
       setProducts: (products) => set({ products }),
+      addProduct: (product) =>
+        set((s) => {
+          const hasPricing = s.productPricing.some((p) => p.productCode === product.code);
+          return {
+            products: [...s.products, product],
+            productPricing: hasPricing ? s.productPricing : [...s.productPricing, emptyProductPricing(product.code)],
+          };
+        }),
+      updateProduct: (code, data) =>
+        set((s) => ({
+          products: s.products.map((p) => (p.code === code ? { ...p, ...data } : p)),
+        })),
+      deleteProduct: (code) =>
+        set((s) => ({
+          products: s.products.filter((p) => p.code !== code),
+          productPricing: s.productPricing.filter((p) => p.productCode !== code),
+        })),
+      setProductPricing: (productPricing) => set({ productPricing }),
+      upsertProductPricing: (row, syncProductPrice = true) =>
+        set((s) => {
+          const exists = s.productPricing.some((p) => p.productCode === row.productCode);
+          const productPricing = exists
+            ? s.productPricing.map((p) => (p.productCode === row.productCode ? row : p))
+            : [...s.productPricing, row];
+          if (!syncProductPrice) return { productPricing };
+          const price = priceLabelFromRow(row, 2);
+          const products = s.products.map((p) =>
+            p.code === row.productCode ? { ...p, price } : p
+          );
+          return { productPricing, products };
+        }),
+      deleteProductPricing: (productCode) =>
+        set((s) => ({
+          productPricing: s.productPricing.filter((p) => p.productCode !== productCode),
+        })),
       addContract: (contract) => set((s) => ({ contracts: [contract, ...s.contracts] })),
       updateContract: (id, data) =>
         set((s) => ({
@@ -239,6 +287,7 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           agents: s.agents,
           guides: s.guides,
           products: s.products,
+          productPricing: s.productPricing,
           finance: s.finance,
           ar: s.ar,
           ap: s.ap,
@@ -269,6 +318,7 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           agents: data.agents ?? get().agents,
           guides: data.guides ?? get().guides,
           products: data.products ?? get().products,
+          productPricing: data.productPricing ?? get().productPricing,
           finance: data.finance ?? get().finance,
           ar: data.ar ?? get().ar,
           ap: data.ap ?? get().ap,
@@ -291,6 +341,13 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
       resetToSeeds: () => set({ ...(isRemoteDataEnabled() ? emptyState() : seedState()), lastBackup: null }),
     });
 
+/** Add seed bookings missing from persisted state (FK targets for finance / cal_events). */
+function mergeMissingSeedBookings(bookings: Booking[]): Booking[] {
+  const ids = new Set(bookings.map((b) => b.id));
+  const missing = seeds.SEED_BOOKINGS.filter((b) => !ids.has(b.id));
+  return missing.length ? [...bookings, ...(missing as unknown as Booking[])] : bookings;
+}
+
 const persistConfig = {
   name: 'ant-crm-v43',
   partialize: (state: CRMState) => ({
@@ -301,6 +358,7 @@ const persistConfig = {
     agents: state.agents,
     guides: state.guides,
     products: state.products,
+    productPricing: state.productPricing,
     finance: state.finance,
     ar: state.ar,
     ap: state.ap,
@@ -319,6 +377,15 @@ const persistConfig = {
     specialSuppliers: state.specialSuppliers,
     lastBackup: state.lastBackup,
   }),
+  version: 2,
+  migrate: (persisted: unknown) => {
+    const state = persisted as Partial<CRMState>;
+    state.productPricing = mergeProductPricing(state.productPricing, seeds.SEED_PRODUCT_PRICING);
+    if (state.bookings) {
+      state.bookings = mergeMissingSeedBookings(state.bookings);
+    }
+    return state as CRMState;
+  },
 };
 
 export const useStore = isRemoteDataEnabled()

@@ -84,6 +84,37 @@ create table if not exists products (
   updated_at      timestamptz default now()
 );
 
+create table if not exists product_pricing (
+  product_code    text primary key references products(code) on delete cascade,
+  std_cost        numeric default 0,
+  p1              numeric default 0,
+  p2              numeric default 0,
+  p3              numeric default 0,
+  p4              numeric default 0,
+  p5              numeric default 0,
+  p6              numeric default 0,
+  p7              numeric default 0,
+  p8              numeric default 0,
+  p9              numeric default 0,
+  p10             numeric default 0,
+  c1              numeric default 0,
+  c2              numeric default 0,
+  c3              numeric default 0,
+  c4              numeric default 0,
+  c5              numeric default 0,
+  c6              numeric default 0,
+  c7              numeric default 0,
+  c8              numeric default 0,
+  c9              numeric default 0,
+  c10             numeric default 0,
+  incl_guide      boolean default false,
+  incl_transport  boolean default false,
+  incl_tickets    boolean default false,
+  incl_water      boolean default false,
+  incl_meals      boolean default false,
+  updated_at      timestamptz default now()
+);
+
 -- ============================================================
 --  MODULE 3 · GUIDES
 -- ============================================================
@@ -614,7 +645,7 @@ declare
   t text;
 begin
   foreach t in array array[
-    'agents','customers','products','guides','guide_reviews','leads',
+    'agents','customers','products','product_pricing','guides','guide_reviews','leads',
     'bookings','booking_changes','booking_itinerary','booking_activities',
     'comms','finance','accounts_receivable','accounts_payable','tax_reports',
     'staff','salary_records','tasks','contracts','feedback',

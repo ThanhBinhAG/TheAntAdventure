@@ -10,10 +10,18 @@ import type {
   Guide,
   Lead,
   Product,
+  ProductPricing,
   StaffMember,
 } from '../types';
 
 type Row = Record<string, unknown>;
+
+/** Empty string → null for optional FK columns (Postgres rejects '' as FK). */
+export function fkOrNull(value: unknown): string | null {
+  if (value == null) return null;
+  const s = String(value).trim();
+  return s.length > 0 ? s : null;
+}
 
 export function rowToCustomer(r: Row): Customer {
   return {
@@ -192,7 +200,7 @@ export function assembleBookings(
 export function bookingToRow(b: Booking): Row {
   return {
     id: b.id,
-    cust_id: b.custId,
+    cust_id: fkOrNull(b.custId),
     tour: b.tour,
     pax: b.pax,
     start_date: b.start || null,
@@ -313,6 +321,72 @@ export function productToRow(p: Product): Row {
   };
 }
 
+export function rowToProductPricing(r: Row): ProductPricing {
+  return {
+    productCode: String(r.product_code),
+    stdCost: Number(r.std_cost ?? 0),
+    p1: Number(r.p1 ?? 0),
+    p2: Number(r.p2 ?? 0),
+    p3: Number(r.p3 ?? 0),
+    p4: Number(r.p4 ?? 0),
+    p5: Number(r.p5 ?? 0),
+    p6: Number(r.p6 ?? 0),
+    p7: Number(r.p7 ?? 0),
+    p8: Number(r.p8 ?? 0),
+    p9: Number(r.p9 ?? 0),
+    p10: Number(r.p10 ?? 0),
+    c1: Number(r.c1 ?? 0),
+    c2: Number(r.c2 ?? 0),
+    c3: Number(r.c3 ?? 0),
+    c4: Number(r.c4 ?? 0),
+    c5: Number(r.c5 ?? 0),
+    c6: Number(r.c6 ?? 0),
+    c7: Number(r.c7 ?? 0),
+    c8: Number(r.c8 ?? 0),
+    c9: Number(r.c9 ?? 0),
+    c10: Number(r.c10 ?? 0),
+    incl: {
+      g: Boolean(r.incl_guide),
+      tr: Boolean(r.incl_transport),
+      tk: Boolean(r.incl_tickets),
+      w: Boolean(r.incl_water),
+      m: Boolean(r.incl_meals),
+    },
+  };
+}
+
+export function productPricingToRow(p: ProductPricing): Row {
+  return {
+    product_code: p.productCode,
+    std_cost: p.stdCost,
+    p1: p.p1,
+    p2: p.p2,
+    p3: p.p3,
+    p4: p.p4,
+    p5: p.p5,
+    p6: p.p6,
+    p7: p.p7,
+    p8: p.p8,
+    p9: p.p9,
+    p10: p.p10,
+    c1: p.c1,
+    c2: p.c2,
+    c3: p.c3,
+    c4: p.c4,
+    c5: p.c5,
+    c6: p.c6,
+    c7: p.c7,
+    c8: p.c8,
+    c9: p.c9,
+    c10: p.c10,
+    incl_guide: p.incl.g,
+    incl_transport: p.incl.tr,
+    incl_tickets: p.incl.tk,
+    incl_water: p.incl.w,
+    incl_meals: p.incl.m,
+  };
+}
+
 export function rowToStaff(r: Row): StaffMember {
   return {
     id: String(r.id),
@@ -346,7 +420,7 @@ export function rowToLoose(r: Row): Row {
 export function financeToRow(r: Row): Row {
   return {
     id: r.id,
-    booking_id: r.bkid ?? r.booking_id ?? null,
+    booking_id: fkOrNull(r.bkid ?? r.booking_id),
     cust_name: r.custName ?? r.cust_name,
     type: r.type,
     txn_date: r.date ?? r.txn_date ?? null,
@@ -364,7 +438,7 @@ export function financeToRow(r: Row): Row {
 export function arToRow(r: Row): Row {
   return {
     id: r.id,
-    finance_id: r.finId ?? r.finance_id ?? null,
+    finance_id: fkOrNull(r.finId ?? r.finance_id),
     cust_name: r.custName ?? r.cust_name,
     tour: r.tour,
     invoice_amount: r.invoiceAmt ?? r.invoice_amount ?? 0,
@@ -429,7 +503,7 @@ export function photoToRow(r: Row): Row {
     id: r.id,
     caption: r.caption ?? null,
     region: r.region ?? null,
-    product_code: r.product ?? r.product_code ?? null,
+    product_code: fkOrNull(r.product ?? r.product_code),
     url: r.url ?? null,
   };
 }
@@ -581,8 +655,8 @@ export function rowToTask(r: Row): Row {
 export function calEventToRow(r: Row): Row {
   return {
     id: r.id,
-    guide_id: r.guideId ?? r.guide_id ?? null,
-    booking_id: r.bookingCode ?? r.booking_id ?? null,
+    guide_id: fkOrNull(r.guideId ?? r.guide_id),
+    booking_id: fkOrNull(r.bookingCode ?? r.booking_id),
     tour: r.tour,
     clients: r.clients,
     start_date: r.start ?? r.start_date ?? null,
@@ -639,7 +713,7 @@ export function feedbackToRow(r: Row): Row {
     id: r.id,
     type: r.type ?? 'client',
     feedback_date: r.date ?? r.feedback_date ?? null,
-    booking_id: r.bkid ?? r.booking_id ?? null,
+    booking_id: fkOrNull(r.bkid ?? r.booking_id),
     client_name: r.client ?? r.client_name,
     nps: r.nps ?? null,
     overall_rating: r.overall ?? r.overall_rating ?? null,

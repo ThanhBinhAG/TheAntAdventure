@@ -9,6 +9,7 @@ export const SYNC_ARRAY_TABLES = [
   'agents',
   'guides',
   'products',
+  'product_pricing',
   'finance',
   'accounts_receivable',
   'accounts_payable',
@@ -28,6 +29,36 @@ export const SYNC_ARRAY_TABLES = [
 
 export type SyncArrayTable = (typeof SYNC_ARRAY_TABLES)[number];
 
+/**
+ * FK-safe push order. Tables in the same wave may run in parallel;
+ * each wave completes before the next starts.
+ */
+export const SYNC_PUSH_WAVES: SyncArrayTable[][] = [
+  [
+    'customers',
+    'agents',
+    'guides',
+    'leads',
+    'products',
+    'staff',
+    'tax_reports',
+    'tasks',
+    'feedback',
+    'contracts',
+    'dev_notes',
+    'cruises',
+    'transport',
+    'restaurants',
+    'suppliers',
+    'comms',
+  ],
+  ['bookings'],
+  ['product_pricing', 'photos'],
+  ['finance'],
+  ['accounts_receivable', 'accounts_payable'],
+  ['cal_events'],
+];
+
 /** Maps Supabase v5 table name → Zustand / BackupData key */
 export const TABLE_TO_STORE_KEY: Record<SyncArrayTable, keyof BackupData> = {
   customers: 'customers',
@@ -37,6 +68,7 @@ export const TABLE_TO_STORE_KEY: Record<SyncArrayTable, keyof BackupData> = {
   agents: 'agents',
   guides: 'guides',
   products: 'products',
+  product_pricing: 'productPricing',
   finance: 'finance',
   accounts_receivable: 'ar',
   accounts_payable: 'ap',
@@ -67,6 +99,8 @@ export const HEALTH_COUNT_TABLES = [
 export function getRowId(row: Record<string, unknown>, table: SyncArrayTable, index: number): string {
   if (row.id != null && String(row.id).length > 0) return String(row.id);
   if (table === 'products' && row.code != null) return String(row.code);
+  if (table === 'product_pricing' && row.product_code != null) return String(row.product_code);
+  if (table === 'product_pricing' && row.productCode != null) return String(row.productCode);
   return `${table}-${index}`;
 }
 

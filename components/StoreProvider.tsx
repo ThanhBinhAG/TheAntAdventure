@@ -19,6 +19,8 @@ import {
   type VerifyResult,
 } from '@/lib/db/hydrate';
 import { isAutoSyncEnabled } from '@/lib/env';
+import { mergeRequiredProducts } from '@/lib/ensure-core-products';
+import { useStore } from '@/lib/store';
 import { SupabaseContext } from '@/lib/SupabaseContext';
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -34,6 +36,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const autoSyncOn = isAutoSyncEnabled();
 
   useEffect(() => subscribeAutoSync(setAutoSync), []);
+
+  useEffect(() => {
+    const current = useStore.getState().products;
+    const merged = mergeRequiredProducts(current);
+    if (merged.length !== current.length) {
+      useStore.setState({ products: merged });
+    }
+  }, []);
 
   const runConnectionCheck = useCallback(async () => {
     if (!remoteEnabled) return;

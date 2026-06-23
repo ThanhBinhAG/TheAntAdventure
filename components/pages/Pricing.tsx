@@ -1,8 +1,12 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import PricingEditModal from '@/components/pricing/PricingEditModal';
 import { fmt } from '@/lib/constants';
-import { TAA_TOURS } from '@/lib/seeds/taa-tours';
+import { useStore } from '@/hooks/useStore';
+import { buildPricingTableRows, emptyProductPricing, type PricingTableRow } from '@/lib/product-pricing-helpers';
 import {
   ICO_EMOJIS,
   ICO_KEYS,
@@ -21,6 +25,13 @@ import {
 type PricingTab = 'pricelist' | 'costbuilder' | 'markup';
 
 export default function Pricing() {
+  const searchParams = useSearchParams();
+  const highlightCode = searchParams.get('product') ?? '';
+
+  const products = useStore((s) => s.products);
+  const productPricing = useStore((s) => s.productPricing);
+  const upsertProductPricing = useStore((s) => s.upsertProductPricing);
+
   const [tab, setTab] = useState<PricingTab>('pricelist');
   const [search, setSearch] = useState('');
   const [region, setRegion] = useState('');
@@ -29,6 +40,8 @@ export default function Pricing() {
   const [currency, setCurrency] = useState<PlCurrency>('USD');
   const [showCost, setShowCost] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [editRow, setEditRow] = useState<PricingTableRow | null>(null);
+  const highlightRef = useRef<HTMLTableRowElement | null>(null);
 
   const [cbDur, setCbDur] = useState(12);
   const [cbPax, setCbPax] = useState(4);
@@ -41,10 +54,28 @@ export default function Pricing() {
   const [mkCost, setMkCost] = useState(500);
   const [mkPctVal, setMkPctVal] = useState(25);
 
+  useEffect(() => {
+    if (highlightCode) setSearch(highlightCode);
+  }, [highlightCode]);
+
+  useEffect(() => {
+    if (highlightCode && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightCode, productPricing.length, search]);
+
+  const allRows = useMemo(
+    () => buildPricingTableRows(products, productPricing),
+    [products, productPricing]
+  );
+
+  const orphanCount = allRows.filter((r) => r.orphanPricing).length;
+  const missingCount = allRows.filter((r) => r.missingProduct).length;
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return TAA_TOURS.filter((t) => {
-      if (q && !t.id.toLowerCase().includes(q) && !t.name.toLowerCase().includes(q)) return false;
+    return allRows.filter((t) => {
+      if (q && !t.productCode.toLowerCase().includes(q) && !t.name.toLowerCase().includes(q)) return false;
       if (region && t.region !== region) return false;
       if (category && t.category !== category) return false;
       if (duration === 'multi') {
@@ -52,7 +83,7 @@ export default function Pricing() {
       } else if (duration && t.duration !== duration) return false;
       return true;
     });
-  }, [search, region, category, duration]);
+  }, [allRows, search, region, category, duration]);
 
   const cbTotal = cbHotel * cbDur + cbGuide * cbDur + cbCar * cbDur + cbMeals * cbDur * cbPax;
   const cbPerPax = cbPax > 0 ? cbTotal / cbPax : 0;
@@ -60,6 +91,11 @@ export default function Pricing() {
 
   const mkSell = mkCost * (1 + mkPctVal / 100);
   const mkProfit = mkSell - mkCost;
+
+  const handleSavePricing = (row: ReturnType<typeof emptyProductPricing>) => {
+    upsertProductPricing(row);
+    setEditRow(null);
+  };
 
   return (
     <div>
@@ -79,6 +115,21 @@ export default function Pricing() {
 
       {tab === 'pricelist' && (
         <>
+          {(orphanCount > 0 || missingCount > 0) && (
+            <div className="card" style={{ marginBottom: 12, borderColor: '#F5D0A0' }}>
+              <div className="card-body" style={{ padding: '10px 16px', fontSize: 12 }}>
+                {missingCount > 0 && (
+                  <span style={{ marginRight: 16 }}>
+                    ⚠ {missingCount} product(s) without pricing — add tiers in Edit pricing.
+                  </span>
+                )}
+                {orphanCount > 0 && (
+                  <span>⚠ {orphanCount} pricing row(s) without matching product in Tour Products.</span>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="card" style={{ marginBottom: 12 }}>
             <div className="card-body" style={{ padding: '14px 18px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 10, alignItems: 'end', marginBottom: 10 }}>
@@ -93,6 +144,7 @@ export default function Pricing() {
                     <option>North</option>
                     <option>Central</option>
                     <option>South</option>
+                    <option>Services</option>
                   </select>
                 </div>
                 <div className="fg">
@@ -149,7 +201,7 @@ export default function Pricing() {
                   </span>
                 </div>
                 <span style={{ fontSize: 12, color: 'var(--m)', fontWeight: 500 }}>
-                  Showing {filtered.length} of {TAA_TOURS.length} tours
+                  Showing {filtered.length} of {allRows.length} tours
                 </span>
                 <button className="btn btn-s btn-sm" type="button" onClick={() => { setSearch(''); setRegion(''); setCategory(''); setDuration(''); }}>
                   Clear Filters
@@ -178,21 +230,31 @@ export default function Pricing() {
                         {n} PAX
                       </th>
                     ))}
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.slice(0, 80).map((t, i) => {
                     const durBdg = MULTI_DURATIONS.includes(t.duration) ? 'bdg-g' : 'bdg-w';
                     const inclIcons = ICO_KEYS.map((k, j) => (
-                      <span key={k} style={{ fontSize: 13, opacity: t.incl[k] ? 1 : 0.2 }} title={ICO_LABELS[j]}>
+                      <span key={k} style={{ fontSize: 13, opacity: t.pricing.incl[k] ? 1 : 0.2 }} title={ICO_LABELS[j]}>
                         {ICO_EMOJIS[j]}
                       </span>
                     ));
+                    const isHighlight = highlightCode && t.productCode === highlightCode;
                     return (
-                      <Fragment key={t.id}>
-                        <tr style={{ background: i % 2 === 0 ? '#fff' : '#FAFBF9' }}>
+                      <Fragment key={t.productCode}>
+                        <tr
+                          ref={isHighlight ? highlightRef : undefined}
+                          style={{
+                            background: isHighlight ? '#FFF8E8' : i % 2 === 0 ? '#fff' : '#FAFBF9',
+                            outline: isHighlight ? '2px solid var(--gold)' : undefined,
+                          }}
+                        >
                           <td className="pl-sticky">
-                            <code className="pl-code">{t.id}</code>
+                            <code className="pl-code">{t.productCode}</code>
+                            {t.missingProduct && <div className="bdg bdg-a" style={{ fontSize: 9, marginTop: 4 }}>no tiers</div>}
+                            {t.orphanPricing && <div className="bdg bdg-r" style={{ fontSize: 9, marginTop: 4 }}>orphan</div>}
                           </td>
                           <td style={{ fontWeight: 500, fontSize: 12.5, maxWidth: 220 }}>{t.name}</td>
                           <td>
@@ -207,8 +269,8 @@ export default function Pricing() {
                             </div>
                           </td>
                           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
-                            const sp = getSpUSD(t, n);
-                            const co = getCostUSD(t, n);
+                            const sp = getSpUSD(t.pricing, n);
+                            const co = getCostUSD(t.pricing, n);
                             const mk = mkPct(sp, co);
                             const mkC = mk >= 30 ? '#2E7D52' : mk >= 20 ? '#D97706' : '#C0392B';
                             return (
@@ -223,19 +285,34 @@ export default function Pricing() {
                               </td>
                             );
                           })}
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <button type="button" className="btn btn-s btn-sm" onClick={() => setEditRow(t)}>
+                              Edit
+                            </button>
+                          </td>
                         </tr>
                         {expanded === t.num && (
                           <tr style={{ background: '#F8FCF9' }}>
-                            <td colSpan={14} style={{ padding: '12px 18px' }}>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            <td colSpan={15} style={{ padding: '12px 18px' }}>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                                 {ICO_KEYS.map((k, j) => {
-                                  const yes = t.incl[k];
+                                  const yes = t.pricing.incl[k];
                                   return (
                                     <span key={k} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 10, background: yes ? '#E8F5EE' : '#F5F5F5', color: yes ? '#1a5c38' : '#9CA3AF' }}>
                                       {ICO_EMOJIS[j]} {yes ? INCL_YES[j] : INCL_NO[j]}
                                     </span>
                                   );
                                 })}
+                              </div>
+                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                {!t.orphanPricing && (
+                                  <Link href={`/products`} className="btn btn-s btn-sm">
+                                    View in Tour Products
+                                  </Link>
+                                )}
+                                <Link href={`/gallery?product=${encodeURIComponent(t.productCode)}`} className="btn btn-s btn-sm">
+                                  Photo gallery
+                                </Link>
                               </div>
                             </td>
                           </tr>
@@ -343,6 +420,15 @@ export default function Pricing() {
           </div>
         </div>
       )}
+
+      <PricingEditModal
+        open={!!editRow}
+        productCode={editRow?.productCode ?? ''}
+        productName={editRow?.name ?? ''}
+        pricing={editRow?.pricing ?? null}
+        onClose={() => setEditRow(null)}
+        onSave={handleSavePricing}
+      />
     </div>
   );
 }

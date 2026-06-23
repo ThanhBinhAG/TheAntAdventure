@@ -43,6 +43,10 @@ export const SEED_BOOKINGS = [
     {day:6,dest:'Hoi An → Da Nang',hotel:'',activities:[{name:'Marble Mountains & Lady Buddha',cat:'Activity'},{name:'Da Nang beach afternoon',cat:'Activity'}]},
     {day:7,dest:'Departure',hotel:'',activities:[{name:'Transfer to Da Nang Airport — departure',cat:'Transfer'}]}
   ]},
+  {id:'BK-2026-004',custId:'CUS-26-004',tour:'Central Vietnam 10D',pax:2,start:'Sep 15',end:'Sep 24',total:9600,deposit:2880,status:'Deposit Paid',guide:'—',hotel:'',changes:[],guideAlertPending:false},
+  {id:'BK-2026-005',custId:'',tour:'Full Vietnam 14D',pax:2,start:'Jul 5',end:'Jul 18',total:18500,deposit:18500,status:'Paid',guide:'—',hotel:'',changes:[],guideAlertPending:false},
+  {id:'BK-2026-006',custId:'',tour:'Vietnam Premium 16D',pax:6,start:'Sep 1',end:'Sep 16',total:31200,deposit:9360,status:'Deposit Paid',guide:'—',hotel:'',changes:[],guideAlertPending:false},
+  {id:'BK-2026-007',custId:'',tour:'South Vietnam 8D',pax:2,start:'Jun 1',end:'Jun 8',total:14400,deposit:0,status:'Invoiced',guide:'—',hotel:'',changes:[],guideAlertPending:false},
   // ── FROM TRACKER ──
   {id:'BK-2026-T01',custId:'CUS-26-005',tour:'Delta Private — Uma Lerner (Cycling Hem)',pax:2,start:'Mar 23',end:'Mar 23',total:380,deposit:380,status:'Completed',guide:'Duy',hotel:'',changes:[],guideAlertPending:false},
   {id:'BK-2026-T02',custId:'CUS-26-006',tour:'Classic Tour — Guests in Hanoi',pax:7,start:'Mar 26',end:'Mar 26',total:2100,deposit:2100,status:'Completed',guide:'Phuc',hotel:'',changes:[],guideAlertPending:false},

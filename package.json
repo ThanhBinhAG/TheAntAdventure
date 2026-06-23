@@ -3,10 +3,11 @@
   "version": "4.3.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3006",
     "build": "next build",
-    "start": "next start",
-    "extract": "node scripts/extract-from-html.mjs"
+    "start": "next start -p 3006",
+    "extract": "node scripts/extract-from-html.mjs",
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

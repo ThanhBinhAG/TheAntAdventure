@@ -111,7 +111,12 @@ export function customerToForm(c: Customer): CustomerFormData {
   };
 }
 
-export function formToCustomer(form: CustomerFormData, id: string, bookings: string[] = []): Customer {
+export function formToCustomer(
+  form: CustomerFormData,
+  id: string,
+  bookings: string[] = [],
+  agentId?: string
+): Customer {
   const childNote =
     Number(form.numChildren) > 0
       ? `\nChildren: ${form.numChildren}${form.childAges ? ` (${form.childAges})` : ''}${form.childDiet ? ` · Diet: ${form.childDiet}` : ''}${form.childPrefs ? ` · Prefs: ${form.childPrefs}` : ''}`
@@ -132,6 +137,7 @@ export function formToCustomer(form: CustomerFormData, id: string, bookings: str
     bookings,
     clientType: form.clientType,
     agentName: form.clientType === 'b2b' ? form.agentName.trim() : undefined,
+    agentId: form.clientType === 'b2b' ? agentId : undefined,
     salesperson: form.salesperson || undefined,
     whatsapp: form.whatsapp.trim() || undefined,
     hotelTier: form.hotelTier,
@@ -145,8 +151,4 @@ export function formToCustomer(form: CustomerFormData, id: string, bookings: str
   };
 }
 
-export function nextCustomerId(customers: Customer[]): string {
-  const nums = customers.map((c) => parseInt(c.id.replace(/\D/g, ''), 10)).filter((n) => !isNaN(n));
-  const next = (nums.length ? Math.max(...nums) : 0) + 1;
-  return `CU-${String(next).padStart(3, '0')}`;
-}
+export { nextCustomerId } from './customer-onboarding';

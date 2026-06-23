@@ -11,7 +11,7 @@ import TourDesign from './TourDesign';
 import Finance from './Finance';
 import TeamChat from './TeamChat';
 import Pricing from './Pricing';
-import Gallery from './Gallery';
+import Gallery from './GalleryPage';
 import Weather from './Weather';
 import Planner from './Planner';
 import Tax from './Tax';

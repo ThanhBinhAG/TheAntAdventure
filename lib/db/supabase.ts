@@ -20,6 +20,7 @@ import {
   messagesToRows,
   photoToRow,
   productToRow,
+  productPricingToRow,
   restaurantToRow,
   rowToAgent,
   rowToAp,
@@ -36,6 +37,7 @@ import {
   rowToLead,
   rowToPhoto,
   rowToProduct,
+  rowToProductPricing,
   rowToRestaurant,
   rowToStaffExtended,
   rowToSupplier,
@@ -75,6 +77,12 @@ const HANDLERS: Record<SyncArrayTable, TableHandler> = {
   agents: { table: 'agents', pk: 'id', toRow: (r) => agentToRow(r as never), fromRow: (r) => ({ ...rowToAgent(r) }) },
   guides: { table: 'guides', pk: 'id', toRow: (r) => guideToRow(r as never), fromRow: (r) => ({ ...rowToGuide(r) }) },
   products: { table: 'products', pk: 'code', toRow: (r) => productToRow(r as never), fromRow: (r) => ({ ...rowToProduct(r) }) },
+  product_pricing: {
+    table: 'product_pricing',
+    pk: 'product_code',
+    toRow: (r) => productPricingToRow(r as never),
+    fromRow: (r) => ({ ...rowToProductPricing(r) }),
+  },
   finance: { table: 'finance', pk: 'id', toRow: financeToRow, fromRow: rowToFinance },
   accounts_receivable: { table: 'accounts_receivable', pk: 'id', toRow: arToRow, fromRow: rowToAr },
   accounts_payable: { table: 'accounts_payable', pk: 'id', toRow: apToRow, fromRow: rowToAp },
@@ -176,12 +184,12 @@ async function syncSimpleTable(handler: TableHandler, rows: Row[]) {
   const client = supabase();
   if (!client) return;
 
-  const localIds = rows.map((r, i) => {
-    if (handler.pk === 'code' && r.code != null) return String(r.code);
-    return String(r.id ?? `${handler.table}-${i}`);
-  });
-
   const mapped = rows.map((r) => handler.toRow(r));
+  const localIds = mapped.map((row, i) => {
+    const pkVal = row[handler.pk];
+    if (pkVal != null && String(pkVal).length > 0) return String(pkVal);
+    return `${handler.table}-${i}`;
+  });
   if (mapped.length) {
     const { error } = await client.from(handler.table).upsert(mapped, { onConflict: handler.pk });
     if (error) throw error;

@@ -2,8 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import { REG_COLORS_HEX, REG_LABELS } from '@/lib/page-helpers';
+import { getLibPriceLabel } from '@/lib/tour-pricing';
+import { getDurationPillLabel, getDurationPillVariant } from '@/lib/product-display';
 import { TOUR_PACKAGES, type TourPackage } from '@/lib/seeds/tourPackages';
+import type { TourBrief, GalleryPhoto } from '@/lib/tour-design-types';
 import type { Product } from '@/lib/types';
+import GuestProfileCard from '@/components/tourdesign/GuestProfileCard';
+import PackagePreviewPanel from '@/components/tourdesign/PackagePreviewPanel';
+import SelectedExperiencesPanel from '@/components/tourdesign/SelectedExperiencesPanel';
 
 const PKG_TAG_COLORS: Record<string, [string, string]> = {
   north: ['#E8F5EE', '#1a5c38'],
@@ -12,50 +18,94 @@ const PKG_TAG_COLORS: Record<string, [string, string]> = {
   full: ['#F3E5F5', '#4a1460'],
 };
 
+const DUR_FILTERS = [
+  { value: '', label: 'All Durations' },
+  { value: '0.5', label: 'Half Day' },
+  { value: '1', label: 'Full Day' },
+  { value: 'service', label: 'Service' },
+  { value: '2', label: '2D1N' },
+  { value: '3', label: '3D2N' },
+  { value: '4', label: '4D3N' },
+];
+
+const CAT_FILTERS = [
+  '',
+  'cultural',
+  'culinary',
+  'adventure',
+  'cycling',
+  'nature',
+  'photography',
+  'wellness',
+  'history',
+  'transfer',
+  'service',
+];
+
 interface Props {
   products: Product[];
+  photos: GalleryPhoto[];
+  brief: TourBrief;
+  clientType: 'b2c' | 'b2b';
+  custName?: string;
   selectedCodes: string[];
   onToggleProduct: (code: string) => void;
   onSelectPackage: (pkg: TourPackage) => void;
   selectedPackageId: string | null;
+  onEditBrief?: () => void;
 }
 
 export default function TourExperiencesStep({
   products,
+  photos,
+  brief,
+  clientType,
+  custName,
   selectedCodes,
   onToggleProduct,
   onSelectPackage,
   selectedPackageId,
+  onEditBrief,
 }: Props) {
   const [libTab, setLibTab] = useState<'pkg' | 'exp'>('pkg');
-  const [previewPkg, setPreviewPkg] = useState<TourPackage | null>(null);
+  const [previewPkgId, setPreviewPkgId] = useState<string | null>(null);
   const [libSearch, setLibSearch] = useState('');
   const [libRegion, setLibRegion] = useState('');
   const [libDur, setLibDur] = useState('');
   const [libCat, setLibCat] = useState('');
+
+  const selectedProducts = useMemo(
+    () => selectedCodes.map((c) => products.find((p) => p.code === c)).filter(Boolean) as Product[],
+    [products, selectedCodes]
+  );
 
   const libFiltered = useMemo(() => {
     return products.filter((p) => {
       if (libRegion && p.region !== libRegion) return false;
       if (libDur) {
         const d = p.dur || '';
-        if (libDur === '0.5' && !d.toLowerCase().includes('half')) return false;
+        if (libDur === 'service' && !d.toLowerCase().includes('service')) return false;
+        if (libDur === '0.5' && !d.toLowerCase().includes('half') && !d.toLowerCase().includes('evening')) return false;
         if (libDur === '1' && !d.toLowerCase().includes('full day') && d !== 'Full Day') return false;
-        if (libDur === '2' && !d.includes('2D')) return false;
-        if (libDur === '3' && !d.includes('3D')) return false;
-        if (libDur === '4' && !d.includes('4D')) return false;
+        if (libDur === '2' && !d.includes('2D') && !d.includes('2 Days')) return false;
+        if (libDur === '3' && !d.includes('3D') && !d.includes('3 Days')) return false;
+        if (libDur === '4' && !d.includes('4D') && !d.includes('4 Days')) return false;
       }
       if (libCat && !(p.cat || '').toLowerCase().includes(libCat)) return false;
       const q = libSearch.toLowerCase();
-      if (q && !p.name.toLowerCase().includes(q) && !p.code.toLowerCase().includes(q)) return false;
+      if (q && !p.name.toLowerCase().includes(q) && !p.code.toLowerCase().includes(q) && !p.desc.toLowerCase().includes(q)) return false;
       return true;
     });
   }, [products, libSearch, libRegion, libDur, libCat]);
 
-  const activePreview = previewPkg || (selectedPackageId ? TOUR_PACKAGES.find((p) => p.id === selectedPackageId) : null);
+  const activePreview = TOUR_PACKAGES.find((p) => p.id === (previewPkgId || selectedPackageId)) || null;
+
+  function switchTab(tab: 'pkg' | 'exp') {
+    setLibTab(tab);
+  }
 
   function openPackage(pkg: TourPackage) {
-    setPreviewPkg(pkg);
+    setPreviewPkgId(pkg.id);
     onSelectPackage(pkg);
   }
 
@@ -63,10 +113,10 @@ export default function TourExperiencesStep({
     <div className="td-exp-layout">
       <div className="card td-exp-left">
         <div className="td-lib-tabs">
-          <button type="button" className={libTab === 'pkg' ? 'on' : ''} onClick={() => setLibTab('pkg')}>
+          <button type="button" className={libTab === 'pkg' ? 'on' : ''} onClick={() => switchTab('pkg')}>
             📦 Tour Packages
           </button>
-          <button type="button" className={libTab === 'exp' ? 'on' : ''} onClick={() => setLibTab('exp')}>
+          <button type="button" className={libTab === 'exp' ? 'on' : ''} onClick={() => switchTab('exp')}>
             🗺 Individual Experiences
           </button>
         </div>
@@ -76,7 +126,7 @@ export default function TourExperiencesStep({
             <div style={{ fontSize: 11, color: 'var(--m)', marginBottom: 10 }}>Click a package to preview the full itinerary →</div>
             {TOUR_PACKAGES.map((p) => {
               const [bg, fg] = PKG_TAG_COLORS[p.tag] || ['#f0f0ee', '#555'];
-              const active = selectedPackageId === p.id;
+              const active = (previewPkgId || selectedPackageId) === p.id;
               return (
                 <div
                   key={p.id}
@@ -105,114 +155,81 @@ export default function TourExperiencesStep({
               <input placeholder="Search experiences..." value={libSearch} onChange={(e) => setLibSearch(e.target.value)} />
               <select value={libRegion} onChange={(e) => setLibRegion(e.target.value)}>
                 <option value="">All Regions</option>
-                <option value="north">North Vietnam</option>
-                <option value="central">Central Vietnam</option>
-                <option value="south">South Vietnam</option>
+                <option value="north">🌿 North Vietnam</option>
+                <option value="central">🏛 Central Vietnam</option>
+                <option value="south">🛶 South Vietnam</option>
+                <option value="services">🛂 Services & Visa</option>
               </select>
               <select value={libDur} onChange={(e) => setLibDur(e.target.value)}>
-                <option value="">All Durations</option>
-                <option value="0.5">Half Day</option>
-                <option value="1">Full Day</option>
-                <option value="2">2D1N</option>
-                <option value="3">3D2N</option>
+                {DUR_FILTERS.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
               </select>
               <select value={libCat} onChange={(e) => setLibCat(e.target.value)}>
                 <option value="">All Categories</option>
-                <option value="cultural">Cultural</option>
-                <option value="culinary">Culinary</option>
-                <option value="cycling">Cycling</option>
-                <option value="transfer">Transfer</option>
+                {CAT_FILTERS.filter(Boolean).map((c) => (
+                  <option key={c} value={c}>
+                    {c.charAt(0).toUpperCase() + c.slice(1)}
+                  </option>
+                ))}
               </select>
-              <div style={{ fontSize: 11, color: 'var(--m)', width: '100%' }}>{libFiltered.length} experiences</div>
+              <div style={{ fontSize: 11, color: 'var(--m)', width: '100%' }}>
+                {libFiltered.length} experience{libFiltered.length !== 1 ? 's' : ''} found
+              </div>
             </div>
             <div className="td-lib-list">
-              {libFiltered.slice(0, 80).map((p) => (
-                <LibRow key={p.code} product={p} selected={selectedCodes.includes(p.code)} onToggle={() => onToggleProduct(p.code)} />
-              ))}
+              {libFiltered.length === 0 ? (
+                <div style={{ color: 'var(--m)', textAlign: 'center', padding: 24, fontSize: 12.5 }}>No experiences found. Try adjusting the filters.</div>
+              ) : (
+                libFiltered.slice(0, 80).map((p) => (
+                  <ExpRow key={p.code} product={p} selected={selectedCodes.includes(p.code)} pax={brief.pax} onToggle={() => onToggleProduct(p.code)} />
+                ))
+              )}
             </div>
           </>
         )}
       </div>
 
-      <div className="card td-exp-right">
-        {libTab === 'pkg' && activePreview ? (
-          <>
-            <div className="card-hd">
-              <span className="card-title">{activePreview.name}</span>
-              <span className="bdg bdg-g">{activePreview.badge}</span>
-            </div>
-            <div className="card-body" style={{ maxHeight: 520, overflowY: 'auto' }}>
-              <div style={{ fontSize: 12, color: 'var(--m)', marginBottom: 8 }}>{activePreview.subtitle}</div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--g)', marginBottom: 12 }}>📍 {activePreview.route}</div>
-              <div style={{ fontSize: 12, fontStyle: 'italic', color: 'var(--td)', marginBottom: 14, lineHeight: 1.6 }}>{activePreview.tagline}</div>
-              <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--m)', marginBottom: 8 }}>
-                Day-by-Day Itinerary
-              </div>
-              {activePreview.days.map((d) => (
-                <div key={d.n} className="td-pkg-day">
-                  <div className="td-pkg-day-hd">
-                    Day {d.n} — {d.title}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--m)', marginBottom: 4 }}>{d.sub}</div>
-                  <div style={{ fontSize: 11.5, lineHeight: 1.65 }}>{d.body.slice(0, 280)}{d.body.length > 280 ? '…' : ''}</div>
-                  <div style={{ fontSize: 10.5, color: 'var(--g)', marginTop: 6 }}>
-                    🏨 {d.hotel} · Meals: {d.meals}
-                  </div>
-                </div>
-              ))}
-              <button className="btn btn-p btn-sm" type="button" style={{ marginTop: 12 }} onClick={() => onSelectPackage(activePreview)}>
-                ✓ Use This Package
-              </button>
-            </div>
-          </>
+      <div className="td-exp-right-wrap">
+        <GuestProfileCard brief={brief} clientType={clientType} custName={custName} onEditBrief={onEditBrief} />
+
+        {libTab === 'pkg' ? (
+          <PackagePreviewPanel pkg={activePreview} brief={brief} onUsePackage={openPackage} />
         ) : (
-          <>
-            <div className="card-hd">
-              <span className="card-title">Selected Experiences</span>
-              <span className="bdg bdg-g">{selectedCodes.length}</span>
-            </div>
-            <div className="card-body" style={{ maxHeight: 520, overflowY: 'auto' }}>
-              {selectedCodes.length === 0 ? (
-                <div className="empty-state">Select experiences from the library or choose a tour package.</div>
-              ) : (
-                selectedCodes.map((code, i) => {
-                  const p = products.find((x) => x.code === code);
-                  if (!p) return null;
-                  return (
-                    <div key={code} className="td-sel-row">
-                      <span style={{ fontSize: 11, color: 'var(--m)' }}>Day {i + 1}</span>
-                      <div style={{ flex: 1 }}>
-                        <code className="pl-code">{code}</code>
-                        <div style={{ fontWeight: 600, fontSize: 12.5 }}>{p.name}</div>
-                      </div>
-                      <button className="btn btn-s btn-sm" type="button" onClick={() => onToggleProduct(code)}>
-                        ✕
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </>
+          <SelectedExperiencesPanel brief={brief} selectedProducts={selectedProducts} photos={photos} onToggleProduct={onToggleProduct} />
         )}
       </div>
     </div>
   );
 }
 
-function LibRow({ product: p, selected, onToggle }: { product: Product; selected: boolean; onToggle: () => void }) {
-  const [rbg, rfg] = REG_COLORS_HEX[p.region as keyof typeof REG_COLORS_HEX] || ['#f5f5f5', '#333'];
+function ExpRow({ product: p, selected, pax, onToggle }: { product: Product; selected: boolean; pax: number; onToggle: () => void }) {
+  const [rbg, rfg] = REG_COLORS_HEX[p.region as keyof typeof REG_COLORS_HEX] || ['#f0f0ee', '#666'];
+  const durVariant = getDurationPillVariant(p.dur);
+  const catLabel = p.cat ? p.cat.charAt(0).toUpperCase() + p.cat.slice(1) : '';
+  const shortDesc = (p.desc || '').replace(/\*\*/g, '').substring(0, 110) + ((p.desc || '').length > 110 ? '…' : '');
+  const price = getLibPriceLabel(p.code, pax);
+
   return (
-    <div className={`td-lib-row${selected ? ' selected' : ''}`} onClick={onToggle} role="button" tabIndex={0}>
-      <code className="pl-code">{p.code}</code>
+    <div className={`prd-pick${selected ? ' sel' : ''}`} onClick={onToggle} role="button" tabIndex={0}>
+      <div className="prd-icon">{selected ? '✓' : '+'}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
-        <span className="prod-region-badge" style={{ background: rbg, color: rfg, fontSize: 9 }}>
-          {REG_LABELS[p.region as keyof typeof REG_LABELS] || p.region}
-        </span>
-        {p.dur && <span className="dur-pill">{p.dur}</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3, flexWrap: 'wrap' }}>
+          <span className="prod-region-badge" style={{ background: rbg, color: rfg, fontSize: 10 }}>
+            {REG_LABELS[p.region as keyof typeof REG_LABELS] || p.region}
+          </span>
+          <span className={`td-dur-pill td-dur-${durVariant}`}>{getDurationPillLabel(p.dur)}</span>
+          {catLabel && <span className="td-cat-pill">{catLabel}</span>}
+          <span style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }} title={p.name}>
+            {p.name}
+          </span>
+        </div>
+        {p.dest && <div style={{ fontSize: 10.5, color: 'var(--g)', fontWeight: 500, marginBottom: 2 }}>📍 {p.dest}</div>}
+        <div style={{ fontSize: 11.5, color: 'var(--m)', lineHeight: 1.45, marginBottom: 3 }}>{shortDesc}</div>
+        <div style={{ fontSize: 11.5, color: 'var(--g)', fontWeight: 600 }}>{price}</div>
       </div>
-      <span className={`bdg ${selected ? 'bdg-g' : 'bdg-w'}`}>{selected ? '✓' : '+'}</span>
     </div>
   );
 }

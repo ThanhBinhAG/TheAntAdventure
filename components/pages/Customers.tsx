@@ -5,9 +5,9 @@ import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
 import { npsBadgeClass, npsIcon } from '@/lib/page-helpers';
 import { getClientPipeline } from '@/lib/crm-utils';
 import { useStore } from '@/hooks/useStore';
-import type { Customer } from '@/lib/types';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import CustomerProfileModal from '@/components/customers/CustomerProfileModal';
+import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
 
 const STAGE_FILTERS: { value: string; label: string; style?: React.CSSProperties }[] = [
   { value: '', label: 'All Clients' },
@@ -24,9 +24,8 @@ export default function Customers() {
   const customers = useStore((s) => s.customers);
   const leads = useStore((s) => s.leads);
   const feedback = useStore((s) => s.feedback) as { custId?: string; nps?: number }[];
-  const addCustomer = useStore((s) => s.addCustomer);
-  const updateCustomer = useStore((s) => s.updateCustomer);
   const deleteCustomer = useStore((s) => s.deleteCustomer);
+  const { saveFromForm } = useRegisterCustomer();
 
   const [search, setSearch] = useState('');
   const [sourceF, setSourceF] = useState('');
@@ -54,14 +53,13 @@ export default function Customers() {
   const profileCustomer = profileId ? customers.find((c) => c.id === profileId) : null;
   const editCustomer = editId ? customers.find((c) => c.id === editId) : null;
 
-  function handleSave(customer: Customer) {
-    if (formMode === 'edit') {
-      updateCustomer(customer.id, customer);
-      setEditId(null);
-    } else {
-      addCustomer(customer);
-    }
+  function handleSave(payload: Parameters<typeof saveFromForm>[0]): boolean {
+    const result = saveFromForm(payload);
+    if (!result.ok) return false;
+    if (result.message) alert(result.message);
     setFormMode(null);
+    setEditId(null);
+    return true;
   }
 
   return (

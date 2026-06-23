@@ -1,6 +1,9 @@
 import { withoutAutoSyncAsync } from './auto-sync';
 import { pushSnapshotToSupabase } from './sync-push';
 import { isRemoteDataEnabled, isRemoteDataEnabled as remoteEnabled } from '../env';
+import { mergeRequiredProducts } from '../ensure-core-products';
+import { mergeProductPricing } from '../product-pricing-helpers';
+import * as seeds from '../seeds';
 import { useStore } from '../store';
 import type { BackupData, ChatMessages } from '../types';
 import {
@@ -90,9 +93,16 @@ export async function hydrateFromSupabase(): Promise<boolean> {
 
     await withoutAutoSyncAsync(async () => {
       const state = useStore.getState();
+      const mergedProducts = remote.products ? mergeRequiredProducts(remote.products as never[]) : undefined;
+      const mergedPricing = mergeProductPricing(
+        remote.productPricing as never[] | undefined,
+        seeds.SEED_PRODUCT_PRICING
+      );
       state.importBackup({
         ...state.exportBackup(),
         ...remote,
+        ...(mergedProducts ? { products: mergedProducts } : {}),
+        productPricing: mergedPricing,
         exportedAt: new Date().toISOString(),
         version: '5.0',
       });

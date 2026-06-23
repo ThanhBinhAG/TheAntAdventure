@@ -6,13 +6,22 @@ import {
   EMPTY_CUSTOMER_FORM,
   SALES_PEOPLE,
   customerToForm,
-  formToCustomer,
-  nextCustomerId,
   type CustomerFormData,
 } from '@/lib/customer-form';
+import { findDuplicateCustomerByEmail, formatDuplicateEmailMessage } from '@/lib/customer-onboarding';
 import type { Customer } from '@/lib/types';
 
 const CHILD_TAGS = ['Infant 0–2', 'Toddler 3–5', 'Child 6–9', 'Pre-teen 10–12', 'Teen 13–17'];
+const EMAIL_CHECK_DEBOUNCE_MS = 400;
+
+export type CustomerFormSavePayload = {
+  form: CustomerFormData;
+  mode: 'add' | 'edit';
+  logInquiry: boolean;
+  existingCustomer?: Customer;
+};
+
+type EmailCheckStatus = 'idle' | 'checking' | 'available' | 'duplicate';
 
 interface CustomerFormModalProps {
   open: boolean;
@@ -20,20 +29,54 @@ interface CustomerFormModalProps {
   customer?: Customer | null;
   customers: Customer[];
   onClose: () => void;
-  onSave: (customer: Customer) => void;
+  onSave: (payload: CustomerFormSavePayload) => boolean;
 }
 
 export default function CustomerFormModal({ open, mode, customer, customers, onClose, onSave }: CustomerFormModalProps) {
   const [form, setForm] = useState<CustomerFormData>(EMPTY_CUSTOMER_FORM);
+  const [logInquiry, setLogInquiry] = useState(true);
+  const [emailCheck, setEmailCheck] = useState<EmailCheckStatus>('idle');
+  const [duplicateCustomer, setDuplicateCustomer] = useState<Customer | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setForm(customer && mode === 'edit' ? customerToForm(customer) : { ...EMPTY_CUSTOMER_FORM });
+    setLogInquiry(true);
+    setEmailCheck('idle');
+    setDuplicateCustomer(null);
   }, [open, customer, mode]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const email = form.email.trim();
+    if (!email) {
+      setEmailCheck('idle');
+      setDuplicateCustomer(null);
+      return;
+    }
+
+    setEmailCheck('checking');
+    const excludeId = mode === 'edit' && customer ? customer.id : undefined;
+    const timer = setTimeout(() => {
+      const dup = findDuplicateCustomerByEmail(customers, email, excludeId);
+      if (dup) {
+        setEmailCheck('duplicate');
+        setDuplicateCustomer(dup);
+      } else {
+        setEmailCheck('available');
+        setDuplicateCustomer(null);
+      }
+    }, EMAIL_CHECK_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [form.email, customers, mode, customer?.id, open]);
 
   if (!open) return null;
 
   const showChildren = Number(form.numChildren) > 0;
+  const emailBlocked = emailCheck === 'duplicate';
+  const saveDisabled = emailBlocked || emailCheck === 'checking';
 
   function set<K extends keyof CustomerFormData>(key: K, value: CustomerFormData[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -52,10 +95,22 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
       alert('Please enter email.');
       return;
     }
-    const id = mode === 'edit' && customer ? customer.id : nextCustomerId(customers);
-    const bookings = mode === 'edit' && customer ? customer.bookings : [];
-    onSave(formToCustomer(form, id, bookings));
-    onClose();
+
+    const excludeId = mode === 'edit' && customer ? customer.id : undefined;
+    const dup = findDuplicateCustomerByEmail(customers, form.email, excludeId);
+    if (dup) {
+      setEmailCheck('duplicate');
+      setDuplicateCustomer(dup);
+      return;
+    }
+
+    const saved = onSave({
+      form,
+      mode,
+      logInquiry: mode === 'add' ? logInquiry : false,
+      existingCustomer: mode === 'edit' && customer ? customer : undefined,
+    });
+    if (saved) onClose();
   }
 
   return (
@@ -138,7 +193,25 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
               <label className="lbl">
                 Email <span className="req">*</span>
               </label>
-              <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="email@example.com" />
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => set('email', e.target.value)}
+                placeholder="email@example.com"
+                aria-invalid={emailBlocked}
+                style={emailBlocked ? { borderColor: '#C0392B', boxShadow: '0 0 0 1px #C0392B' } : undefined}
+              />
+              {emailCheck === 'checking' && form.email.trim() && (
+                <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>Checking email… / Đang kiểm tra email…</div>
+              )}
+              {emailBlocked && duplicateCustomer && (
+                <div style={{ fontSize: 11, color: '#C0392B', marginTop: 4, lineHeight: 1.45 }}>
+                  {formatDuplicateEmailMessage(duplicateCustomer)}
+                </div>
+              )}
+              {emailCheck === 'available' && form.email.trim() && (
+                <div style={{ fontSize: 11, color: 'var(--g)', marginTop: 4 }}>Email available / Email hợp lệ</div>
+              )}
             </div>
             <div className="fg">
               <label className="lbl">Phone</label>
@@ -318,11 +391,20 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} style={{ minHeight: 80 }} placeholder="Dietary restrictions, mobility, anniversaries..." />
           </div>
 
+          {mode === 'add' && (
+            <label className="fg" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, cursor: 'pointer' }}>
+              <input type="checkbox" checked={logInquiry} onChange={(e) => setLogInquiry(e.target.checked)} />
+              <span style={{ fontSize: 12.5 }}>
+                Log initial inquiry in Communications / Ghi nhận inquiry ban đầu
+              </span>
+            </label>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
             <button className="btn btn-s" type="button" onClick={onClose}>
               Cancel / Hủy
             </button>
-            <button className="btn btn-p" type="button" onClick={handleSave}>
+            <button className="btn btn-p" type="button" onClick={handleSave} disabled={saveDisabled}>
               ✓ {mode === 'edit' ? 'Save Changes' : 'Add Customer / Thêm khách'}
             </button>
           </div>

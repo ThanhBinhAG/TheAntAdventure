@@ -5,6 +5,9 @@ import { useMemo, useState } from 'react';
 import { STAGE_COLORS, STAGE_PROB_V22, fmt } from '@/lib/constants';
 import { getCustomerName } from '@/lib/crm-utils';
 import { useStore } from '@/hooks/useStore';
+import { useLanguage } from '@/hooks/useLanguage';
+import CustomerFormModal from '@/components/customers/CustomerFormModal';
+import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
 import type { Lead } from '@/lib/types';
 
 const STAGES = ['Inquiry', 'Designing', 'Quoted', 'Negotiation', 'Confirmed', 'Completed'] as const;
@@ -13,6 +16,23 @@ const LOST_REASONS = ['Price too high', 'Chose competitor', 'Dates unavailable',
 type SalesTab = 'pipeline' | 'list' | 'policy';
 
 function SalesPolicyView() {
+  const { tc, tsf } = useLanguage();
+
+  const bookingItems = [
+    ['30%', tsf('deposit30'), 'var(--g)'],
+    ['70%', tsf('balance70'), 'var(--g)'],
+    ['FX', tsf('fxPolicy'), 'var(--blue)'],
+    ['B2B', tsf('b2bCommission'), 'var(--pur)'],
+  ] as const;
+
+  const cancellationRows = [
+    [tsf('cancel60plus'), tsf('cancelDepositForfeited')],
+    [tsf('cancel45to59'), tsf('cancel30pct')],
+    [tsf('cancel30to44'), tsf('cancel50pct')],
+    [tsf('cancel15to29'), tsf('cancel75pct')],
+    [tsf('cancel0to14'), tsf('cancel100pct')],
+  ] as const;
+
   return (
     <div>
       <div
@@ -29,25 +49,20 @@ function SalesPolicyView() {
       >
         <span style={{ fontSize: 15 }}>📎</span>
         <span style={{ fontSize: 12.5, color: 'var(--gd)', flex: 1 }}>
-          Quick reference for sales staff. Full policy version in{' '}
+          {tsf('policyQuickRef')}{' '}
           <Link href="/regulations" style={{ color: 'var(--g)', fontWeight: 600, textDecoration: 'none' }}>
-            Regulations page →
+            {tsf('regulationsLink')}
           </Link>
         </span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">📋 Booking & Payment Policy</span>
+            <span className="card-title">{tsf('bookingPaymentPolicy')}</span>
           </div>
           <div className="card-body">
             <div style={{ fontSize: 12.5, lineHeight: 1.8, display: 'flex', flexDirection: 'column', gap: 9 }}>
-              {[
-                ['30%', 'Non-refundable deposit to confirm. Payable within 7 days of confirmation.', 'var(--g)'],
-                ['70%', 'Balance due 45 days before departure. Bookings within 45 days: full payment at confirmation.', 'var(--g)'],
-                ['FX', 'All prices in USD. Payment via bank transfer or credit card (+2.5% fee).', 'var(--blue)'],
-                ['B2B', 'Agent commission within 14 days of completion. Bronze 8% / Silver 12% / Gold 15% / Platinum 20%.', 'var(--pur)'],
-              ].map(([tag, text, bg]) => (
+              {bookingItems.map(([tag, text, bg]) => (
                 <div key={tag} style={{ display: 'flex', gap: 10 }}>
                   <span style={{ background: bg, color: '#fff', borderRadius: 5, padding: '2px 9px', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
                     {tag}
@@ -60,24 +75,18 @@ function SalesPolicyView() {
         </div>
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">🚫 Cancellation Policy</span>
+            <span className="card-title">{tsf('cancellationPolicy')}</span>
           </div>
           <div className="card-body">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Notice Period</th>
-                  <th>Penalty</th>
+                  <th>{tsf('noticePeriod')}</th>
+                  <th>{tsf('penalty')}</th>
                 </tr>
               </thead>
               <tbody>
-                {[
-                  ['60+ days before', 'Deposit forfeited'],
-                  ['45–59 days', '30% of total'],
-                  ['30–44 days', '50% of total'],
-                  ['15–29 days', '75% of total'],
-                  ['0–14 days / no-show', '100% of total'],
-                ].map(([period, penalty]) => (
+                {cancellationRows.map(([period, penalty]) => (
                   <tr key={period}>
                     <td>{period}</td>
                     <td style={penalty.includes('100%') ? { color: 'var(--red)', fontWeight: 600 } : undefined}>{penalty}</td>
@@ -105,6 +114,7 @@ function PipeCard({
   onStageChange: (id: string, stage: string) => void;
   onUpdate: (id: string, data: Partial<Lead>) => void;
 }) {
+  const { tc, tsf, tStage } = useLanguage();
   const [fupOpen, setFupOpen] = useState(false);
   const [fupDate, setFupDate] = useState(lead.followUpDate || '');
   const [fupAction, setFupAction] = useState(lead.nextAction || '');
@@ -113,15 +123,17 @@ function PipeCard({
   const prob = lead.probability ?? STAGE_PROB_V22[stage] ?? 10;
   const weighted = Math.round(((lead.value || 0) * prob) / 100);
 
-  const aiDraft = `Dear ${name.split(' ')[0] || name},
+  const firstName = name.split(' ')[0] || name;
+  const travelWhen = lead.month || tsf('preferredDates');
+  const aiDraft = `${tsf('aiEmailGreeting')} ${firstName},
 
-Thank you for your interest in "${lead.tour}". We are preparing a tailored proposal for ${lead.pax} guests travelling in ${lead.month || 'your preferred dates'}.
+${tsf('aiEmailThanks')} "${lead.tour}". ${tsf('aiEmailPreparing')} ${lead.pax} ${tsf('aiEmailGuests')} ${travelWhen}.
 
-Our team at The Ant Adventures will follow up shortly with itinerary options and pricing.
+${tsf('aiEmailFollowUp')}
 
-Warm regards,
+${tsf('aiEmailRegards')}
 Tai Pham
-The Ant Adventures`;
+${tsf('aiEmailSignature')}`;
 
   return (
     <div
@@ -129,11 +141,11 @@ The Ant Adventures`;
       style={{
         borderLeft: stage === 'Confirmed' ? '3px solid var(--g)' : stage === 'Negotiation' ? '3px solid var(--amb)' : undefined,
       }}
-      title={`${lead.tour} | ${lead.pax} pax | ${lead.month}`}
+      title={`${lead.tour} | ${lead.pax} ${tsf('paxSuffix')} | ${lead.month}`}
     >
       <div className="pname">{name}</div>
       <div className="pmeta">
-        {Number(lead.pax) > 0 ? `${lead.pax} pax · ` : ''}
+        {Number(lead.pax) > 0 ? `${lead.pax} ${tsf('paxSuffix')} · ` : ''}
         {lead.month}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
@@ -151,21 +163,21 @@ The Ant Adventures`;
         >
           {['Inquiry', 'Designing', 'Quoted', 'Negotiation', 'Confirmed', 'Completed', 'Lost'].map((st) => (
             <option key={st} value={st}>
-              {st}
+              {tStage(st)}
             </option>
           ))}
         </select>
       </div>
       <div style={{ marginTop: 6 }}>
         <button type="button" className="pipe-ai-btn" onClick={() => setAiOpen(!aiOpen)}>
-          ✉ AI Draft Email
+          ✉ {tc('aiDraftEmail')}
         </button>
       </div>
       {aiOpen && (
         <div className="pipe-ai-panel">
           <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', margin: '0 0 8px', fontFamily: 'inherit' }}>{aiDraft}</pre>
           <button type="button" className="btn btn-pu btn-sm" style={{ width: '100%', fontSize: 10.5 }} onClick={() => navigator.clipboard?.writeText(aiDraft)}>
-            Copy to clipboard
+            {tc('copyToClipboard')}
           </button>
         </div>
       )}
@@ -177,12 +189,12 @@ The Ant Adventures`;
           </div>
         )}
         <button type="button" className="pipe-fup-btn" onClick={() => setFupOpen(!fupOpen)}>
-          📅 {lead.followUpDate ? 'Edit' : 'Set'} Follow-up
+          📅 {lead.followUpDate ? tc('editFollowUp') : tc('setFollowUp')}
         </button>
         {fupOpen && (
           <div className="pipe-fup-form">
             <input type="date" value={fupDate} onChange={(e) => setFupDate(e.target.value)} />
-            <input type="text" value={fupAction} onChange={(e) => setFupAction(e.target.value)} placeholder="Next action…" />
+            <input type="text" value={fupAction} onChange={(e) => setFupAction(e.target.value)} placeholder={`${tc('nextAction')}…`} />
             <button
               type="button"
               onClick={() => {
@@ -190,7 +202,7 @@ The Ant Adventures`;
                 setFupOpen(false);
               }}
             >
-              ✓ Save
+              ✓ {tc('save')}
             </button>
           </div>
         )}
@@ -200,11 +212,14 @@ The Ant Adventures`;
 }
 
 export default function Sales() {
+  const { tc, t, tStage, language, tsf, tLostReason } = useLanguage();
   const leads = useStore((s) => s.leads);
   const customers = useStore((s) => s.customers);
   const updateLead = useStore((s) => s.updateLead);
+  const { saveFromForm } = useRegisterCustomer();
   const [tab, setTab] = useState<SalesTab>('pipeline');
   const [lostModal, setLostModal] = useState<{ leadId: string; reason: string; note: string } | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
 
   const activeLeads = leads.filter((l) => l.stage !== 'Lost' && l.stage !== 'Completed');
   const totalPipelineVal = activeLeads.reduce((s, l) => s + (l.value || 0), 0);
@@ -253,12 +268,19 @@ export default function Sales() {
 
   return (
     <div>
+      <div className="search-row" style={{ marginBottom: 12 }}>
+        <div style={{ flex: 1 }} />
+        <button className="btn btn-p btn-sm" type="button" onClick={() => setFormOpen(true)}>
+          {tc('newClientBtn')}
+        </button>
+      </div>
+
       <div className="tabs">
         {(
           [
-            ['pipeline', 'Pipeline View'],
-            ['list', 'List View'],
-            ['policy', '📋 Tour Policy & Regulations'],
+            ['pipeline', tc('pipelineView')],
+            ['list', tc('listView')],
+            ['policy', `📋 ${tc('tourPolicy')}`],
           ] as const
         ).map(([id, label]) => (
           <div key={id} className={`tab${tab === id ? ' on' : ''}`} onClick={() => setTab(id)} role="button" tabIndex={0}>
@@ -274,22 +296,22 @@ export default function Sales() {
               <div className="pipeline-forecast-val" style={{ color: 'var(--g)' }}>
                 ${fmt(Math.round(confirmedVal))}
               </div>
-              <div className="pipeline-forecast-lbl">Confirmed</div>
+              <div className="pipeline-forecast-lbl">{tc('confirmed')}</div>
             </div>
             <div style={{ textAlign: 'center', minWidth: 110 }}>
               <div className="pipeline-forecast-val" style={{ color: 'var(--pur)' }}>
                 ${fmt(Math.round(weightedForecast))}
               </div>
-              <div className="pipeline-forecast-lbl">Weighted Forecast</div>
+              <div className="pipeline-forecast-lbl">{tc('weightedForecast')}</div>
             </div>
             <div style={{ textAlign: 'center', minWidth: 100 }}>
               <div className="pipeline-forecast-val" style={{ color: 'var(--m)' }}>
                 ${fmt(Math.round(totalPipelineVal))}
               </div>
-              <div className="pipeline-forecast-lbl">Total Pipeline</div>
+              <div className="pipeline-forecast-lbl">{tc('totalPipeline')}</div>
             </div>
             <div style={{ flex: 1 }} />
-            <span style={{ fontSize: 11, color: 'var(--m)' }}>Weighted = stage probability × deal value</span>
+            <span style={{ fontSize: 11, color: 'var(--m)' }}>{tsf('weightedFormula')}</span>
           </div>
 
           <div className="pipeline">
@@ -299,7 +321,7 @@ export default function Sales() {
               return (
                 <div className="pipe-col" key={stage}>
                   <div className="pipe-hd">
-                    <span>{stage}</span>
+                    <span>{tStage(stage)}</span>
                     <span className={`bdg ${STAGE_COLORS[stage] || 'bdg-w'}`}>{stageLeads.length}</span>
                     {stageVal > 0 && <span className="pipe-col-val">${fmt(Math.round(stageVal))}</span>}
                   </div>
@@ -326,22 +348,23 @@ export default function Sales() {
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Lead ID</th>
-                  <th>Customer</th>
-                  <th>Tour</th>
-                  <th>Pax</th>
-                  <th>Value</th>
-                  <th style={{ color: 'var(--pur)' }}>Weighted ▾</th>
-                  <th>Travel Date</th>
-                  <th>Stage</th>
-                  <th>Owner</th>
-                  <th>Lost Reason</th>
+                  <th>{tsf('leadId')}</th>
+                  <th>{tsf('customer')}</th>
+                  <th>{tc('tour')}</th>
+                  <th>{tc('pax')}</th>
+                  <th>{tc('value')}</th>
+                  <th style={{ color: 'var(--pur)' }}>{tc('weighted')} ▾</th>
+                  <th>{tsf('travelDate')}</th>
+                  <th>{tc('stage')}</th>
+                  <th>{tc('owner')}</th>
+                  <th>{tc('lostReason')}</th>
                 </tr>
               </thead>
               <tbody>
                 {listLeads.map((l) => {
                   const prob = l.probability ?? STAGE_PROB_V22[l.stage] ?? 10;
                   const weighted = Math.round(((l.value || 0) * prob) / 100);
+                  const lostReason = (l.lostReason as string) || '';
                   return (
                     <tr key={l.id}>
                       <td>
@@ -357,11 +380,11 @@ export default function Sales() {
                       <td style={{ fontSize: 12, color: 'var(--m)' }}>{l.month || '—'}</td>
                       <td>
                         <span className={`bdg ${STAGE_COLORS[l.stage] || 'bdg-w'}`} style={{ fontSize: 10 }}>
-                          {l.stage}
+                          {tStage(l.stage)}
                         </span>
                       </td>
                       <td style={{ fontSize: 12 }}>{l.owner || 'Tai Pham'}</td>
-                      <td style={{ fontSize: 11.5, color: 'var(--m)' }}>{(l.lostReason as string) || '—'}</td>
+                      <td style={{ fontSize: 11.5, color: 'var(--m)' }}>{lostReason ? tLostReason(lostReason) : '—'}</td>
                     </tr>
                   );
                 })}
@@ -377,39 +400,53 @@ export default function Sales() {
         <div className="overlay open" onClick={() => setLostModal(null)}>
           <div className="modal lost-reason-modal" style={{ width: 440 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-hd modal-hd-green">
-              <div style={{ color: '#fff', fontWeight: 700 }}>Mark Lead as Lost</div>
+              <div style={{ color: '#fff', fontWeight: 700 }}>{tc('markLost')}</div>
               <button type="button" className="modal-close-btn" onClick={() => setLostModal(null)}>
                 ✕
               </button>
             </div>
             <div style={{ padding: 22 }}>
               <div className="fg">
-                <label className="lbl">Lost Reason</label>
+                <label className="lbl">{tc('lostReason')}</label>
                 <select value={lostModal.reason} onChange={(e) => setLostModal({ ...lostModal, reason: e.target.value })}>
-                  <option value="">— Select reason —</option>
+                  <option value="">{tsf('selectReason')}</option>
                   {LOST_REASONS.map((r) => (
                     <option key={r} value={r}>
-                      {r}
+                      {tLostReason(r)}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="fg">
-                <label className="lbl">Additional Notes</label>
-                <textarea value={lostModal.note} onChange={(e) => setLostModal({ ...lostModal, note: e.target.value })} placeholder="Optional context..." />
+                <label className="lbl">{tc('additionalNotes')}</label>
+                <textarea value={lostModal.note} onChange={(e) => setLostModal({ ...lostModal, note: e.target.value })} placeholder={tsf('optionalContext')} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button className="btn btn-s" type="button" onClick={() => setLostModal(null)}>
-                  Cancel
+                  {tc('cancel')}
                 </button>
                 <button className="btn btn-p" type="button" onClick={saveLostReason} disabled={!lostModal.reason}>
-                  Confirm Lost
+                  {tc('confirmLost')}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      <CustomerFormModal
+        open={formOpen}
+        mode="add"
+        customers={customers}
+        onClose={() => setFormOpen(false)}
+        onSave={(payload) => {
+          const result = saveFromForm(payload);
+          if (!result.ok) return false;
+          if (result.message) alert(result.message);
+          setFormOpen(false);
+          return true;
+        }}
+      />
     </div>
   );
 }

@@ -142,6 +142,42 @@ export interface Product {
   usp: string;
   price: string;
   region: string;
+  nameVn?: string;
+  status?: 'active' | 'draft' | 'archived';
+}
+
+export interface ProductPricingInclusions {
+  g: boolean;
+  tr: boolean;
+  tk: boolean;
+  w: boolean;
+  m: boolean;
+}
+
+export interface ProductPricing {
+  productCode: string;
+  stdCost: number;
+  p1: number;
+  p2: number;
+  p3: number;
+  p4: number;
+  p5: number;
+  p6: number;
+  p7: number;
+  p8: number;
+  p9: number;
+  p10: number;
+  c1: number;
+  c2: number;
+  c3: number;
+  c4: number;
+  c5: number;
+  c6: number;
+  c7: number;
+  c8: number;
+  c9: number;
+  c10: number;
+  incl: ProductPricingInclusions;
 }
 
 export interface StaffMember {
@@ -175,6 +211,7 @@ export interface BackupData {
   agents: Agent[];
   guides: Guide[];
   products: Product[];
+  productPricing: ProductPricing[];
   comms: Comm[];
   finance: unknown[];
   ar: unknown[];

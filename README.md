@@ -67,7 +67,9 @@ docs/SUPABASE-SETUP.md  # Supabase install & connect
 |---------|---------|
 | `npm run dev` | Development server |
 | `npm run build` | Production build |
-| `npm run extract` | Re-generate seeds/CSS from HTML source |
+| `npm run test` | Unit tests (`tests/`) |
+
+Private notes, legacy HTML, and one-off migration tools live in **`Personal/`** (gitignored — local only).
 
 ## Logo
 

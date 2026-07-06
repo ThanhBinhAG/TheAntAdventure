@@ -1,6 +1,47 @@
 import type { Customer, Lead } from './types';
 import { STAGE_ORDER } from './constants';
 
+export interface GetClientLeadsOptions {
+  includeLost?: boolean;
+}
+
+function stageSortIndex(stage: string): number {
+  const idx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
+  return idx === -1 ? STAGE_ORDER.length : idx;
+}
+
+export function getClientLeads(
+  custId: string,
+  leads: Lead[],
+  options: GetClientLeadsOptions = {}
+): Lead[] {
+  const { includeLost = false } = options;
+  return leads
+    .filter((l) => l.custId === custId && (includeLost || l.stage !== 'Lost'))
+    .sort((a, b) => {
+      const stageDiff = stageSortIndex(a.stage) - stageSortIndex(b.stage);
+      if (stageDiff !== 0) return stageDiff;
+      return a.id.localeCompare(b.id);
+    });
+}
+
+export function customerMatchesSearch(customer: Customer, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [
+    customer.name,
+    customer.email,
+    customer.phone,
+    customer.whatsapp,
+    customer.id,
+    customer.agentName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
 export function getClientPipeline(custId: string, leads: Lead[]) {
   const allLeads = leads.filter((l) => l.custId === custId);
   const active = allLeads.filter((l) => l.stage !== 'Lost');

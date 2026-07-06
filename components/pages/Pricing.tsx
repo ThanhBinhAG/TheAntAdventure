@@ -7,6 +7,7 @@ import PricingEditModal from '@/components/pricing/PricingEditModal';
 import { fmt } from '@/lib/constants';
 import { useStore } from '@/hooks/useStore';
 import { buildPricingTableRows, emptyProductPricing, type PricingTableRow } from '@/lib/product-pricing-helpers';
+import { isSelectableProduct } from '@/lib/product-display';
 import {
   ICO_EMOJIS,
   ICO_KEYS,
@@ -65,7 +66,7 @@ export default function Pricing() {
   }, [highlightCode, productPricing.length, search]);
 
   const allRows = useMemo(
-    () => buildPricingTableRows(products, productPricing),
+    () => buildPricingTableRows(products.filter(isSelectableProduct), productPricing),
     [products, productPricing]
   );
 
@@ -234,7 +235,7 @@ export default function Pricing() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.slice(0, 80).map((t, i) => {
+                  {filtered.map((t, i) => {
                     const durBdg = MULTI_DURATIONS.includes(t.duration) ? 'bdg-g' : 'bdg-w';
                     const inclIcons = ICO_KEYS.map((k, j) => (
                       <span key={k} style={{ fontSize: 13, opacity: t.pricing.incl[k] ? 1 : 0.2 }} title={ICO_LABELS[j]}>

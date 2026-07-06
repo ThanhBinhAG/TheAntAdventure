@@ -2,38 +2,39 @@ import { withoutAutoSyncAsync } from './auto-sync';
 import { pushSnapshotToSupabase } from './sync-push';
 import { isRemoteDataEnabled, isRemoteDataEnabled as remoteEnabled } from '../env';
 import { mergeRequiredProducts } from '../ensure-core-products';
+import { mergeSupplierSeeds } from '../ensure-supplier-seeds';
 import { mergeProductPricing } from '../product-pricing-helpers';
 import * as seeds from '../seeds';
 import { useStore } from '../store';
-import type { BackupData, ChatMessages } from '../types';
+import type { BackupData, ChatMessages, CruiseSupplier, ExtendedSupplier, Hotel, RestaurantSupplier, TransportSupplier } from '../types';
 import {
   countBackupRows,
   MESSAGES_TABLE,
   SYNC_ARRAY_TABLES,
   TABLE_TO_STORE_KEY,
+  type SyncArrayTable,
 } from './sync-config';
+import {
+  markHydrationFailed,
+  markHydrationPending,
+  markHydrationReady,
+  subscribeHydration,
+  updateBaselineCounts,
+} from './sync-lifecycle';
 import { db as supabaseDb } from './supabase';
 import { withTimeout } from './timeout';
 
 export { isRemoteDataEnabled } from '../env';
+export {
+  getHydrationState,
+  subscribeHydration,
+  type HydrationPhase,
+  type HydrationState,
+} from './sync-lifecycle';
 
 const STORAGE_KEY = 'ant-crm-v43';
 const HYDRATE_TIMEOUT_MS = 12_000;
 const PING_TIMEOUT_MS = 8_000;
-
-export type ConnectionStatus = {
-  ok: boolean;
-  latencyMs: number;
-  tables: Record<string, number>;
-  error?: string;
-};
-
-export type VerifyResult = {
-  ok: boolean;
-  local: Record<string, number>;
-  remote: Record<string, number>;
-  mismatches: string[];
-};
 
 async function fetchRemoteBackup(): Promise<Partial<BackupData> | null> {
   const results = await Promise.all([
@@ -62,6 +63,15 @@ async function fetchRemoteBackup(): Promise<Partial<BackupData> | null> {
   return totalRows > 0 ? backup : null;
 }
 
+function baselineFromBackup(backup: BackupData): Partial<Record<SyncArrayTable, number>> {
+  const counts = countBackupRows(backup);
+  const baseline: Partial<Record<SyncArrayTable, number>> = {};
+  for (const table of SYNC_ARRAY_TABLES) {
+    baseline[table] = counts[table] ?? 0;
+  }
+  return baseline;
+}
+
 export async function checkSupabaseConnection(): Promise<ConnectionStatus> {
   if (!isRemoteDataEnabled()) {
     return { ok: false, latencyMs: 0, tables: {}, error: 'Supabase not enabled in .env.local' };
@@ -84,32 +94,91 @@ export async function quickSupabasePing(): Promise<ConnectionStatus> {
   );
 }
 
+export type ConnectionStatus = {
+  ok: boolean;
+  latencyMs: number;
+  tables: Record<string, number>;
+  error?: string;
+};
+
+export type VerifyResult = {
+  ok: boolean;
+  local: Record<string, number>;
+  remote: Record<string, number>;
+  mismatches: string[];
+};
+
 export async function hydrateFromSupabase(): Promise<boolean> {
   if (!remoteEnabled()) return false;
 
+  markHydrationPending();
+
   try {
-    const remote = await withTimeout(fetchRemoteBackup(), HYDRATE_TIMEOUT_MS, null);
-    if (!remote) return false;
+    const fetchResult = await Promise.race([
+      fetchRemoteBackup().then((data) => ({ timedOut: false as const, data })),
+      new Promise<{ timedOut: true }>((resolve) => {
+        setTimeout(() => resolve({ timedOut: true }), HYDRATE_TIMEOUT_MS);
+      }),
+    ]);
+
+    if (fetchResult.timedOut) {
+      markHydrationFailed('Hydrate timeout — kiểm tra kết nối Supabase');
+      return false;
+    }
+
+    const remote = fetchResult.data;
 
     await withoutAutoSyncAsync(async () => {
       const state = useStore.getState();
-      const mergedProducts = remote.products ? mergeRequiredProducts(remote.products as never[]) : undefined;
+      const mergedProducts = remote?.products
+        ? mergeRequiredProducts(remote.products as never[])
+        : mergeRequiredProducts(state.products);
       const mergedPricing = mergeProductPricing(
-        remote.productPricing as never[] | undefined,
+        (remote?.productPricing as never[] | undefined) ?? state.productPricing,
         seeds.SEED_PRODUCT_PRICING
       );
-      state.importBackup({
-        ...state.exportBackup(),
-        ...remote,
-        ...(mergedProducts ? { products: mergedProducts } : {}),
-        productPricing: mergedPricing,
-        exportedAt: new Date().toISOString(),
-        version: '5.0',
+      const mergedSuppliers = mergeSupplierSeeds({
+        hotels: (remote?.hotels as Hotel[] | undefined) ?? state.hotels,
+        transport: (remote?.transport as TransportSupplier[] | undefined) ?? state.transport,
+        restaurants: (remote?.restaurants as RestaurantSupplier[] | undefined) ?? state.restaurants,
+        cruises: (remote?.cruises as CruiseSupplier[] | undefined) ?? state.cruises,
+        specialSuppliers: (remote?.specialSuppliers as ExtendedSupplier[] | undefined) ?? state.specialSuppliers,
       });
+
+      if (remote) {
+        state.importBackup({
+          ...state.exportBackup(),
+          ...remote,
+          products: mergedProducts,
+          productPricing: mergedPricing,
+          hotels: mergedSuppliers.hotels,
+          transport: mergedSuppliers.transport,
+          restaurants: mergedSuppliers.restaurants,
+          cruises: mergedSuppliers.cruises,
+          specialSuppliers: mergedSuppliers.specialSuppliers,
+          exportedAt: new Date().toISOString(),
+          version: '5.0',
+        });
+      } else {
+        useStore.setState({
+          products: mergedProducts,
+          productPricing: mergedPricing,
+          hotels: mergedSuppliers.hotels,
+          transport: mergedSuppliers.transport,
+          restaurants: mergedSuppliers.restaurants,
+          cruises: mergedSuppliers.cruises,
+          specialSuppliers: mergedSuppliers.specialSuppliers,
+        });
+      }
     });
+
+    const backup = useStore.getState().exportBackup();
+    markHydrationReady(baselineFromBackup(backup));
     return true;
   } catch (e) {
-    console.warn('[CRM] Supabase hydrate failed, using local store:', e);
+    const message = e instanceof Error ? e.message : 'Hydrate failed';
+    console.warn('[CRM] Supabase hydrate failed:', e);
+    markHydrationFailed(message);
     return false;
   }
 }
@@ -147,7 +216,7 @@ export async function completeMigrationToSupabase(): Promise<{
   verify?: VerifyResult;
   needsReload?: boolean;
 }> {
-  const push = await pushSnapshotToSupabase();
+  const push = await pushSnapshotToSupabase({ force: true });
   if (!push.ok) return { ok: false, error: push.error };
 
   const verify = await verifyLocalMatchesRemote();
@@ -161,6 +230,7 @@ export async function completeMigrationToSupabase(): Promise<{
     };
   }
 
+  updateBaselineCounts(countBackupRows(useStore.getState().exportBackup()));
   clearLocalPersistedData();
   await hydrateFromSupabase();
   return { ok: true, verify, needsReload: true };

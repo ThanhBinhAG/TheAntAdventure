@@ -2,22 +2,15 @@
 
 import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
-import { REG_COLORS_HEX, REG_LABELS } from '@/lib/page-helpers';
 import {
-  buildDayGroups,
+  buildItinerary,
   formatDayDateLabel,
   formatTravelStartTitle,
   stripMarkdown,
   totalDurationDays,
 } from '@/lib/tour-itinerary';
 import { resolveProductPhotos } from '@/lib/tour-photos';
-import {
-  getCostPrice,
-  getSellPrice,
-  markupPct,
-  paxToExactN,
-  sumSellForProducts,
-} from '@/lib/tour-pricing';
+import { getCostPrice, getSellPrice, markupPct, paxToExactN, sumSellForProducts } from '@/lib/tour-pricing';
 import type { TourBrief, GalleryPhoto } from '@/lib/tour-design-types';
 import type { Product } from '@/lib/types';
 import PhotoStack from '@/components/tourdesign/PhotoStack';
@@ -29,13 +22,25 @@ interface Props {
   onToggleProduct: (code: string) => void;
 }
 
-const QP_PAX = [1, 2, 3, 4, 5, 6, 8, 10];
-
 function markupColor(sell: number, cost: number): string {
   const mk = sell > 0 && cost > 0 ? Math.round(((sell - cost) / sell) * 100) : 0;
   if (mk >= 30) return '#2E7D52';
   if (mk >= 20) return '#D97706';
   return '#C0392B';
+}
+
+function ExperiencePricing({ code, pn }: { code: string; pn: number }) {
+  const itemSell = getSellPrice(code, pn);
+  const itemCost = getCostPrice(code, pn);
+  const itemMk = markupPct(itemSell, itemCost);
+  if (itemSell <= 0) return null;
+  return (
+    <div style={{ fontSize: 10.5, fontWeight: 600, marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+      <span style={{ color: 'var(--g)' }}>${fmt(itemSell)}/pax</span>
+      <span style={{ color: '#9CA3AF' }}>Cost: ${fmt(itemCost)}/pax</span>
+      <span style={{ color: markupColor(itemSell, itemCost) }}>Markup: {itemMk}%</span>
+    </div>
+  );
 }
 
 export default function SelectedExperiencesPanel({ brief, selectedProducts, photos, onToggleProduct }: Props) {
@@ -46,9 +51,8 @@ export default function SelectedExperiencesPanel({ brief, selectedProducts, phot
   const totalD = totalDurationDays(selectedProducts);
   const pn = paxToExactN(brief.pax);
   const totalSell = sumSellForProducts(codes, pn);
-  const totalCost = codes.reduce((s, c) => s + getCostPrice(c, pn), 0);
 
-  const days = useMemo(() => buildDayGroups(selectedProducts), [selectedProducts]);
+  const { addons, days } = useMemo(() => buildItinerary(selectedProducts), [selectedProducts]);
 
   function aiRecommend() {
     const recs = selectedProducts.length
@@ -122,28 +126,43 @@ export default function SelectedExperiencesPanel({ brief, selectedProducts, phot
         </div>
 
         <div className="td-section-lbl">Selected Experiences</div>
-        {selectedProducts.map((p, i) => {
-          const meta = [p.dur, p.dest].filter(Boolean).join(' · ');
-          return (
-            <div key={p.code} className="td-sel-chip">
-              <div className="td-sel-chip-num">{i + 1}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                <div style={{ fontSize: 10.5, color: 'var(--m)' }}>{meta}</div>
-              </div>
-              <button type="button" className="td-sel-remove" onClick={() => onToggleProduct(p.code)}>
-                ×
-              </button>
+        {selectedProducts.map((p, i) => (
+          <div key={p.code} className="td-sel-chip">
+            <div className="td-sel-chip-num">{i + 1}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
             </div>
-          );
-        })}
+            <button type="button" className="td-sel-remove" onClick={() => onToggleProduct(p.code)}>
+              ×
+            </button>
+          </div>
+        ))}
 
-        <div className="td-section-lbl td-section-divider">
-          {formatTravelStartTitle(brief.startDate, brief.travelMonth)}
-          <span style={{ fontSize: 9.5, fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4, color: 'var(--m)' }}>
-            (edit in Step 4 AI Export)
-          </span>
-        </div>
+        {addons.length > 0 && (
+          <>
+            <div className="td-section-lbl td-section-divider">Tour Services / Add-ons</div>
+            {addons.map((item) => {
+              const desc = stripMarkdown(item.desc);
+              const shortDesc = desc.substring(0, 130) + (desc.length > 130 ? '…' : '');
+              return (
+                <div key={item.code} className="td-draft-day" style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t)', marginBottom: 3 }}>{item.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--m)', lineHeight: 1.5 }}>{shortDesc}</div>
+                  <ExperiencePricing code={item.code} pn={pn} />
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {(days.length > 0 || addons.length === 0) && (
+          <div className="td-section-lbl td-section-divider">
+            {formatTravelStartTitle(brief.startDate, brief.travelMonth)}
+            <span style={{ fontSize: 9.5, fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4, color: 'var(--m)' }}>
+              (edit in Step 4 AI Export)
+            </span>
+          </div>
+        )}
 
         {days.map((day) => {
           const dayLabel = formatDayDateLabel(
@@ -163,41 +182,13 @@ export default function SelectedExperiencesPanel({ brief, selectedProducts, phot
                   {day.items.map((item, ii) => {
                     const desc = stripMarkdown(item.desc);
                     const shortDesc = desc.substring(0, 130) + (desc.length > 130 ? '…' : '');
-                    const [rbg, rfg] = REG_COLORS_HEX[item.region as keyof typeof REG_COLORS_HEX] || ['#f0f0ee', '#666'];
-                    const itemSell = getSellPrice(item.code, pn);
-                    const itemCost = getCostPrice(item.code, pn);
-                    const itemMk = markupPct(itemSell, itemCost);
-                    const regLabel = REG_LABELS[item.region as keyof typeof REG_LABELS] || 'Experience';
 
                     return (
                       <div key={item.code} style={{ marginBottom: ii < day.items.length - 1 ? 6 : 0 }}>
                         {ii > 0 && <div className="td-item-divider" />}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3, flexWrap: 'wrap' }}>
-                          <span
-                            style={{
-                              background: rbg,
-                              color: rfg,
-                              fontSize: 9.5,
-                              fontWeight: 700,
-                              padding: '1px 6px',
-                              borderRadius: 3,
-                            }}
-                          >
-                            {regLabel}
-                          </span>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--t)' }}>{item.name}</span>
-                        </div>
-                        {item.dest && (
-                          <div style={{ fontSize: 10.5, color: 'var(--g)', fontWeight: 500, marginBottom: 3 }}>📍 {item.dest}</div>
-                        )}
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t)', marginBottom: 3 }}>{item.name}</div>
                         <div style={{ fontSize: 11, color: 'var(--m)', lineHeight: 1.5 }}>{shortDesc}</div>
-                        {itemSell > 0 && (
-                          <div style={{ fontSize: 10.5, fontWeight: 600, marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                            <span style={{ color: 'var(--g)' }}>${fmt(itemSell)}/pax</span>
-                            <span style={{ color: '#9CA3AF' }}>Cost: ${fmt(itemCost)}/pax</span>
-                            <span style={{ color: markupColor(itemSell, itemCost) }}>Markup: {itemMk}%</span>
-                          </div>
-                        )}
+                        <ExperiencePricing code={item.code} pn={pn} />
                       </div>
                     );
                   })}
@@ -207,26 +198,6 @@ export default function SelectedExperiencesPanel({ brief, selectedProducts, phot
             </div>
           );
         })}
-
-        <div className="td-section-lbl td-section-divider">💵 Quick Pricing (by pax count)</div>
-        {QP_PAX.map((np) => {
-          const npn = Math.min(np, 10);
-          const sell = sumSellForProducts(codes, npn);
-          const isCur = np === brief.pax;
-          return (
-            <div key={np} className={`td-qp-row${isCur ? ' on' : ''}`}>
-              <span>
-                {np} pax{isCur ? ' ★' : ''}
-              </span>
-              <span>${fmt(sell)}/pax</span>
-              <span style={{ fontWeight: 600 }}>${fmt(sell * np)}</span>
-            </div>
-          );
-        })}
-        <div style={{ fontSize: 10.5, color: 'var(--m)', marginTop: 6 }}>
-          Net: ${fmt(totalCost)}/pax · Sell: ${fmt(totalSell)}/pax · Margin: {markupPct(totalSell, totalCost)}% · {brief.pax} pax tour total: $
-          {fmt(totalSell * brief.pax)}
-        </div>
       </div>
     </div>
   );

@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useRef } from 'react';
 import { PAGE_TITLES, QUICK_NAV_PAGES } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
 import { useSupabasePanel } from '@/lib/SupabaseContext';
+import { createClient } from '@/lib/supabase/client';
 import type { PageSlug } from '@/lib/types';
 
 interface TopbarProps {
@@ -15,6 +16,7 @@ interface TopbarProps {
 
 export default function Topbar({ onMenuToggle }: TopbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const page = (pathname.split('/').pop() || 'dashboard') as PageSlug;
   const { language, setLanguage, pageTitle } = useLanguage();
   const exportBackup = useStore((s) => s.exportBackup);
@@ -56,6 +58,17 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch {
+      /* redirect even if signOut fails */
+    }
+    router.push('/login');
+    router.refresh();
   };
 
   return (
@@ -119,6 +132,9 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
           </button>
           <button className="btn btn-s btn-sm" onClick={() => fileRef.current?.click()} type="button" title="Restore from backup">
             ⬆ Restore
+          </button>
+          <button className="btn btn-s btn-sm" onClick={handleLogout} type="button" title="Đăng xuất">
+            ⎋ Logout
           </button>
           <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
         </div>

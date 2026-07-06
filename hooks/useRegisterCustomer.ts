@@ -53,6 +53,7 @@ export function useRegisterCustomer() {
         leads,
         logInquiry: payload.logInquiry,
         createLead: true,
+        flagTourDesign: payload.flagTourDesign ?? false,
       });
 
       if (!result.ok) {

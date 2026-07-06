@@ -2,31 +2,85 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { SRC_COLORS, fmt } from '@/lib/constants';
+import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
+import { createInquiryLeadForCustomer } from '@/lib/customer-onboarding';
+import { getClientLeads, getClientPipeline } from '@/lib/crm-utils';
 import { npsBadgeClass, npsIcon } from '@/lib/page-helpers';
-import { getClientPipeline } from '@/lib/crm-utils';
 import { useStore } from '@/hooks/useStore';
-import type { Booking, Comm, Customer } from '@/lib/types';
+import type { Booking, Comm, Customer, Lead } from '@/lib/types';
 
-const TABS = ['overview', 'communications', 'bookings', 'notes', 'feedback'] as const;
+const TABS = ['overview', 'pipeline', 'communications', 'bookings', 'notes', 'feedback'] as const;
 type Tab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<Tab, string> = {
+  overview: 'Overview',
+  pipeline: 'Pipeline',
+  communications: 'Communications',
+  bookings: 'Bookings',
+  notes: 'Notes',
+  feedback: 'Feedback',
+};
 
 interface CustomerProfileModalProps {
   customer: Customer;
+  initialTab?: Tab;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export default function CustomerProfileModal({ customer, onClose, onEdit, onDelete }: CustomerProfileModalProps) {
+function PipelineLeadRow({ lead, customerId }: { lead: Lead; customerId: string }) {
+  return (
+    <tr>
+      <td>
+        <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{lead.id}</code>
+      </td>
+      <td style={{ fontSize: 12, maxWidth: 180 }}>{lead.tour}</td>
+      <td>
+        <span className={`bdg ${STAGE_COLORS[lead.stage] || 'bdg-w'}`} style={{ fontSize: 10 }}>
+          {lead.stage}
+        </span>
+      </td>
+      <td style={{ fontWeight: 600, color: 'var(--g)' }}>{lead.value > 0 ? `$${fmt(lead.value)}` : '—'}</td>
+      <td style={{ fontSize: 12, color: 'var(--m)' }}>{lead.month || '—'}</td>
+      <td style={{ fontSize: 12 }}>{lead.owner || '—'}</td>
+      <td style={{ whiteSpace: 'nowrap' }}>
+        <Link
+          href={`/sales?custId=${encodeURIComponent(customerId)}&leadId=${encodeURIComponent(lead.id)}&tab=list`}
+          className="btn btn-s btn-sm"
+          style={{ marginRight: 4 }}
+        >
+          Pipeline
+        </Link>
+        <Link
+          href={`/tourdesign?leadId=${encodeURIComponent(lead.id)}&custId=${encodeURIComponent(customerId)}`}
+          className="btn btn-s btn-sm"
+        >
+          Tour Design
+        </Link>
+      </td>
+    </tr>
+  );
+}
+
+export default function CustomerProfileModal({
+  customer,
+  initialTab = 'overview',
+  onClose,
+  onEdit,
+  onDelete,
+}: CustomerProfileModalProps) {
   const comms = useStore((s) => s.comms);
   const leads = useStore((s) => s.leads);
   const bookings = useStore((s) => s.bookings);
   const feedback = useStore((s) => s.feedback) as { custId?: string; nps?: number; id?: string; bkid?: string; date?: string; comments?: string; best?: string; improve?: string }[];
   const addComm = useStore((s) => s.addComm);
+  const addLead = useStore((s) => s.addLead);
   const updateCustomer = useStore((s) => s.updateCustomer);
 
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>(initialTab);
+  const [showLostLeads, setShowLostLeads] = useState(false);
+  const [createdLead, setCreatedLead] = useState<{ leadId: string; custId: string } | null>(null);
   const [notesDraft, setNotesDraft] = useState(customer.notes || '');
   const [commForm, setCommForm] = useState({
     type: 'Email',
@@ -44,6 +98,11 @@ export default function CustomerProfileModal({ customer, onClose, onEdit, onDele
   const cfb = feedback.filter((f) => f.custId === customer.id);
   const avgNps = cfb.length ? cfb.reduce((s, f) => s + (f.nps || 0), 0) / cfb.length : null;
   const pipeline = getClientPipeline(customer.id, leads);
+  const activeLeads = useMemo(() => getClientLeads(customer.id, leads), [customer.id, leads]);
+  const lostLeads = useMemo(
+    () => leads.filter((l) => l.custId === customer.id && l.stage === 'Lost').sort((a, b) => a.id.localeCompare(b.id)),
+    [customer.id, leads]
+  );
 
   const custBookings = useMemo(() => {
     return (customer.bookings || [])
@@ -90,6 +149,13 @@ The Ant Adventures`;
     setTab('communications');
   }
 
+  function startNewInquiry() {
+    const lead = createInquiryLeadForCustomer(customer, leads, { flagTourDesign: true });
+    addLead(lead);
+    setCreatedLead({ leadId: lead.id, custId: customer.id });
+    setTab('pipeline');
+  }
+
   return (
     <div className="overlay open prof-overlay" onClick={onClose}>
       <div className="modal prof-modal" onClick={(e) => e.stopPropagation()}>
@@ -124,7 +190,7 @@ The Ant Adventures`;
           <div className="prof-tabs">
             {TABS.map((t) => (
               <div key={t} className={`prof-tab${tab === t ? ' on' : ''}`} onClick={() => setTab(t)} role="button" tabIndex={0}>
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+                {TAB_LABELS[t]}
               </div>
             ))}
           </div>
@@ -190,6 +256,88 @@ The Ant Adventures`;
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {tab === 'pipeline' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div className="prof-section-lbl" style={{ marginBottom: 0 }}>
+                  Quotes & Pipeline ({activeLeads.length})
+                </div>
+                <button className="btn btn-p btn-sm" type="button" onClick={startNewInquiry}>
+                  + Start New Inquiry
+                </button>
+              </div>
+
+              {activeLeads.length === 0 ? (
+                <div className="prof-empty" style={{ textAlign: 'center', padding: 28 }}>
+                  <div style={{ fontSize: 13, marginBottom: 12 }}>No quotes yet for this client.</div>
+                  <button className="btn btn-p btn-sm" type="button" onClick={startNewInquiry}>
+                    Start New Inquiry
+                  </button>
+                </div>
+              ) : (
+                <div className="card" style={{ marginBottom: 14 }}>
+                  <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Lead ID</th>
+                          <th>Tour</th>
+                          <th>Stage</th>
+                          <th>Value</th>
+                          <th>Travel Month</th>
+                          <th>Owner</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeLeads.map((lead) => (
+                          <PipelineLeadRow key={lead.id} lead={lead} customerId={customer.id} />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {lostLeads.length > 0 && (
+                <div>
+                  <button
+                    type="button"
+                    className="btn btn-s btn-sm"
+                    style={{ marginBottom: 8 }}
+                    onClick={() => setShowLostLeads((v) => !v)}
+                  >
+                    {showLostLeads ? 'Hide' : 'Show'} lost leads ({lostLeads.length})
+                  </button>
+                  {showLostLeads && (
+                    <div className="card">
+                      <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
+                        <table className="tbl">
+                          <thead>
+                            <tr>
+                              <th>Lead ID</th>
+                              <th>Tour</th>
+                              <th>Stage</th>
+                              <th>Value</th>
+                              <th>Travel Month</th>
+                              <th>Owner</th>
+                              <th>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {lostLeads.map((lead) => (
+                              <PipelineLeadRow key={lead.id} lead={lead} customerId={customer.id} />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -355,6 +503,39 @@ The Ant Adventures`;
           )}
         </div>
       </div>
+
+      {createdLead && (
+        <div className="overlay open" style={{ zIndex: 10001 }} onClick={() => setCreatedLead(null)}>
+          <div className="modal" style={{ width: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-hd modal-hd-green">
+              <div style={{ color: '#fff', fontWeight: 700 }}>Inquiry created</div>
+              <button type="button" className="modal-close-btn" onClick={() => setCreatedLead(null)}>
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: 22 }}>
+              <p style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
+                Lead <code>{createdLead.leadId}</code> added for <strong>{customer.name}</strong>.
+              </p>
+              <p style={{ fontSize: 13, marginBottom: 16 }}>
+                Continue in <strong>Tour Design</strong> to complete the client brief.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button className="btn btn-s" type="button" onClick={() => setCreatedLead(null)}>
+                  Stay here
+                </button>
+                <Link
+                  href={`/tourdesign?leadId=${encodeURIComponent(createdLead.leadId)}&custId=${encodeURIComponent(createdLead.custId)}`}
+                  className="btn btn-p"
+                  onClick={() => setCreatedLead(null)}
+                >
+                  Tour Design →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

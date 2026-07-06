@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
 import { getCustomerName } from '@/lib/crm-utils';
+import { parseMoneyInput } from '@/lib/money';
 import { useStore } from '@/hooks/useStore';
 import type { Booking } from '@/lib/types';
 
@@ -66,6 +67,21 @@ export default function Bookings() {
   const [monthF, setMonthF] = useState('');
   const [showNew, setShowNew] = useState(false);
   const [newBk, setNewBk] = useState(emptyNewBooking);
+  const [totalInput, setTotalInput] = useState('');
+  const [depositInput, setDepositInput] = useState('');
+
+  const openNewBooking = () => {
+    setNewBk(emptyNewBooking);
+    setTotalInput('');
+    setDepositInput('');
+    setShowNew(true);
+  };
+
+  const formatMoneyBlur = (raw: string, setter: (v: string) => void) => {
+    const n = parseMoneyInput(raw, { absolute: true });
+    setter(n ? fmt(n) : '');
+    return n;
+  };
 
   const selected = bookings.find((b) => b.id === selectedId) || null;
 
@@ -87,6 +103,9 @@ export default function Bookings() {
       alert('Please select a customer and enter tour name.');
       return;
     }
+    const total = parseMoneyInput(totalInput, { absolute: true });
+    let deposit = parseMoneyInput(depositInput, { absolute: true });
+    if (deposit > total) deposit = total;
     const n = bookings.length + 1;
     const id = `BK-2026-${String(n).padStart(3, '0')}`;
     addBooking({
@@ -96,8 +115,8 @@ export default function Bookings() {
       pax: newBk.pax,
       start: newBk.start || 'TBD',
       end: newBk.end || 'TBD',
-      total: newBk.total,
-      deposit: newBk.deposit,
+      total,
+      deposit,
       status: newBk.status,
       guide: newBk.guide,
       hotel: newBk.hotel,
@@ -106,6 +125,8 @@ export default function Bookings() {
     });
     setShowNew(false);
     setNewBk(emptyNewBooking);
+    setTotalInput('');
+    setDepositInput('');
   };
 
   const saveOnTourChange = (type: OtTab, payload: Record<string, unknown>) => {
@@ -119,9 +140,9 @@ export default function Bookings() {
       by: 'Staff',
       description: String(payload.description || ''),
       detail: String(payload.detail || ''),
-      costImpact: Number(payload.costImpact || 0),
-      cancelFee: Number(payload.cancelFee || 0),
-      refund: Number(payload.refund || 0),
+      costImpact: parseMoneyInput(payload.costImpact as string | number, { allowNegative: true }),
+      cancelFee: parseMoneyInput(payload.cancelFee as string | number, { absolute: true }),
+      refund: parseMoneyInput(payload.refund as string | number, { absolute: true }),
     };
     const changes = [entry, ...((selected.changes as BookingChange[]) || [])];
     const updates: Partial<Booking> = {
@@ -181,7 +202,7 @@ export default function Bookings() {
           <option>Nov 2026</option>
         </select>
         <div style={{ flex: 1 }} />
-        <button className="btn btn-p btn-sm" type="button" onClick={() => setShowNew(true)}>
+        <button className="btn btn-p btn-sm" type="button" onClick={openNewBooking}>
           + New Booking
         </button>
       </div>
@@ -308,11 +329,23 @@ export default function Bookings() {
                 </div>
                 <div className="fg">
                   <label className="lbl">Total (USD)</label>
-                  <input type="number" value={newBk.total || ''} onChange={(e) => setNewBk({ ...newBk, total: +e.target.value })} />
+                  <input
+                    type="text"
+                    value={totalInput}
+                    placeholder="e.g. 22,000 or $22000"
+                    onChange={(e) => setTotalInput(e.target.value)}
+                    onBlur={() => formatMoneyBlur(totalInput, setTotalInput)}
+                  />
                 </div>
                 <div className="fg">
                   <label className="lbl">Deposit (USD)</label>
-                  <input type="number" value={newBk.deposit || ''} onChange={(e) => setNewBk({ ...newBk, deposit: +e.target.value })} />
+                  <input
+                    type="text"
+                    value={depositInput}
+                    placeholder="e.g. 6,600"
+                    onChange={(e) => setDepositInput(e.target.value)}
+                    onBlur={() => formatMoneyBlur(depositInput, setDepositInput)}
+                  />
                 </div>
                 <div className="fg">
                   <label className="lbl">Guide</label>
@@ -444,6 +477,7 @@ function BookingDetailModal({
           {changes.length === 0 ? (
             <div className="bkd-empty-log">No changes recorded yet for this booking.</div>
           ) : (
+            <div className="bkd-log-scroll">
             <table className="tbl">
               <thead>
                 <tr>
@@ -486,6 +520,7 @@ function BookingDetailModal({
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>
@@ -495,11 +530,17 @@ function BookingDetailModal({
 
 function OnTourForm({ tab, onSave }: { tab: OtTab; onSave: (type: OtTab, payload: Record<string, unknown>) => void }) {
   const [addName, setAddName] = useState('');
-  const [addCost, setAddCost] = useState(0);
+  const [addCostInput, setAddCostInput] = useState('');
   const [addNotes, setAddNotes] = useState('');
   const [addAlert, setAddAlert] = useState(true);
   const [cancelName, setCancelName] = useState('');
   const [fullConfirm, setFullConfirm] = useState(false);
+
+  const blurCost = () => {
+    const n = parseMoneyInput(addCostInput, { absolute: true });
+    setAddCostInput(n ? fmt(n) : '');
+    return n;
+  };
 
   if (tab === 'add') {
     return (
@@ -511,7 +552,13 @@ function OnTourForm({ tab, onSave }: { tab: OtTab; onSave: (type: OtTab, payload
           </div>
           <div className="fg">
             <label className="lbl">Additional Cost (USD)</label>
-            <input type="number" min={0} value={addCost || ''} onChange={(e) => setAddCost(+e.target.value)} />
+            <input
+              type="text"
+              value={addCostInput}
+              placeholder="e.g. 150 or $150"
+              onChange={(e) => setAddCostInput(e.target.value)}
+              onBlur={blurCost}
+            />
           </div>
           <div className="fg" style={{ gridColumn: '1 / 3' }}>
             <label className="lbl">Notes for guide / operations</label>
@@ -531,9 +578,10 @@ function OnTourForm({ tab, onSave }: { tab: OtTab; onSave: (type: OtTab, payload
                 alert('Please enter the activity name.');
                 return;
               }
+              const addCost = parseMoneyInput(addCostInput, { absolute: true });
               onSave('add', { description: `Added: ${addName}`, detail: addNotes, costImpact: addCost, guideAlert: addAlert });
               setAddName('');
-              setAddCost(0);
+              setAddCostInput('');
               setAddNotes('');
             }}
           >

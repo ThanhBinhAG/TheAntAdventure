@@ -1,6 +1,7 @@
 'use client';
 
-import type { MouseEvent } from 'react';
+import { useMemo, type MouseEvent } from 'react';
+import { isSelectableProduct } from '@/lib/product-display';
 import { REG_COLORS_HEX, REG_LABELS } from '@/lib/page-helpers';
 import {
   DUR_LABELS,
@@ -32,7 +33,8 @@ export default function ModulesView({
   expandedCode,
   onToggleExpand,
 }: ModulesViewProps) {
-  const grouped = groupProductsForModules(products, search);
+  const activeProducts = useMemo(() => products.filter(isSelectableProduct), [products]);
+  const grouped = groupProductsForModules(activeProducts, search);
   const total = countModulesProducts(grouped);
   const regionCount = MODULE_REGIONS.filter((r) =>
     MODULE_DUR_KEYS.some((dk) => (grouped[r][dk]?.length ?? 0) > 0)

@@ -3,14 +3,47 @@ import type { PageSlug } from './types';
 export const FX = { USD: 1, EUR: 0.92, VND: 25000 } as const;
 export const FX_SYM = { USD: '$', EUR: '€', VND: '₫' } as const;
 
+/** Annual revenue target (USD) for Dashboard YTD progress bar. */
+export const ANNUAL_REVENUE_TARGET_USD = 250_000;
+
+export const DASHBOARD_MONTH_ABBR = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+export const KANBAN_STAGES = [
+  'Inquiry',
+  'Pending',
+  'Designing',
+  'Quoted',
+  'Negotiation',
+  'Confirmed',
+  'On Tour',
+  'Completed',
+] as const;
+
 export const STAGE_ORDER = [
   'Completed',
+  'On Tour',
   'Confirmed',
+  'Pending',
   'Negotiation',
   'Quoted',
   'Designing',
   'Inquiry',
 ] as const;
+
+export const ACTIVE_STAGE_FILTERS = [...KANBAN_STAGES] as const;
 
 export const STAGE_PROB_V22: Record<string, number> = {
   Inquiry: 10,
@@ -26,6 +59,7 @@ export const STAGE_PROB_V22: Record<string, number> = {
 
 export const STAGE_COLORS: Record<string, string> = {
   Inquiry: 'bdg-b',
+  Pending: 'bdg-w',
   Designing: 'bdg-p',
   Quoted: 'bdg-a',
   Negotiation: 'bdg-a',
@@ -44,6 +78,7 @@ export const SRC_COLORS: Record<string, string> = {
   Abercrombie: 'bdg-a',
 };
 
+/** @deprecated Legacy v4 pipeline — use KANBAN_STAGES */
 export const PIPELINE_STAGES = [
   'Inquiry',
   'Designing',
@@ -53,16 +88,7 @@ export const PIPELINE_STAGES = [
   'Lost',
 ] as const;
 
-export const SALES_STAGES = [
-  'Inquiry',
-  'Designing',
-  'Quoted',
-  'Negotiation',
-  'Confirmed',
-  'Completed',
-  'Lost',
-  'On Tour',
-] as const;
+export const SALES_STAGES = [...KANBAN_STAGES, 'Lost'] as const;
 
 export const PAGE_TITLES: Record<PageSlug, string> = {
   dashboard: 'Dashboard',
@@ -151,6 +177,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { page: 'products', icon: '◆', en: 'Tour Products', vi: 'Sản phẩm tour' },
       { page: 'gallery', icon: '🖼', en: 'Photo Gallery', vi: 'Thư viện ảnh' },
       { page: 'pricing', icon: '◈', en: 'Pricing', vi: 'Bảng giá' },
+      { page: 'weather', icon: '☁', en: 'Weather Guide', vi: 'Thời tiết' },
+      { page: 'attractions', icon: '🏛', en: 'Attraction Schedule', vi: 'Lịch điểm tham quan', badge: 'NEW', badgeType: 'new' },
     ],
   },
   {
@@ -161,8 +189,6 @@ export const NAV_SECTIONS: NavSection[] = [
       { page: 'contracts', icon: '📄', en: 'Contracts', vi: 'Hợp đồng' },
       { page: 'suppliers', icon: '◫', en: 'Suppliers', vi: 'Nhà cung cấp' },
       { page: 'guides', icon: '◑', en: 'Guides', vi: 'Hướng dẫn viên' },
-      { page: 'weather', icon: '☁', en: 'Weather Guide', vi: 'Thời tiết' },
-      { page: 'attractions', icon: '🏛', en: 'Attraction Schedule', vi: 'Lịch điểm tham quan', badge: 'NEW', badgeType: 'new' },
       { page: 'posttour', icon: '⭐', en: 'Post-Tour & Feedback', vi: 'Hậu tour & Phản hồi', badge: 'NEW', badgeType: 'new' },
     ],
   },

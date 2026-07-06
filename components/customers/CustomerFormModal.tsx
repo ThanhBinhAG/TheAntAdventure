@@ -19,6 +19,7 @@ export type CustomerFormSavePayload = {
   mode: 'add' | 'edit';
   logInquiry: boolean;
   existingCustomer?: Customer;
+  flagTourDesign?: boolean;
 };
 
 type EmailCheckStatus = 'idle' | 'checking' | 'available' | 'duplicate';

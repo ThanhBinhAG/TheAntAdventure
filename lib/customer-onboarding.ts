@@ -1,5 +1,7 @@
 import type { Agent, Comm, Customer, Lead } from './types';
-import { AGENT_DATALIST, type CustomerFormData, formToCustomer } from './customer-form';
+import { localTodayIso } from './date-utils';
+import { formatLeadTravelMonth } from './sales-lead-utils';
+import { AGENT_DATALIST, customerToForm, type CustomerFormData, formToCustomer } from './customer-form';
 
 /** Map free-text agent / datalist labels → agents.id */
 const AGENT_ALIASES: Record<string, string[]> = {
@@ -17,6 +19,7 @@ export type RegisterNewCustomerInput = {
   leads: Lead[];
   logInquiry?: boolean;
   createLead?: boolean;
+  flagTourDesign?: boolean;
 };
 
 export type RegisterNewCustomerResult =
@@ -102,10 +105,16 @@ export function salesOwnerFromForm(form: CustomerFormData): string {
   return form.salesperson.split(' ')[0] || 'Tai';
 }
 
-export function buildInquiryLead(customer: Customer, form: CustomerFormData, leadId: string): Lead {
+export function buildInquiryLead(
+  customer: Customer,
+  form: CustomerFormData,
+  leadId: string,
+  options?: { flagTourDesign?: boolean }
+): Lead {
   const year = new Date().getFullYear();
-  const month = form.travelMonth ? `${form.travelMonth} ${year}` : 'TBD';
+  const month = formatLeadTravelMonth(form.travelMonth, undefined, year);
   const tour = `${form.style || 'General'} inquiry — ${form.adults} pax`;
+  const flagTourDesign = options?.flagTourDesign ?? false;
 
   return {
     id: leadId,
@@ -116,11 +125,15 @@ export function buildInquiryLead(customer: Customer, form: CustomerFormData, lea
     month,
     stage: 'Inquiry',
     owner: salesOwnerFromForm(form),
-    nextAction: 'Contact client and gather trip requirements',
+    nextAction: flagTourDesign
+      ? 'Start tour design — Client Brief'
+      : 'Contact client and gather trip requirements',
     probability: 10,
     clientType: form.clientType,
     agentId: customer.agentId,
     notes: `Auto-created on customer registration. Source: ${form.source}`,
+    needsTourDesign: flagTourDesign,
+    tourDesignAcked: false,
   };
 }
 
@@ -129,7 +142,7 @@ export function buildInquiryComm(customer: Customer, form: CustomerFormData): Co
   return {
     id: `CM-${Date.now()}`,
     cid: customer.id,
-    date: new Date().toISOString().split('T')[0],
+    date: localTodayIso(),
     type,
     dir: 'inbound',
     subj: `Initial inquiry — ${form.source}`,
@@ -167,8 +180,25 @@ export function buildCustomerFromForm(
   return formToCustomer(form, id, bookings, agentId);
 }
 
+export function createInquiryLeadForCustomer(
+  customer: Customer,
+  leads: Lead[],
+  options?: { flagTourDesign?: boolean }
+): Lead {
+  const form = customerToForm(customer);
+  return buildInquiryLead(customer, form, nextLeadId(leads), options);
+}
+
 export function registerNewCustomer(input: RegisterNewCustomerInput): RegisterNewCustomerResult {
-  const { form, customers, agents, leads, logInquiry = true, createLead = true } = input;
+  const {
+    form,
+    customers,
+    agents,
+    leads,
+    logInquiry = true,
+    createLead = true,
+    flagTourDesign = false,
+  } = input;
 
   const duplicate = findDuplicateCustomerByEmail(customers, form.email);
   if (duplicate) {
@@ -179,7 +209,7 @@ export function registerNewCustomer(input: RegisterNewCustomerInput): RegisterNe
 
   let lead: Lead | undefined;
   if (createLead) {
-    lead = buildInquiryLead(customer, form, nextLeadId(leads));
+    lead = buildInquiryLead(customer, form, nextLeadId(leads), { flagTourDesign });
   }
 
   let comm: Comm | undefined;

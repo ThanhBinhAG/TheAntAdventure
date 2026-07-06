@@ -5,25 +5,23 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
-  LineElement,
-  PointElement,
   Title,
   Tooltip,
   Legend,
-  Filler,
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FX, FX_SYM, STAGE_PROB_V22, STAGE_COLORS, fmt } from '@/lib/constants';
+import { computeDashboardMetrics } from '@/lib/dashboard-metrics';
 import { TIER_BG, TIER_COLORS } from '@/lib/page-helpers';
 import { useStore } from '@/hooks/useStore';
 import { getCustomerName } from '@/lib/crm-utils';
 import type { Customer, Lead } from '@/lib/types';
 
 function ForecastBreakdown({ leads, customers }: { leads: Lead[]; customers: Customer[] }) {
-  const deals = useMemo(() => {
-    return leads
+  const { deals, allActive } = useMemo(() => {
+    const active = leads
       .filter((l) => l.stage !== 'Lost' && l.stage !== 'Completed' && (l.value || 0) > 0)
       .map((l) => {
         const prob = l.probability ?? STAGE_PROB_V22[l.stage] ?? 10;
@@ -33,9 +31,11 @@ function ForecastBreakdown({ leads, customers }: { leads: Lead[]; customers: Cus
           probability: prob,
           weightedValue: ((l.value || 0) * prob) / 100,
         };
-      })
-      .sort((a, b) => b.weightedValue - a.weightedValue)
-      .slice(0, 12);
+      });
+    return {
+      allActive: active,
+      deals: [...active].sort((a, b) => b.weightedValue - a.weightedValue).slice(0, 12),
+    };
   }, [leads]);
 
   if (deals.length < 2) {
@@ -57,6 +57,8 @@ function ForecastBreakdown({ leads, customers }: { leads: Lead[]; customers: Cus
 
   const totalValue = deals.reduce((s, d) => s + d.tourValue, 0);
   const totalWeighted = deals.reduce((s, d) => s + d.weightedValue, 0);
+  const allActiveValue = allActive.reduce((s, d) => s + d.tourValue, 0);
+  const allActiveWeighted = allActive.reduce((s, d) => s + d.weightedValue, 0);
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
@@ -109,12 +111,25 @@ function ForecastBreakdown({ leads, customers }: { leads: Lead[]; customers: Cus
             <tfoot>
               <tr>
                 <td colSpan={2} style={{ fontWeight: 700 }}>
-                  TOTAL
+                  Top 12 subtotal
                 </td>
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>${fmt(Math.round(totalValue))}</td>
                 <td>—</td>
                 <td style={{ textAlign: 'right', fontWeight: 700, color: '#2E7D52' }}>
                   ${fmt(Math.round(totalWeighted))}
+                </td>
+                <td colSpan={2}>—</td>
+              </tr>
+              <tr>
+                <td colSpan={2} style={{ fontWeight: 600, color: 'var(--m)', fontSize: 12 }}>
+                  All active pipeline
+                </td>
+                <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--m)', fontSize: 12 }}>
+                  ${fmt(Math.round(allActiveValue))}
+                </td>
+                <td>—</td>
+                <td style={{ textAlign: 'right', fontWeight: 600, color: '#2E7D52', fontSize: 12 }}>
+                  ${fmt(Math.round(allActiveWeighted))}
                 </td>
                 <td colSpan={2}>—</td>
               </tr>
@@ -126,7 +141,7 @@ function ForecastBreakdown({ leads, customers }: { leads: Lead[]; customers: Cus
   );
 }
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 export default function Dashboard() {
   const leads = useStore((s) => s.leads);
@@ -135,147 +150,36 @@ export default function Dashboard() {
   const agents = useStore((s) => s.agents);
   const feedback = useStore((s) => s.feedback) as { nps?: number; custId?: string }[];
 
-  const [typeF, setTypeF] = useState('');
+  const [typeF, setTypeF] = useState<'' | 'b2b' | 'b2c'>('');
   const [marketF, setMarketF] = useState('');
   const [currency, setCurrency] = useState<'USD' | 'EUR' | 'VND'>('USD');
 
   const sym = FX_SYM[currency];
   const rate = FX[currency];
 
-  const metrics = useMemo(() => {
-    const allLeads = leads.filter(
-      (l) =>
-        !typeF ||
-        l.clientType === typeF ||
-        (typeF === 'b2b' && !l.clientType && l.id.includes('ILV'))
-    );
-
-    const drafted = allLeads.filter((l) => l.stage === 'Designing').length;
-    const sent = allLeads.filter((l) => l.stage === 'Quoted').length;
-    const pending = allLeads.filter((l) => l.stage === 'Negotiation').length;
-    const confirmed = allLeads.filter((l) => l.stage === 'Confirmed' || l.stage === 'On Tour');
-    const totalPax = confirmed.reduce((s, l) => s + (parseInt(String(l.pax)) || 0), 0);
-    const totalVal = confirmed.reduce((s, l) => s + (l.value || 0), 0);
-
-    const completedLeads = allLeads.filter((l) => l.stage === 'Completed');
-    const completedLeadsBkIds = completedLeads.map((l) => l.id);
-    const realizedFromLeads = completedLeads.reduce((s, l) => s + (l.value || 0), 0);
-    const realizedFromBk = bookings
-      .filter(
-        (b) =>
-          (b.status === 'Fully Paid' || b.status === 'Completed') &&
-          !completedLeadsBkIds.some((lid) => b.id.includes(lid.replace('LD-', '')))
-      )
-      .reduce((s, b) => s + (b.total || 0), 0);
-    const realized = realizedFromLeads + realizedFromBk;
-
-    const weightedForecast = allLeads
-      .filter((l) => l.stage !== 'Lost' && l.stage !== 'Completed')
-      .reduce(
-        (s, l) =>
-          s + ((l.value || 0) * ((l.probability ?? STAGE_PROB_V22[l.stage] ?? 10) / 100)),
-        0
-      );
-
-    const mktMap: Record<string, number> = {};
-    allLeads.forEach((l) => {
-      if (!l.value || l.value <= 0) return;
-      const cust = customers.find((c) => c.id === l.custId);
-      const country = cust?.country || 'Other';
-      mktMap[country] = (mktMap[country] || 0) + (l.value || 0);
-    });
-    const DEMO_MKT = { USA: 94000, Australia: 74000, France: 55000, UK: 41000, Germany: 20000 };
-    const mktData = Object.keys(mktMap).length >= 2 ? mktMap : DEMO_MKT;
-    const filtered = marketF
-      ? Object.fromEntries(Object.entries(mktData).filter(([m]) => m === marketF))
-      : mktData;
-
-    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const realizedByMonth = MONTHS.map((m) =>
-      leads
-        .filter((l) => l.stage === 'Completed' && (l.month || '').startsWith(m))
-        .reduce((s, l) => s + (l.value || 0), 0)
-    );
-    const forecastByMonth = MONTHS.map((m) =>
-      leads
-        .filter((l) => (l.stage === 'Confirmed' || l.stage === 'Quoted') && (l.month || '').startsWith(m))
-        .reduce((s, l) => s + (l.value || 0), 0)
-    );
-
-    const stageNames = ['Inquiry', 'Designing', 'Quoted', 'Negotiation', 'Confirmed', 'Completed'];
-    const stageCounts = stageNames.map((s) => leads.filter((l) => l.stage === s).length);
-
-    const tourMap: Record<string, number> = {};
-    leads
-      .filter((l) => l.stage === 'Completed' || l.stage === 'Confirmed')
-      .forEach((l) => {
-        tourMap[l.tour] = (tourMap[l.tour] || 0) + (l.value || 0);
-      });
-    const topTours = Object.entries(tourMap)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-
-    const b2b = leads.filter((l) => l.clientType === 'b2b' || l.id.includes('ILV')).length;
-    const b2c = leads.length - b2b;
-
-    const agentMap: Record<string, number> = {};
-    leads
-      .filter((l) => l.stage === 'Confirmed' || l.stage === 'Completed')
-      .forEach((l) => {
-        const cust = customers.find((c) => c.id === l.custId);
-        if (cust?.source === 'Agent') {
-          agentMap[cust.agentName || 'Agent'] = (agentMap[cust.agentName || 'Agent'] || 0) + (l.value || 0);
-        }
-      });
-
-    const npsScores = feedback.filter((f) => f.nps).map((f) => f.nps as number);
-    const avgNps = npsScores.length
-      ? Math.round((npsScores.reduce((a, b) => a + b, 0) / npsScores.length) * 10) / 10
-      : null;
-
-    const YTD_TARGET = 250000;
-    const ytdPct = Math.min(100, Math.round((realized / YTD_TARGET) * 100));
-
-    return {
-      allLeads,
-      drafted,
-      sent,
-      pending,
-      confirmed,
-      totalPax,
-      totalVal,
-      realized,
-      completedLeads,
-      weightedForecast,
-      filtered,
-      MONTHS,
-      realizedByMonth,
-      forecastByMonth,
-      stageNames,
-      stageCounts,
-      topTours,
-      b2b,
-      b2c,
-      agentMap,
-      avgNps,
-      npsScores,
-      YTD_TARGET,
-      ytdPct,
-    };
-  }, [leads, bookings, customers, feedback, typeF, marketF]);
+  const metrics = useMemo(
+    () =>
+      computeDashboardMetrics(leads, bookings, customers, feedback, {
+        clientType: typeF,
+        market: marketF,
+      }),
+    [leads, bookings, customers, feedback, typeF, marketF]
+  );
 
   const filterLabel = [typeF && (typeF === 'b2b' ? 'B2B Agents' : 'B2C Direct'), marketF]
     .filter(Boolean)
     .join(' · ');
 
   const mktLabels = Object.keys(metrics.filtered);
-  const filteredMkt = metrics.filtered as Record<string, number>;
+  const filteredMkt = metrics.filtered;
   const mktVals = mktLabels.map((m) => Math.round(filteredMkt[m] * rate));
+
+  const totalToursAllTime = metrics.toursByMonth.reduce((s, n) => s + n, 0);
 
   return (
     <div>
       <div className="dash-filter-bar">
-        <select value={typeF} onChange={(e) => setTypeF(e.target.value)}>
+        <select value={typeF} onChange={(e) => setTypeF(e.target.value as '' | 'b2b' | 'b2c')}>
           <option value="">All Clients (B2B + B2C)</option>
           <option value="b2b">B2B — Agents Only</option>
           <option value="b2c">B2C — Direct Only</option>
@@ -324,7 +228,7 @@ export default function Dashboard() {
                 <div className="dash-kpi-val" style={{ fontSize: 22, color: 'var(--pur)' }}>
                   {metrics.pending}
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--m)', marginTop: 2 }}>Pending</div>
+                <div style={{ fontSize: 10, color: 'var(--m)', marginTop: 2 }}>Negotiation</div>
               </div>
             </div>
           </div>
@@ -384,7 +288,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <ForecastBreakdown leads={metrics.allLeads} customers={customers} />
+      <ForecastBreakdown leads={metrics.filteredLeads} customers={customers} />
 
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="card-body" style={{ padding: '14px 18px' }}>
@@ -440,6 +344,7 @@ export default function Dashboard() {
               <span className="card-title">Revenue by Market</span>
             </div>
             <div className="card-body">
+              {metrics.hasMarketData ? (
               <div className="chart-wrap">
                 <Bar
                 data={{
@@ -472,21 +377,26 @@ export default function Dashboard() {
                 }}
               />
               </div>
+              ) : (
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--m)', fontSize: 13 }}>
+                  Not enough market data — add leads with customer countries to see revenue by market.
+                </div>
+              )}
             </div>
           </div>
 
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Monthly Revenue Trend 2026</span>
+              <span className="card-title">Monthly Revenue Trend</span>
               <span className="bdg bdg-g" style={{ fontSize: 10 }}>
-                Realized vs Forecast
+                All time · Realized vs Forecast
               </span>
             </div>
             <div className="card-body">
               <div className="chart-wrap">
                 <Bar
                 data={{
-                  labels: metrics.MONTHS,
+                  labels: [...metrics.MONTHS],
                   datasets: [
                     {
                       label: 'Realized Revenue',
@@ -495,7 +405,7 @@ export default function Dashboard() {
                       borderRadius: 4,
                     },
                     {
-                      label: 'Forecast (Confirmed + Quoted)',
+                      label: 'Pipeline Forecast',
                       data: metrics.forecastByMonth.map((v) => Math.round(v * rate)),
                       backgroundColor: '#FDE68A',
                       borderColor: '#D97706',
@@ -525,7 +435,59 @@ export default function Dashboard() {
 
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Conversion Funnel</span>
+              <span className="card-title">Tours per Month</span>
+              <span className="bdg bdg-b" style={{ fontSize: 10 }}>
+                All time · Confirmed · On Tour · Completed
+              </span>
+            </div>
+            <div className="card-body">
+              {totalToursAllTime > 0 ? (
+                <div className="chart-wrap">
+                  <Bar
+                    data={{
+                      labels: [...metrics.MONTHS],
+                      datasets: [
+                        {
+                          label: 'Tours',
+                          data: metrics.toursByMonth,
+                          backgroundColor: '#1565C0',
+                          borderRadius: 4,
+                        },
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          callbacks: {
+                            label: (ctx) => ` ${ctx.parsed.y ?? 0} tour${(ctx.parsed.y ?? 0) !== 1 ? 's' : ''}`,
+                          },
+                        },
+                      },
+                      scales: {
+                        x: { grid: { display: false } },
+                        y: {
+                          grid: { color: '#f0f0f0' },
+                          ticks: { stepSize: 1, font: { size: 11 } },
+                          beginAtZero: true,
+                        },
+                      },
+                    }}
+                  />
+                </div>
+              ) : (
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--m)', fontSize: 13 }}>
+                  No scheduled tours yet — confirm leads with travel months to see tours per month.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-hd">
+              <span className="card-title">Pipeline Conversion Funnel</span>
             </div>
             <div className="card-body">
               <div className="chart-wrap">
@@ -545,11 +507,28 @@ export default function Dashboard() {
                   indexAxis: 'y',
                   responsive: true,
                   maintainAspectRatio: false,
-                  plugins: { legend: { display: false } },
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                      callbacks: {
+                        label: (ctx) => {
+                          const count = ctx.parsed.x ?? 0;
+                          const idx = ctx.dataIndex;
+                          const pct = metrics.conversionPct[idx];
+                          const base = `${count} lead${count !== 1 ? 's' : ''}`;
+                          if (pct === null) return ` ${base}`;
+                          return ` ${base} · ${pct}% from previous stage`;
+                        },
+                      },
+                    },
+                  },
                   scales: { x: { grid: { display: false } }, y: { grid: { display: false } } },
                 }}
               />
               </div>
+              <p style={{ fontSize: 11, color: 'var(--m)', marginTop: 10, marginBottom: 0 }}>
+                Conversion % = current stage count ÷ previous stage count
+              </p>
             </div>
           </div>
         </div>
@@ -574,6 +553,11 @@ export default function Dashboard() {
                     />
                   </div>
                   <span style={{ fontWeight: 600, width: 24, textAlign: 'right' }}>{metrics.stageCounts[i]}</span>
+                  {metrics.conversionPct[i] !== null && (
+                    <span style={{ fontSize: 10, color: 'var(--m)', width: 32, textAlign: 'right' }}>
+                      {metrics.conversionPct[i]}%
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -584,6 +568,7 @@ export default function Dashboard() {
               <span className="card-title">Top Tours YTD</span>
             </div>
             <div className="card-body" style={{ padding: 12 }}>
+              <div style={{ fontSize: 10, color: 'var(--m)', marginBottom: 8 }}>By revenue</div>
               {metrics.topTours.length === 0 ? (
                 <div style={{ color: 'var(--m)', fontSize: 12 }}>No tour data yet</div>
               ) : (
@@ -630,7 +615,9 @@ export default function Dashboard() {
                 const rows = agents
                   .filter((a) => a.id !== 'AGT-001')
                   .map((a) => {
-                    const agLeads = leads.filter((l) => l.agentId === a.id && l.stage !== 'Lost');
+                    const agLeads = metrics.filteredLeads.filter(
+                      (l) => l.agentId === a.id && l.stage !== 'Lost'
+                    );
                     const pipeline = agLeads.reduce((s, l) => s + (l.value || 0), 0);
                     const comm = Math.round(pipeline * (a.commissionPct / 100));
                     const tc = TIER_COLORS[a.tier] || '#6B7F74';

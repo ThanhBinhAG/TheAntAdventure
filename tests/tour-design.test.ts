@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDayGroups, parseDuration } from '../lib/tour-itinerary';
+import { buildDayGroups, buildItinerary, parseDuration, totalDurationDays } from '../lib/tour-itinerary';
 import { productPhotoSlotStatus } from '../lib/gallery-helpers';
 import { resolveProductPhotos } from '../lib/tour-photos';
 import type { Product } from '../lib/types';
@@ -26,9 +26,23 @@ const fullDay: Product = {
   dur: 'Full Day',
 };
 
+const serviceProduct: Product = {
+  ...halfDay,
+  code: 'SV-SVC-VOA-01',
+  name: 'E-Visa Support Service',
+  dur: 'Service',
+  cat: 'Visa',
+  dest: 'All Vietnam',
+  region: 'services',
+};
+
 describe('tour-itinerary', () => {
   it('parseDuration half day', () => {
     assert.equal(parseDuration('Half Day'), 0.5);
+  });
+
+  it('parseDuration service returns 0', () => {
+    assert.equal(parseDuration('Service'), 0);
   });
 
   it('pairs two half days on one day', () => {
@@ -41,6 +55,22 @@ describe('tour-itinerary', () => {
     const days = buildDayGroups([fullDay]);
     assert.equal(days.length, 1);
     assert.equal(days[0].items[0].code, 'B');
+  });
+
+  it('service-only selection has no days and zero total duration', () => {
+    const { addons, days } = buildItinerary([serviceProduct]);
+    assert.equal(addons.length, 1);
+    assert.equal(addons[0].code, 'SV-SVC-VOA-01');
+    assert.equal(days.length, 0);
+    assert.equal(totalDurationDays([serviceProduct]), 0);
+  });
+
+  it('half day plus visa splits addons from timed days', () => {
+    const { addons, days } = buildItinerary([serviceProduct, halfDay]);
+    assert.equal(addons.length, 1);
+    assert.equal(addons[0].code, 'SV-SVC-VOA-01');
+    assert.equal(days.length, 1);
+    assert.equal(days[0].items[0].code, 'A');
   });
 });
 

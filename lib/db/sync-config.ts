@@ -5,6 +5,8 @@ export const SYNC_ARRAY_TABLES = [
   'customers',
   'comms',
   'leads',
+  'tour_drafts',
+  'tour_outline_days',
   'bookings',
   'agents',
   'guides',
@@ -24,6 +26,7 @@ export const SYNC_ARRAY_TABLES = [
   'cruises',
   'transport',
   'restaurants',
+  'hotels',
   'suppliers',
 ] as const;
 
@@ -39,6 +42,7 @@ export const SYNC_PUSH_WAVES: SyncArrayTable[][] = [
     'agents',
     'guides',
     'leads',
+    'tour_drafts',
     'products',
     'staff',
     'tax_reports',
@@ -49,9 +53,11 @@ export const SYNC_PUSH_WAVES: SyncArrayTable[][] = [
     'cruises',
     'transport',
     'restaurants',
+    'hotels',
     'suppliers',
     'comms',
   ],
+  ['tour_outline_days'],
   ['bookings'],
   ['product_pricing', 'photos'],
   ['finance'],
@@ -64,6 +70,8 @@ export const TABLE_TO_STORE_KEY: Record<SyncArrayTable, keyof BackupData> = {
   customers: 'customers',
   comms: 'comms',
   leads: 'leads',
+  tour_drafts: 'tourDrafts',
+  tour_outline_days: 'tourOutlineDays',
   bookings: 'bookings',
   agents: 'agents',
   guides: 'guides',
@@ -83,6 +91,7 @@ export const TABLE_TO_STORE_KEY: Record<SyncArrayTable, keyof BackupData> = {
   cruises: 'cruises',
   transport: 'transport',
   restaurants: 'restaurants',
+  hotels: 'hotels',
   suppliers: 'specialSuppliers',
 };
 
@@ -93,6 +102,8 @@ export const HEALTH_COUNT_TABLES = [
   ...SYNC_ARRAY_TABLES,
   'booking_itinerary',
   'booking_activities',
+  'tour_outline_days',
+  'hotel_rooms',
   MESSAGES_TABLE,
 ] as const;
 

@@ -7,6 +7,12 @@ import { useStore } from '@/hooks/useStore';
 import type { Agent } from '@/lib/types';
 import AgentFormModal from '@/components/agents/AgentFormModal';
 
+const EARNED_STAGES = ['Confirmed', 'Completed', 'On Tour'] as const;
+
+function isActivePipelineLead(stage: string): boolean {
+  return stage !== 'Lost' && stage !== 'Completed';
+}
+
 export default function Agents() {
   const agents = useStore((s) => s.agents);
   const leads = useStore((s) => s.leads);
@@ -23,23 +29,22 @@ export default function Agents() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return agents.filter(
-      (a) => !q || a.name.toLowerCase().includes(q) || a.country.toLowerCase().includes(q) || (a.tier || '').toLowerCase().includes(q)
+      (a) =>
+        !q ||
+        a.name.toLowerCase().includes(q) ||
+        a.country.toLowerCase().includes(q) ||
+        (a.tier || '').toLowerCase().includes(q) ||
+        (a.notes || '').toLowerCase().includes(q)
     );
   }, [agents, search]);
 
   const totalAgents = agents.filter((a) => a.id !== 'AGT-001').length;
   const activeAgents = agents.filter((a) => a.id !== 'AGT-001' && a.status === 'Active').length;
-  const totalComm = leads.reduce((s, l) => {
-    const ag = agents.find((a) => a.id === l.agentId);
-    if (!ag || ag.commissionPct === 0) return s;
-    return s + (l.value || 0) * (ag.commissionPct / 100);
-  }, 0);
-
   const summaryRows = useMemo(() => {
     let grandGross = 0;
     let grandComm = 0;
     const rows = agents.map((a) => {
-      const agLeads = leads.filter((l) => l.agentId === a.id && ['Confirmed', 'Completed', 'On Tour'].includes(l.stage));
+      const agLeads = leads.filter((l) => l.agentId === a.id && EARNED_STAGES.includes(l.stage as (typeof EARNED_STAGES)[number]));
       const gross = agLeads.reduce((s, l) => s + (l.value || 0), 0);
       const comm = Math.round(gross * (a.commissionPct / 100));
       const net = gross - comm;
@@ -49,6 +54,8 @@ export default function Agents() {
     });
     return { rows, grandGross, grandComm, grandNet: grandGross - grandComm };
   }, [agents, leads]);
+
+  const totalEarnedComm = summaryRows.grandComm;
 
   const profile = profileId ? agents.find((a) => a.id === profileId) : null;
   const editAgent = editId ? agents.find((a) => a.id === editId) : null;
@@ -71,10 +78,16 @@ export default function Agents() {
     setFormMode(null);
   }
 
+  function openEdit(id: string) {
+    setProfileId(null);
+    setEditId(id);
+    setFormMode('edit');
+  }
+
   function renderAgentCard(a: Agent) {
-    const agLeads = leads.filter((l) => l.agentId === a.id);
+    const agLeads = leads.filter((l) => l.agentId === a.id && isActivePipelineLead(l.stage));
     const pipelineValue = agLeads.reduce((s, l) => s + (l.value || 0), 0);
-    const commEarned = Math.round(pipelineValue * (a.commissionPct / 100));
+    const pipelineComm = Math.round(pipelineValue * (a.commissionPct / 100));
     const tc = TIER_COLORS[a.tier] || '#6B7F74';
     const tb = TIER_BG[a.tier] || '#f9f9f9';
 
@@ -109,11 +122,21 @@ export default function Agents() {
             <div className="agent-stat-val">${fmt(pipelineValue)}</div>
           </div>
           <div className="agent-stat" style={{ background: '#FDF6E3' }}>
-            <div className="agent-stat-lbl">Est. Commission</div>
+            <div className="agent-stat-lbl">Est. Pipeline Comm</div>
             <div className="agent-stat-val" style={{ color: 'var(--gold)' }}>
-              ${fmt(commEarned)}
+              ${fmt(pipelineComm)}
             </div>
           </div>
+        </div>
+        <div className={`agent-note-preview${a.notes ? '' : ' empty'}`} title={a.notes || undefined}>
+          {a.notes ? (
+            <>
+              <div className="agent-note-preview-lbl">Note</div>
+              <div className="agent-note-preview-text">{a.notes}</div>
+            </>
+          ) : (
+            '—'
+          )}
         </div>
         <div style={{ marginTop: 10, fontSize: 11, color: 'var(--m)', borderTop: '1px solid #E2E8E4', paddingTop: 8 }}>
           {a.status === 'Active' ? <span style={{ color: 'var(--g)' }}>● Active</span> : <span style={{ color: 'var(--red)' }}>● Inactive</span>} · {a.currency} ·{' '}
@@ -130,9 +153,13 @@ export default function Agents() {
   }
 
   function renderProfileBody(a: Agent) {
+    const pipelineLeads = leads.filter((l) => l.agentId === a.id && isActivePipelineLead(l.stage));
+    const pipelineValue = pipelineLeads.reduce((s, l) => s + (l.value || 0), 0);
+    const pipelineComm = Math.round(pipelineValue * (a.commissionPct / 100));
+    const earnedLeads = leads.filter((l) => l.agentId === a.id && EARNED_STAGES.includes(l.stage as (typeof EARNED_STAGES)[number]));
+    const earnedGross = earnedLeads.reduce((s, l) => s + (l.value || 0), 0);
+    const earnedComm = Math.round(earnedGross * (a.commissionPct / 100));
     const leadsForAgent = leads.filter((l) => l.agentId === a.id);
-    const pipelineValue = leadsForAgent.reduce((s, l) => s + (l.value || 0), 0);
-    const commEarned = Math.round(pipelineValue * (a.commissionPct / 100));
     const tc = TIER_COLORS[a.tier] || '#6B7F74';
     const tb = TIER_BG[a.tier] || '#f9f9f9';
 
@@ -149,7 +176,7 @@ export default function Agents() {
             {a.tier}
           </span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
           <div style={{ background: '#E8F5EE', borderRadius: 8, padding: 12, textAlign: 'center' }}>
             <div style={{ fontSize: 11, color: 'var(--m)', textTransform: 'uppercase', letterSpacing: 0.7 }}>Commission</div>
             <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--gold)' }}>{a.commissionPct}%</div>
@@ -159,8 +186,12 @@ export default function Agents() {
             <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--g)' }}>${fmt(pipelineValue)}</div>
           </div>
           <div style={{ background: '#FDF6E3', borderRadius: 8, padding: 12, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--m)', textTransform: 'uppercase', letterSpacing: 0.7 }}>Est. Comm.</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--gold)' }}>${fmt(commEarned)}</div>
+            <div style={{ fontSize: 11, color: 'var(--m)', textTransform: 'uppercase', letterSpacing: 0.7 }}>Est. Pipeline Comm</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--gold)' }}>${fmt(pipelineComm)}</div>
+          </div>
+          <div style={{ background: '#F3FAF6', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--m)', textTransform: 'uppercase', letterSpacing: 0.7 }}>Earned Comm</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--g)' }}>${fmt(earnedComm)}</div>
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18, fontSize: 13 }}>
@@ -239,8 +270,7 @@ export default function Agents() {
                 className="btn btn-s btn-sm"
                 onClick={() => {
                   setProfileId(null);
-                  setEditId(a.id);
-                  setFormMode('edit');
+                  openEdit(a.id);
                 }}
               >
                 ✎ Edit
@@ -299,9 +329,9 @@ export default function Agents() {
           </div>
         </div>
         <div className="agent-pill" style={{ background: '#FDF6E3' }}>
-          <div className="agent-pill-lbl">Est. Commission (Pipeline)</div>
+          <div className="agent-pill-lbl">Earned Commission</div>
           <div className="agent-pill-val" style={{ color: 'var(--gold)' }}>
-            ${fmt(Math.round(totalComm))}
+            ${fmt(Math.round(totalEarnedComm))}
           </div>
         </div>
       </div>
@@ -320,6 +350,7 @@ export default function Agents() {
                   <th>Contact</th>
                   <th>Phone</th>
                   <th>Email</th>
+                  <th>Note</th>
                   <th style={{ textAlign: 'right' }}>Comm %</th>
                   <th style={{ textAlign: 'right' }}>Active Leads</th>
                   <th style={{ textAlign: 'right' }}>Pipeline</th>
@@ -350,6 +381,9 @@ export default function Agents() {
                       <td style={{ fontSize: 12 }}>{a.contactName !== '—' ? <b>{a.contactName}</b> : '—'}</td>
                       <td style={{ fontSize: 11.5 }}>{a.phone && a.phone !== '—' ? a.phone : '—'}</td>
                       <td style={{ fontSize: 11.5 }}>{a.email && a.email !== '—' ? a.email : '—'}</td>
+                      <td className="agent-note-cell" title={a.notes || undefined}>
+                        {a.notes ? <span className="agent-note-cell-text">{a.notes}</span> : <span className="agent-note-cell-empty">—</span>}
+                      </td>
                       <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--gold)' }}>{a.commissionPct}%</td>
                       <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--g)' }}>{agLeads.length}</td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>${fmt(pipeline)}</td>
@@ -363,9 +397,14 @@ export default function Agents() {
                             View
                           </button>
                           {a.id !== 'AGT-001' && (
-                            <button className="btn btn-danger btn-sm" type="button" onClick={() => handleDelete(a.id)}>
-                              🗑
-                            </button>
+                            <>
+                              <button className="btn btn-s btn-sm" type="button" onClick={() => openEdit(a.id)}>
+                                Edit
+                              </button>
+                              <button className="btn btn-danger btn-sm" type="button" onClick={() => handleDelete(a.id)}>
+                                🗑
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>

@@ -55,6 +55,12 @@ create table if not exists customers (
   budget          text,
   travel_month    text,
   children        smallint    default 0,
+  adults          smallint    default 2,
+  first_time      text,
+  intl_flights    text,
+  child_ages      text,
+  child_diet      text,
+  child_prefs     text,
   flights         text,
   visa_status     text,
   interests       text,
@@ -172,12 +178,50 @@ create table if not exists leads (
   probability     smallint    default 0,
   client_type     text,
   notes           text,
+  needs_tour_design boolean   default false,
+  tour_design_acked boolean   default false,
   created_at      timestamptz default now(),
   updated_at      timestamptz default now(),
   constraint chk_leads_stage check (stage in (
     'Inquiry','Designing','Quoted','Negotiation',
     'Confirmed','On Tour','Completed','Lost','Pending'
   ))
+);
+
+-- ============================================================
+--  MODULE 4b · TOUR DESIGN DRAFTS
+-- ============================================================
+
+create table if not exists tour_drafts (
+  id                  text primary key,
+  lead_id             text        unique references leads(id) on delete cascade,
+  cust_id             text        references customers(id) on delete cascade,
+  brief_json          jsonb,
+  outline_status      text        default 'draft',
+  outline_notes       text,
+  outline_sent_at     timestamptz,
+  outline_approved_at timestamptz,
+  outline_revision    smallint    default 0,
+  selected_codes      text[],
+  selected_package_id text,
+  markup_pct          numeric(5,2) default 30,
+  client_type         text        default 'b2c',
+  current_step        smallint    default 0,
+  created_at          timestamptz default now(),
+  updated_at          timestamptz default now(),
+  constraint chk_outline_status check (outline_status in ('draft', 'sent', 'approved'))
+);
+
+create table if not exists tour_outline_days (
+  id              uuid        primary key default gen_random_uuid(),
+  draft_id        text        not null references tour_drafts(id) on delete cascade,
+  day_number      smallint    not null,
+  outline_date    date,
+  location        text,
+  activities      text,
+  hotels          text,
+  sort_order      smallint    default 0,
+  constraint uq_tour_outline_day unique (draft_id, day_number)
 );
 
 -- ============================================================
@@ -497,6 +541,36 @@ create table if not exists restaurants (
   created_at      timestamptz default now()
 );
 
+create table if not exists hotels (
+  id              text primary key,
+  name            text not null,
+  destination     text not null,
+  category        text,
+  stars           text,
+  region          text not null,
+  status          text default 'Active',
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+
+create table if not exists hotel_rooms (
+  id              text primary key,
+  hotel_id        text not null references hotels(id) on delete cascade,
+  room_type       text not null,
+  view            text,
+  sqm             smallint,
+  low_mup         numeric,
+  high_mup        numeric,
+  festive_mup     numeric,
+  peak_mup        numeric,
+  low_net         numeric,
+  high_net        numeric,
+  festive_net     numeric,
+  peak_net        numeric,
+  sort_order      smallint default 0,
+  created_at      timestamptz default now()
+);
+
 -- ============================================================
 --  MODULE 13 · GALLERY
 -- ============================================================
@@ -601,6 +675,11 @@ create index if not exists idx_customers_agent_id on customers(agent_id);
 create index if not exists idx_leads_cust_id on leads(cust_id);
 create index if not exists idx_leads_stage on leads(stage);
 create index if not exists idx_leads_owner on leads(owner);
+create index if not exists idx_leads_needs_tour_design on leads(needs_tour_design) where needs_tour_design = true;
+
+create index if not exists idx_tour_drafts_lead_id on tour_drafts(lead_id);
+create index if not exists idx_tour_drafts_cust_id on tour_drafts(cust_id);
+create index if not exists idx_tour_outline_days_draft on tour_outline_days(draft_id);
 
 create index if not exists idx_bookings_cust_id on bookings(cust_id);
 create index if not exists idx_bookings_status on bookings(status);
@@ -637,6 +716,53 @@ create index if not exists idx_products_region on products(region);
 create index if not exists idx_products_category on products(category);
 
 -- ============================================================
+--  MODULE · WEATHER (live weekly forecast cache)
+-- ============================================================
+
+create table if not exists weather_destinations (
+  id              text primary key,
+  name            text        not null,
+  region          text        not null check (region in ('north', 'central', 'south')),
+  emoji           text,
+  latitude        numeric(9,6) not null,
+  longitude       numeric(9,6) not null,
+  elevation_m     int,
+  sort_order      int         default 0,
+  active          boolean     default true,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+
+create table if not exists weather_forecast_cache (
+  id              bigserial primary key,
+  destination_id  text        not null references weather_destinations(id) on delete cascade,
+  forecast_date   date        not null,
+  temp_min_c      numeric(5,1) not null,
+  temp_max_c      numeric(5,1) not null,
+  precip_mm       numeric(6,1) default 0,
+  wind_kmh        numeric(6,1),
+  weather_code    int         not null,
+  travel_rating   text        not null check (travel_rating in ('E', 'G', 'F', 'P')),
+  fetched_at      timestamptz not null,
+  expires_at      timestamptz not null,
+  unique (destination_id, forecast_date)
+);
+
+create table if not exists weather_fetch_log (
+  id                  bigserial primary key,
+  fetched_at          timestamptz default now(),
+  status              text        not null check (status in ('ok', 'error', 'skipped')),
+  destinations_count  int         default 0,
+  duration_ms         int,
+  error_message       text
+);
+
+create index if not exists idx_weather_cache_dest on weather_forecast_cache(destination_id);
+create index if not exists idx_weather_cache_date on weather_forecast_cache(forecast_date);
+create index if not exists idx_weather_cache_expires on weather_forecast_cache(expires_at);
+create index if not exists idx_weather_fetch_log_at on weather_fetch_log(fetched_at desc);
+
+-- ============================================================
 --  ROW LEVEL SECURITY (development — tighten before production)
 -- ============================================================
 
@@ -646,12 +772,14 @@ declare
 begin
   foreach t in array array[
     'agents','customers','products','product_pricing','guides','guide_reviews','leads',
+    'tour_drafts','tour_outline_days',
     'bookings','booking_changes','booking_itinerary','booking_activities',
     'comms','finance','accounts_receivable','accounts_payable','tax_reports',
     'staff','salary_records','tasks','contracts','feedback',
     'suppliers','supplier_tags','cruises','transport','restaurants',
     'photos','photo_tags','cal_events',
-    'chat_channels','chat_messages','chat_reactions','dev_notes'
+    'chat_channels','chat_messages','chat_reactions','dev_notes',
+    'weather_destinations','weather_forecast_cache','weather_fetch_log'
   ] loop
     execute format('alter table %I enable row level security', t);
     execute format('drop policy if exists dev_allow_all on %I', t);
@@ -691,6 +819,10 @@ create trigger trg_updated_at before update on guides
 
 drop trigger if exists trg_updated_at on leads;
 create trigger trg_updated_at before update on leads
+  for each row execute procedure set_updated_at();
+
+drop trigger if exists trg_updated_at on tour_drafts;
+create trigger trg_updated_at before update on tour_drafts
   for each row execute procedure set_updated_at();
 
 drop trigger if exists trg_updated_at on bookings;
@@ -735,6 +867,10 @@ create trigger trg_updated_at before update on cal_events
 
 drop trigger if exists trg_updated_at on dev_notes;
 create trigger trg_updated_at before update on dev_notes
+  for each row execute procedure set_updated_at();
+
+drop trigger if exists trg_updated_at on weather_destinations;
+create trigger trg_updated_at before update on weather_destinations
   for each row execute procedure set_updated_at();
 
 -- ============================================================

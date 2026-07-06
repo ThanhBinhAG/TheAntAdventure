@@ -9,17 +9,22 @@ import {
 } from '@/lib/db/auto-sync';
 import {
   checkSupabaseConnection,
+  clearLocalPersistedData,
   completeMigrationToSupabase,
+  getHydrationState,
   hydrateFromSupabase,
   isRemoteDataEnabled,
   pushSnapshotToSupabase,
   quickSupabasePing,
+  subscribeHydration,
   verifyLocalMatchesRemote,
   type ConnectionStatus,
+  type HydrationState,
   type VerifyResult,
 } from '@/lib/db/hydrate';
-import { isAutoSyncEnabled } from '@/lib/env';
-import { mergeRequiredProducts } from '@/lib/ensure-core-products';
+import { markHydrationFailed, updateBaselineCounts } from '@/lib/db/sync-lifecycle';
+import { countBackupRows } from '@/lib/db/sync-config';
+import { isAutoSyncEnabled, isSupabaseReadOnly } from '@/lib/env';
 import { useStore } from '@/lib/store';
 import { SupabaseContext } from '@/lib/SupabaseContext';
 
@@ -31,19 +36,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [verify, setVerify] = useState<VerifyResult | null>(null);
   const [checking, setChecking] = useState(false);
   const [autoSync, setAutoSync] = useState<AutoSyncState>(getAutoSyncState);
+  const [hydration, setHydration] = useState<HydrationState>(getHydrationState);
 
   const remoteEnabled = isRemoteDataEnabled();
   const autoSyncOn = isAutoSyncEnabled();
+  const readOnly = isSupabaseReadOnly();
 
   useEffect(() => subscribeAutoSync(setAutoSync), []);
+  useEffect(() => subscribeHydration(setHydration), []);
 
   useEffect(() => {
-    const current = useStore.getState().products;
-    const merged = mergeRequiredProducts(current);
-    if (merged.length !== current.length) {
-      useStore.setState({ products: merged });
+    clearLocalPersistedData();
+    if (!remoteEnabled) {
+      markHydrationFailed(
+        'Supabase bắt buộc — bật NEXT_PUBLIC_USE_SUPABASE=true và cấu hình URL + anon key trong .env.local'
+      );
     }
-  }, []);
+  }, [remoteEnabled]);
 
   const runConnectionCheck = useCallback(async () => {
     if (!remoteEnabled) return;
@@ -53,16 +62,26 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setChecking(false);
   }, [remoteEnabled]);
 
+  const runHydrate = useCallback(async () => {
+    if (!remoteEnabled) return false;
+    const ok = await hydrateFromSupabase();
+    if (ok) useStore.getState().rolloverIncompleteTasks();
+    setRemote(ok);
+    const status = await quickSupabasePing();
+    setConn(status);
+    return ok;
+  }, [remoteEnabled]);
+
   useEffect(() => {
     let cancelled = false;
 
-    // Supabase init runs in background — UI is never blocked
     async function initSupabase() {
       if (!remoteEnabled) return;
 
       try {
         const ok = await hydrateFromSupabase();
         if (cancelled) return;
+        if (ok) useStore.getState().rolloverIncompleteTasks();
         setRemote(ok);
 
         const status = await quickSupabasePing();
@@ -86,15 +105,36 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     };
   }, [remoteEnabled]);
 
-  async function handleSync() {
+  async function handleSync(force = false) {
+    if (force) {
+      const backup = useStore.getState().exportBackup();
+      const counts = countBackupRows(backup);
+      const summary = Object.entries(counts)
+        .filter(([, n]) => n > 0)
+        .map(([k, n]) => `${k}: ${n}`)
+        .join('\n');
+      const ok = window.confirm(
+        'Push toàn bộ snapshot lên Supabase?\n\n' +
+          'Catalogue (products) chỉ upsert — không xóa orphan.\n' +
+          'Các bảng khác có thể mirror nếu bạn chọn force.\n\n' +
+          (summary || '(empty)') +
+          '\n\nTiếp tục?'
+      );
+      if (!ok) return;
+    }
+
     setSyncing(true);
-    const result = await pushSnapshotToSupabase();
+    const result = await pushSnapshotToSupabase({ force });
     setSyncing(false);
     if (result.ok) {
       await runConnectionCheck();
       const v = await verifyLocalMatchesRemote();
       setVerify(v);
-      alert(`Đã push lên Supabase.\n\n${formatCounts(result.counts)}`);
+      if (v.ok) {
+        updateBaselineCounts(countBackupRows(useStore.getState().exportBackup()));
+      }
+      const warn = result.warnings?.length ? `\n\nCảnh báo:\n${result.warnings.join('\n')}` : '';
+      alert(`Đã push lên Supabase.${warn}\n\n${formatCounts(result.counts)}`);
     } else alert(result.error || 'Sync failed');
   }
 
@@ -103,6 +143,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const v = await verifyLocalMatchesRemote();
     setVerify(v);
     await runConnectionCheck();
+    setChecking(false);
+  }
+
+  async function handleRetryHydrate() {
+    setChecking(true);
+    await runHydrate();
     setChecking(false);
   }
 
@@ -132,6 +178,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const hydrationLabel =
+    hydration.phase === 'pending'
+      ? 'Đang tải từ Supabase…'
+      : hydration.phase === 'ready'
+        ? 'Dữ liệu sẵn sàng'
+        : `Lỗi tải: ${hydration.error ?? 'unknown'}`;
+
   return (
     <SupabaseContext.Provider
       value={{
@@ -145,27 +198,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         checking,
         syncing,
         autoSync,
+        hydration,
+        readOnly,
       }}
     >
       <AutoSyncListener />
-      <div className={`crm-remote-banner${panelOpen ? ' open' : ''}${remoteEnabled ? '' : ' crm-remote-off'}`}>
-        <button
-          type="button"
-          className="crm-remote-toggle"
-          onClick={() => setPanelOpen((o) => !o)}
-          title="Supabase migration panel"
-        >
-          <span className={`crm-conn-dot${conn?.ok ? ' ok' : conn ? ' fail' : remoteEnabled ? '' : ' fail'}`} />
-          ☁ {remote ? 'Supabase loaded' : remoteEnabled ? 'Supabase mode' : 'Supabase (off)'}
-          {autoSyncOn && autoSync.status === 'syncing' ? ' · đang lưu…' : ''}
-          {autoSyncOn && autoSync.status === 'synced' && autoSync.lastSyncedAt
-            ? ` · đã lưu ${autoSync.lastSyncedAt}`
-            : ''}
-          {autoSyncOn && autoSync.status === 'error' ? ' · lỗi lưu' : ''}
-          {conn?.ok && conn.latencyMs ? ` · ${conn.latencyMs}ms` : ''}
-        </button>
-
-        {panelOpen && (
+      {panelOpen && (
+        <div className={`crm-remote-banner open${remoteEnabled ? '' : ' crm-remote-off'}`}>
           <div className="crm-remote-panel">
             <div className="crm-remote-panel-head">
               <strong>Supabase Migration</strong>
@@ -177,7 +216,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             {!remoteEnabled && (
               <div className="crm-remote-status">
                 <span className="crm-status-fail">
-                  ✗ Chưa bật Supabase. Kiểm tra .env.local: USE_SUPABASE=true, URL, anon key — rồi restart npm run dev
+                  ✗ CRM chỉ dùng Supabase — không còn lưu localStorage. Kiểm tra .env.local: USE_SUPABASE=true, URL, anon key — rồi restart npm run dev
                 </span>
               </div>
             )}
@@ -190,13 +229,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                   ) : (
                     <span className="crm-status-fail">✗ {conn?.error || 'Đang kết nối…'}</span>
                   )}
-                  {autoSyncOn && (
+                  <div style={{ marginTop: 4, opacity: 0.95 }}>
+                    Hydrate: {hydrationLabel}
+                  </div>
+                  {readOnly && (
+                    <div style={{ marginTop: 4, opacity: 0.95 }} className="crm-status-fail">
+                      Chế độ chỉ đọc — không ghi lên Supabase
+                    </div>
+                  )}
+                  {autoSyncOn && !readOnly && (
                     <div style={{ marginTop: 4, opacity: 0.95 }}>
                       Auto-sync:{' '}
-                      {autoSync.status === 'idle' && 'bật — lưu lên Supabase sau ~2.5s khi bạn sửa'}
+                      {hydration.phase !== 'ready' && 'chờ hydrate…'}
+                      {hydration.phase === 'ready' && autoSync.status === 'idle' && 'bật — lưu sau ~2.5s khi bạn sửa'}
                       {autoSync.status === 'pending' && 'chờ lưu…'}
                       {autoSync.status === 'syncing' && 'đang lưu lên Supabase…'}
                       {autoSync.status === 'synced' && `đã lưu lúc ${autoSync.lastSyncedAt ?? '—'}`}
+                      {autoSync.status === 'blocked' && `bị chặn: ${autoSync.lastError ?? '—'}`}
                       {autoSync.status === 'error' && `lỗi: ${autoSync.lastError ?? 'unknown'}`}
                     </div>
                   )}
@@ -206,13 +255,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                   <button type="button" onClick={runConnectionCheck} disabled={checking}>
                     {checking ? '…' : 'Test connection'}
                   </button>
-                  <button type="button" onClick={handleSync} disabled={syncing}>
-                    {syncing ? '…' : 'Push full snapshot'}
+                  {hydration.phase === 'failed' && (
+                    <button type="button" onClick={handleRetryHydrate} disabled={checking}>
+                      {checking ? '…' : 'Thử load lại'}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => handleSync(false)} disabled={syncing || readOnly}>
+                    {syncing ? '…' : 'Push snapshot'}
+                  </button>
+                  <button type="button" onClick={() => handleSync(true)} disabled={syncing || readOnly}>
+                    {syncing ? '…' : 'Push có xác nhận'}
                   </button>
                   <button type="button" onClick={handleVerify} disabled={checking}>
                     Verify counts
                   </button>
-                  <button type="button" className="danger" onClick={handleCompleteMigration} disabled={syncing}>
+                  <button type="button" className="danger" onClick={handleCompleteMigration} disabled={syncing || readOnly}>
                     Hoàn tất migration
                   </button>
                 </div>
@@ -249,8 +306,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               </>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
       {children}
     </SupabaseContext.Provider>
   );

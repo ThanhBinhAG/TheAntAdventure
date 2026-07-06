@@ -1,9 +1,10 @@
-import { isAutoSyncEnabled, isRemoteDataEnabled } from '../env';
+import { isAutoSyncEnabled, isRemoteDataEnabled, isSupabaseReadOnly } from '../env';
 import type { BackupData } from '../types';
 import { TABLE_TO_STORE_KEY, SYNC_ARRAY_TABLES, type SyncArrayTable } from './sync-config';
+import { isSyncAllowed } from './sync-lifecycle';
 import { pushSnapshotToSupabase, pushTablesToSupabase } from './sync-push';
 
-export type AutoSyncStatus = 'idle' | 'pending' | 'syncing' | 'synced' | 'error';
+export type AutoSyncStatus = 'idle' | 'pending' | 'syncing' | 'synced' | 'error' | 'blocked';
 
 export type AutoSyncState = {
   status: AutoSyncStatus;
@@ -69,11 +70,27 @@ export async function withoutAutoSyncAsync<T>(fn: () => Promise<T>): Promise<T> 
 }
 
 function canAutoSync() {
-  return suppressCount === 0 && isRemoteDataEnabled() && isAutoSyncEnabled();
+  return (
+    suppressCount === 0 &&
+    isRemoteDataEnabled() &&
+    isAutoSyncEnabled() &&
+    !isSupabaseReadOnly() &&
+    isSyncAllowed()
+  );
 }
 
 /** Queue sync for specific tables (debounced) */
 export function scheduleAutoSync(changed?: { tables?: SyncArrayTable[]; messages?: boolean }) {
+  if (!isRemoteDataEnabled() || !isAutoSyncEnabled() || isSupabaseReadOnly()) return;
+
+  if (!isSyncAllowed()) {
+    setSyncState({
+      status: 'blocked',
+      lastError: 'Đang chờ tải dữ liệu từ Supabase — sync tạm dừng',
+    });
+    return;
+  }
+
   if (!canAutoSync()) return;
 
   if (changed?.tables) changed.tables.forEach((t) => pendingTables.add(t));
@@ -115,9 +132,9 @@ async function flushAutoSync() {
 
     if (result.ok) {
       setSyncState({
-        status: 'synced',
+        status: result.warnings?.length ? 'blocked' : 'synced',
         lastSyncedAt: new Date().toLocaleTimeString(),
-        lastError: null,
+        lastError: result.warnings?.length ? result.warnings.join('; ') : null,
       });
     } else {
       setSyncState({ status: 'error', lastError: result.error ?? 'Sync failed' });

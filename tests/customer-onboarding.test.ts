@@ -5,6 +5,7 @@ import {
   buildCustomerFromForm,
   buildInquiryComm,
   buildInquiryLead,
+  createInquiryLeadForCustomer,
   findDuplicateCustomerByEmail,
   formatDuplicateEmailMessage,
   isCustomerEmailAvailable,
@@ -197,6 +198,44 @@ describe('registerNewCustomer', () => {
     assert.equal(result.lead?.owner, 'Linh');
     assert.equal(result.comm?.dir, 'inbound');
     assert.equal(result.comm?.cid, result.customer.id);
+  });
+
+  it('flags tour design when requested from Sales Pipeline', () => {
+    const form = {
+      ...EMPTY_CUSTOMER_FORM,
+      name: 'Pipeline Client',
+      email: 'pipeline@example.com',
+    };
+
+    const result = registerNewCustomer({
+      form,
+      customers: seedCustomers,
+      agents: sampleAgents,
+      leads: seedLeads,
+      flagTourDesign: true,
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.lead?.needsTourDesign, true);
+    assert.equal(result.lead?.tourDesignAcked, false);
+    assert.match(result.lead?.nextAction ?? '', /tour design/i);
+  });
+
+  it('createInquiryLeadForCustomer builds inquiry for existing client', () => {
+    const customer = seedCustomers[0];
+    const lead = createInquiryLeadForCustomer(customer, seedLeads);
+    assert.equal(lead.custId, customer.id);
+    assert.equal(lead.stage, 'Inquiry');
+    assert.equal(lead.id, nextLeadId(seedLeads));
+    assert.match(lead.notes ?? '', /Auto-created on customer registration/);
+  });
+
+  it('createInquiryLeadForCustomer supports tour design flag', () => {
+    const customer = seedCustomers[0];
+    const lead = createInquiryLeadForCustomer(customer, seedLeads, { flagTourDesign: true });
+    assert.equal(lead.needsTourDesign, true);
+    assert.match(lead.nextAction ?? '', /tour design/i);
   });
 
   it('rejects duplicate email', () => {

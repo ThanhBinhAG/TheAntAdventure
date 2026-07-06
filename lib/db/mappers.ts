@@ -12,9 +12,15 @@ import type {
   Product,
   ProductPricing,
   StaffMember,
+  TourDraft,
+  TourOutlineDay,
 } from '../types';
+import { normalizeMoneyUSD } from '../money';
 
 type Row = Record<string, unknown>;
+
+const money = (v: unknown) => normalizeMoneyUSD(Number(v ?? 0));
+const moneyAbs = (v: unknown) => normalizeMoneyUSD(Number(v ?? 0), { absolute: true });
 
 /** Empty string → null for optional FK columns (Postgres rejects '' as FK). */
 export function fkOrNull(value: unknown): string | null {
@@ -44,6 +50,12 @@ export function rowToCustomer(r: Row): Customer {
     budget: r.budget ? String(r.budget) : undefined,
     travelMonth: r.travel_month ? String(r.travel_month) : undefined,
     children: r.children != null ? Number(r.children) : undefined,
+    adults: r.adults != null ? Number(r.adults) : undefined,
+    firstTime: r.first_time ? String(r.first_time) : undefined,
+    intlFlights: r.intl_flights ? String(r.intl_flights) : undefined,
+    childAges: r.child_ages ? String(r.child_ages) : undefined,
+    childDiet: r.child_diet ? String(r.child_diet) : undefined,
+    childPrefs: r.child_prefs ? String(r.child_prefs) : undefined,
     flights: r.flights ? String(r.flights) : undefined,
     visaStatus: r.visa_status ? String(r.visa_status) : undefined,
     interests: r.interests ? String(r.interests) : undefined,
@@ -70,6 +82,12 @@ export function customerToRow(c: Customer): Row {
     budget: c.budget ?? null,
     travel_month: c.travelMonth ?? null,
     children: c.children ?? 0,
+    adults: c.adults ?? 2,
+    first_time: c.firstTime ?? null,
+    intl_flights: c.intlFlights ?? null,
+    child_ages: c.childAges ?? null,
+    child_diet: c.childDiet ?? null,
+    child_prefs: c.childPrefs ?? null,
     flights: c.flights ?? null,
     visa_status: c.visaStatus ?? null,
     interests: c.interests ?? null,
@@ -116,7 +134,7 @@ export function rowToLead(r: Row): Lead {
     custId: String(r.cust_id ?? ''),
     tour: String(r.tour ?? ''),
     pax: r.pax != null ? Number(r.pax) : 1,
-    value: Number(r.value ?? 0),
+    value: money(r.value),
     month: String(r.month ?? ''),
     stage: String(r.stage ?? 'Inquiry'),
     owner: String(r.owner ?? ''),
@@ -126,6 +144,8 @@ export function rowToLead(r: Row): Lead {
     clientType: r.client_type ? String(r.client_type) : undefined,
     currency: r.currency ? String(r.currency) : undefined,
     notes: r.notes ? String(r.notes) : undefined,
+    needsTourDesign: r.needs_tour_design != null ? Boolean(r.needs_tour_design) : undefined,
+    tourDesignAcked: r.tour_design_acked != null ? Boolean(r.tour_design_acked) : undefined,
   };
 }
 
@@ -135,7 +155,7 @@ export function leadToRow(l: Lead): Row {
     cust_id: l.custId,
     tour: l.tour,
     pax: l.pax,
-    value: l.value,
+    value: money(l.value),
     currency: l.currency ?? 'USD',
     month: l.month,
     stage: l.stage,
@@ -145,6 +165,8 @@ export function leadToRow(l: Lead): Row {
     probability: l.probability ?? null,
     client_type: l.clientType ?? null,
     notes: l.notes ?? null,
+    needs_tour_design: l.needsTourDesign ?? false,
+    tour_design_acked: l.tourDesignAcked ?? false,
   };
 }
 
@@ -185,8 +207,8 @@ export function assembleBookings(
       pax: Number(r.pax ?? 1),
       start: r.start_date ? String(r.start_date) : '',
       end: r.end_date ? String(r.end_date) : '',
-      total: Number(r.total ?? 0),
-      deposit: Number(r.deposit ?? 0),
+      total: moneyAbs(r.total),
+      deposit: moneyAbs(r.deposit),
       status: String(r.status ?? ''),
       guide: String(r.guide_name ?? ''),
       hotel: String(r.hotel ?? ''),
@@ -205,8 +227,8 @@ export function bookingToRow(b: Booking): Row {
     pax: b.pax,
     start_date: b.start || null,
     end_date: b.end || null,
-    total: b.total,
-    deposit: b.deposit,
+    total: moneyAbs(b.total),
+    deposit: moneyAbs(b.deposit),
     status: b.status,
     guide_name: b.guide,
     hotel: b.hotel,
@@ -249,7 +271,7 @@ export function rowToGuide(r: Row): Guide {
     langs: String(r.languages ?? ''),
     specialty: String(r.specialty ?? ''),
     license: String(r.license_number ?? ''),
-    rate: Number(r.daily_rate ?? 0),
+    rate: money(r.daily_rate),
     rating: String(r.rating ?? ''),
     status: String(r.status ?? ''),
     photo: String(r.photo_url ?? ''),
@@ -274,7 +296,7 @@ export function guideToRow(g: Guide): Row {
     languages: g.langs,
     specialty: g.specialty,
     license_number: g.license,
-    daily_rate: g.rate,
+    daily_rate: money(g.rate),
     rating: g.rating,
     status: g.status,
     photo_url: g.photo,
@@ -324,27 +346,27 @@ export function productToRow(p: Product): Row {
 export function rowToProductPricing(r: Row): ProductPricing {
   return {
     productCode: String(r.product_code),
-    stdCost: Number(r.std_cost ?? 0),
-    p1: Number(r.p1 ?? 0),
-    p2: Number(r.p2 ?? 0),
-    p3: Number(r.p3 ?? 0),
-    p4: Number(r.p4 ?? 0),
-    p5: Number(r.p5 ?? 0),
-    p6: Number(r.p6 ?? 0),
-    p7: Number(r.p7 ?? 0),
-    p8: Number(r.p8 ?? 0),
-    p9: Number(r.p9 ?? 0),
-    p10: Number(r.p10 ?? 0),
-    c1: Number(r.c1 ?? 0),
-    c2: Number(r.c2 ?? 0),
-    c3: Number(r.c3 ?? 0),
-    c4: Number(r.c4 ?? 0),
-    c5: Number(r.c5 ?? 0),
-    c6: Number(r.c6 ?? 0),
-    c7: Number(r.c7 ?? 0),
-    c8: Number(r.c8 ?? 0),
-    c9: Number(r.c9 ?? 0),
-    c10: Number(r.c10 ?? 0),
+    stdCost: money(r.std_cost),
+    p1: money(r.p1),
+    p2: money(r.p2),
+    p3: money(r.p3),
+    p4: money(r.p4),
+    p5: money(r.p5),
+    p6: money(r.p6),
+    p7: money(r.p7),
+    p8: money(r.p8),
+    p9: money(r.p9),
+    p10: money(r.p10),
+    c1: money(r.c1),
+    c2: money(r.c2),
+    c3: money(r.c3),
+    c4: money(r.c4),
+    c5: money(r.c5),
+    c6: money(r.c6),
+    c7: money(r.c7),
+    c8: money(r.c8),
+    c9: money(r.c9),
+    c10: money(r.c10),
     incl: {
       g: Boolean(r.incl_guide),
       tr: Boolean(r.incl_transport),
@@ -358,27 +380,27 @@ export function rowToProductPricing(r: Row): ProductPricing {
 export function productPricingToRow(p: ProductPricing): Row {
   return {
     product_code: p.productCode,
-    std_cost: p.stdCost,
-    p1: p.p1,
-    p2: p.p2,
-    p3: p.p3,
-    p4: p.p4,
-    p5: p.p5,
-    p6: p.p6,
-    p7: p.p7,
-    p8: p.p8,
-    p9: p.p9,
-    p10: p.p10,
-    c1: p.c1,
-    c2: p.c2,
-    c3: p.c3,
-    c4: p.c4,
-    c5: p.c5,
-    c6: p.c6,
-    c7: p.c7,
-    c8: p.c8,
-    c9: p.c9,
-    c10: p.c10,
+    std_cost: money(p.stdCost),
+    p1: money(p.p1),
+    p2: money(p.p2),
+    p3: money(p.p3),
+    p4: money(p.p4),
+    p5: money(p.p5),
+    p6: money(p.p6),
+    p7: money(p.p7),
+    p8: money(p.p8),
+    p9: money(p.p9),
+    p10: money(p.p10),
+    c1: money(p.c1),
+    c2: money(p.c2),
+    c3: money(p.c3),
+    c4: money(p.c4),
+    c5: money(p.c5),
+    c6: money(p.c6),
+    c7: money(p.c7),
+    c8: money(p.c8),
+    c9: money(p.c9),
+    c10: money(p.c10),
     incl_guide: p.incl.g,
     incl_transport: p.incl.tr,
     incl_tickets: p.incl.tk,
@@ -425,10 +447,10 @@ export function financeToRow(r: Row): Row {
     type: r.type,
     txn_date: r.date ?? r.txn_date ?? null,
     month: r.month,
-    revenue: r.rev ?? r.revenue ?? 0,
-    cost: r.cost ?? 0,
-    cash_in: r.cashIn ?? r.cash_in ?? 0,
-    cash_out: r.cashOut ?? r.cash_out ?? 0,
+    revenue: moneyAbs(r.rev ?? r.revenue),
+    cost: moneyAbs(r.cost),
+    cash_in: moneyAbs(r.cashIn ?? r.cash_in),
+    cash_out: moneyAbs(r.cashOut ?? r.cash_out),
     status: r.status,
     invoice_ref: r.inv ?? r.invoice_ref ?? null,
     notes: r.notes ?? null,
@@ -441,8 +463,8 @@ export function arToRow(r: Row): Row {
     finance_id: fkOrNull(r.finId ?? r.finance_id),
     cust_name: r.custName ?? r.cust_name,
     tour: r.tour,
-    invoice_amount: r.invoiceAmt ?? r.invoice_amount ?? 0,
-    deposit_paid: r.depositPaid ?? r.deposit_paid ?? 0,
+    invoice_amount: moneyAbs(r.invoiceAmt ?? r.invoice_amount),
+    deposit_paid: moneyAbs(r.depositPaid ?? r.deposit_paid),
     due_date: r.dueDate ?? r.due_date ?? null,
     status: r.status,
   };
@@ -453,7 +475,7 @@ export function apToRow(r: Row): Row {
     id: r.id,
     supplier: r.supplier,
     description: r.description,
-    amount: r.amount ?? 0,
+    amount: moneyAbs(r.amount),
     due_date: r.dueDate ?? r.due_date ?? null,
     status: r.status,
     category: r.category ?? null,
@@ -464,11 +486,11 @@ export function taxToRow(r: Row): Row {
   return {
     id: r.id,
     period: r.period,
-    revenue: r.rev ?? r.revenue ?? 0,
-    expenses: r.expenses ?? 0,
-    vat_output: r.vat_out ?? r.vat_output ?? 0,
-    vat_input: r.vat_in ?? r.vat_input ?? 0,
-    corp_tax: r.corp_tax ?? 0,
+    revenue: moneyAbs(r.rev ?? r.revenue),
+    expenses: moneyAbs(r.expenses),
+    vat_output: moneyAbs(r.vat_out ?? r.vat_output),
+    vat_input: moneyAbs(r.vat_in ?? r.vat_input),
+    corp_tax: moneyAbs(r.corp_tax),
   };
 }
 
@@ -540,10 +562,10 @@ export function rowToFinance(r: Row): Row {
     type: r.type,
     date: r.txn_date,
     month: r.month,
-    rev: r.revenue,
-    cost: r.cost,
-    cashIn: r.cash_in,
-    cashOut: r.cash_out,
+    rev: money(r.revenue),
+    cost: money(r.cost),
+    cashIn: money(r.cash_in),
+    cashOut: money(r.cash_out),
     status: r.status,
     inv: r.invoice_ref,
     notes: r.notes,
@@ -556,8 +578,8 @@ export function rowToAr(r: Row): Row {
     finId: r.finance_id,
     custName: r.cust_name,
     tour: r.tour,
-    invoiceAmt: r.invoice_amount,
-    depositPaid: r.deposit_paid,
+    invoiceAmt: money(r.invoice_amount),
+    depositPaid: money(r.deposit_paid),
     balance: r.balance,
     dueDate: r.due_date,
     status: r.status,
@@ -569,7 +591,7 @@ export function rowToAp(r: Row): Row {
     id: r.id,
     supplier: r.supplier,
     description: r.description,
-    amount: r.amount,
+    amount: money(r.amount),
     dueDate: r.due_date,
     status: r.status,
     category: r.category,
@@ -580,11 +602,11 @@ export function rowToTax(r: Row): Row {
   return {
     id: r.id,
     period: r.period,
-    rev: r.revenue,
-    expenses: r.expenses,
-    vat_out: r.vat_output,
-    vat_in: r.vat_input,
-    corp_tax: r.corp_tax,
+    rev: money(r.revenue),
+    expenses: money(r.expenses),
+    vat_out: money(r.vat_output),
+    vat_in: money(r.vat_input),
+    corp_tax: money(r.corp_tax),
   };
 }
 
@@ -761,9 +783,9 @@ export function contractToRow(r: Row): Row {
     exclusions: r.exclusions ?? null,
     flights_info: r.flights ?? r.flights_info ?? null,
     currency: r.currency ?? 'USD',
-    total: r.total ?? 0,
+    total: moneyAbs(r.total),
     deposit_pct: r.depositPct ?? r.deposit_pct ?? 30,
-    deposit_amount: r.depositAmt ?? r.deposit_amount ?? 0,
+    deposit_amount: moneyAbs(r.depositAmt ?? r.deposit_amount),
     balance_due_date: r.balanceDueDate ?? r.balance_due_date ?? null,
     status: r.status ?? 'Draft',
     created_at: r.createdAt ?? r.created_at ?? null,
@@ -789,9 +811,9 @@ export function rowToContract(r: Row): Row {
     exclusions: r.exclusions,
     flights: r.flights_info,
     currency: r.currency,
-    total: r.total,
+    total: money(r.total),
     depositPct: r.deposit_pct,
-    depositAmt: r.deposit_amount,
+    depositAmt: money(r.deposit_amount),
     balanceDueDate: r.balance_due_date,
     status: r.status,
     createdAt: r.created_at,
@@ -803,6 +825,7 @@ export function rowToContract(r: Row): Row {
 export function cruiseToRow(r: Row): Row {
   return {
     id: r.id,
+    supplier_id: fkOrNull(r.supplierId ?? r.supplier_id),
     name: r.name,
     route: r.route ?? null,
     cabins: r.cabins ?? null,
@@ -814,12 +837,23 @@ export function cruiseToRow(r: Row): Row {
 }
 
 export function rowToCruise(r: Row): Row {
-  return { ...r, valid: r.valid_until };
+  return {
+    id: r.id,
+    supplierId: r.supplier_id ?? undefined,
+    name: r.name,
+    route: r.route,
+    cabins: r.cabins,
+    rate: r.rate,
+    valid: r.valid_until,
+    rating: r.rating,
+    notes: r.notes,
+  };
 }
 
 export function transportToRow(r: Row): Row {
   return {
     id: r.id,
+    supplier_id: fkOrNull(r.supplierId ?? r.supplier_id),
     name: r.name,
     region: r.region ?? null,
     vehicles: r.vehicles ?? null,
@@ -828,9 +862,22 @@ export function transportToRow(r: Row): Row {
   };
 }
 
+export function rowToTransport(r: Row): Row {
+  return {
+    id: r.id,
+    supplierId: r.supplier_id ?? undefined,
+    name: r.name,
+    region: r.region,
+    vehicles: r.vehicles,
+    rate: r.rate,
+    notes: r.notes,
+  };
+}
+
 export function restaurantToRow(r: Row): Row {
   return {
     id: r.id,
+    supplier_id: fkOrNull(r.supplierId ?? r.supplier_id),
     name: r.name,
     city: r.city ?? null,
     cuisine: r.cuisine ?? null,
@@ -842,7 +889,84 @@ export function restaurantToRow(r: Row): Row {
 }
 
 export function rowToRestaurant(r: Row): Row {
-  return { ...r, set: r.set_menu, cap: r.capacity };
+  return {
+    id: r.id,
+    supplierId: r.supplier_id ?? undefined,
+    name: r.name,
+    city: r.city,
+    cuisine: r.cuisine,
+    set: r.set_menu,
+    cap: r.capacity,
+    rating: r.rating,
+    notes: r.notes,
+  };
+}
+
+export function hotelToRow(h: Row): Row {
+  return {
+    id: h.id,
+    name: h.name,
+    destination: h.dest ?? h.destination,
+    category: h.cat ?? h.category ?? null,
+    stars: h.stars ?? null,
+    region: h.region,
+    status: h.status ?? 'Active',
+  };
+}
+
+export function roomToRow(hotelId: string, room: Row, sortOrder: number): Row {
+  return {
+    id: room.id ?? `${hotelId}-R${sortOrder + 1}`,
+    hotel_id: hotelId,
+    room_type: room.type ?? room.room_type,
+    view: room.view ?? null,
+    sqm: room.sqm ?? null,
+    low_mup: room.lm ?? room.low_mup ?? 0,
+    high_mup: room.hm ?? room.high_mup ?? 0,
+    festive_mup: room.fm ?? room.festive_mup ?? 0,
+    peak_mup: room.pm ?? room.peak_mup ?? 0,
+    low_net: room.ln ?? room.low_net ?? 0,
+    high_net: room.hn ?? room.high_net ?? 0,
+    festive_net: room.fn ?? room.festive_net ?? 0,
+    peak_net: room.pn ?? room.peak_net ?? 0,
+    sort_order: sortOrder,
+  };
+}
+
+export function rowToRoom(r: Row): Row {
+  return {
+    id: r.id,
+    type: r.room_type,
+    view: r.view ?? undefined,
+    sqm: r.sqm != null ? Number(r.sqm) : undefined,
+    lm: Number(r.low_mup ?? 0),
+    hm: Number(r.high_mup ?? 0),
+    fm: Number(r.festive_mup ?? 0),
+    pm: Number(r.peak_mup ?? 0),
+    ln: Number(r.low_net ?? 0),
+    hn: Number(r.high_net ?? 0),
+    fn: Number(r.festive_net ?? 0),
+    pn: Number(r.peak_net ?? 0),
+  };
+}
+
+export function assembleHotels(hotelRows: Row[], roomRows: Row[]): Row[] {
+  const roomsByHotel = new Map<string, Row[]>();
+  for (const r of [...roomRows].sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))) {
+    const hid = String(r.hotel_id);
+    if (!roomsByHotel.has(hid)) roomsByHotel.set(hid, []);
+    roomsByHotel.get(hid)!.push(rowToRoom(r));
+  }
+  return hotelRows.map((h) => ({
+    id: h.id,
+    name: h.name,
+    dest: h.destination,
+    cat: h.category ?? '',
+    stars: h.stars ?? '',
+    region: h.region,
+    status: h.status ?? 'Active',
+    rooms: roomsByHotel.get(String(h.id)) ?? [],
+  }));
 }
 
 export function staffToRowExtended(s: StaffMember & Row): Row {
@@ -861,6 +985,70 @@ export function rowToStaffExtended(r: Row): StaffMember & Row {
     start: r.start_date,
     contract: r.contract_type,
     baseSalary: r.base_salary,
+  };
+}
+
+export function rowToTourDraft(r: Row): TourDraft {
+  return {
+    id: String(r.id),
+    leadId: String(r.lead_id ?? ''),
+    custId: String(r.cust_id ?? ''),
+    briefJson: (r.brief_json as Record<string, unknown>) ?? undefined,
+    outlineStatus: (r.outline_status as TourDraft['outlineStatus']) ?? 'draft',
+    outlineNotes: r.outline_notes ? String(r.outline_notes) : undefined,
+    outlineSentAt: r.outline_sent_at ? String(r.outline_sent_at) : undefined,
+    outlineApprovedAt: r.outline_approved_at ? String(r.outline_approved_at) : undefined,
+    outlineRevision: r.outline_revision != null ? Number(r.outline_revision) : undefined,
+    selectedCodes: Array.isArray(r.selected_codes) ? (r.selected_codes as string[]) : undefined,
+    selectedPackageId: r.selected_package_id ? String(r.selected_package_id) : null,
+    markupPct: r.markup_pct != null ? Number(r.markup_pct) : undefined,
+    clientType: (r.client_type as TourDraft['clientType']) ?? undefined,
+    currentStep: r.current_step != null ? Number(r.current_step) : undefined,
+  };
+}
+
+export function tourDraftToRow(d: TourDraft): Row {
+  return {
+    id: d.id,
+    lead_id: fkOrNull(d.leadId),
+    cust_id: fkOrNull(d.custId),
+    brief_json: d.briefJson ?? null,
+    outline_status: d.outlineStatus ?? 'draft',
+    outline_notes: d.outlineNotes ?? null,
+    outline_sent_at: d.outlineSentAt ?? null,
+    outline_approved_at: d.outlineApprovedAt ?? null,
+    outline_revision: d.outlineRevision ?? 0,
+    selected_codes: d.selectedCodes ?? null,
+    selected_package_id: d.selectedPackageId ?? null,
+    markup_pct: d.markupPct ?? 30,
+    client_type: d.clientType ?? 'b2c',
+    current_step: d.currentStep ?? 0,
+  };
+}
+
+export function rowToTourOutlineDay(r: Row): TourOutlineDay {
+  return {
+    id: String(r.id),
+    draftId: String(r.draft_id ?? ''),
+    dayNumber: Number(r.day_number ?? 1),
+    date: r.outline_date ? String(r.outline_date) : undefined,
+    location: r.location ? String(r.location) : undefined,
+    activities: r.activities ? String(r.activities) : undefined,
+    hotels: r.hotels ? String(r.hotels) : undefined,
+    sortOrder: r.sort_order != null ? Number(r.sort_order) : undefined,
+  };
+}
+
+export function tourOutlineDayToRow(d: TourOutlineDay): Row {
+  return {
+    id: d.id,
+    draft_id: d.draftId,
+    day_number: d.dayNumber,
+    outline_date: d.date || null,
+    location: d.location ?? null,
+    activities: d.activities ?? null,
+    hotels: d.hotels ?? null,
+    sort_order: d.sortOrder ?? d.dayNumber,
   };
 }
 

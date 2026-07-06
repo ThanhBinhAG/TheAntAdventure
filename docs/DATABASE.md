@@ -42,6 +42,9 @@ Schema **quan hệ hoàn toàn** — **không dùng JSONB** làm kho document.
 erDiagram
   agents ||--o{ customers : "agent_id"
   customers ||--o{ leads : "cust_id"
+  leads ||--o{ tour_drafts : "lead_id"
+  tour_drafts ||--o{ tour_outline_days : "draft_id"
+  customers ||--o{ tour_drafts : "cust_id"
   customers ||--o{ bookings : "cust_id"
   customers ||--o{ comms : "cust_id"
   leads ||--o{ bookings : "lead_id"
@@ -74,6 +77,7 @@ erDiagram
 | 1 | Customers | `customers` | → `agents` |
 | 2 | B2B Agents | `agents` | |
 | 3 | Sales Pipeline | `leads` | → `customers` |
+| 3b | Tour Design drafts | `tour_drafts` | `tour_outline_days` → `leads`, `customers` |
 | 4 | Bookings | `bookings` | `booking_itinerary`, `booking_activities`, `booking_changes` |
 | 5 | Comms (trong Customer profile) | `comms` | |
 | 6 | Guides | `guides` | `guide_reviews` |
@@ -265,7 +269,7 @@ Mapping đầy đủ trong SQL comments — xem [`schema.sql`](../supabase/schem
 - **RESTRICT** trên `bookings.cust_id`, `contracts.booking_id` — tránh xóa nhầm booking đang có hợp đồng.
 - **Generated columns:** `accounts_receivable.balance`, `tax_reports.vat_payable`, `salary_records.net_pay`.
 - **Index** theo cột filter thường dùng: stage, status, assignee, due_date, channel_id.
-- **RLS:** policy `dev_allow_all` — **chỉ dev**; production cần auth + policy theo role.
+- **RLS:** production uses `authenticated_access` (see `supabase/rls-authenticated.sql`); `dev_allow_all` is dev-only in `schema.sql`.
 
 ---
 
@@ -322,7 +326,7 @@ Mapper nên nằm ở `lib/db/mappers/` — một file per entity.
 - [x] Import dữ liệu (`import-v5-data.sql`)
 - [x] `verify-counts-v5.sql` — rows ≈ expected
 - [x] App adapter v5 (`lib/db/supabase.ts` + `lib/db/mappers.ts`)
-- [ ] Thắt RLS + Supabase Auth
+- [x] Thắt RLS + Supabase Auth — `supabase/rls-authenticated.sql` + `/login` + middleware
 - [ ] Backup schedule (Supabase dashboard)
 
 ---

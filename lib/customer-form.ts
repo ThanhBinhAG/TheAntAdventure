@@ -97,17 +97,17 @@ export function customerToForm(c: Customer): CustomerFormData {
     hotelTier: c.hotelTier || 'Boutique 4★',
     budget: c.budget || '$2,000–$3,500/pax',
     travelMonth: c.travelMonth || '',
-    adults: '2',
-    firstTime: 'unknown',
+    adults: String(c.adults ?? 2),
+    firstTime: c.firstTime || 'unknown',
     flights: c.flights || 'yes',
-    intlFlights: 'not-included',
+    intlFlights: c.intlFlights || 'not-included',
     visaStatus: c.visaStatus || 'exempt',
     interests: c.interests || '',
     donts: c.donts || '',
     numChildren: String(c.children || 0),
-    childAges: '',
-    childDiet: '',
-    childPrefs: '',
+    childAges: c.childAges || '',
+    childDiet: c.childDiet || '',
+    childPrefs: c.childPrefs || '',
   };
 }
 
@@ -118,8 +118,8 @@ export function formToCustomer(
   agentId?: string
 ): Customer {
   const childNote =
-    Number(form.numChildren) > 0
-      ? `\nChildren: ${form.numChildren}${form.childAges ? ` (${form.childAges})` : ''}${form.childDiet ? ` · Diet: ${form.childDiet}` : ''}${form.childPrefs ? ` · Prefs: ${form.childPrefs}` : ''}`
+    Number(form.numChildren) > 0 && !form.childAges && !form.childDiet && !form.childPrefs
+      ? `\nChildren: ${form.numChildren}`
       : '';
   const notes = [form.notes, childNote].filter(Boolean).join('').trim();
 
@@ -144,6 +144,12 @@ export function formToCustomer(
     budget: form.budget,
     travelMonth: form.travelMonth || undefined,
     children: Number(form.numChildren) || 0,
+    adults: Number(form.adults) || 2,
+    firstTime: form.firstTime || undefined,
+    intlFlights: form.intlFlights || undefined,
+    childAges: form.childAges.trim() || undefined,
+    childDiet: form.childDiet.trim() || undefined,
+    childPrefs: form.childPrefs.trim() || undefined,
     flights: form.flights,
     visaStatus: form.visaStatus,
     interests: form.interests.trim() || undefined,

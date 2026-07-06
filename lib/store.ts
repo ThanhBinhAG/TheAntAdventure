@@ -1,21 +1,27 @@
 import { create, type StateCreator } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { isRemoteDataEnabled } from './env';
-import { mergeRequiredProducts } from './ensure-core-products';
-import { mergeProductPricing } from './product-pricing-helpers';
-import * as seeds from './seeds';
+import { deleteProductFromRemote, deleteProductPricingFromRemote } from './db/remote-delete';
+import { rolloverTasks } from './planner-task-utils';
+import { localTodayIso } from './date-utils';
 import type {
   Agent,
   BackupData,
   Booking,
   ChatMessages,
   Comm,
+  CruiseSupplier,
   Customer,
+  ExtendedSupplier,
   Guide,
+  Hotel,
   Lead,
   Product,
   ProductPricing,
+  RestaurantSupplier,
   StaffMember,
+  Task,
+  TourDraft,
+  TourOutlineDay,
+  TransportSupplier,
 } from './types';
 import { emptyProductPricing, priceLabelFromRow } from './product-pricing-helpers';
 
@@ -40,10 +46,13 @@ interface CRMState {
   messages: ChatMessages;
   calEvents: unknown[];
   devNotes: unknown[];
-  cruises: unknown[];
-  transport: unknown[];
-  restaurants: unknown[];
-  specialSuppliers: unknown[];
+  hotels: Hotel[];
+  cruises: CruiseSupplier[];
+  transport: TransportSupplier[];
+  restaurants: RestaurantSupplier[];
+  specialSuppliers: ExtendedSupplier[];
+  tourDrafts: TourDraft[];
+  tourOutlineDays: TourOutlineDay[];
 
   language: 'en' | 'vi';
   lastBackup: string | null;
@@ -63,6 +72,11 @@ interface CRMState {
   addLead: (lead: Lead) => void;
   updateLead: (id: string, data: Partial<Lead>) => void;
   deleteLead: (id: string) => void;
+
+  setTourDrafts: (drafts: TourDraft[]) => void;
+  upsertTourDraft: (draft: TourDraft) => void;
+  setTourOutlineDays: (days: TourOutlineDay[]) => void;
+  replaceOutlineDaysForDraft: (draftId: string, days: TourOutlineDay[]) => void;
 
   setBookings: (bookings: Booking[]) => void;
   addBooking: (booking: Booking) => void;
@@ -88,12 +102,26 @@ interface CRMState {
   addFeedback: (item: Record<string, unknown>) => void;
   addDevNote: (note: Record<string, unknown>) => void;
   updateDevNote: (id: string, data: Record<string, unknown>) => void;
-  addSpecialSupplier: (supplier: Record<string, unknown>) => void;
+  addSpecialSupplier: (supplier: ExtendedSupplier) => void;
+  updateSpecialSupplier: (id: string, data: Partial<ExtendedSupplier>) => void;
   removeSpecialSupplier: (id: string) => void;
+  addHotel: (hotel: Hotel) => void;
+  updateHotel: (id: string, data: Partial<Hotel>) => void;
+  removeHotel: (id: string) => void;
+  addTransport: (row: TransportSupplier) => void;
+  updateTransport: (id: string, data: Partial<TransportSupplier>) => void;
+  removeTransport: (id: string) => void;
+  addRestaurant: (row: RestaurantSupplier) => void;
+  updateRestaurant: (id: string, data: Partial<RestaurantSupplier>) => void;
+  removeRestaurant: (id: string) => void;
+  addCruise: (row: CruiseSupplier) => void;
+  updateCruise: (id: string, data: Partial<CruiseSupplier>) => void;
+  removeCruise: (id: string) => void;
   addCalEvent: (event: Record<string, unknown>) => void;
   removeCalEvent: (id: string) => void;
   addTask: (task: Record<string, unknown>) => void;
   updateTask: (id: string, data: Record<string, unknown>) => void;
+  rolloverIncompleteTasks: () => void;
 
   exportBackup: () => BackupData;
   importBackup: (data: BackupData) => void;
@@ -121,41 +149,17 @@ const emptyState = () => ({
   messages: {} as ChatMessages,
   calEvents: [] as unknown[],
   devNotes: [] as unknown[],
-  cruises: [] as unknown[],
-  transport: [] as unknown[],
-  restaurants: [] as unknown[],
-  specialSuppliers: [] as unknown[],
-});
-
-const seedState = () => ({
-  customers: [...seeds.SEED_CUSTOMERS] as unknown as Customer[],
-  comms: [...seeds.SEED_COMMS] as unknown as Comm[],
-  leads: [...seeds.SEED_LEADS] as unknown as Lead[],
-  bookings: [...seeds.SEED_BOOKINGS] as unknown as Booking[],
-  agents: [...seeds.SEED_AGENTS] as unknown as Agent[],
-  guides: [...seeds.SEED_GUIDES] as unknown as Guide[],
-  products: mergeRequiredProducts([...seeds.AA_PRODUCTS] as unknown as Product[]),
-  productPricing: [...seeds.SEED_PRODUCT_PRICING],
-  finance: [...seeds.SEED_FINANCE],
-  ar: [...seeds.SEED_AR],
-  ap: [...seeds.SEED_AP],
-  tax: [...seeds.SEED_TAX],
-  staff: [...seeds.SEED_STAFF] as unknown as StaffMember[],
-  tasks: [...seeds.SEED_TASKS],
-  feedback: [...seeds.SEED_FEEDBACK],
-  contracts: [...seeds.SEED_CONTRACTS],
-  photos: [...seeds.SEED_PHOTOS],
-  messages: { ...seeds.SEED_MESSAGES } as unknown as ChatMessages,
-  calEvents: [...seeds.SEED_CAL_EVENTS],
-  devNotes: [...seeds.SEED_DEV_NOTES],
-  cruises: [...seeds.SEED_CRUISES],
-  transport: [...seeds.SEED_TRANSPORT],
-  restaurants: [...seeds.SEED_RESTAURANTS],
-  specialSuppliers: [...seeds.SEED_SPECIAL_SUPPLIERS],
+  hotels: [] as Hotel[],
+  cruises: [] as CruiseSupplier[],
+  transport: [] as TransportSupplier[],
+  restaurants: [] as RestaurantSupplier[],
+  specialSuppliers: [] as ExtendedSupplier[],
+  tourDrafts: [] as TourDraft[],
+  tourOutlineDays: [] as TourOutlineDay[],
 });
 
 const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
-      ...(isRemoteDataEnabled() ? emptyState() : seedState()),
+      ...emptyState(),
       language: 'en',
       lastBackup: null,
 
@@ -181,6 +185,25 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           leads: s.leads.map((l) => (l.id === id ? { ...l, ...data } : l)),
         })),
       deleteLead: (id) => set((s) => ({ leads: s.leads.filter((l) => l.id !== id) })),
+
+      setTourDrafts: (tourDrafts) => set({ tourDrafts }),
+      upsertTourDraft: (draft) =>
+        set((s) => {
+          const idx = s.tourDrafts.findIndex((d) => d.id === draft.id);
+          const tourDrafts =
+            idx >= 0
+              ? s.tourDrafts.map((d, i) => (i === idx ? { ...d, ...draft } : d))
+              : [...s.tourDrafts, draft];
+          return { tourDrafts };
+        }),
+      setTourOutlineDays: (tourOutlineDays) => set({ tourOutlineDays }),
+      replaceOutlineDaysForDraft: (draftId, days) =>
+        set((s) => ({
+          tourOutlineDays: [
+            ...s.tourOutlineDays.filter((d) => d.draftId !== draftId),
+            ...days,
+          ],
+        })),
 
       setBookings: (bookings) => set({ bookings }),
       addBooking: (booking) => set((s) => ({ bookings: [...s.bookings, booking] })),
@@ -217,11 +240,13 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         set((s) => ({
           products: s.products.map((p) => (p.code === code ? { ...p, ...data } : p)),
         })),
-      deleteProduct: (code) =>
+      deleteProduct: (code) => {
         set((s) => ({
           products: s.products.filter((p) => p.code !== code),
           productPricing: s.productPricing.filter((p) => p.productCode !== code),
-        })),
+        }));
+        void deleteProductFromRemote(code);
+      },
       setProductPricing: (productPricing) => set({ productPricing }),
       upsertProductPricing: (row, syncProductPrice = true) =>
         set((s) => {
@@ -236,10 +261,12 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           );
           return { productPricing, products };
         }),
-      deleteProductPricing: (productCode) =>
+      deleteProductPricing: (productCode) => {
         set((s) => ({
           productPricing: s.productPricing.filter((p) => p.productCode !== productCode),
-        })),
+        }));
+        void deleteProductPricingFromRemote(productCode);
+      },
       addContract: (contract) => set((s) => ({ contracts: [contract, ...s.contracts] })),
       updateContract: (id, data) =>
         set((s) => ({
@@ -259,10 +286,38 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         })),
       addSpecialSupplier: (supplier) =>
         set((s) => ({ specialSuppliers: [supplier, ...s.specialSuppliers] })),
+      updateSpecialSupplier: (id, data) =>
+        set((s) => ({
+          specialSuppliers: s.specialSuppliers.map((x) => (x.id === id ? { ...x, ...data } : x)),
+        })),
       removeSpecialSupplier: (id) =>
         set((s) => ({
-          specialSuppliers: s.specialSuppliers.filter((x) => (x as { id?: string }).id !== id),
+          specialSuppliers: s.specialSuppliers.filter((x) => x.id !== id),
         })),
+      addHotel: (hotel) => set((s) => ({ hotels: [...s.hotels, hotel] })),
+      updateHotel: (id, data) =>
+        set((s) => ({
+          hotels: s.hotels.map((h) => (h.id === id ? { ...h, ...data } : h)),
+        })),
+      removeHotel: (id) => set((s) => ({ hotels: s.hotels.filter((h) => h.id !== id) })),
+      addTransport: (row) => set((s) => ({ transport: [...s.transport, row] })),
+      updateTransport: (id, data) =>
+        set((s) => ({
+          transport: s.transport.map((t) => (t.id === id ? { ...t, ...data } : t)),
+        })),
+      removeTransport: (id) => set((s) => ({ transport: s.transport.filter((t) => t.id !== id) })),
+      addRestaurant: (row) => set((s) => ({ restaurants: [...s.restaurants, row] })),
+      updateRestaurant: (id, data) =>
+        set((s) => ({
+          restaurants: s.restaurants.map((r) => (r.id === id ? { ...r, ...data } : r)),
+        })),
+      removeRestaurant: (id) => set((s) => ({ restaurants: s.restaurants.filter((r) => r.id !== id) })),
+      addCruise: (row) => set((s) => ({ cruises: [...s.cruises, row] })),
+      updateCruise: (id, data) =>
+        set((s) => ({
+          cruises: s.cruises.map((c) => (c.id === id ? { ...c, ...data } : c)),
+        })),
+      removeCruise: (id) => set((s) => ({ cruises: s.cruises.filter((c) => c.id !== id) })),
       addCalEvent: (event) => set((s) => ({ calEvents: [...s.calEvents, event] })),
       removeCalEvent: (id) =>
         set((s) => ({
@@ -276,6 +331,12 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
             return row.id === id ? { ...row, ...data } : t;
           }),
         })),
+      rolloverIncompleteTasks: () =>
+        set((s) => {
+          const today = localTodayIso();
+          const { tasks, changed } = rolloverTasks(s.tasks as Task[], today);
+          return changed ? { tasks } : s;
+        }),
 
       exportBackup: () => {
         const s = get();
@@ -300,10 +361,13 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           messages: s.messages,
           calEvents: s.calEvents,
           devNotes: s.devNotes,
+          hotels: s.hotels,
           cruises: s.cruises,
           transport: s.transport,
           restaurants: s.restaurants,
           specialSuppliers: s.specialSuppliers,
+          tourDrafts: s.tourDrafts,
+          tourOutlineDays: s.tourOutlineDays,
           exportedAt: new Date().toISOString(),
           version: '4.3',
         };
@@ -331,63 +395,19 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           messages: data.messages ?? get().messages,
           calEvents: data.calEvents ?? get().calEvents,
           devNotes: data.devNotes ?? get().devNotes,
+          hotels: data.hotels ?? get().hotels,
           cruises: data.cruises ?? get().cruises,
           transport: data.transport ?? get().transport,
           restaurants: data.restaurants ?? get().restaurants,
           specialSuppliers: data.specialSuppliers ?? get().specialSuppliers,
+          tourDrafts: data.tourDrafts ?? get().tourDrafts,
+          tourOutlineDays: data.tourOutlineDays ?? get().tourOutlineDays,
           lastBackup: new Date().toLocaleString("en-US"),
         }),
 
-      resetToSeeds: () => set({ ...(isRemoteDataEnabled() ? emptyState() : seedState()), lastBackup: null }),
+      resetToSeeds: () => {
+        console.warn('[CRM] resetToSeeds is disabled — data is stored in Supabase only');
+      },
     });
 
-/** Add seed bookings missing from persisted state (FK targets for finance / cal_events). */
-function mergeMissingSeedBookings(bookings: Booking[]): Booking[] {
-  const ids = new Set(bookings.map((b) => b.id));
-  const missing = seeds.SEED_BOOKINGS.filter((b) => !ids.has(b.id));
-  return missing.length ? [...bookings, ...(missing as unknown as Booking[])] : bookings;
-}
-
-const persistConfig = {
-  name: 'ant-crm-v43',
-  partialize: (state: CRMState) => ({
-    customers: state.customers,
-    comms: state.comms,
-    leads: state.leads,
-    bookings: state.bookings,
-    agents: state.agents,
-    guides: state.guides,
-    products: state.products,
-    productPricing: state.productPricing,
-    finance: state.finance,
-    ar: state.ar,
-    ap: state.ap,
-    tax: state.tax,
-    staff: state.staff,
-    tasks: state.tasks,
-    feedback: state.feedback,
-    contracts: state.contracts,
-    photos: state.photos,
-    messages: state.messages,
-    calEvents: state.calEvents,
-    devNotes: state.devNotes,
-    cruises: state.cruises,
-    transport: state.transport,
-    restaurants: state.restaurants,
-    specialSuppliers: state.specialSuppliers,
-    lastBackup: state.lastBackup,
-  }),
-  version: 2,
-  migrate: (persisted: unknown) => {
-    const state = persisted as Partial<CRMState>;
-    state.productPricing = mergeProductPricing(state.productPricing, seeds.SEED_PRODUCT_PRICING);
-    if (state.bookings) {
-      state.bookings = mergeMissingSeedBookings(state.bookings);
-    }
-    return state as CRMState;
-  },
-};
-
-export const useStore = isRemoteDataEnabled()
-  ? create<CRMState>()(crmStateCreator)
-  : create<CRMState>()(persist(crmStateCreator, persistConfig));
+export const useStore = create<CRMState>()(crmStateCreator);

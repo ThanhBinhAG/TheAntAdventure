@@ -2,12 +2,19 @@
 
 import { useMemo, useState } from 'react';
 import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
+import { SALES_PEOPLE } from '@/lib/customer-form';
+import { customerMatchesSearch, getClientPipeline } from '@/lib/crm-utils';
 import { npsBadgeClass, npsIcon } from '@/lib/page-helpers';
-import { getClientPipeline } from '@/lib/crm-utils';
 import { useStore } from '@/hooks/useStore';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import CustomerProfileModal from '@/components/customers/CustomerProfileModal';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
+
+const TYPE_FILTERS: { value: string; label: string; style?: React.CSSProperties }[] = [
+  { value: '', label: 'All (B2B + B2C)' },
+  { value: 'b2b', label: 'B2B', style: { borderColor: '#6B21A8', color: '#6B21A8' } },
+  { value: 'b2c', label: 'B2C', style: { borderColor: '#1565C0', color: '#1565C0' } },
+];
 
 const STAGE_FILTERS: { value: string; label: string; style?: React.CSSProperties }[] = [
   { value: '', label: 'All Clients' },
@@ -15,7 +22,9 @@ const STAGE_FILTERS: { value: string; label: string; style?: React.CSSProperties
   { value: 'Designing', label: 'Designing', style: { borderColor: '#D97706', color: '#D97706' } },
   { value: 'Quoted', label: 'Quoted', style: { borderColor: '#D97706', color: '#D97706' } },
   { value: 'Negotiation', label: 'Negotiation', style: { borderColor: '#D97706', color: '#D97706' } },
+  { value: 'Pending', label: 'Pending', style: { borderColor: '#D97706', color: '#D97706' } },
   { value: 'Confirmed', label: 'Confirmed', style: { borderColor: '#2E7D52', color: '#2E7D52' } },
+  { value: 'On Tour', label: 'On Tour', style: { borderColor: '#6B21A8', color: '#6B21A8' } },
   { value: 'Completed', label: 'Completed', style: { borderColor: '#6B7F74', color: '#6B7F74' } },
   { value: 'none', label: 'No Activity', style: { borderColor: '#C0392B', color: '#C0392B' } },
 ];
@@ -30,17 +39,22 @@ export default function Customers() {
   const [search, setSearch] = useState('');
   const [sourceF, setSourceF] = useState('');
   const [countryF, setCountryF] = useState('');
+  const [salesF, setSalesF] = useState('');
+  const [typeF, setTypeF] = useState('');
   const [stageF, setStageF] = useState('');
   const [formMode, setFormMode] = useState<'add' | 'edit' | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
+  const [profileInitialTab, setProfileInitialTab] = useState<'overview' | 'pipeline'>('overview');
   const [editId, setEditId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let list = customers.filter(
       (c) =>
-        (!search || c.name.toLowerCase().includes(search.toLowerCase()) || c.email.toLowerCase().includes(search.toLowerCase())) &&
+        customerMatchesSearch(c, search) &&
         (!sourceF || c.source === sourceF) &&
-        (!countryF || c.country === countryF)
+        (!countryF || c.country === countryF) &&
+        (!salesF || c.salesperson === salesF) &&
+        (!typeF || (c.clientType ?? 'b2c') === typeF)
     );
     if (stageF === 'none') {
       list = list.filter((c) => leads.filter((l) => l.custId === c.id && l.stage !== 'Lost').length === 0);
@@ -48,10 +62,20 @@ export default function Customers() {
       list = list.filter((c) => getClientPipeline(c.id, leads).stage === stageF);
     }
     return list;
-  }, [customers, leads, search, sourceF, countryF, stageF]);
+  }, [customers, leads, search, sourceF, countryF, salesF, typeF, stageF]);
 
   const profileCustomer = profileId ? customers.find((c) => c.id === profileId) : null;
   const editCustomer = editId ? customers.find((c) => c.id === editId) : null;
+
+  function openProfile(id: string, tab: 'overview' | 'pipeline' = 'overview') {
+    setProfileInitialTab(tab);
+    setProfileId(id);
+  }
+
+  function closeProfile() {
+    setProfileId(null);
+    setProfileInitialTab('overview');
+  }
 
   function handleSave(payload: Parameters<typeof saveFromForm>[0]): boolean {
     const result = saveFromForm(payload);
@@ -65,7 +89,12 @@ export default function Customers() {
   return (
     <div>
       <div className="search-row">
-        <input type="text" placeholder="Tìm khách hàng / Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input
+          type="text"
+          placeholder="Search name, email, phone, ID, agent…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
         <select value={sourceF} onChange={(e) => setSourceF(e.target.value)}>
           <option value="">All Sources</option>
           <option>Referral</option>
@@ -84,10 +113,33 @@ export default function Customers() {
           <option>Germany</option>
           <option>Japan</option>
         </select>
+        <select value={salesF} onChange={(e) => setSalesF(e.target.value)}>
+          <option value="">All Sales People</option>
+          {SALES_PEOPLE.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
         <div style={{ flex: 1 }} />
         <button className="btn btn-p btn-sm" type="button" onClick={() => setFormMode('add')}>
           + Add Customer
         </button>
+      </div>
+
+      <div className="csf-bar">
+        <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--m)', marginRight: 2 }}>Filter by type:</span>
+        {TYPE_FILTERS.map((t) => (
+          <button
+            key={t.value || 'all-type'}
+            className={`csf-btn${typeF === t.value ? ' csf-active' : ''}`}
+            style={typeF !== t.value ? t.style : undefined}
+            onClick={() => setTypeF(t.value)}
+            type="button"
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       <div className="csf-bar">
@@ -153,19 +205,42 @@ export default function Customers() {
                     </td>
                     <td>
                       {p.stage ? (
-                        <span className={`bdg ${STAGE_COLORS[p.stage] || 'bdg-w'}`} style={{ fontSize: 10 }}>
+                        <button
+                          type="button"
+                          className={`bdg ${STAGE_COLORS[p.stage] || 'bdg-w'}`}
+                          style={{ fontSize: 10, border: 'none', cursor: 'pointer' }}
+                          onClick={() => openProfile(c.id, 'pipeline')}
+                        >
                           {p.stage}
-                        </span>
+                        </button>
                       ) : (
-                        <span className="bdg bdg-w" style={{ fontSize: 10 }}>
+                        <button
+                          type="button"
+                          className="bdg bdg-w"
+                          style={{ fontSize: 10, border: 'none', cursor: 'pointer' }}
+                          onClick={() => openProfile(c.id, 'pipeline')}
+                        >
                           No Activity
-                        </span>
+                        </button>
                       )}
                     </td>
                     <td style={{ fontWeight: 600, color: 'var(--g)' }}>
                       {p.value > 0 ? `$${fmt(p.value)}` : <span style={{ color: 'var(--m)' }}>—</span>}
                     </td>
-                    <td style={{ textAlign: 'center' }}>{p.count || <span style={{ color: 'var(--m)' }}>0</span>}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {p.count ? (
+                        <button
+                          type="button"
+                          className="btn btn-s btn-sm"
+                          style={{ minWidth: 28, padding: '2px 8px' }}
+                          onClick={() => openProfile(c.id, 'pipeline')}
+                        >
+                          {p.count}
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--m)' }}>0</span>
+                      )}
+                    </td>
                     <td>
                       {avgNps !== null ? (
                         <span className={`bdg ${npsBadgeClass(avgNps)}`}>
@@ -176,7 +251,7 @@ export default function Customers() {
                       )}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      <button className="btn btn-s btn-sm" type="button" style={{ marginRight: 4 }} onClick={() => setProfileId(c.id)}>
+                      <button className="btn btn-s btn-sm" type="button" style={{ marginRight: 4 }} onClick={() => openProfile(c.id)}>
                         View
                       </button>
                       <button
@@ -223,16 +298,17 @@ export default function Customers() {
       {profileCustomer && (
         <CustomerProfileModal
           customer={profileCustomer}
-          onClose={() => setProfileId(null)}
+          initialTab={profileInitialTab}
+          onClose={closeProfile}
           onEdit={() => {
-            setProfileId(null);
+            closeProfile();
             setEditId(profileCustomer.id);
             setFormMode('edit');
           }}
           onDelete={() => {
             if (confirm(`Delete ${profileCustomer.name}?`)) {
               deleteCustomer(profileCustomer.id);
-              setProfileId(null);
+              closeProfile();
             }
           }}
         />

@@ -1,23 +1,36 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import WeatherWeeklyGrid from '@/components/weather/WeatherWeeklyGrid';
 import { BEST_BY, DEFAULT_WEATHER, DESTINATIONS, MONTHS, TEMP_RANGES, WR } from '@/lib/seeds/weather';
 import { REG_COLORS_HEX } from '@/lib/page-helpers';
 
 type WeatherData = Record<string, string[]>;
 type WeatherCode = keyof typeof WR;
+type WeatherTab = 'week' | 'grid' | 'region' | 'month';
+
+const STORAGE_KEY = 'ant_weather_v3';
 
 function getWR(code: string) {
   return WR[code as WeatherCode] || WR.G;
 }
 
 export default function Weather() {
-  const [tab, setTab] = useState<'grid' | 'region' | 'month'>('grid');
+  const [tab, setTab] = useState<WeatherTab>('week');
   const [regionF, setRegionF] = useState('all');
   const [weatherData, setWeatherData] = useState<WeatherData>(() => ({ ...DEFAULT_WEATHER } as WeatherData));
   const [editCell, setEditCell] = useState<{ destId: string; monthIdx: number } | null>(null);
   const [pendingCode, setPendingCode] = useState<string>('G');
   const [savedFlash, setSavedFlash] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) setWeatherData(JSON.parse(raw) as WeatherData);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const dests = useMemo(
     () => DESTINATIONS.filter((d) => regionF === 'all' || d.region === regionF),
@@ -35,7 +48,7 @@ export default function Weather() {
 
   function saveAll() {
     try {
-      localStorage.setItem('ant_weather_v3', JSON.stringify(weatherData));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(weatherData));
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2000);
     } catch {
@@ -49,9 +62,10 @@ export default function Weather() {
         <div className="tabs" style={{ marginBottom: 0 }}>
           {(
             [
-              ['grid', '📊 Grid View'],
-              ['region', '🗺 By Region'],
-              ['month', '📅 By Month'],
+              ['week', 'This Week'],
+              ['grid', 'Seasonal Grid'],
+              ['region', 'By Region'],
+              ['month', 'Best Time to Visit'],
             ] as const
           ).map(([id, label]) => (
             <div key={id} className={`tab${tab === id ? ' on' : ''}`} onClick={() => setTab(id)} role="button" tabIndex={0}>
@@ -60,7 +74,7 @@ export default function Weather() {
           ))}
         </div>
         <div style={{ flex: 1 }} />
-        {tab === 'grid' && (
+        {(tab === 'week' || tab === 'grid') && (
           <select
             value={regionF}
             onChange={(e) => setRegionF(e.target.value)}
@@ -72,9 +86,11 @@ export default function Weather() {
             <option value="south">Southern Vietnam</option>
           </select>
         )}
-        <button className="btn btn-p btn-sm" type="button" onClick={saveAll}>
-          💾 {savedFlash ? 'Saved!' : 'Save Changes'}
-        </button>
+        {tab !== 'week' && (
+          <button className="btn btn-p btn-sm" type="button" onClick={saveAll}>
+            💾 {savedFlash ? 'Saved!' : 'Save Changes'}
+          </button>
+        )}
       </div>
 
       <div className="weather-legend">
@@ -85,8 +101,14 @@ export default function Weather() {
           </span>
         ))}
         <span className="weather-best-pill">⭐ Best By Month</span>
-        <span style={{ fontSize: 11, color: 'var(--m)', marginLeft: 4 }}>Click any cell to edit. Changes are saved locally.</span>
+        <span style={{ fontSize: 11, color: 'var(--m)', marginLeft: 4 }}>
+          {tab === 'week'
+            ? 'Live 7-day forecast (cached). Seasonal tabs: click cells to edit locally.'
+            : 'Click any cell to edit. Changes are saved locally.'}
+        </span>
       </div>
+
+      {tab === 'week' && <WeatherWeeklyGrid region={regionF} />}
 
       {tab === 'grid' && (
         <div className="card" style={{ overflow: 'hidden' }}>

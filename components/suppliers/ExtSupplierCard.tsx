@@ -28,10 +28,11 @@ export function regionLabel(region?: string) {
 
 type Props = {
   supplier: ExtendedSupplier;
+  onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
 };
 
-export default function ExtSupplierCard({ supplier: s, onDelete }: Props) {
+export default function ExtSupplierCard({ supplier: s, onEdit, onDelete }: Props) {
   const cat = SUP_MASTER_CATS[s.cat] || { emoji: '📌', color: '#555', bg: '#F5F5F5', label: s.cat };
   return (
     <div className="sp-card">
@@ -67,6 +68,11 @@ export default function ExtSupplierCard({ supplier: s, onDelete }: Props) {
           <span className={`bdg ${s.status === 'Active' ? 'bdg-g' : s.status === 'Standby' ? 'bdg-a' : 'bdg-r'}`}>{s.status}</span>
           <span style={{ fontSize: 11, color: 'var(--m)' }}>{s.contract === 'yes' ? '✅ Contract' : '🤝 Verbal'}</span>
           <div style={{ flex: 1 }} />
+          {onEdit && (
+            <button className="sp-contact-btn" type="button" onClick={() => onEdit(s.id)} title="Edit">
+              ✏
+            </button>
+          )}
           {s.phone && (
             <a href={`tel:${s.phone}`} className="sp-contact-btn sp-contact-phone">
               📞

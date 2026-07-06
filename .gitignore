@@ -44,3 +44,6 @@ backups/
 
 # Private notes & archives — local only, never commit
 Personal/
+supabase/
+Material_test/
+Material/

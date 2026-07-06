@@ -1,10 +1,11 @@
 import { getSupabaseClient } from '../supabase';
-import type { Booking, ChatMessages } from '../types';
+import type { Booking, ChatMessages, Hotel } from '../types';
 import {
   agentToRow,
   apToRow,
   arToRow,
   assembleBookings,
+  assembleHotels,
   bookingToRow,
   calEventToRow,
   commToRow,
@@ -15,6 +16,7 @@ import {
   feedbackToRow,
   financeToRow,
   guideToRow,
+  hotelToRow,
   leadToRow,
   messagesFromRows,
   messagesToRows,
@@ -22,6 +24,7 @@ import {
   productToRow,
   productPricingToRow,
   restaurantToRow,
+  roomToRow,
   rowToAgent,
   rowToAp,
   rowToAr,
@@ -43,10 +46,15 @@ import {
   rowToSupplier,
   rowToTask,
   rowToTax,
+  rowToTourDraft,
+  rowToTourOutlineDay,
+  rowToTransport,
   staffToRowExtended,
   supplierToRow,
   taskToRow,
   taxToRow,
+  tourDraftToRow,
+  tourOutlineDayToRow,
   transportToRow,
 } from './mappers';
 import {
@@ -55,6 +63,12 @@ import {
   SYNC_ARRAY_TABLES,
   type SyncArrayTable,
 } from './sync-config';
+import {
+  buildOrphanSkipWarning,
+  shouldSkipOrphanDelete,
+  type SyncTableOptions,
+  type SyncTableResult,
+} from './sync-policy';
 
 type Row = Record<string, unknown>;
 
@@ -73,6 +87,18 @@ const HANDLERS: Record<SyncArrayTable, TableHandler> = {
   customers: { table: 'customers', pk: 'id', toRow: (r) => customerToRow(r as never), fromRow: (r) => ({ ...rowToCustomer(r) }) },
   comms: { table: 'comms', pk: 'id', toRow: (r) => commToRow(r as never), fromRow: (r) => ({ ...rowToComm(r) }) },
   leads: { table: 'leads', pk: 'id', toRow: (r) => leadToRow(r as never), fromRow: (r) => ({ ...rowToLead(r) }) },
+  tour_drafts: {
+    table: 'tour_drafts',
+    pk: 'id',
+    toRow: (r) => tourDraftToRow(r as never),
+    fromRow: (r) => ({ ...rowToTourDraft(r) }),
+  },
+  tour_outline_days: {
+    table: 'tour_outline_days',
+    pk: 'id',
+    toRow: (r) => tourOutlineDayToRow(r as never),
+    fromRow: (r) => ({ ...rowToTourOutlineDay(r) }),
+  },
   bookings: { table: 'bookings', pk: 'id', toRow: (r) => bookingToRow(r as never), fromRow: (r) => r },
   agents: { table: 'agents', pk: 'id', toRow: (r) => agentToRow(r as never), fromRow: (r) => ({ ...rowToAgent(r) }) },
   guides: { table: 'guides', pk: 'id', toRow: (r) => guideToRow(r as never), fromRow: (r) => ({ ...rowToGuide(r) }) },
@@ -102,8 +128,9 @@ const HANDLERS: Record<SyncArrayTable, TableHandler> = {
   cal_events: { table: 'cal_events', pk: 'id', toRow: calEventToRow, fromRow: rowToCalEvent },
   dev_notes: { table: 'dev_notes', pk: 'id', toRow: devNoteToRow, fromRow: rowToDevNote },
   cruises: { table: 'cruises', pk: 'id', toRow: cruiseToRow, fromRow: rowToCruise },
-  transport: { table: 'transport', pk: 'id', toRow: transportToRow, fromRow: (r) => r },
+  transport: { table: 'transport', pk: 'id', toRow: transportToRow, fromRow: rowToTransport },
   restaurants: { table: 'restaurants', pk: 'id', toRow: restaurantToRow, fromRow: rowToRestaurant },
+  hotels: { table: 'hotels', pk: 'id', toRow: hotelToRow, fromRow: (r) => r },
   suppliers: {
     table: 'suppliers',
     pk: 'id',
@@ -139,9 +166,14 @@ async function deleteOrphans(table: string, pk: string, localIds: string[]) {
   }
 }
 
-async function syncTaggedTable(handler: TableHandler, rows: Row[]) {
+async function syncTaggedTable(
+  table: SyncArrayTable,
+  handler: TableHandler,
+  rows: Row[],
+  options: SyncTableOptions = {}
+): Promise<SyncTableResult> {
   const client = supabase();
-  if (!client) return;
+  if (!client) return { skippedOrphanDelete: false };
 
   const localIds = rows.map((r, i) => String(r.id ?? `${handler.table}-${i}`));
   const baseRows = rows.map((r) => {
@@ -177,12 +209,26 @@ async function syncTaggedTable(handler: TableHandler, rows: Row[]) {
     }
   }
 
-  await deleteOrphans(handler.table, handler.pk, localIds);
+  const skipOrphans = shouldSkipOrphanDelete(table, localIds.length, options.force);
+  if (!skipOrphans) {
+    await deleteOrphans(handler.table, handler.pk, localIds);
+    return { skippedOrphanDelete: false };
+  }
+
+  return {
+    skippedOrphanDelete: true,
+    warning: buildOrphanSkipWarning(table, localIds.length),
+  };
 }
 
-async function syncSimpleTable(handler: TableHandler, rows: Row[]) {
+async function syncSimpleTable(
+  table: SyncArrayTable,
+  handler: TableHandler,
+  rows: Row[],
+  options: SyncTableOptions = {}
+): Promise<SyncTableResult> {
   const client = supabase();
-  if (!client) return;
+  if (!client) return { skippedOrphanDelete: false };
 
   const mapped = rows.map((r) => handler.toRow(r));
   const localIds = mapped.map((row, i) => {
@@ -195,7 +241,16 @@ async function syncSimpleTable(handler: TableHandler, rows: Row[]) {
     if (error) throw error;
   }
 
-  await deleteOrphans(handler.table, handler.pk, localIds);
+  const skipOrphans = shouldSkipOrphanDelete(table, localIds.length, options.force);
+  if (!skipOrphans) {
+    await deleteOrphans(handler.table, handler.pk, localIds);
+    return { skippedOrphanDelete: false };
+  }
+
+  return {
+    skippedOrphanDelete: true,
+    warning: buildOrphanSkipWarning(table, localIds.length),
+  };
 }
 
 async function syncBookingItinerary(booking: Booking) {
@@ -250,9 +305,9 @@ async function syncBookingItinerary(booking: Booking) {
   }
 }
 
-async function syncBookings(rows: Row[]) {
+async function syncBookings(rows: Row[], options: SyncTableOptions = {}): Promise<SyncTableResult> {
   const client = supabase();
-  if (!client) return;
+  if (!client) return { skippedOrphanDelete: false };
 
   const bookings = rows as unknown as Booking[];
   const localIds = bookings.map((b) => b.id);
@@ -268,7 +323,16 @@ async function syncBookings(rows: Row[]) {
     }
   }
 
-  await deleteOrphans('bookings', 'id', localIds);
+  const skipOrphans = shouldSkipOrphanDelete('bookings', localIds.length, options.force);
+  if (!skipOrphans) {
+    await deleteOrphans('bookings', 'id', localIds);
+    return { skippedOrphanDelete: false };
+  }
+
+  return {
+    skippedOrphanDelete: true,
+    warning: buildOrphanSkipWarning('bookings', localIds.length),
+  };
 }
 
 async function getTaggedRows(handler: TableHandler): Promise<Row[]> {
@@ -310,6 +374,76 @@ async function getSimpleRows(handler: TableHandler): Promise<Row[]> {
   return (data ?? []).map((r) => handler.fromRow(r as unknown as Row));
 }
 
+async function getHotels(): Promise<Hotel[]> {
+  const client = supabase();
+  if (!client) return [];
+
+  const [hotelRes, roomRes] = await Promise.all([
+    client.from('hotels').select('*'),
+    client.from('hotel_rooms').select('*'),
+  ]);
+  if (hotelRes.error) throw hotelRes.error;
+  if (roomRes.error) throw roomRes.error;
+
+  return assembleHotels((hotelRes.data ?? []) as Row[], (roomRes.data ?? []) as Row[]) as unknown as Hotel[];
+}
+
+async function syncHotelRooms(hotel: Hotel) {
+  const client = supabase();
+  if (!client) return;
+
+  const { data: existing, error: fetchErr } = await client
+    .from('hotel_rooms')
+    .select('id')
+    .eq('hotel_id', hotel.id);
+  if (fetchErr) throw fetchErr;
+
+  const localRoomIds = hotel.rooms.map((room, i) => String(room.id ?? `${hotel.id}-R${i + 1}`));
+  const remoteIds = (existing ?? []).map((r) => String(r.id));
+  const orphanIds = remoteIds.filter((id) => !localRoomIds.includes(id));
+
+  if (orphanIds.length) {
+    const { error: delErr } = await client.from('hotel_rooms').delete().in('id', orphanIds);
+    if (delErr) throw delErr;
+  }
+
+  const roomRows = hotel.rooms.map((room, i) => roomToRow(hotel.id, room as unknown as Row, i));
+  if (roomRows.length) {
+    const { error: upsertErr } = await client.from('hotel_rooms').upsert(roomRows, { onConflict: 'id' });
+    if (upsertErr) throw upsertErr;
+  }
+}
+
+async function syncHotels(rows: Row[], options: SyncTableOptions = {}): Promise<SyncTableResult> {
+  const client = supabase();
+  if (!client) return { skippedOrphanDelete: false };
+
+  const hotels = rows as unknown as Hotel[];
+  const localIds = hotels.map((h) => h.id);
+
+  if (hotels.length) {
+    const { error } = await client.from('hotels').upsert(hotels.map((h) => hotelToRow(h as unknown as Row)), {
+      onConflict: 'id',
+    });
+    if (error) throw error;
+
+    for (const hotel of hotels) {
+      await syncHotelRooms(hotel);
+    }
+  }
+
+  const skipOrphans = shouldSkipOrphanDelete('hotels', localIds.length, options.force);
+  if (!skipOrphans) {
+    await deleteOrphans('hotels', 'id', localIds);
+    return { skippedOrphanDelete: false };
+  }
+
+  return {
+    skippedOrphanDelete: true,
+    warning: buildOrphanSkipWarning('hotels', localIds.length),
+  };
+}
+
 async function getBookings(): Promise<Booking[]> {
   const client = supabase();
   if (!client) return [];
@@ -336,26 +470,52 @@ function makeTableApi(table: SyncArrayTable) {
   if (table === 'bookings') {
     return {
       getAll: () => getBookings(),
-      syncTable: (rows: Row[]) => syncBookings(rows),
+      syncTable: (rows: Row[], options?: SyncTableOptions) => syncBookings(rows, options),
+      deleteRemote: async (id: string) => {
+        const client = supabase();
+        if (!client) return;
+        const { error } = await client.from('bookings').delete().eq('id', id);
+        if (error) throw error;
+      },
       count: () => countTable('bookings'),
+    };
+  }
+
+  if (table === 'hotels') {
+    return {
+      getAll: () => getHotels(),
+      syncTable: (rows: Row[], options?: SyncTableOptions) => syncHotels(rows, options),
+      deleteRemote: async (id: string) => {
+        const client = supabase();
+        if (!client) return;
+        const { error } = await client.from('hotels').delete().eq('id', id);
+        if (error) throw error;
+      },
+      count: () => countTable('hotels'),
     };
   }
 
   const getAll = handler.tagTable ? () => getTaggedRows(handler) : () => getSimpleRows(handler);
   const syncTable = handler.tagTable
-    ? (rows: Row[]) => syncTaggedTable(handler, rows)
-    : (rows: Row[]) => syncSimpleTable(handler, rows);
+    ? (rows: Row[], options?: SyncTableOptions) => syncTaggedTable(table, handler, rows, options)
+    : (rows: Row[], options?: SyncTableOptions) => syncSimpleTable(table, handler, rows, options);
 
   return {
     getAll,
     syncTable,
+    deleteRemote: async (id: string) => {
+      const client = supabase();
+      if (!client) return;
+      const { error } = await client.from(handler.table).delete().eq(handler.pk, id);
+      if (error) throw error;
+    },
     count: () => countTable(handler.table),
   };
 }
 
-async function syncMessages(messages: ChatMessages) {
+async function syncMessages(messages: ChatMessages, _options: SyncTableOptions = {}): Promise<SyncTableResult> {
   const client = supabase();
-  if (!client) return;
+  if (!client) return { skippedOrphanDelete: false };
 
   const { messages: msgRows, reactions } = messagesToRows(messages);
   const localMsgIds = msgRows.map((m) => String(m.id));
@@ -363,6 +523,13 @@ async function syncMessages(messages: ChatMessages) {
   if (msgRows.length) {
     const { error } = await client.from('chat_messages').upsert(msgRows, { onConflict: 'id' });
     if (error) throw error;
+  }
+
+  if (localMsgIds.length === 0) {
+    return {
+      skippedOrphanDelete: true,
+      warning: 'chat_messages: local=0 — skipped orphan delete',
+    };
   }
 
   await deleteOrphans('chat_messages', 'id', localMsgIds);
@@ -379,6 +546,8 @@ async function syncMessages(messages: ChatMessages) {
     const { error: rxInsErr } = await client.from('chat_reactions').insert(reactions);
     if (rxInsErr) throw rxInsErr;
   }
+
+  return { skippedOrphanDelete: false };
 }
 
 export const db = {

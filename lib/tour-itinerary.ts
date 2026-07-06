@@ -18,9 +18,17 @@ const MONTH_MAP: Record<string, number> = {
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+export function isDaylessExperience(dur: string): boolean {
+  const d = (dur || '').trim().toLowerCase();
+  if (!d || d.includes('service')) return true;
+  if (d.includes('full day') || d.includes('half') || d.includes('evening')) return false;
+  if (/\d+\s*d/i.test(dur)) return false;
+  return true;
+}
+
 export function parseDuration(dur: string): number {
+  if (isDaylessExperience(dur)) return 0;
   const d = (dur || '').toLowerCase();
-  if (d.includes('service')) return 0;
   const m2 = d.match(/(\d+)\s*d/i);
   if (m2) return parseInt(m2[1], 10);
   if (d.includes('4 days') || d.includes('4d')) return 4;
@@ -29,7 +37,7 @@ export function parseDuration(dur: string): number {
   if (d.includes('full day') || d === 'full day') return 1;
   if (d.includes('half')) return 0.5;
   if (d.includes('evening')) return 0.5;
-  return 0.5;
+  return 0;
 }
 
 export interface ItineraryDay {
@@ -41,7 +49,12 @@ export interface ItineraryDay {
   totalDays?: number;
 }
 
-export function buildDayGroups(products: Product[]): ItineraryDay[] {
+export interface ItineraryBuildResult {
+  addons: Product[];
+  days: ItineraryDay[];
+}
+
+function buildTimedDayGroups(products: Product[]): ItineraryDay[] {
   const days: ItineraryDay[] = [];
   let dayNum = 1;
   let halfDayBuffer: Product | null = null;
@@ -74,7 +87,7 @@ export function buildDayGroups(products: Product[]): ItineraryDay[] {
       } else {
         halfDayBuffer = p;
       }
-    } else {
+    } else if (dur === 1) {
       if (halfDayBuffer) {
         days.push({ n: dayNum++, items: [halfDayBuffer], label: halfDayBuffer.dest || '' });
         halfDayBuffer = null;
@@ -88,6 +101,23 @@ export function buildDayGroups(products: Product[]): ItineraryDay[] {
   }
 
   return days;
+}
+
+export function buildItinerary(products: Product[]): ItineraryBuildResult {
+  const addons: Product[] = [];
+  const timed: Product[] = [];
+  for (const p of products) {
+    if (parseDuration(p.dur) === 0) {
+      addons.push(p);
+    } else {
+      timed.push(p);
+    }
+  }
+  return { addons, days: buildTimedDayGroups(timed) };
+}
+
+export function buildDayGroups(products: Product[]): ItineraryDay[] {
+  return buildItinerary(products).days;
 }
 
 export function totalDurationDays(products: Product[]): number {

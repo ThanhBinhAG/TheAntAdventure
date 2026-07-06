@@ -123,6 +123,8 @@ export function getGuestPanelData(brief: TourBrief, clientType: 'b2c' | 'b2b', c
   if (brief.dietary) rows.push({ label: 'Dietary', value: brief.dietary });
   if (brief.mobility) rows.push({ label: 'Mobility', value: brief.mobility });
   if (brief.specialRequests) rows.push({ label: 'Special', value: brief.specialRequests });
+  if (brief.childDiet) rows.push({ label: 'Child diet', value: brief.childDiet });
+  if (brief.childPrefs) rows.push({ label: 'Child prefs', value: brief.childPrefs });
   if (brief.salesperson) rows.push({ label: 'Sales', value: brief.salesperson });
 
   return {

@@ -1,19 +1,61 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { STAGE_COLORS, STAGE_PROB_V22, fmt } from '@/lib/constants';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { STAGE_COLORS, STAGE_PROB_V22, fmt, KANBAN_STAGES } from '@/lib/constants';
 import { getCustomerName } from '@/lib/crm-utils';
+import { patchOutlineApproved, outlineStatusLabel } from '@/lib/tour-design-lead';
+import { applyOutlineWorkflowPatch } from '@/lib/tour-outline-workflow';
+import { getTourDraftForLead } from '@/lib/tour-design-leads';
+import {
+  PIPELINE_CARDS_LIMIT,
+  filterLeadsByTime,
+  getLeadWeightedValue,
+  getUniqueTravelMonths,
+  groupLeadsByTravelMonth,
+  hasActiveFilters,
+  isFollowUpOverdue,
+  leadMatchesSearch,
+  sortLeads,
+  type ListSortField,
+  type ListSortState,
+  type SalesTimeFilterMode,
+  type SalesTimeFilterState,
+} from '@/lib/sales-lead-utils';
+import { localTodayIso } from '@/lib/date-utils';
 import { useStore } from '@/hooks/useStore';
 import { useLanguage } from '@/hooks/useLanguage';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
-import type { Lead } from '@/lib/types';
+import type { SalesKey } from '@/lib/i18n/pages/sales';
+import type { Lead, TourDraft } from '@/lib/types';
 
-const STAGES = ['Inquiry', 'Designing', 'Quoted', 'Negotiation', 'Confirmed', 'Completed'] as const;
 const LOST_REASONS = ['Price too high', 'Chose competitor', 'Dates unavailable', 'No response', 'Changed plans', 'Other'];
 
+const TIME_FILTER_MODES: SalesTimeFilterMode[] = [
+  'all',
+  'followUpToday',
+  'followUpWeek',
+  'overdue',
+  'travelMonth',
+  'followUpRange',
+];
+
+const TIME_FILTER_LABELS: Record<SalesTimeFilterMode, SalesKey> = {
+  all: 'filterAll',
+  followUpToday: 'filterFollowUpToday',
+  followUpWeek: 'filterFollowUpWeek',
+  overdue: 'filterOverdue',
+  travelMonth: 'filterByTravelMonth',
+  followUpRange: 'filterFollowUpRange',
+};
+
 type SalesTab = 'pipeline' | 'list' | 'policy';
+
+function timeFilterLabel(mode: SalesTimeFilterMode, tsf: (key: SalesKey) => string): string {
+  return tsf(TIME_FILTER_LABELS[mode]);
+}
 
 function SalesPolicyView() {
   const { tc, tsf } = useLanguage();
@@ -105,14 +147,20 @@ function PipeCard({
   lead,
   stage,
   name,
+  today,
+  tourDrafts,
   onStageChange,
   onUpdate,
+  onApproveOutline,
 }: {
   lead: Lead;
   stage: string;
   name: string;
+  today: string;
+  tourDrafts: TourDraft[];
   onStageChange: (id: string, stage: string) => void;
   onUpdate: (id: string, data: Partial<Lead>) => void;
+  onApproveOutline: (lead: Lead) => void;
 }) {
   const { tc, tsf, tStage } = useLanguage();
   const [fupOpen, setFupOpen] = useState(false);
@@ -122,6 +170,9 @@ function PipeCard({
 
   const prob = lead.probability ?? STAGE_PROB_V22[stage] ?? 10;
   const weighted = Math.round(((lead.value || 0) * prob) / 100);
+  const overdue = isFollowUpOverdue(lead, today);
+  const draft = getTourDraftForLead(lead.id, tourDrafts);
+  const outlineWaiting = draft?.outlineStatus === 'sent';
 
   const firstName = name.split(' ')[0] || name;
   const travelWhen = lead.month || tsf('preferredDates');
@@ -137,13 +188,21 @@ ${tsf('aiEmailSignature')}`;
 
   return (
     <div
-      className="pipe-card"
+      className={`pipe-card${overdue ? ' pipe-card-overdue' : ''}${outlineWaiting ? ' pipe-card-outline-waiting' : ''}`}
       style={{
         borderLeft: stage === 'Confirmed' ? '3px solid var(--g)' : stage === 'Negotiation' ? '3px solid var(--amb)' : undefined,
       }}
       title={`${lead.tour} | ${lead.pax} ${tsf('paxSuffix')} | ${lead.month}`}
     >
       <div className="pname">{name}</div>
+      {draft && (
+        <div style={{ fontSize: 10.5, marginTop: 4 }}>
+          <span className={`bdg ${draft.outlineStatus === 'approved' ? 'bdg-g' : draft.outlineStatus === 'sent' ? 'bdg-a' : 'bdg-w'}`}>
+            Outline: {outlineStatusLabel(draft.outlineStatus)}
+            {(draft.outlineRevision ?? 0) > 0 ? ` v${draft.outlineRevision}` : ''}
+          </span>
+        </div>
+      )}
       <div className="pmeta">
         {Number(lead.pax) > 0 ? `${lead.pax} ${tsf('paxSuffix')} · ` : ''}
         {lead.month}
@@ -161,12 +220,35 @@ ${tsf('aiEmailSignature')}`;
           onChange={(e) => onStageChange(lead.id, e.target.value)}
           onClick={(e) => e.stopPropagation()}
         >
-          {['Inquiry', 'Designing', 'Quoted', 'Negotiation', 'Confirmed', 'Completed', 'Lost'].map((st) => (
+          {['Inquiry', 'Pending', 'Designing', 'Quoted', 'Negotiation', 'Confirmed', 'Completed', 'Lost'].map((st) => (
             <option key={st} value={st}>
               {tStage(st)}
             </option>
           ))}
         </select>
+      </div>
+      <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <Link
+          href={`/tourdesign?leadId=${encodeURIComponent(lead.id)}&custId=${encodeURIComponent(lead.custId)}&step=1`}
+          className="btn btn-s btn-sm"
+          style={{ fontSize: 10.5 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          Open outline
+        </Link>
+        {outlineWaiting && (
+          <button
+            type="button"
+            className="btn btn-p btn-sm"
+            style={{ fontSize: 10.5 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onApproveOutline(lead);
+            }}
+          >
+            Mark approved
+          </button>
+        )}
       </div>
       <div style={{ marginTop: 6 }}>
         <button type="button" className="pipe-ai-btn" onClick={() => setAiOpen(!aiOpen)}>
@@ -211,35 +293,140 @@ ${tsf('aiEmailSignature')}`;
   );
 }
 
+function SortableTh({
+  field,
+  label,
+  listSort,
+  onSort,
+  style,
+}: {
+  field: ListSortField;
+  label: string;
+  listSort: ListSortState;
+  onSort: (field: ListSortField) => void;
+  style?: React.CSSProperties;
+}) {
+  const indicator = listSort.field === field ? (listSort.direction === 'asc' ? ' ▴' : ' ▾') : '';
+  return (
+    <th className="sortable" style={style} onClick={() => onSort(field)}>
+      {label}
+      {indicator}
+    </th>
+  );
+}
+
 export default function Sales() {
-  const { tc, t, tStage, language, tsf, tLostReason } = useLanguage();
+  const { tc, tStage, tsf, tLostReason } = useLanguage();
+  const searchParams = useSearchParams();
+  const urlInitRef = useRef(false);
   const leads = useStore((s) => s.leads);
   const customers = useStore((s) => s.customers);
+  const tourDrafts = useStore((s) => s.tourDrafts);
   const updateLead = useStore((s) => s.updateLead);
+  const upsertTourDraft = useStore((s) => s.upsertTourDraft);
+  const addComm = useStore((s) => s.addComm);
   const { saveFromForm } = useRegisterCustomer();
   const [tab, setTab] = useState<SalesTab>('pipeline');
   const [lostModal, setLostModal] = useState<{ leadId: string; reason: string; note: string } | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [createdClient, setCreatedClient] = useState<{
+    leadId: string;
+    custId: string;
+    name: string;
+    message: string;
+  } | null>(null);
 
-  const activeLeads = leads.filter((l) => l.stage !== 'Lost' && l.stage !== 'Completed');
+  const today = localTodayIso();
+  const [search, setSearch] = useState('');
+  const [custIdFilter, setCustIdFilter] = useState('');
+  const [highlightLeadId, setHighlightLeadId] = useState('');
+  const [timeFilter, setTimeFilter] = useState<SalesTimeFilterState>({ mode: 'all' });
+  const [stageFilter, setStageFilter] = useState('');
+  const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
+  const [listSort, setListSort] = useState<ListSortState>({ field: 'followUp', direction: 'asc' });
+  const [groupByMonth, setGroupByMonth] = useState(false);
+
+  useEffect(() => {
+    if (urlInitRef.current) return;
+    const urlCustId = searchParams.get('custId');
+    const urlLeadId = searchParams.get('leadId');
+    const urlTab = searchParams.get('tab');
+
+    if (urlLeadId) setTab('list');
+    else if (urlTab === 'list' || urlTab === 'pipeline') setTab(urlTab);
+
+    if (urlCustId) setCustIdFilter(urlCustId);
+    if (urlLeadId) setHighlightLeadId(urlLeadId);
+
+    urlInitRef.current = true;
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (highlightLeadId) {
+      const lead = leads.find((l) => l.id === highlightLeadId);
+      if (lead) {
+        setExpandedStages((prev) => new Set(prev).add(lead.stage));
+        if (!custIdFilter) setCustIdFilter(lead.custId);
+      }
+    }
+    if (custIdFilter && !search) {
+      const cust = customers.find((c) => c.id === custIdFilter);
+      if (cust) setSearch(cust.name);
+    }
+  }, [highlightLeadId, custIdFilter, leads, customers, search]);
+
+  const travelMonths = useMemo(() => getUniqueTravelMonths(leads), [leads]);
+
+  const filteredLeads = useMemo(() => {
+    let list = leads.filter((l) => l.stage !== 'Lost');
+    list = filterLeadsByTime(list, timeFilter, today);
+    if (stageFilter) list = list.filter((l) => l.stage === stageFilter);
+    if (custIdFilter) list = list.filter((l) => l.custId === custIdFilter);
+    if (search.trim()) list = list.filter((l) => leadMatchesSearch(l, search, customers));
+
+    if (highlightLeadId) {
+      const highlighted = leads.find((l) => l.id === highlightLeadId);
+      if (highlighted && !list.some((l) => l.id === highlightLeadId)) {
+        list = [highlighted, ...list];
+      }
+    }
+
+    return list;
+  }, [leads, timeFilter, stageFilter, custIdFilter, search, customers, today, highlightLeadId]);
+
+  const activeLeads = filteredLeads.filter((l) => l.stage !== 'Lost' && l.stage !== 'Completed');
   const totalPipelineVal = activeLeads.reduce((s, l) => s + (l.value || 0), 0);
-  const weightedForecast = activeLeads.reduce((s, l) => {
-    const prob = l.probability ?? STAGE_PROB_V22[l.stage] ?? 10;
-    return s + (l.value || 0) * (prob / 100);
-  }, 0);
-  const confirmedVal = leads.filter((l) => l.stage === 'Confirmed').reduce((s, l) => s + (l.value || 0), 0);
+  const weightedForecast = activeLeads.reduce((s, l) => s + getLeadWeightedValue(l), 0);
+  const confirmedVal = filteredLeads.filter((l) => l.stage === 'Confirmed').reduce((s, l) => s + (l.value || 0), 0);
 
-  const listLeads = useMemo(
-    () =>
-      [...leads]
-        .filter((l) => l.stage !== 'Lost')
-        .sort((a, b) => {
-          const wa = ((a.value || 0) * (a.probability ?? STAGE_PROB_V22[a.stage] ?? 10)) / 100;
-          const wb = ((b.value || 0) * (b.probability ?? STAGE_PROB_V22[b.stage] ?? 10)) / 100;
-          return wb - wa;
-        }),
-    [leads]
-  );
+  const listLeads = useMemo(() => sortLeads(filteredLeads, listSort, customers), [filteredLeads, listSort, customers]);
+
+  const filtersActive = hasActiveFilters(search, timeFilter, stageFilter) || !!custIdFilter;
+
+  function clearFilters() {
+    setSearch('');
+    setTimeFilter({ mode: 'all' });
+    setStageFilter('');
+    setCustIdFilter('');
+    setHighlightLeadId('');
+  }
+
+  function handleSortClick(field: ListSortField) {
+    setListSort((prev) =>
+      prev.field === field
+        ? { field, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { field, direction: field === 'followUp' || field === 'customer' || field === 'travelDate' ? 'asc' : 'desc' }
+    );
+  }
+
+  function toggleStageExpanded(stage: string) {
+    setExpandedStages((prev) => {
+      const next = new Set(prev);
+      if (next.has(stage)) next.delete(stage);
+      else next.add(stage);
+      return next;
+    });
+  }
 
   function moveStage(leadId: string, newStage: string) {
     if (newStage === 'Lost') {
@@ -254,6 +441,14 @@ export default function Sales() {
     }
   }
 
+  function handleApproveOutline(lead: Lead) {
+    const draft = getTourDraftForLead(lead.id, tourDrafts);
+    if (!draft || draft.outlineStatus !== 'sent') return;
+    const name = getCustomerName(customers, lead.custId);
+    const patch = patchOutlineApproved(draft, lead.custId, name, lead.owner);
+    applyOutlineWorkflowPatch(lead.id, draft, patch, { upsertTourDraft, updateLead, addComm });
+  }
+
   function saveLostReason() {
     if (!lostModal) return;
     updateLead(lostModal.leadId, {
@@ -261,33 +456,144 @@ export default function Sales() {
       probability: 0,
       lostReason: lostModal.reason,
       lostNote: lostModal.note,
-      lostAt: new Date().toISOString().split('T')[0],
+      lostAt: today,
     });
     setLostModal(null);
   }
 
+  function renderLeadRow(l: Lead) {
+    const prob = l.probability ?? STAGE_PROB_V22[l.stage] ?? 10;
+    const weighted = Math.round(getLeadWeightedValue(l));
+    const lostReason = (l.lostReason as string) || '';
+    return (
+      <tr
+        key={l.id}
+        data-lead-id={l.id}
+        className={l.id === highlightLeadId ? 'sales-lead-highlight' : undefined}
+      >
+        <td>
+          <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{l.id}</code>
+        </td>
+        <td>
+          <b>{getCustomerName(customers, l.custId)}</b>
+        </td>
+        <td style={{ fontSize: 12, maxWidth: 200 }}>{l.tour}</td>
+        <td>{l.pax || '—'}</td>
+        <td style={{ fontWeight: 600, color: 'var(--g)' }}>{l.value > 0 ? `$${fmt(l.value)}` : '—'}</td>
+        <td style={{ fontWeight: 700, color: 'var(--pur)' }}>{weighted > 0 ? `$${fmt(weighted)}` : '—'}</td>
+        <td style={{ fontSize: 12, color: 'var(--m)' }}>{l.month || '—'}</td>
+        <td style={{ fontSize: 12, color: isFollowUpOverdue(l, today) ? 'var(--red)' : 'var(--m)', fontWeight: isFollowUpOverdue(l, today) ? 600 : 400 }}>
+          {l.followUpDate || '—'}
+        </td>
+        <td>
+          <span className={`bdg ${STAGE_COLORS[l.stage] || 'bdg-w'}`} style={{ fontSize: 10 }}>
+            {tStage(l.stage)}
+          </span>
+        </td>
+        <td style={{ fontSize: 12 }}>{l.owner || 'Tai Pham'}</td>
+        <td style={{ fontSize: 11.5, color: 'var(--m)' }}>{lostReason ? tLostReason(lostReason) : '—'}</td>
+      </tr>
+    );
+  }
+
+  const salesToolbar = (tab === 'pipeline' || tab === 'list') && (
+    <div className="sales-filter-row">
+      <div className="search-row" style={{ marginBottom: 0 }}>
+        <input
+          type="search"
+          placeholder={tsf('searchPlaceholder')}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      <div className="sales-filter-chips" role="group" aria-label={tsf('filterAll')}>
+        {TIME_FILTER_MODES.map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            className={`sales-filter-chip${timeFilter.mode === mode ? ' on' : ''}`}
+            onClick={() => setTimeFilter((prev) => ({ ...prev, mode, travelMonth: mode === 'travelMonth' ? prev.travelMonth : undefined }))}
+          >
+            {timeFilterLabel(mode, tsf)}
+          </button>
+        ))}
+      </div>
+      {timeFilter.mode === 'travelMonth' && (
+        <select
+          className="sales-travel-month-select"
+          value={timeFilter.travelMonth || ''}
+          onChange={(e) => setTimeFilter((prev) => ({ ...prev, travelMonth: e.target.value }))}
+        >
+          <option value="">{tsf('filterByTravelMonth')}</option>
+          {travelMonths.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+      )}
+      {timeFilter.mode === 'followUpRange' && (
+        <div className="sales-date-range">
+          <label>
+            {tsf('followUpFrom')}
+            <input
+              type="date"
+              value={timeFilter.followUpFrom || ''}
+              onChange={(e) => setTimeFilter((prev) => ({ ...prev, followUpFrom: e.target.value }))}
+            />
+          </label>
+          <label>
+            {tsf('followUpTo')}
+            <input
+              type="date"
+              value={timeFilter.followUpTo || ''}
+              onChange={(e) => setTimeFilter((prev) => ({ ...prev, followUpTo: e.target.value }))}
+            />
+          </label>
+        </div>
+      )}
+      <select className="sales-stage-select" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
+        <option value="">{tsf('filterStage')}</option>
+        {KANBAN_STAGES.map((st) => (
+          <option key={st} value={st}>
+            {tStage(st)}
+          </option>
+        ))}
+      </select>
+      {filtersActive && (
+        <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
+          {tsf('clearFilters')}
+        </button>
+      )}
+      <span className="sales-result-count">
+        {filteredLeads.length} {tsf('leadCount')}
+      </span>
+    </div>
+  );
+
   return (
     <div>
-      <div className="search-row" style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+        <div className="tabs" style={{ marginBottom: 0 }}>
+          {(
+            [
+              ['pipeline', tc('pipelineView')],
+              ['list', tc('listView')],
+              ['policy', `📋 ${tc('tourPolicy')}`],
+            ] as const
+          ).map(([id, label]) => (
+            <div key={id} className={`tab${tab === id ? ' on' : ''}`} onClick={() => setTab(id)} role="button" tabIndex={0}>
+              {label}
+            </div>
+          ))}
+        </div>
         <div style={{ flex: 1 }} />
         <button className="btn btn-p btn-sm" type="button" onClick={() => setFormOpen(true)}>
           {tc('newClientBtn')}
         </button>
       </div>
 
-      <div className="tabs">
-        {(
-          [
-            ['pipeline', tc('pipelineView')],
-            ['list', tc('listView')],
-            ['policy', `📋 ${tc('tourPolicy')}`],
-          ] as const
-        ).map(([id, label]) => (
-          <div key={id} className={`tab${tab === id ? ' on' : ''}`} onClick={() => setTab(id)} role="button" tabIndex={0}>
-            {label}
-          </div>
-        ))}
-      </div>
+      {salesToolbar}
 
       {tab === 'pipeline' && (
         <>
@@ -314,82 +620,105 @@ export default function Sales() {
             <span style={{ fontSize: 11, color: 'var(--m)' }}>{tsf('weightedFormula')}</span>
           </div>
 
-          <div className="pipeline">
-            {STAGES.map((stage) => {
-              const stageLeads = leads.filter((l) => l.stage === stage);
-              const stageVal = stageLeads.reduce((acc, l) => acc + (l.value || 0), 0);
-              return (
-                <div className="pipe-col" key={stage}>
-                  <div className="pipe-hd">
-                    <span>{tStage(stage)}</span>
-                    <span className={`bdg ${STAGE_COLORS[stage] || 'bdg-w'}`}>{stageLeads.length}</span>
-                    {stageVal > 0 && <span className="pipe-col-val">${fmt(Math.round(stageVal))}</span>}
+          {filteredLeads.length === 0 ? (
+            <div className="sales-empty-state">
+              <p>{tsf('noResults')}</p>
+              {filtersActive && (
+                <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
+                  {tsf('clearFilters')}
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="pipeline">
+              {KANBAN_STAGES.map((stage) => {
+                const stageLeads = filteredLeads.filter((l) => l.stage === stage);
+                const stageVal = stageLeads.reduce((acc, l) => acc + (l.value || 0), 0);
+                const expanded = expandedStages.has(stage);
+                const visibleLeads = expanded ? stageLeads : stageLeads.slice(0, PIPELINE_CARDS_LIMIT);
+                const hiddenCount = stageLeads.length - visibleLeads.length;
+                return (
+                  <div className="pipe-col" key={stage}>
+                    <div className="pipe-hd">
+                      <span>{tStage(stage)}</span>
+                      <span className={`bdg ${STAGE_COLORS[stage] || 'bdg-w'}`}>{stageLeads.length}</span>
+                      {stageVal > 0 && <span className="pipe-col-val">${fmt(Math.round(stageVal))}</span>}
+                    </div>
+                    {visibleLeads.map((l) => (
+                      <PipeCard
+                        key={l.id}
+                        lead={l}
+                        stage={stage}
+                        name={getCustomerName(customers, l.custId)}
+                        today={today}
+                        tourDrafts={tourDrafts}
+                        onStageChange={moveStage}
+                        onUpdate={updateLead}
+                        onApproveOutline={handleApproveOutline}
+                      />
+                    ))}
+                    {hiddenCount > 0 && (
+                      <button type="button" className="sales-show-more-btn" onClick={() => toggleStageExpanded(stage)}>
+                        +{hiddenCount} {tsf('showMore')}
+                      </button>
+                    )}
                   </div>
-                  {stageLeads.map((l) => (
-                    <PipeCard
-                      key={l.id}
-                      lead={l}
-                      stage={stage}
-                      name={getCustomerName(customers, l.custId)}
-                      onStageChange={moveStage}
-                      onUpdate={updateLead}
-                    />
-                  ))}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </>
       )}
 
       {tab === 'list' && (
         <div className="card">
+          <div className="sales-list-toolbar">
+            <label>
+              <input type="checkbox" checked={groupByMonth} onChange={(e) => setGroupByMonth(e.target.checked)} />
+              {tsf('groupByTravelMonth')}
+            </label>
+          </div>
           <div className="card-body" style={{ padding: 0 }}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>{tsf('leadId')}</th>
-                  <th>{tsf('customer')}</th>
-                  <th>{tc('tour')}</th>
-                  <th>{tc('pax')}</th>
-                  <th>{tc('value')}</th>
-                  <th style={{ color: 'var(--pur)' }}>{tc('weighted')} ▾</th>
-                  <th>{tsf('travelDate')}</th>
-                  <th>{tc('stage')}</th>
-                  <th>{tc('owner')}</th>
-                  <th>{tc('lostReason')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {listLeads.map((l) => {
-                  const prob = l.probability ?? STAGE_PROB_V22[l.stage] ?? 10;
-                  const weighted = Math.round(((l.value || 0) * prob) / 100);
-                  const lostReason = (l.lostReason as string) || '';
-                  return (
-                    <tr key={l.id}>
-                      <td>
-                        <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{l.id}</code>
-                      </td>
-                      <td>
-                        <b>{getCustomerName(customers, l.custId)}</b>
-                      </td>
-                      <td style={{ fontSize: 12, maxWidth: 200 }}>{l.tour}</td>
-                      <td>{l.pax || '—'}</td>
-                      <td style={{ fontWeight: 600, color: 'var(--g)' }}>{l.value > 0 ? `$${fmt(l.value)}` : '—'}</td>
-                      <td style={{ fontWeight: 700, color: 'var(--pur)' }}>{weighted > 0 ? `$${fmt(weighted)}` : '—'}</td>
-                      <td style={{ fontSize: 12, color: 'var(--m)' }}>{l.month || '—'}</td>
-                      <td>
-                        <span className={`bdg ${STAGE_COLORS[l.stage] || 'bdg-w'}`} style={{ fontSize: 10 }}>
-                          {tStage(l.stage)}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: 12 }}>{l.owner || 'Tai Pham'}</td>
-                      <td style={{ fontSize: 11.5, color: 'var(--m)' }}>{lostReason ? tLostReason(lostReason) : '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {listLeads.length === 0 ? (
+              <div className="sales-empty-state">
+                <p>{tsf('noResults')}</p>
+                {filtersActive && (
+                  <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
+                    {tsf('clearFilters')}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>{tsf('leadId')}</th>
+                    <SortableTh field="customer" label={tsf('customer')} listSort={listSort} onSort={handleSortClick} />
+                    <th>{tc('tour')}</th>
+                    <th>{tc('pax')}</th>
+                    <SortableTh field="value" label={tc('value')} listSort={listSort} onSort={handleSortClick} />
+                    <SortableTh field="weighted" label={tc('weighted')} listSort={listSort} onSort={handleSortClick} style={{ color: 'var(--pur)' }} />
+                    <SortableTh field="travelDate" label={tsf('travelDate')} listSort={listSort} onSort={handleSortClick} />
+                    <SortableTh field="followUp" label={tsf('followUp')} listSort={listSort} onSort={handleSortClick} />
+                    <SortableTh field="stage" label={tc('stage')} listSort={listSort} onSort={handleSortClick} />
+                    <th>{tc('owner')}</th>
+                    <th>{tc('lostReason')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupByMonth
+                    ? groupLeadsByTravelMonth(listLeads).flatMap((group) => [
+                        <tr key={`group-${group.label}`} className="sales-group-row">
+                          <td colSpan={11}>
+                            {group.label === 'TBD' ? tsf('travelMonthUndetermined') : group.label} ({group.leads.length})
+                          </td>
+                        </tr>,
+                        ...group.leads.map((l) => renderLeadRow(l)),
+                      ])
+                    : listLeads.map((l) => renderLeadRow(l))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
@@ -440,13 +769,54 @@ export default function Sales() {
         customers={customers}
         onClose={() => setFormOpen(false)}
         onSave={(payload) => {
-          const result = saveFromForm(payload);
+          const result = saveFromForm({ ...payload, flagTourDesign: true });
           if (!result.ok) return false;
-          if (result.message) alert(result.message);
           setFormOpen(false);
+          if (result.leadId) {
+            setCreatedClient({
+              leadId: result.leadId,
+              custId: result.customer.id,
+              name: result.customer.name,
+              message: result.message || `Customer ${result.customer.id} created.`,
+            });
+          } else if (result.message) {
+            alert(result.message);
+          }
           return true;
         }}
       />
+
+      {createdClient && (
+        <div className="overlay open" onClick={() => setCreatedClient(null)}>
+          <div className="modal" style={{ width: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-hd modal-hd-green">
+              <div style={{ color: '#fff', fontWeight: 700 }}>{tc('newClientBtn')}</div>
+              <button type="button" className="modal-close-btn" onClick={() => setCreatedClient(null)}>
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: 22 }}>
+              <p style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>{createdClient.message}</p>
+              <p style={{ fontSize: 13, marginBottom: 16 }}>
+                Continue in <strong>Tour Design</strong> to complete the client brief for{' '}
+                <strong>{createdClient.name}</strong>.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button className="btn btn-s" type="button" onClick={() => setCreatedClient(null)}>
+                  {tc('cancel')}
+                </button>
+                <Link
+                  href={`/tourdesign?leadId=${encodeURIComponent(createdClient.leadId)}&custId=${encodeURIComponent(createdClient.custId)}`}
+                  className="btn btn-p"
+                  onClick={() => setCreatedClient(null)}
+                >
+                  Tour Design →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

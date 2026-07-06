@@ -1,13 +1,15 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
 import { NAV_SECTIONS } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
-import type { PageSlug } from '@/lib/types';
+import { countActiveTasks } from '@/lib/planner-task-utils';
+import { countTourDesignAttention } from '@/lib/tour-design-leads';
+import type { Lead, PageSlug, Task, TourDraft } from '@/lib/types';
 
 interface SidebarProps {
   open: boolean;
@@ -18,16 +20,15 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { language, t } = useLanguage();
   const current = (pathname.split('/').pop() || 'dashboard') as PageSlug;
-  const leads = useStore((s) => s.leads);
+  const tasks = useStore((s) => s.tasks) as Task[];
+  const leads = useStore((s) => s.leads) as Lead[];
+  const tourDrafts = useStore((s) => s.tourDrafts) as TourDraft[];
   const messages = useStore((s) => s.messages);
 
-  const today = new Date().toISOString().split('T')[0];
-  const overdueCount = useMemo(
-    () =>
-      leads.filter(
-        (l) => l.followUpDate && l.followUpDate < today && l.stage !== 'Completed' && l.stage !== 'Lost'
-      ).length,
-    [leads, today]
+  const activeTaskCount = useMemo(() => countActiveTasks(tasks), [tasks]);
+  const pendingTourDesign = useMemo(
+    () => countTourDesignAttention(leads, tourDrafts),
+    [leads, tourDrafts]
   );
 
   const chatUnread = useMemo(() => {
@@ -84,14 +85,18 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                 key={item.page}
                 href={`/${item.page}`}
                 className={`sbi${current === item.page ? ' on' : ''}`}
+                title={t(item.en, item.vi)}
                 onClick={onClose}
               >
-                <span className="sb-icon">{item.icon}</span>{' '}
-                <span>{t(item.en, item.vi)}</span>
+                <span className="sb-icon">{item.icon}</span>
+                <span className="sb-label">{t(item.en, item.vi)}</span>
                 {item.badge && item.badgeType === 'ceo' && <span className="sb-badge">{item.badge}</span>}
                 {item.badge && item.badgeType === 'new' && <span className="sb-new">{item.badge}</span>}
-                {item.page === 'planner' && overdueCount > 0 && (
-                  <span className="sb-overdue-badge">{overdueCount}</span>
+                {item.page === 'planner' && activeTaskCount > 0 && (
+                  <span className="sb-overdue-badge">{activeTaskCount}</span>
+                )}
+                {item.page === 'tourdesign' && pendingTourDesign > 0 && (
+                  <span className="sb-overdue-badge">{pendingTourDesign}</span>
                 )}
                 {item.page === 'teamchat' && chatUnread > 0 && (
                   <span className="sb-chat-badge">{chatUnread}</span>

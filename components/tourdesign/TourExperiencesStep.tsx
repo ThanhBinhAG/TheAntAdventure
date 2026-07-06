@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { REG_COLORS_HEX, REG_LABELS } from '@/lib/page-helpers';
 import { getLibPriceLabel } from '@/lib/tour-pricing';
-import { getDurationPillLabel, getDurationPillVariant } from '@/lib/product-display';
+import { getDurationPillLabel, getDurationPillVariant, isSelectableProduct } from '@/lib/product-display';
 import { TOUR_PACKAGES, type TourPackage } from '@/lib/seeds/tourPackages';
 import type { TourBrief, GalleryPhoto } from '@/lib/tour-design-types';
 import type { Product } from '@/lib/types';
@@ -81,6 +81,7 @@ export default function TourExperiencesStep({
 
   const libFiltered = useMemo(() => {
     return products.filter((p) => {
+      if (!isSelectableProduct(p)) return false;
       if (libRegion && p.region !== libRegion) return false;
       if (libDur) {
         const d = p.dur || '';

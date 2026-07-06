@@ -30,6 +30,12 @@ export interface Customer {
   budget?: string;
   travelMonth?: string;
   children?: number;
+  adults?: number;
+  firstTime?: string;
+  intlFlights?: string;
+  childAges?: string;
+  childDiet?: string;
+  childPrefs?: string;
   flights?: string;
   visaStatus?: string;
   interests?: string;
@@ -61,7 +67,40 @@ export interface Lead {
   probability?: number;
   clientType?: string;
   currency?: string;
+  needsTourDesign?: boolean;
+  tourDesignAcked?: boolean;
+  notes?: string;
   [key: string]: unknown;
+}
+
+export type OutlineStatus = 'draft' | 'sent' | 'approved';
+
+export interface TourDraft {
+  id: string;
+  leadId: string;
+  custId: string;
+  briefJson?: Record<string, unknown>;
+  outlineStatus: OutlineStatus;
+  outlineNotes?: string;
+  outlineSentAt?: string;
+  outlineApprovedAt?: string;
+  outlineRevision?: number;
+  selectedCodes?: string[];
+  selectedPackageId?: string | null;
+  markupPct?: number;
+  clientType?: 'b2c' | 'b2b';
+  currentStep?: number;
+}
+
+export interface TourOutlineDay {
+  id: string;
+  draftId: string;
+  dayNumber: number;
+  date?: string;
+  location?: string;
+  activities?: string;
+  hotels?: string;
+  sortOrder?: number;
 }
 
 export interface BookingActivity {
@@ -204,6 +243,17 @@ export interface ChatMessages {
   [channel: string]: ChatMessage[];
 }
 
+export interface Task {
+  id?: string;
+  title?: string;
+  assignee?: string;
+  date?: string;
+  priority?: string;
+  dept?: string;
+  status?: string;
+  notes?: string;
+}
+
 export interface BackupData {
   customers: Customer[];
   leads: Lead[];
@@ -225,12 +275,75 @@ export interface BackupData {
   messages: ChatMessages;
   calEvents: unknown[];
   devNotes: unknown[];
-  cruises: unknown[];
-  transport: unknown[];
-  restaurants: unknown[];
-  specialSuppliers: unknown[];
+  hotels: Hotel[];
+  cruises: CruiseSupplier[];
+  transport: TransportSupplier[];
+  restaurants: RestaurantSupplier[];
+  specialSuppliers: ExtendedSupplier[];
+  tourDrafts: TourDraft[];
+  tourOutlineDays: TourOutlineDay[];
   exportedAt: string;
   version: string;
+}
+
+export interface HotelRoom {
+  id?: string;
+  type: string;
+  view?: string;
+  sqm?: number;
+  lm: number;
+  hm: number;
+  fm: number;
+  pm: number;
+  ln: number;
+  hn: number;
+  fn: number;
+  pn: number;
+}
+
+export interface Hotel {
+  id: string;
+  name: string;
+  dest: string;
+  cat: string;
+  stars: string;
+  region: 'north' | 'central' | 'south';
+  rooms: HotelRoom[];
+  status?: string;
+}
+
+export interface TransportSupplier {
+  id: string;
+  name: string;
+  region?: string;
+  vehicles?: string;
+  rate?: string;
+  notes?: string;
+  supplierId?: string;
+}
+
+export interface RestaurantSupplier {
+  id: string;
+  name: string;
+  city?: string;
+  cuisine?: string;
+  set?: string;
+  cap?: number;
+  rating?: string;
+  notes?: string;
+  supplierId?: string;
+}
+
+export interface CruiseSupplier {
+  id: string;
+  name: string;
+  route?: string;
+  cabins?: string;
+  rate?: string;
+  valid?: string;
+  rating?: string;
+  notes?: string;
+  supplierId?: string;
 }
 
 export interface ExtendedSupplier {

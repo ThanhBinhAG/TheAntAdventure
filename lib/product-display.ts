@@ -1,3 +1,9 @@
+import type { Product } from './types';
+
+export function isSelectableProduct(p: Product): boolean {
+  return !p.status || p.status === 'active';
+}
+
 export type DurationPillVariant = 'half' | 'full' | 'multiday' | 'service' | 'other';
 
 export function getDurationPillVariant(dur: string): DurationPillVariant {

@@ -1,3 +1,5 @@
+import { openPrintWindow } from './print-window';
+
 export type ContractDoc = {
   id: string;
   clientName?: string;
@@ -188,10 +190,8 @@ export function downloadContractWord(c: ContractDoc) {
 }
 
 export function printContract(c: ContractDoc) {
-  const w = window.open('', '_blank');
-  if (!w) return;
-  w.document.write(`<!DOCTYPE html><html><head><title>${c.id}</title></head><body>${buildContractHTML(c, true)}</body></html>`);
-  w.document.close();
-  w.focus();
-  w.print();
+  openPrintWindow(
+    `<!DOCTYPE html><html><head><title>${c.id}</title></head><body>${buildContractHTML(c, true)}</body></html>`,
+    c.id
+  );
 }

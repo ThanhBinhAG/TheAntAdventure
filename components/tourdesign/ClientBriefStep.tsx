@@ -341,7 +341,7 @@ export default function ClientBriefStep({
             ✦ AI Suggest Style
           </button>
           <button className="btn btn-p" type="button" onClick={onNext}>
-            Next: Tour Experiences →
+            Next: Outline →
           </button>
         </div>
       </div>

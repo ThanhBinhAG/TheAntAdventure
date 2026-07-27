@@ -1,13 +1,24 @@
 import { addDays, localTodayIso } from './date-utils';
 import { REG_LABELS } from './page-helpers';
 import { ICO_KEYS, INCL_YES } from './pricing-utils';
-import { findProductPricing, getAdjustedSell, paxToTierN, sumSellForProducts } from './tour-pricing';
+import { findProductPricing, paxToTierN, sumSellForProducts } from './tour-pricing';
 import { TOUR_PACKAGES } from './seeds/tourPackages';
 import { SEED_STAFF } from './seeds/staff';
 import { fmtOutlineDate } from './outline-html';
-import { formatDayDateLabel, resolveTravelStart, totalDurationDays } from './tour-itinerary';
-import type { TourBrief } from './tour-design-types';
-import type { Product, ProductPricing, TourOutlineDay } from './types';
+import {
+  buildDayGroups,
+  formatDayDateLabel,
+  resolveTravelStart,
+  stripMarkdown,
+  totalDurationDays,
+} from './tour-itinerary';
+import {
+  getDayPhotos,
+  resolvePackageDayPhotos,
+  resolveProductPhotos,
+} from './tour-photos';
+import type { GalleryPhoto, TourBrief } from './tour-design-types';
+import type { Hotel, Product, ProductPricing, TourOutlineDay } from './types';
 import type {
   AssembleProposalInput,
   ProposalB2BPricing,
@@ -187,6 +198,7 @@ function buildItineraryFromOutline(
       body: activitiesPlain || 'Program details to be confirmed.',
       hotel,
       meals: inferMealsFromText(activitiesPlain),
+      imageUrls: [],
     });
   }
 
@@ -218,10 +230,172 @@ function buildItineraryFromPackage(brief: TourBrief, packageId: string) {
       body: stripHtmlToPlain(d.body),
       hotel: d.hotel,
       meals: formatMealsCode(d.meals),
+      imageUrls: [],
     });
   }
 
   return { glance, days };
+}
+
+function buildItineraryFromProducts(
+  brief: TourBrief,
+  products: Product[]
+): { glance: ProposalItineraryRow[]; days: ProposalDayDetail[] } {
+  const timed = products.filter((p) => !isFlightProduct(p));
+  const dayGroups = buildDayGroups(timed);
+  const glance: ProposalItineraryRow[] = [];
+  const days: ProposalDayDetail[] = [];
+
+  for (const g of dayGroups) {
+    const primary = g.items[0];
+    const dateLabel = formatDayDateLabel(brief.startDate, brief.travelMonth, g.n);
+    const isoPart = dateLabel.includes(',') ? dateLabel.split('—')[1]?.trim() : dateLabel;
+    const title =
+      g.multiDay && g.dayOf && g.totalDays
+        ? `${primary?.name || 'Experience'} (Day ${g.dayOf}/${g.totalDays})`
+        : g.items.map((p) => p.name).join(' · ') || `Day ${g.n}`;
+    const body = g.items
+      .map((p) => stripMarkdown(p.desc || p.usp || p.name))
+      .filter(Boolean)
+      .join('\n\n');
+    const destination = g.label || primary?.dest || '—';
+    const hotel = '—';
+
+    glance.push({
+      dayNumber: g.n,
+      dateLabel: isoPart || `Day ${g.n}`,
+      destination,
+      theme: title,
+      hotel,
+    });
+    days.push({
+      dayNumber: g.n,
+      dateLabel: isoPart || `Day ${g.n}`,
+      destination,
+      title,
+      body: body || 'Program details to be confirmed.',
+      hotel,
+      meals: 'As per program',
+      imageUrls: [],
+    });
+  }
+
+  return { glance, days };
+}
+
+function resolveRegionTag(brief: TourBrief, packageId: string | null): string {
+  if (packageId) {
+    const pkg = TOUR_PACKAGES.find((p) => p.id === packageId);
+    if (pkg?.tag) return pkg.tag;
+  }
+  return brief.region || 'generic';
+}
+
+function findProductsForDay(day: ProposalDayDetail, products: Product[]): Product[] {
+  const dest = (day.destination || '').toLowerCase();
+  const title = (day.title || '').toLowerCase();
+  const body = (day.body || '').toLowerCase();
+  const tokens = dest
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 3);
+
+  return products.filter((p) => {
+    if (isFlightProduct(p)) return false;
+    const hay = `${p.dest} ${p.name} ${p.region}`.toLowerCase();
+    if (tokens.some((t) => hay.includes(t))) return true;
+    return hay
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 4)
+      .some((t) => title.includes(t) || body.includes(t));
+  });
+}
+
+export function attachDayImages(
+  days: ProposalDayDetail[],
+  products: Product[],
+  galleryPhotos: GalleryPhoto[],
+  packageId: string | null,
+  brief: TourBrief
+): ProposalDayDetail[] {
+  const regionTag = resolveRegionTag(brief, packageId);
+  return days.map((day) => {
+    const urls: string[] = [];
+    const matched = findProductsForDay(day, products);
+
+    for (const p of matched) {
+      const photos = resolveProductPhotos(p, galleryPhotos, 2, day.dayNumber);
+      for (const ph of photos) {
+        if (ph.url && !urls.includes(ph.url)) urls.push(ph.url);
+        if (urls.length >= 2) break;
+      }
+      if (urls.length >= 2) break;
+    }
+
+    if (urls.length < 2) {
+      const pkgPhotos = resolvePackageDayPhotos(
+        day.title || day.destination,
+        regionTag,
+        day.hotel,
+        galleryPhotos,
+        day.dayNumber,
+        2 - urls.length
+      );
+      for (const ph of pkgPhotos) {
+        if (ph.url && !urls.includes(ph.url)) urls.push(ph.url);
+      }
+    }
+
+    if (urls.length < 2) {
+      for (const url of getDayPhotos(
+        day.title || day.destination,
+        regionTag,
+        day.hotel,
+        day.dayNumber,
+        2 - urls.length
+      )) {
+        if (!urls.includes(url)) urls.push(url);
+      }
+    }
+
+    return { ...day, imageUrls: urls.slice(0, 2) };
+  });
+}
+
+function suggestFiveStarHotel(location: string, catalog: Hotel[]): Hotel | undefined {
+  const loc = (location || '').toLowerCase();
+  const locKey = loc.split(/[,\-–]/)[0]?.trim() || '';
+  const fiveStar = catalog.filter((h) => /5/.test(String(h.stars)));
+  if (!fiveStar.length) return undefined;
+  return (
+    fiveStar.find((h) => {
+      const dest = (h.dest || '').toLowerCase();
+      const name = (h.name || '').toLowerCase();
+      return (
+        (locKey && (dest.includes(locKey) || loc.includes(dest) || name.includes(locKey))) ||
+        (loc && dest && loc.includes(dest))
+      );
+    }) || fiveStar[0]
+  );
+}
+
+/** Parallel Option B rows from Option A stays; suggest 5★ names from catalog when available. */
+export function seedOptionBHotelRates(
+  optionA: ProposalHotelRate[],
+  hotelsCatalog: Hotel[] = []
+): ProposalHotelRate[] {
+  return optionA.map((a) => {
+    const suggested = suggestFiveStarHotel(a.location, hotelsCatalog);
+    return {
+      id: `optb-${a.id}`,
+      hotelName: suggested?.name || '',
+      location: a.location,
+      stayFrom: a.stayFrom,
+      stayTo: a.stayTo,
+      roomType: 'Deluxe Double Room',
+      nights: a.nights,
+      ratePerNight: 0,
+    };
+  });
 }
 
 function formatMealsCode(code: string): string {
@@ -445,7 +619,8 @@ function buildB2BPricing(
   codes: string[],
   packageId: string | null,
   markupPct: number,
-  hotelRates: ProposalHotelRate[]
+  hotelRatesOptionA: ProposalHotelRate[],
+  hotelRatesOptionB: ProposalHotelRate[]
 ): ProposalB2BPricing {
   const tierN = paxToTierN(brief.pax);
   const groundCodes = codes.filter((c) => {
@@ -466,7 +641,8 @@ function buildB2BPricing(
     flightsPerPax = Math.round(pkgTotal * 0.15);
   }
 
-  const hotelsTotal = hotelRates.reduce((s, h) => s + h.ratePerNight * h.nights, 0);
+  const hotelsTotalOptionA = hotelRatesOptionA.reduce((s, h) => s + h.ratePerNight * h.nights, 0);
+  const hotelsTotalOptionB = hotelRatesOptionB.reduce((s, h) => s + h.ratePerNight * h.nights, 0);
 
   return {
     kind: 'b2b',
@@ -477,9 +653,18 @@ function buildB2BPricing(
     touringsTotal: touringsPerPax * brief.pax,
     flightsPerPax,
     flightsTotal: flightsPerPax * brief.pax,
-    hotelsTotal,
-    hotelRates,
+    hotelsTotalOptionA,
+    hotelsTotalOptionB,
+    hotelRatesOptionA,
+    hotelRatesOptionB,
   };
+}
+
+function normalizeAccommodationOptionA(tier: string): string {
+  const t = (tier || '').trim();
+  if (!t) return '4★ Boutique Properties';
+  if (/5\s*★|5-?\s*star/i.test(t) && !/4/.test(t)) return '4★ Boutique Properties';
+  return t;
 }
 
 export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
@@ -493,17 +678,21 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
     selectedPackageId,
     markupPct,
     leadId,
-    hotelRates: hotelRatesInput,
+    hotelRatesOptionA: hotelRatesOptionAInput,
+    hotelRatesOptionB: hotelRatesOptionBInput,
+    hotelRates: hotelRatesLegacy,
     inclusionsOverride,
     exclusionsOverride,
     specialNotesOverride,
     logoUrl = '/Logo-3.svg',
+    galleryPhotos = [],
+    hotelsCatalog = [],
+    detailedProgramLayout = 'sidebar',
   } = input;
 
   const variant: ProposalVariant = clientType === 'b2b' ? 'b2b' : 'b2c';
   const codes = resolveEffectiveCodes(selectedCodes, selectedPackageId);
   const preparedDate = localTodayIso();
-  const validUntil = addDaysIso(preparedDate, 30);
 
   let glance: ProposalItineraryRow[] = [];
   let days: ProposalDayDetail[] = [];
@@ -512,22 +701,47 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
     ({ glance, days } = buildItineraryFromOutline(brief, outlineRows));
   } else if (selectedPackageId) {
     ({ glance, days } = buildItineraryFromPackage(brief, selectedPackageId));
+  } else if (products.length) {
+    const selected = products.filter((p) => codes.includes(p.code));
+    ({ glance, days } = buildItineraryFromProducts(brief, selected.length ? selected : products));
   }
+
+  days = attachDayImages(days, products, galleryPhotos, selectedPackageId, brief);
 
   const dayCount = days.length || parseDurationDays(brief.duration) || totalDurationDays(products);
   const endDate = resolveEndDate(brief, dayCount);
   const pkg = selectedPackageId ? TOUR_PACKAGES.find((p) => p.id === selectedPackageId) : null;
 
   const tourTitle = buildTourTitle(brief, selectedPackageId, products.length);
-  const tagline = pkg?.tagline?.replace(/^"|"$/g, '') || brief.notes || 'A private journey through Vietnam\'s most remarkable landscapes and cultures.';
+  const tagline =
+    pkg?.tagline?.replace(/^"|"$/g, '') ||
+    brief.notes ||
+    "A private journey through Vietnam's most remarkable landscapes and cultures.";
   const route = buildRoute(brief, selectedPackageId, glance);
 
-  const hotelRates =
-    hotelRatesInput?.length ? hotelRatesInput : extractHotelBlocksFromOutline(brief, outlineRows);
+  const hotelRatesOptionA =
+    hotelRatesOptionAInput?.length
+      ? hotelRatesOptionAInput
+      : hotelRatesLegacy?.length
+        ? hotelRatesLegacy
+        : extractHotelBlocksFromOutline(brief, outlineRows);
+
+  const hotelRatesOptionB =
+    hotelRatesOptionBInput?.length
+      ? hotelRatesOptionBInput
+      : seedOptionBHotelRates(hotelRatesOptionA, hotelsCatalog);
 
   const pricing =
     variant === 'b2b'
-      ? buildB2BPricing(brief, products, codes, selectedPackageId, markupPct, hotelRates)
+      ? buildB2BPricing(
+          brief,
+          products,
+          codes,
+          selectedPackageId,
+          markupPct,
+          hotelRatesOptionA,
+          hotelRatesOptionB
+        )
       : buildB2CPricing(brief, codes, selectedPackageId, markupPct, tourTitle);
 
   const guestLabel =
@@ -553,17 +767,21 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
     season: inferSeason(brief.travelMonth),
     rooming: inferRooming(brief.pax),
     guestCountLabel: guestLabel,
-    accommodationOptionA: brief.hotelTier || '4★ Boutique Properties',
+    accommodationOptionA: normalizeAccommodationOptionA(brief.hotelTier),
     accommodationOptionB: '5★ Luxury Hotels & Resorts',
     flights: buildFlights(brief, selectedPackageId, outlineRows, products),
     itineraryGlance: glance,
     days,
-    inclusions: inclusionsOverride?.length ? inclusionsOverride : aggregateInclusions(products, selectedPackageId, input.productPricing),
+    inclusions: inclusionsOverride?.length
+      ? inclusionsOverride
+      : aggregateInclusions(products, selectedPackageId, input.productPricing),
     exclusions: exclusionsOverride?.length ? exclusionsOverride : aggregateExclusions(selectedPackageId),
     pricing,
-    hotelRates,
+    hotelRatesOptionA,
+    hotelRatesOptionB,
     specialNotes: buildSpecialNotes(brief, specialNotesOverride),
     logoUrl,
+    detailedProgramLayout: detailedProgramLayout === 'inline' ? 'inline' : 'sidebar',
   };
 }
 

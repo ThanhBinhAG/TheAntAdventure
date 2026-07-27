@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
 import { useStore } from '@/hooks/useStore';
+import { usePagination } from '@/hooks/usePagination';
+import PaginationBar from '@/components/PaginationBar';
 
 type FinTab = 'overview' | 'cashflow' | 'pl' | 'ar' | 'ap';
 
@@ -75,6 +77,14 @@ export default function Finance() {
   const arFiltered = ar.filter((r) => !arFilter || r.status === arFilter);
   const apFiltered = ap.filter((p) => !apFilter || p.status === apFilter);
 
+  const financePagination = usePagination(finance, undefined, [tab]);
+  const arPagination = usePagination(arFiltered, undefined, [arFilter, tab]);
+  const apPagination = usePagination(apFiltered, undefined, [apFilter, tab]);
+
+  const { paginatedItems: financePage } = financePagination;
+  const { paginatedItems: arPage } = arPagination;
+  const { paginatedItems: apPage } = apPagination;
+
   return (
     <div>
       <div className="fin-kpi fin-kpi-5">
@@ -135,7 +145,7 @@ export default function Finance() {
                 </tr>
               </thead>
               <tbody>
-                {finance.map((f) => (
+                {financePage.map((f) => (
                   <tr key={f.id}>
                     <td>
                       <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{f.id}</code>
@@ -157,6 +167,7 @@ export default function Finance() {
                 ))}
               </tbody>
             </table>
+            <PaginationBar {...financePagination} />
           </div>
         </div>
       )}
@@ -263,7 +274,7 @@ export default function Finance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {arFiltered.map((r) => (
+                  {arPage.map((r) => (
                     <tr key={r.id}>
                       <td>
                         <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{r.id}</code>
@@ -287,6 +298,7 @@ export default function Finance() {
                   ))}
                 </tbody>
               </table>
+              <PaginationBar {...arPagination} />
             </div>
           </div>
         </>
@@ -318,7 +330,7 @@ export default function Finance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {apFiltered.map((p) => (
+                  {apPage.map((p) => (
                     <tr key={p.id}>
                       <td>
                         <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{p.id}</code>
@@ -341,6 +353,7 @@ export default function Finance() {
                   ))}
                 </tbody>
               </table>
+              <PaginationBar {...apPagination} />
             </div>
           </div>
         </>

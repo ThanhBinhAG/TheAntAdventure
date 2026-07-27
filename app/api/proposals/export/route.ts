@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isProposalExportAuthorized } from '@/lib/proposal-auth';
 import { renderProposalPdf } from '@/lib/proposal-pdf';
 import type { ProposalDoc } from '@/lib/proposal-types';
+import { captureAppError } from '@/lib/system/app-logger';
 
 export async function POST(request: Request) {
   const allowed = await isProposalExportAuthorized();
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'PDF generation failed';
-    console.error('[proposals/export]', message);
+    captureAppError('proposals/export', err, message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

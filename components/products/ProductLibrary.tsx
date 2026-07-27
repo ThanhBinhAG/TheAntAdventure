@@ -4,7 +4,11 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import ProductCard from '@/components/products/ProductCard';
 import { deriveCategoriesFromProducts } from '@/lib/product-form';
-import type { Product } from '@/lib/types';
+import {
+  matchesPricingStatusFilter,
+  type PricingStatusFilter,
+} from '@/lib/product-pricing-helpers';
+import type { Product, ProductPricing } from '@/lib/types';
 
 const DURATION_OPTIONS = [
   '',
@@ -20,6 +24,7 @@ const DURATION_OPTIONS = [
 
 interface ProductLibraryProps {
   products: Product[];
+  productPricing: ProductPricing[];
   search: string;
   onSearchChange: (q: string) => void;
   region: string;
@@ -30,14 +35,18 @@ interface ProductLibraryProps {
   onCategoryChange: (v: string) => void;
   destFilter: string;
   onDestFilterChange: (v: string) => void;
+  pricingStatus: PricingStatusFilter;
+  onPricingStatusChange: (v: PricingStatusFilter) => void;
   pickMode?: boolean;
   expandedCode: string | null;
   onToggleExpand: (code: string) => void;
   onPickProduct?: (p: Product) => void;
+  onImportPortfolio?: () => void;
 }
 
 export default function ProductLibrary({
   products,
+  productPricing,
   search,
   onSearchChange,
   region,
@@ -48,12 +57,20 @@ export default function ProductLibrary({
   onCategoryChange,
   destFilter,
   onDestFilterChange,
+  pricingStatus,
+  onPricingStatusChange,
   pickMode = false,
   expandedCode,
   onToggleExpand,
   onPickProduct,
+  onImportPortfolio,
 }: ProductLibraryProps) {
   const categories = useMemo(() => deriveCategoriesFromProducts(products), [products]);
+
+  const pricingByCode = useMemo(
+    () => new Map(productPricing.map((row) => [row.productCode, row])),
+    [productPricing]
+  );
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -62,6 +79,7 @@ export default function ProductLibrary({
       if (duration && p.dur !== duration) return false;
       if (category && !p.cat.toLowerCase().includes(category.toLowerCase())) return false;
       if (destFilter && !p.dest.toLowerCase().includes(destFilter.toLowerCase())) return false;
+      if (!matchesPricingStatusFilter(p.code, pricingByCode, pricingStatus)) return false;
       if (
         q &&
         !p.name.toLowerCase().includes(q) &&
@@ -72,7 +90,7 @@ export default function ProductLibrary({
         return false;
       return true;
     });
-  }, [products, search, region, duration, category, destFilter]);
+  }, [products, search, region, duration, category, destFilter, pricingStatus, pricingByCode]);
 
   const byDest = useMemo(() => {
     const map: Record<string, Product[]> = {};
@@ -85,7 +103,7 @@ export default function ProductLibrary({
   }, [filtered]);
 
   const destCount = Object.keys(byDest).length;
-  const hasFilters = !!(search || region || duration || category || destFilter);
+  const hasFilters = !!(search || region || duration || category || destFilter || pricingStatus);
 
   const clearFilters = () => {
     onSearchChange('');
@@ -93,6 +111,7 @@ export default function ProductLibrary({
     onDurationChange('');
     onCategoryChange('');
     onDestFilterChange('');
+    onPricingStatusChange('');
   };
 
   return (
@@ -104,6 +123,11 @@ export default function ProductLibrary({
             <p className="prod-page-sub">Browse and filter tour products by destination, region, and category.</p>
           </div>
           <div className="prod-stat-chips">
+            {onImportPortfolio && !pickMode && (
+              <button type="button" className="btn btn-s btn-sm" onClick={onImportPortfolio}>
+                Import Portfolio
+              </button>
+            )}
             <span className="prod-stat-chip">
               <strong>{filtered.length}</strong> shown
             </span>
@@ -168,6 +192,19 @@ export default function ProductLibrary({
               onChange={(e) => onDestFilterChange(e.target.value)}
               aria-label="Destination filter"
             />
+          </div>
+          <div className="fg">
+            <label className="lbl">Pricing</label>
+            <select
+              value={pricingStatus}
+              onChange={(e) => onPricingStatusChange(e.target.value as PricingStatusFilter)}
+              aria-label="Pricing status filter"
+            >
+              <option value="">All pricing</option>
+              <option value="complete">Full pricing</option>
+              <option value="incomplete">Partial</option>
+              <option value="missing">No pricing</option>
+            </select>
           </div>
         </div>
 

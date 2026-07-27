@@ -1,6 +1,9 @@
 import type { PageSlug } from './types';
 
 export const FX = { USD: 1, EUR: 0.92, VND: 25000 } as const;
+
+/** Default page size for CRM table pagination. */
+export const PAGE_SIZE = 20;
 export const FX_SYM = { USD: '$', EUR: '€', VND: '₫' } as const;
 
 /** Annual revenue target (USD) for Dashboard YTD progress bar. */
@@ -78,16 +81,6 @@ export const SRC_COLORS: Record<string, string> = {
   Abercrombie: 'bdg-a',
 };
 
-/** @deprecated Legacy v4 pipeline — use KANBAN_STAGES */
-export const PIPELINE_STAGES = [
-  'Inquiry',
-  'Designing',
-  'Quoted',
-  'Negotiation',
-  'Won',
-  'Lost',
-] as const;
-
 export const SALES_STAGES = [...KANBAN_STAGES, 'Lost'] as const;
 
 export const PAGE_TITLES: Record<PageSlug, string> = {
@@ -99,7 +92,9 @@ export const PAGE_TITLES: Record<PageSlug, string> = {
   tourdesign: 'Tour Design Studio ✦',
   products: 'Tour Products',
   gallery: 'Photo Gallery',
-  pricing: 'Pricing',
+  pricing: 'Tour Price List',
+  'pricing-essentials': 'Essentials — Saigon & Mekong',
+  'pricing-accommodation': 'Accommodation & Cruises',
   bookings: 'Bookings',
   contracts: 'Contracts',
   suppliers: 'Suppliers',
@@ -127,6 +122,9 @@ export const VI_LABELS: Record<string, string> = {
   'Tour Design Studio ✦': 'Thiết kế tour ✦',
   'Tour Products': 'Sản phẩm tour',
   Pricing: 'Bảng giá',
+  'Tour Price List': 'Bảng giá tour',
+  'Essentials — Saigon & Mekong': 'Essentials — Sài Gòn & Mekong',
+  'Accommodation & Cruises': 'Lưu trú & Du thuyền',
   Bookings: 'Đặt tour',
   Suppliers: 'Nhà cung cấp',
   Guides: 'Hướng dẫn viên',
@@ -155,6 +153,8 @@ export interface NavItem {
   vi: string;
   badge?: string;
   badgeType?: 'ceo' | 'new';
+  /** Renders the item as an expandable group in the sidebar. */
+  children?: NavItem[];
 }
 
 export interface NavSection {
@@ -176,7 +176,31 @@ export const NAV_SECTIONS: NavSection[] = [
       { page: 'tourdesign', icon: '✦', en: 'Tour Design', vi: 'Thiết kế tour', badge: 'AI', badgeType: 'new' },
       { page: 'products', icon: '◆', en: 'Tour Products', vi: 'Sản phẩm tour' },
       { page: 'gallery', icon: '🖼', en: 'Photo Gallery', vi: 'Thư viện ảnh' },
-      { page: 'pricing', icon: '◈', en: 'Pricing', vi: 'Bảng giá' },
+      {
+        page: 'pricing',
+        icon: '◈',
+        en: 'Pricing',
+        vi: 'Bảng giá',
+        children: [
+          { page: 'pricing', icon: '◇', en: 'Tour Price List', vi: 'Bảng giá tour' },
+          {
+            page: 'pricing-essentials',
+            icon: '🚲',
+            en: 'Essentials',
+            vi: 'Essentials',
+            badge: 'NEW',
+            badgeType: 'new',
+          },
+          {
+            page: 'pricing-accommodation',
+            icon: '🏨',
+            en: 'Accommodation & Cruises',
+            vi: 'Lưu trú & Du thuyền',
+            badge: 'NEW',
+            badgeType: 'new',
+          },
+        ],
+      },
       { page: 'weather', icon: '☁', en: 'Weather Guide', vi: 'Thời tiết' },
       { page: 'attractions', icon: '🏛', en: 'Attraction Schedule', vi: 'Lịch điểm tham quan', badge: 'NEW', badgeType: 'new' },
     ],
@@ -218,7 +242,13 @@ export const NAV_SECTIONS: NavSection[] = [
 
 export const QUICK_NAV_PAGES: PageSlug[] = ['dashboard', 'sales', 'tourdesign', 'bookings'];
 
-export const VALID_PAGES = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.page));
+export const VALID_PAGES = Array.from(
+  new Set(
+    NAV_SECTIONS.flatMap((s) =>
+      s.items.flatMap((i) => [i.page, ...(i.children?.map((c) => c.page) ?? [])])
+    )
+  )
+);
 
 export function fmt(n: number): string {
   return n.toLocaleString("en-US");

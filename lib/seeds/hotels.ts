@@ -109,14 +109,3 @@ export const AA_HOTELS = [
   {id:'HTL-S-035',name:'Dakruco Hotel Buon Ma Thuot',dest:'Dak Lak',cat:'4★ Business & Leisure Hotel',stars:'★★★★',region:'south',rooms:[{sqm:22,view:'City',type:'Standard Room',lm:55.0,hm:80.0,fm:109.0,pm:121.0,ln:48.0,hn:70.0,fn:95.0,pn:105.0}]},
   {id:'HTL-S-036',name:'Ban Don Elephant Lodge',dest:'Dak Lak',cat:'4★ Eco-Elephant Conservation Lodge',stars:'★★★★',region:'south',rooms:[{sqm:25,view:'Forest',type:'Jungle Bungalow',lm:63.0,hm:94.0,fm:128.0,pm:141.0,ln:55.0,hn:82.0,fn:111.0,pn:123.0}]}
 ] as const;
-
-export const SEED_HOTELS = AA_HOTELS.map((h) => ({
-  id: h.id,
-  name: h.name,
-  loc: h.dest,
-  stars: h.stars,
-  region: h.region,
-  category: h.cat,
-  rooms: h.rooms,
-  status: 'Active',
-}));

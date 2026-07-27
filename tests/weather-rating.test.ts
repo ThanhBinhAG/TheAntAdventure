@@ -20,8 +20,9 @@ describe('toTravelRating', () => {
     assert.equal(toTravelRating(1, 0, 39, 30), 'F');
   });
 
-  it('returns G for mild cloudy day', () => {
-    assert.equal(toTravelRating(2, 1, 27, 20), 'G');
+  it('returns G for foggy dry day outside clear codes', () => {
+    // Codes 0–3 with low precip are Excellent; G is the residual (e.g. fog 45).
+    assert.equal(toTravelRating(45, 1, 27, 20), 'G');
   });
 });
 

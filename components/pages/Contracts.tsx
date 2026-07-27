@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
 import { buildContractHTML, downloadContractWord, printContract } from '@/lib/contract-html';
 import { useStore } from '@/hooks/useStore';
+import { usePagination } from '@/hooks/usePagination';
+import PaginationBar from '@/components/PaginationBar';
 
 type Contract = {
   id: string;
@@ -103,6 +105,9 @@ export default function Contracts() {
       return true;
     });
   }, [contracts, search, filter]);
+
+  const pagination = usePagination(filtered, undefined, [search, filter]);
+  const { paginatedItems } = pagination;
 
   const kpis = useMemo(() => {
     const draft = contracts.filter((c) => c.status === 'Draft').length;
@@ -219,7 +224,7 @@ export default function Contracts() {
                 </td>
               </tr>
             ) : (
-              filtered.map((c) => (
+              paginatedItems.map((c) => (
                 <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => setPreview(c)}>
                   <td>
                     <b style={{ color: 'var(--gd)' }}>{c.id}</b>
@@ -247,6 +252,7 @@ export default function Contracts() {
             )}
           </tbody>
         </table>
+        <PaginationBar {...pagination} />
       </div>
 
       {showNew && (

@@ -1,11 +1,60 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useState, type FormEvent } from 'react';
 import { DebugPanel } from '@/components/system/DebugPanel';
 
+const STORAGE_KEY = 'system-debug-token';
+
 export function DebugPanelClient() {
-  const searchParams = useSearchParams();
-  const token = searchParams.get('token') ?? '';
+  const [token, setToken] = useState('');
+  const [draft, setDraft] = useState('');
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY) ?? '';
+      setToken(saved);
+      setDraft(saved);
+    } catch {
+      /* ignore */
+    }
+    setReady(true);
+  }, []);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const next = draft.trim();
+    setToken(next);
+    try {
+      if (next) sessionStorage.setItem(STORAGE_KEY, next);
+      else sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const clearToken = () => {
+    setToken('');
+    setDraft('');
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  if (!ready) {
+    return (
+      <div className="login-page">
+        <div className="login-card">
+          <div className="login-brand">
+            <div className="login-title">System Debug</div>
+            <div className="login-subtitle">Loading…</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!token) {
     return (
@@ -13,11 +62,29 @@ export function DebugPanelClient() {
         <div className="login-card">
           <div className="login-brand">
             <div className="login-title">System Debug</div>
-            <div className="login-subtitle">Thiếu token</div>
+            <div className="login-subtitle">Nhập debug token</div>
           </div>
           <p className="login-hint">
-            Truy cập với query <code>?token=YOUR_SYSTEM_DEBUG_TOKEN</code> (lấy từ env server).
+            Token lấy từ env server <code>SYSTEM_DEBUG_TOKEN</code>. Gửi qua header{' '}
+            <code>X-Debug-Token</code> (không dùng query string).
           </p>
+          <form onSubmit={submit} className="login-form">
+            <label className="lbl" htmlFor="debug-token">
+              Debug token
+            </label>
+            <input
+              id="debug-token"
+              className="inp"
+              type="password"
+              autoComplete="off"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="SYSTEM_DEBUG_TOKEN"
+            />
+            <button className="btn btn-p" type="submit" disabled={!draft.trim()}>
+              Continue
+            </button>
+          </form>
         </div>
       </div>
     );
@@ -25,6 +92,11 @@ export function DebugPanelClient() {
 
   return (
     <div className="login-page debug-page-wrap">
+      <div className="debug-token-bar" style={{ marginBottom: 12, textAlign: 'right' }}>
+        <button className="btn btn-sm" type="button" onClick={clearToken}>
+          Clear token
+        </button>
+      </div>
       <DebugPanel token={token} />
     </div>
   );

@@ -71,10 +71,29 @@ export async function renderProposalPdf(doc: ProposalDoc): Promise<Buffer> {
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'load', timeout: 60_000 });
+    await page.evaluate(async () => {
+      const imgs = Array.from(document.images);
+      await Promise.all(
+        imgs.map(
+          (img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise<void>((resolve) => {
+                  img.onload = () => resolve();
+                  img.onerror = () => resolve();
+                })
+        )
+      );
+    });
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
-      margin: { top: '14mm', right: '12mm', bottom: '18mm', left: '12mm' },
+      displayHeaderFooter: true,
+      headerTemplate: '<div></div>',
+      footerTemplate: `<div style="width:100%;font-size:8px;color:#6B7F74;text-align:center;padding:0 12mm;font-family:Calibri,Arial,sans-serif;">
+        THE ANT ADVENTURES &nbsp;|&nbsp; Boutique Inbound Travel — Vietnam &nbsp;|&nbsp; sales@theantadventures.com &nbsp;|&nbsp; www.theantadventures.com &nbsp;|&nbsp; Page <span class="pageNumber"></span>
+      </div>`,
+      margin: { top: '12mm', right: '12mm', bottom: '16mm', left: '12mm' },
     });
     return Buffer.from(pdf);
   } finally {

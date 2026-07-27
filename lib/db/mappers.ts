@@ -128,6 +128,109 @@ export function agentToRow(a: Agent): Row {
   };
 }
 
+export function rowToAttraction(r: Row): Row {
+  return {
+    id: String(r.id),
+    region: String(r.region ?? 'north'),
+    type: String(r.type ?? ''),
+    name: String(r.name ?? ''),
+    dest: String(r.dest ?? ''),
+    hours: String(r.hours ?? ''),
+    closed: String(r.closed ?? ''),
+    admission: String(r.admission ?? ''),
+    duration: Number(r.duration ?? 0),
+    best_time: String(r.best_time ?? ''),
+    crowd: String(r.crowd ?? ''),
+    book_req: Boolean(r.book_req),
+    seasonal: String(r.seasonal ?? ''),
+    notes: String(r.notes ?? ''),
+    alert: String(r.alert ?? ''),
+    phone: String(r.phone ?? ''),
+    photoIds: [],
+    linkedPhotoIds: [],
+  };
+}
+
+export function attractionToRow(a: Row): Row {
+  return {
+    id: a.id,
+    region: a.region,
+    type: a.type,
+    name: a.name,
+    dest: a.dest,
+    hours: a.hours ?? null,
+    closed: a.closed ?? null,
+    admission: a.admission ?? null,
+    duration: a.duration ?? 0,
+    best_time: a.best_time ?? null,
+    crowd: a.crowd ?? null,
+    book_req: Boolean(a.book_req),
+    seasonal: a.seasonal ?? null,
+    notes: a.notes ?? null,
+    alert: a.alert ?? null,
+    phone: a.phone ?? '',
+  };
+}
+
+export function assembleAttractions(baseRows: Row[], linkRows: Row[]): Row[] {
+  const photosByAttraction = new Map<
+    string,
+    { photoId: string; sortOrder: number; isFeatured: boolean }[]
+  >();
+  for (const link of linkRows) {
+    const attId = String(link.attraction_id);
+    if (!photosByAttraction.has(attId)) photosByAttraction.set(attId, []);
+    photosByAttraction.get(attId)!.push({
+      photoId: String(link.photo_id),
+      sortOrder: Number(link.sort_order ?? 0),
+      isFeatured: Boolean(link.is_featured),
+    });
+  }
+
+  return baseRows.map((r) => {
+    const base = rowToAttraction(r);
+    const links = photosByAttraction.get(String(base.id)) ?? [];
+    links.sort((a, b) => a.sortOrder - b.sortOrder);
+    const linkedPhotoIds = links.map((l) => l.photoId);
+    const featuredLinks = links.filter((l) => l.isFeatured);
+    const photoIds =
+      featuredLinks.length > 0
+        ? featuredLinks.map((l) => l.photoId).slice(0, 4)
+        : linkedPhotoIds.slice(0, 4);
+    return { ...base, linkedPhotoIds, photoIds };
+  });
+}
+
+/** Build junction rows for Supabase sync from an attraction's pool + featured sets. */
+export function attractionPhotoRows(attraction: {
+  id: string;
+  photoIds?: string[];
+  linkedPhotoIds?: string[];
+}): Row[] {
+  const linked =
+    attraction.linkedPhotoIds?.length
+      ? attraction.linkedPhotoIds
+      : (attraction.photoIds ?? []);
+  const featured = (attraction.photoIds ?? []).filter((id) => linked.includes(id)).slice(0, 4);
+  const featuredSet = new Set(featured);
+  const poolOnly = linked.filter((id) => !featuredSet.has(id));
+
+  return [
+    ...featured.map((photoId, i) => ({
+      attraction_id: attraction.id,
+      photo_id: photoId,
+      sort_order: i,
+      is_featured: true,
+    })),
+    ...poolOnly.map((photoId, i) => ({
+      attraction_id: attraction.id,
+      photo_id: photoId,
+      sort_order: featured.length + i,
+      is_featured: false,
+    })),
+  ];
+}
+
 export function rowToLead(r: Row): Lead {
   return {
     id: String(r.id),
@@ -203,6 +306,7 @@ export function assembleBookings(
     return {
       id,
       custId: String(r.cust_id ?? ''),
+      leadId: r.lead_id != null && String(r.lead_id) ? String(r.lead_id) : undefined,
       tour: String(r.tour ?? ''),
       pax: Number(r.pax ?? 1),
       start: r.start_date ? String(r.start_date) : '',
@@ -223,6 +327,7 @@ export function bookingToRow(b: Booking): Row {
   return {
     id: b.id,
     cust_id: fkOrNull(b.custId),
+    lead_id: fkOrNull(b.leadId),
     tour: b.tour,
     pax: b.pax,
     start_date: b.start || null,
@@ -322,6 +427,7 @@ export function rowToProduct(r: Row): Product {
     lvl: String(r.level ?? ''),
     desc: String(r.description ?? ''),
     usp: String(r.usp ?? ''),
+    notesToSales: String(r.notes_to_sales ?? ''),
     price: String(r.price_from ?? ''),
     region: String(r.region ?? ''),
   };
@@ -338,6 +444,7 @@ export function productToRow(p: Product): Row {
     level: p.lvl,
     description: p.desc,
     usp: p.usp,
+    notes_to_sales: p.notesToSales ?? '',
     price_from: p.price,
     region: p.region,
   };
@@ -521,12 +628,17 @@ export function supplierToRow(r: Row): Row {
 }
 
 export function photoToRow(r: Row): Row {
+  const slot = r.slot ?? r.slot_number;
   return {
     id: r.id,
     caption: r.caption ?? null,
     region: r.region ?? null,
     product_code: fkOrNull(r.product ?? r.product_code),
+    slot: slot === 1 || slot === 2 ? slot : null,
     url: r.url ?? null,
+    thumb_url: r.thumbUrl ?? r.thumb_url ?? null,
+    storage_path: r.storagePath ?? r.storage_path ?? null,
+    display_bytes: r.displayBytes ?? r.display_bytes ?? null,
   };
 }
 
@@ -638,12 +750,17 @@ export function rowToSupplier(r: Row, tags: string[] = []): Row {
 }
 
 export function rowToPhoto(r: Row, tags: string[] = []): Row {
+  const slot = r.slot;
   return {
     id: r.id,
     caption: r.caption,
     region: r.region,
     product: r.product_code,
+    slot: slot === 1 || slot === 2 ? slot : undefined,
     url: r.url,
+    thumbUrl: r.thumb_url,
+    storagePath: r.storage_path,
+    displayBytes: r.display_bytes != null ? Number(r.display_bytes) : undefined,
     tags,
   };
 }

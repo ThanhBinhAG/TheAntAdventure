@@ -4,11 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
 import { stripMarkdown } from '@/lib/tour-itinerary';
 import { paxToTierN, sumSellForProducts } from '@/lib/tour-pricing';
-import { assembleProposalDoc, extractHotelBlocksFromOutline } from '@/lib/proposal-assembler';
+import {
+  assembleProposalDoc,
+  extractHotelBlocksFromOutline,
+  seedOptionBHotelRates,
+} from '@/lib/proposal-assembler';
 import { buildProposalHTML, downloadProposalWord, printProposal } from '@/lib/proposal-html';
-import type { TourBrief } from '@/lib/tour-design-types';
-import type { Product, TourOutlineDay } from '@/lib/types';
-import type { ProposalDoc, ProposalHotelRate } from '@/lib/proposal-types';
+import type { GalleryPhoto, TourBrief } from '@/lib/tour-design-types';
+import type { Hotel, Product, TourOutlineDay } from '@/lib/types';
+import type { ProposalDoc, ProposalDetailedProgramLayout, ProposalHotelRate } from '@/lib/proposal-types';
 import ProposalHotelRatesPanel from '@/components/tourdesign/ProposalHotelRatesPanel';
 
 const API_KEY_STORAGE = 'ant_api_key';
@@ -30,6 +34,8 @@ interface Props {
   outlineRows: TourOutlineDay[];
   markupPct: number;
   leadId?: string;
+  galleryPhotos?: GalleryPhoto[];
+  hotelsCatalog?: Hotel[];
   onSavePipeline: () => void;
   onReset: () => void;
   onBack: () => void;
@@ -45,6 +51,8 @@ export default function ProposalExportStep({
   outlineRows,
   markupPct,
   leadId,
+  galleryPhotos = [],
+  hotelsCatalog = [],
   onSavePipeline,
   onReset,
   onBack,
@@ -57,7 +65,10 @@ export default function ProposalExportStep({
   const [result, setResult] = useState('');
   const [showCopy, setShowCopy] = useState(false);
   const [specialNotes, setSpecialNotes] = useState('');
-  const [hotelRates, setHotelRates] = useState<ProposalHotelRate[]>([]);
+  const [detailedProgramLayout, setDetailedProgramLayout] =
+    useState<ProposalDetailedProgramLayout>('sidebar');
+  const [hotelRatesOptionA, setHotelRatesOptionA] = useState<ProposalHotelRate[]>([]);
+  const [hotelRatesOptionB, setHotelRatesOptionB] = useState<ProposalHotelRate[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
@@ -67,8 +78,10 @@ export default function ProposalExportStep({
   }, []);
 
   useEffect(() => {
-    setHotelRates(extractHotelBlocksFromOutline(brief, outlineRows));
-  }, [brief, outlineRows]);
+    const optionA = extractHotelBlocksFromOutline(brief, outlineRows);
+    setHotelRatesOptionA(optionA);
+    setHotelRatesOptionB(seedOptionBHotelRates(optionA, hotelsCatalog));
+  }, [brief, outlineRows, hotelsCatalog]);
 
   const proposalDoc: ProposalDoc = useMemo(
     () =>
@@ -82,9 +95,13 @@ export default function ProposalExportStep({
         selectedPackageId,
         markupPct,
         leadId,
-        hotelRates,
+        hotelRatesOptionA,
+        hotelRatesOptionB,
         specialNotesOverride: specialNotes || undefined,
         logoUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/Logo-3.svg`,
+        galleryPhotos,
+        hotelsCatalog,
+        detailedProgramLayout,
       }),
     [
       brief,
@@ -96,8 +113,12 @@ export default function ProposalExportStep({
       selectedPackageId,
       markupPct,
       leadId,
-      hotelRates,
+      hotelRatesOptionA,
+      hotelRatesOptionB,
       specialNotes,
+      galleryPhotos,
+      hotelsCatalog,
+      detailedProgramLayout,
     ]
   );
 
@@ -127,9 +148,13 @@ export default function ProposalExportStep({
 
     const codes = selectedProducts.map((p) => p.code);
     const tierN = paxToTierN(brief.pax);
-    const sellPerPax = sumSellForProducts(codes, tierN, markupPct) || (proposalDoc.pricing.kind === 'b2c' ? proposalDoc.pricing.perPerson : 0);
+    const sellPerPax =
+      sumSellForProducts(codes, tierN, markupPct) ||
+      (proposalDoc.pricing.kind === 'b2c' ? proposalDoc.pricing.perPerson : 0);
     const groupTotal = sellPerPax * brief.pax;
-    const expList = selectedProducts.map((p) => `- ${p.name} (${p.dur}): ${stripMarkdown(p.desc).slice(0, 120)}…`).join('\n');
+    const expList = selectedProducts
+      .map((p) => `- ${p.name} (${p.dur}): ${stripMarkdown(p.desc).slice(0, 120)}…`)
+      .join('\n');
     const special = specialNotes || brief.specialRequests || brief.notes || 'None';
 
     let prompt = '';
@@ -230,6 +255,43 @@ Include subject line, body, sign-off from ${proposalDoc.consultant.name}.`;
     }
   }, [hasContent, proposalDoc]);
 
+  /** Open Puppeteer PDF in a new tab for print — avoids browser date/URL/title chrome. */
+  const printViaPdf = useCallback(async () => {
+    if (!hasContent) {
+      alert('Please add tour content before printing.');
+      return;
+    }
+    setPdfLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/proposals/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposalDoc }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url, '_blank');
+      if (!w) {
+        // Popup blocked — fall back to HTML print without app URL in footer.
+        URL.revokeObjectURL(url);
+        printProposal(proposalDoc, window.location.origin);
+        return;
+      }
+      // Revoke after the viewer has loaded the blob.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      setError(formatPdfDownloadError(e instanceof Error ? e.message : 'PDF print failed.'));
+      printProposal(proposalDoc, window.location.origin);
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [hasContent, proposalDoc]);
+
   function copyResult() {
     if (result) navigator.clipboard.writeText(result);
   }
@@ -250,8 +312,8 @@ Include subject line, body, sign-off from ${proposalDoc.consultant.name}.`;
           <button
             className="btn btn-s"
             type="button"
-            onClick={() => printProposal(proposalDoc, window.location.origin)}
-            disabled={!hasContent}
+            onClick={() => void printViaPdf()}
+            disabled={pdfLoading || !hasContent}
           >
             🖨 Print / Save PDF
           </button>
@@ -287,14 +349,55 @@ Include subject line, body, sign-off from ${proposalDoc.consultant.name}.`;
           />
         </div>
 
+        <div style={{ marginBottom: 14 }}>
+          <div className="lbl" style={{ marginBottom: 6 }}>
+            Detailed Program photo layout
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${detailedProgramLayout === 'sidebar' ? 'btn-p' : 'btn-s'}`}
+              onClick={() => setDetailedProgramLayout('sidebar')}
+            >
+              Sidebar (Material)
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${detailedProgramLayout === 'inline' ? 'btn-p' : 'btn-s'}`}
+              onClick={() => setDetailedProgramLayout('inline')}
+            >
+              Inline horizontal
+            </button>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>
+            {detailedProgramLayout === 'sidebar'
+              ? 'Text left · stacked photos in a Day panel on the right (matches sample PDF).'
+              : 'Photos in a horizontal row under the day narrative (previous layout).'}
+          </div>
+        </div>
+
         {clientType === 'b2b' && (
           <div style={{ marginBottom: 16 }}>
-            <ProposalHotelRatesPanel rates={hotelRates} onChange={setHotelRates} />
+            <ProposalHotelRatesPanel
+              title="C. HOTELS — OPTION A (4★) — enter net rate per night"
+              rates={hotelRatesOptionA}
+              onChange={setHotelRatesOptionA}
+            />
+            <ProposalHotelRatesPanel
+              title="C. HOTELS — OPTION B (5★ Luxury) — enter hotel names & net rates"
+              rates={hotelRatesOptionB}
+              onChange={setHotelRatesOptionB}
+              editableHotelName
+              emptyHint="Option B rows appear once Outline hotels are detected (same stays as Option A)."
+            />
           </div>
         )}
 
         {previewOpen && (
-          <div className="td-proposal-preview" style={{ marginBottom: 16, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+          <div
+            className="td-proposal-preview"
+            style={{ marginBottom: 16, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}
+          >
             <iframe
               title="Proposal preview"
               srcDoc={previewHtml}
@@ -305,7 +408,9 @@ Include subject line, body, sign-off from ${proposalDoc.consultant.name}.`;
 
         <div className="td-api-key-banner">
           <div style={{ flex: 1, minWidth: 220 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--pur)', marginBottom: 3 }}>⚡ Anthropic API Key (optional — AI narrative)</div>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--pur)', marginBottom: 3 }}>
+              ⚡ Anthropic API Key (optional — AI narrative)
+            </div>
             <div style={{ fontSize: 11.5, color: '#4a1460' }}>Required only for AI Itinerary / Quote Email below.</div>
           </div>
           <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -314,12 +419,23 @@ Include subject line, body, sign-off from ${proposalDoc.consultant.name}.`;
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="sk-ant-api03-..."
-              style={{ padding: '7px 11px', border: '1.5px solid var(--pur)', borderRadius: 7, fontFamily: 'monospace', fontSize: 12, width: 280 }}
+              style={{
+                padding: '7px 11px',
+                border: '1.5px solid var(--pur)',
+                borderRadius: 7,
+                fontFamily: 'monospace',
+                fontSize: 12,
+                width: 280,
+              }}
             />
             <button className="btn btn-pu btn-sm" type="button" onClick={saveKey}>
               Save Key
             </button>
-            <button type="button" onClick={clearKey} style={{ background: 'none', border: 'none', color: 'var(--m)', fontSize: 11, cursor: 'pointer' }}>
+            <button
+              type="button"
+              onClick={clearKey}
+              style={{ background: 'none', border: 'none', color: 'var(--m)', fontSize: 11, cursor: 'pointer' }}
+            >
               Clear
             </button>
           </div>
@@ -330,17 +446,23 @@ Include subject line, body, sign-off from ${proposalDoc.consultant.name}.`;
           <div className="td-export-card td-export-proposal" onClick={() => aiExport('proposal')} role="button" tabIndex={0}>
             <div style={{ fontSize: 26, marginBottom: 8 }}>✦</div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--g)' }}>AI Itinerary Narrative</div>
-            <div style={{ fontSize: 11.5, color: 'var(--gd)', marginTop: 4 }}>Optional luxury copy to paste into outline or email</div>
+            <div style={{ fontSize: 11.5, color: 'var(--gd)', marginTop: 4 }}>
+              Optional luxury copy to paste into outline or email
+            </div>
           </div>
           <div className="td-export-card td-export-email" onClick={() => aiExport('email')} role="button" tabIndex={0}>
             <div style={{ fontSize: 26, marginBottom: 8 }}>✉️</div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#92711d' }}>Quote Email</div>
-            <div style={{ fontSize: 11.5, color: '#92711d', marginTop: 4 }}>AI drafts personalized B2C/B2B proposal email</div>
+            <div style={{ fontSize: 11.5, color: '#92711d', marginTop: 4 }}>
+              AI drafts personalized B2C/B2B proposal email
+            </div>
           </div>
           <div className="td-export-card td-export-save" onClick={onSavePipeline} role="button" tabIndex={0}>
             <div style={{ fontSize: 26, marginBottom: 8 }}>✓</div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--m)' }}>Save to Pipeline</div>
-            <div style={{ fontSize: 11.5, color: 'var(--m)', marginTop: 4 }}>Add to Sales CRM as Designing-stage lead</div>
+            <div style={{ fontSize: 11.5, color: 'var(--m)', marginTop: 4 }}>
+              Add to Sales CRM as Designing-stage lead
+            </div>
           </div>
         </div>
 
@@ -352,11 +474,17 @@ Include subject line, body, sign-off from ${proposalDoc.consultant.name}.`;
           </div>
         )}
 
-        {error && <div className="td-ai-error" style={{ whiteSpace: 'pre-wrap' }}>{error}</div>}
+        {error && (
+          <div className="td-ai-error" style={{ whiteSpace: 'pre-wrap' }}>
+            {error}
+          </div>
+        )}
 
         {result && (
           <div className="td-ai-result">
-            <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 12.5, lineHeight: 1.7, margin: 0 }}>{result}</pre>
+            <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 12.5, lineHeight: 1.7, margin: 0 }}>
+              {result}
+            </pre>
           </div>
         )}
 

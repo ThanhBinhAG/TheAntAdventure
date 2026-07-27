@@ -16,10 +16,8 @@ export function isValidDebugToken(token: string | null | undefined): boolean {
   return token === expected;
 }
 
+/** Only accept the header — never query `?token=` (leaks via Referer / access logs). */
 export function extractDebugToken(request: NextRequest | Request): string | null {
-  const url = new URL(request.url);
-  const fromQuery = url.searchParams.get('token');
-  if (fromQuery) return fromQuery;
   return request.headers.get('x-debug-token');
 }
 

@@ -7,6 +7,7 @@ import { REG_COLORS_HEX, REG_LABELS } from '@/lib/page-helpers';
 import { pricingStatus, pricingUrlForProduct } from '@/lib/product-pricing-helpers';
 import { getLibPriceLabel } from '@/lib/tour-pricing';
 import { useStore } from '@/hooks/useStore';
+import type { GalleryPhoto } from '@/lib/tour-design-types';
 import type { Product } from '@/lib/types';
 
 interface ProductCardProps {
@@ -30,7 +31,7 @@ export default function ProductCard({
   onToggleExpand,
   onPick,
 }: ProductCardProps) {
-  const photos = useStore((s) => s.photos);
+  const photos = useStore((s) => s.photos) as GalleryPhoto[];
   const pricingRow = useStore((s) => s.productPricing.find((r) => r.productCode === p.code));
   const [rbg, rfg] = REG_COLORS_HEX[p.region as keyof typeof REG_COLORS_HEX] || ['#f5f5f5', '#333'];
   const priceLabel = p.price || getLibPriceLabel(p.code, 2);
@@ -94,6 +95,12 @@ export default function ProductCard({
         <div className="prod-card-expanded">
           {p.desc && <div className="prod-card-snippet">{p.desc}</div>}
           {p.usp && <div className="prod-usp">{p.usp.replace(/\n/g, ' · ')}</div>}
+          {p.notesToSales?.trim() && (
+            <div className="prod-notes-sales">
+              <div className="prod-notes-sales-label">Notes to Sales</div>
+              <div className="prod-notes-sales-body">{p.notesToSales}</div>
+            </div>
+          )}
           <div className="prod-card-links" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             <Link href={pricingUrlForProduct(p.code)} className="btn btn-s btn-sm" onClick={(e) => e.stopPropagation()}>
               Edit pricing

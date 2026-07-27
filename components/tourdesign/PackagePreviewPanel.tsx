@@ -1,23 +1,26 @@
 'use client';
 
 import { useMemo } from 'react';
-import { getDayPhotos } from '@/lib/tour-photos';
+import { resolvePackageDayPhotos } from '@/lib/tour-photos';
 import { formatDayDateLabel } from '@/lib/tour-itinerary';
-import type { TourBrief } from '@/lib/tour-design-types';
+import type { TourBrief, GalleryPhoto } from '@/lib/tour-design-types';
 import type { TourPackage } from '@/lib/seeds/tourPackages';
 import PhotoStack from '@/components/tourdesign/PhotoStack';
+import StorageImage from '@/components/media/StorageImage';
 
 interface Props {
   pkg: TourPackage | null;
   brief: TourBrief;
+  photos: GalleryPhoto[];
   onUsePackage: (pkg: TourPackage) => void;
 }
 
-export default function PackagePreviewPanel({ pkg, brief, onUsePackage }: Props) {
-  const heroUrl = useMemo(() => {
-    if (!pkg?.days?.length) return '';
-    return getDayPhotos(pkg.days[0].title, pkg.tag, pkg.days[0].hotel, 0, 1)[0];
-  }, [pkg]);
+export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage }: Props) {
+  const heroPhoto = useMemo(() => {
+    if (!pkg?.days?.length) return null;
+    const day = pkg.days[0];
+    return resolvePackageDayPhotos(day.title, pkg.tag, day.hotel, photos, 0, 1)[0] ?? null;
+  }, [pkg, photos]);
 
   if (!pkg) {
     return (
@@ -33,9 +36,9 @@ export default function PackagePreviewPanel({ pkg, brief, onUsePackage }: Props)
   return (
     <div className="card td-pkg-preview-card">
       <div className="td-pkg-preview-body">
-        {heroUrl && (
-          <div className="td-pkg-hero">
-            <img src={heroUrl} alt={pkg.name} loading="lazy" />
+        {heroPhoto?.url && (
+          <div className="td-pkg-hero" style={{ position: 'relative' }}>
+            <StorageImage src={heroPhoto.thumbUrl || heroPhoto.url} alt={pkg.name} fill className="td-pkg-hero-img" />
             <div className="td-pkg-hero-overlay" />
             <div className="td-pkg-hero-text">
               <div className="td-pkg-hero-title">{pkg.name}</div>
@@ -47,7 +50,7 @@ export default function PackagePreviewPanel({ pkg, brief, onUsePackage }: Props)
 
         <div className="td-section-lbl">📅 Detailed Programme</div>
         {pkg.days.map((d) => {
-          const dayPhotos = getDayPhotos(d.title, pkg.tag, d.hotel, d.n, 2).map((url) => ({ url }));
+          const dayPhotos = resolvePackageDayPhotos(d.title, pkg.tag, d.hotel, photos, d.n, 2);
           const dayLabel = formatDayDateLabel(brief.startDate, brief.travelMonth, d.n);
           return (
             <div key={d.n} className="td-draft-day">
@@ -109,13 +112,14 @@ export default function PackagePreviewPanel({ pkg, brief, onUsePackage }: Props)
             ))}
           </tbody>
         </table>
-        <div style={{ fontSize: 10.5, color: 'var(--m)', marginTop: 8 }}>
-          Peak season (Oct–Mar) +20% · Off-season (Apr–Sep) −10%
-        </div>
 
-        <div style={{ marginTop: 16, textAlign: 'center' }}>
-          <button className="btn btn-p" type="button" style={{ width: '100%' }} onClick={() => onUsePackage(pkg)}>
-            ✓ Use This Package
+        <div className="td-pkg-price-row">
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--m)' }}>Indicative price (4 pax, peak)</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--g)' }}>{pkg.price4pax}</div>
+          </div>
+          <button className="btn btn-p" type="button" onClick={() => onUsePackage(pkg)}>
+            Use This Package →
           </button>
         </div>
       </div>

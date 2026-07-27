@@ -15,6 +15,7 @@ export const PRODUCT_CATEGORIES = [
   'Cultural',
   'Transfer',
   'Culinary',
+  'Boat',
   'Cycling',
   'Nature',
   'Service',
@@ -58,6 +59,7 @@ export interface ProductFormState {
   lvl: string;
   desc: string;
   usp: string;
+  notesToSales: string;
   logic: string;
   price: string;
   status: 'active' | 'draft' | 'archived';
@@ -86,15 +88,11 @@ export function emptyProductForm(region = 'north', existingCodes: string[] = [])
     lvl: 'Easy & Comfortable',
     desc: '',
     usp: '',
+    notesToSales: '',
     logic: '',
     price: '',
     status: 'active',
   };
-}
-
-/** @deprecated Use buildProductCode from lib/product-code instead */
-export function generateProductCode(region: string): string {
-  return emptyProductForm(region).code;
 }
 
 export function regenerateProductCode(
@@ -141,6 +139,7 @@ export function productToForm(p: Product): ProductFormState {
     lvl: p.lvl || 'Easy & Comfortable',
     desc: p.desc || '',
     usp: p.usp || '',
+    notesToSales: p.notesToSales || '',
     logic: p.logic || '',
     price: p.price || '',
     status: p.status ?? 'active',
@@ -159,6 +158,7 @@ export function formToProduct(form: ProductFormState): Product {
     lvl: form.lvl,
     desc: form.desc.trim(),
     usp: form.usp.trim(),
+    notesToSales: form.notesToSales.trim(),
     logic: form.logic.trim(),
     price: form.price.trim(),
     status: form.status,

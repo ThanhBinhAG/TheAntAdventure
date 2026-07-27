@@ -1,9 +1,11 @@
 import { create, type StateCreator } from 'zustand';
-import { deleteProductFromRemote, deleteProductPricingFromRemote } from './db/remote-delete';
+import { deletePhotosFromRemote, deleteProductFromRemote, deleteProductPricingFromRemote } from './db/remote-delete';
+import { appLog } from './system/app-logger';
 import { rolloverTasks } from './planner-task-utils';
 import { localTodayIso } from './date-utils';
 import type {
   Agent,
+  Attraction,
   BackupData,
   Booking,
   ChatMessages,
@@ -31,6 +33,7 @@ interface CRMState {
   leads: Lead[];
   bookings: Booking[];
   agents: Agent[];
+  attractions: Attraction[];
   guides: Guide[];
   products: Product[];
   productPricing: ProductPricing[];
@@ -87,6 +90,10 @@ interface CRMState {
   addAgent: (agent: Agent) => void;
   updateAgent: (id: string, data: Partial<Agent>) => void;
   deleteAgent: (id: string) => void;
+  setAttractions: (attractions: Attraction[]) => void;
+  addAttraction: (attraction: Attraction) => void;
+  updateAttraction: (id: string, data: Partial<Attraction>) => void;
+  deleteAttraction: (id: string) => void;
   setGuides: (guides: Guide[]) => void;
   addGuide: (guide: Guide) => void;
   updateGuide: (id: string, data: Partial<Guide>) => void;
@@ -134,6 +141,7 @@ const emptyState = () => ({
   leads: [] as Lead[],
   bookings: [] as Booking[],
   agents: [] as Agent[],
+  attractions: [] as Attraction[],
   guides: [] as Guide[],
   products: [] as Product[],
   productPricing: [] as ProductPricing[],
@@ -221,6 +229,14 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         })),
       deleteAgent: (id) =>
         set((s) => ({ agents: s.agents.filter((a) => a.id !== id) })),
+      setAttractions: (attractions) => set({ attractions }),
+      addAttraction: (attraction) => set((s) => ({ attractions: [...s.attractions, attraction] })),
+      updateAttraction: (id, data) =>
+        set((s) => ({
+          attractions: s.attractions.map((a) => (a.id === id ? { ...a, ...data } : a)),
+        })),
+      deleteAttraction: (id) =>
+        set((s) => ({ attractions: s.attractions.filter((a) => a.id !== id) })),
       setGuides: (guides) => set({ guides }),
       addGuide: (guide) => set((s) => ({ guides: [...s.guides, guide] })),
       updateGuide: (id, data) =>
@@ -241,11 +257,16 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           products: s.products.map((p) => (p.code === code ? { ...p, ...data } : p)),
         })),
       deleteProduct: (code) => {
+        const linkedPhotoIds = (get().photos as { id?: string; product?: string }[])
+          .filter((p) => p.product === code && p.id)
+          .map((p) => String(p.id));
         set((s) => ({
           products: s.products.filter((p) => p.code !== code),
           productPricing: s.productPricing.filter((p) => p.productCode !== code),
+          photos: (s.photos as { product?: string }[]).filter((p) => p.product !== code),
         }));
         void deleteProductFromRemote(code);
+        void deletePhotosFromRemote(linkedPhotoIds);
       },
       setProductPricing: (productPricing) => set({ productPricing }),
       upsertProductPricing: (row, syncProductPrice = true) =>
@@ -346,6 +367,7 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           leads: s.leads,
           bookings: s.bookings,
           agents: s.agents,
+          attractions: s.attractions,
           guides: s.guides,
           products: s.products,
           productPricing: s.productPricing,
@@ -380,6 +402,7 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           leads: data.leads ?? get().leads,
           bookings: data.bookings ?? get().bookings,
           agents: data.agents ?? get().agents,
+          attractions: data.attractions ?? get().attractions,
           guides: data.guides ?? get().guides,
           products: data.products ?? get().products,
           productPricing: data.productPricing ?? get().productPricing,
@@ -406,7 +429,9 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         }),
 
       resetToSeeds: () => {
-        console.warn('[CRM] resetToSeeds is disabled — data is stored in Supabase only');
+        appLog('store', 'resetToSeeds is disabled — data is stored in Supabase only', {
+          level: 'warn',
+        });
       },
     });
 

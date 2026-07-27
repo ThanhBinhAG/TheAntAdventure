@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
+import { usePagination } from '@/hooks/usePagination';
+import PaginationBar from '@/components/PaginationBar';
 
 type HRTab = 'staff' | 'onboarding' | 'performance' | 'leave';
 
@@ -81,6 +83,15 @@ export default function HR() {
 
   const fullTime = staff.filter((s) => s.contract === 'Full-time');
 
+  const staffPagination = usePagination(filtered, undefined, [search, deptF, tab]);
+  const { paginatedItems: staffPage } = staffPagination;
+
+  const fullTimeIndexed = useMemo(() => fullTime.map((s, index) => ({ staff: s, index })), [fullTime]);
+  const perfPagination = usePagination(fullTimeIndexed, undefined, [tab]);
+  const leavePagination = usePagination(fullTimeIndexed, undefined, [tab]);
+  const { paginatedItems: perfPage } = perfPagination;
+  const { paginatedItems: leavePage } = leavePagination;
+
   return (
     <div>
       <div className="tabs">
@@ -134,7 +145,7 @@ export default function HR() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((s) => (
+                  {staffPage.map((s) => (
                     <tr key={s.id}>
                       <td>
                         <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{s.id}</code>
@@ -165,6 +176,7 @@ export default function HR() {
                   ))}
                 </tbody>
               </table>
+              <PaginationBar {...staffPagination} />
             </div>
           </div>
         </>
@@ -229,7 +241,7 @@ export default function HR() {
                 </tr>
               </thead>
               <tbody>
-                {fullTime.map((s, i) => {
+                {perfPage.map(({ staff: s, index: i }) => {
                   const score = PERF_SCORES[i] ?? 85;
                   const met = score >= 80;
                   return (
@@ -269,6 +281,7 @@ export default function HR() {
                 })}
               </tbody>
             </table>
+            <PaginationBar {...perfPagination} />
           </div>
         </div>
       )}
@@ -291,7 +304,7 @@ export default function HR() {
                   </tr>
                 </thead>
                 <tbody>
-                  {fullTime.map((s, i) => {
+                  {leavePage.map(({ staff: s, index: i }) => {
                     const [total, used, rem, sick] = LEAVE_DATA[i] || [12, 0, 12, 0];
                     return (
                       <tr key={s.id}>
@@ -311,6 +324,7 @@ export default function HR() {
                   })}
                 </tbody>
               </table>
+              <PaginationBar {...leavePagination} />
             </div>
           </div>
           <div className="card">

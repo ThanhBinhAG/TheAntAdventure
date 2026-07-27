@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useCallback, useState } from 'react';
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
 import { getAuthCaptchaSiteKey } from '@/lib/env';
-import { createClient } from '@/lib/supabase/client';
 
 function logAuthEvent(message: string, meta?: Record<string, unknown>, level: 'info' | 'warn' | 'error' = 'info') {
   void fetch('/api/system/log', {
@@ -25,16 +24,19 @@ function authErrorMessage(message: string): string {
     lower.includes('ssl') ||
     lower.includes('certificate')
   ) {
-    return 'Không kết nối được Supabase Auth — có thể do SSL, mạng, hoặc firewall trên server. Liên hệ quản trị viên.';
+    return 'Không kết nối được máy chủ xác thực — có thể do SSL, mạng, hoặc firewall. Liên hệ quản trị viên.';
   }
-  if (lower.includes('invalid login credentials')) {
-    return 'Email hoặc mật khẩu không đúng.';
+  if (lower.includes('invalid login credentials') || lower.includes('email hoặc mật khẩu') || lower.includes('tài khoản hoặc mật khẩu')) {
+    return 'Tài khoản hoặc mật khẩu không đúng.';
   }
-  if (lower.includes('email not confirmed')) {
+  if (lower.includes('email not confirmed') || lower.includes('chưa được xác nhận')) {
     return 'Email chưa được xác nhận. Kiểm tra hộp thư hoặc liên hệ quản trị viên.';
   }
   if (lower.includes('captcha')) {
     return 'Xác minh CAPTCHA thất bại. Vui lòng thử lại.';
+  }
+  if (lower.includes('quá nhiều')) {
+    return message;
   }
   return message || 'Đăng nhập thất bại. Vui lòng thử lại.';
 }
@@ -49,7 +51,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
   const captchaSiteKey = getAuthCaptchaSiteKey();
   const captchaRequired = Boolean(captchaSiteKey);
 
-  const [email, setEmail] = useState('');
+  const [identity, setIdentity] = useState('');
   const [password, setPassword] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,25 +71,44 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
     }
 
     setLoading(true);
-    logAuthEvent('signIn attempt', { email: email.trim() });
+    const trimmed = identity.trim();
+    // Do not log raw identity when it might be break-glass username.
+    logAuthEvent('signIn attempt', {
+      hasAt: trimmed.includes('@'),
+    });
 
     try {
-      const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-        options: captchaToken ? { captchaToken } : undefined,
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identity: trimmed,
+          password,
+          captchaToken: captchaToken || undefined,
+        }),
       });
 
-      if (signInError) {
-        const msg = authErrorMessage(signInError.message);
-        logAuthEvent('signIn failed', { error: signInError.message, status: signInError.status }, 'error');
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        mode?: string;
+      };
+
+      if (!res.ok || !data.ok) {
+        const msg = authErrorMessage(data.error || 'Đăng nhập thất bại.');
+        logAuthEvent(
+          'signIn failed',
+          { status: res.status, mode: data.mode },
+          'error',
+        );
         setError(msg);
         setCaptchaToken(null);
         return;
       }
 
-      logAuthEvent('signIn success', { email: email.trim() });
+      logAuthEvent('signIn success', {
+        mode: data.mode === 'break_glass' ? 'break_glass' : 'supabase',
+      });
       const next = searchParams.get('next');
       const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
       router.push(safeNext);
@@ -110,17 +131,18 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
-          <label className="login-label" htmlFor="login-email">
+          <label className="login-label" htmlFor="login-identity">
             Email
           </label>
           <input
-            id="login-email"
-            type="email"
+            id="login-identity"
+            type="text"
+            inputMode="text"
             autoComplete="username"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            value={identity}
+            onChange={(e) => setIdentity(e.target.value)}
+            placeholder="email@example.com"
           />
 
           <label className="login-label" htmlFor="login-password">
@@ -156,7 +178,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
         {showDebugLink && (
           <p className="login-hint debug-login-link">
             Admin:{' '}
-            <Link href="/system/debug">System diagnostics</Link> (cần token trong URL)
+            <Link href="/system/debug">System diagnostics</Link> 
           </p>
         )}
       </div>

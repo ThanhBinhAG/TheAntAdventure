@@ -15,5 +15,3 @@ export const SEED_RESTAURANTS = [
   {id:'SUP-R-002',name:'The Deck Saigon',city:'Ho Chi Minh City',cuisine:'International / Vietnamese',set:'$35/pax',cap:80,rating:'★★★★★'},
   {id:'SUP-R-003',name:'Morning Glory Hoi An',city:'Hoi An',cuisine:'Central Vietnamese',set:'$22/pax',cap:60,rating:'★★★★'},
 ] as const;
-
-export { SEED_EXTENDED_SUPPLIERS as SEED_SPECIAL_SUPPLIERS } from './extendedSuppliers';

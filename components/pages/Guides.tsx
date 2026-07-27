@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import GuideCalendar from '@/components/guides/GuideCalendar';
 import { useStore } from '@/hooks/useStore';
+import { createClient } from '@/lib/supabase/client';
+import { uploadGuideAvatar } from '@/lib/storage/upload-guide-avatar';
 import type { Guide } from '@/lib/types';
 
 const REG_COLORS: Record<string, string> = { North: 'bdg-g', Central: 'bdg-a', South: 'bdg-b' };
@@ -52,6 +55,8 @@ export default function Guides() {
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Guide>>(emptyGuide());
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const filtered = useMemo(
     () =>
@@ -81,18 +86,32 @@ export default function Guides() {
       setEditId(null);
       setForm(emptyGuide());
     }
+    setAvatarFile(null);
     setShowAdd(true);
   };
 
-  const saveGuide = () => {
+  const saveGuide = async () => {
     if (!form.fullname || !form.id) {
       alert('Guide ID and Full Name are required.');
       return;
     }
-    const payload = form as Guide;
-    if (editId) updateGuide(editId, payload);
-    else addGuide(payload);
-    setShowAdd(false);
+    setSaving(true);
+    try {
+      let photo = form.photo || '';
+      if (avatarFile) {
+        const supabase = createClient();
+        photo = await uploadGuideAvatar(supabase, form.id, avatarFile);
+      }
+      const payload = { ...(form as Guide), photo };
+      if (editId) updateGuide(editId, payload);
+      else addGuide(payload);
+      setShowAdd(false);
+      setAvatarFile(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Avatar upload failed');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -236,9 +255,15 @@ export default function Guides() {
         <div className="guide-bio-grid">
           {filtered.map((g) => (
             <div key={g.id} className="guide-bio-card" onClick={() => setBioGuide(g)} role="button" tabIndex={0}>
-              <div className="guide-bio-avatar" style={{ background: g.region === 'North' ? 'var(--g)' : g.region === 'Central' ? 'var(--amb)' : 'var(--blue)' }}>
-                {g.ename.slice(0, 2).toUpperCase()}
-              </div>
+              {g.photo ? (
+                <div className="guide-bio-avatar guide-bio-avatar-img" style={{ position: 'relative', overflow: 'hidden' }}>
+                  <Image src={g.photo} alt={g.fullname} fill style={{ objectFit: 'cover' }} sizes="80px" />
+                </div>
+              ) : (
+                <div className="guide-bio-avatar" style={{ background: g.region === 'North' ? 'var(--g)' : g.region === 'Central' ? 'var(--amb)' : 'var(--blue)' }}>
+                  {g.ename.slice(0, 2).toUpperCase()}
+                </div>
+              )}
               <div className="guide-bio-name">{g.fullname}</div>
               <div className="guide-bio-sub">
                 {g.ename} · {g.region}
@@ -349,6 +374,18 @@ export default function Guides() {
                 </div>
               </div>
               <div className="fg">
+                <label className="lbl">Avatar photo</label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
+                  disabled={saving}
+                />
+                {form.photo && !avatarFile && (
+                  <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>Current avatar will be kept unless you upload a new file.</div>
+                )}
+              </div>
+              <div className="fg">
                 <label className="lbl">Biography</label>
                 <textarea rows={4} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} />
               </div>
@@ -356,8 +393,8 @@ export default function Guides() {
                 <button className="btn btn-s" type="button" onClick={() => setShowAdd(false)}>
                   Cancel
                 </button>
-                <button className="btn btn-p" type="button" onClick={saveGuide}>
-                  ✔ Save Guide
+                <button className="btn btn-p" type="button" onClick={() => void saveGuide()} disabled={saving}>
+                  {saving ? 'Saving…' : '✔ Save Guide'}
                 </button>
               </div>
             </div>

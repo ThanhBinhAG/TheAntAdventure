@@ -10,7 +10,7 @@ import {
   totalDurationDays,
 } from '@/lib/tour-itinerary';
 import { resolveProductPhotos } from '@/lib/tour-photos';
-import { getCostPrice, getSellPrice, markupPct, paxToExactN, sumSellForProducts } from '@/lib/tour-pricing';
+import { paxToExactN, sumSellForProducts } from '@/lib/tour-pricing';
 import type { TourBrief, GalleryPhoto } from '@/lib/tour-design-types';
 import type { Product } from '@/lib/types';
 import PhotoStack from '@/components/tourdesign/PhotoStack';
@@ -20,27 +20,6 @@ interface Props {
   selectedProducts: Product[];
   photos: GalleryPhoto[];
   onToggleProduct: (code: string) => void;
-}
-
-function markupColor(sell: number, cost: number): string {
-  const mk = sell > 0 && cost > 0 ? Math.round(((sell - cost) / sell) * 100) : 0;
-  if (mk >= 30) return '#2E7D52';
-  if (mk >= 20) return '#D97706';
-  return '#C0392B';
-}
-
-function ExperiencePricing({ code, pn }: { code: string; pn: number }) {
-  const itemSell = getSellPrice(code, pn);
-  const itemCost = getCostPrice(code, pn);
-  const itemMk = markupPct(itemSell, itemCost);
-  if (itemSell <= 0) return null;
-  return (
-    <div style={{ fontSize: 10.5, fontWeight: 600, marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-      <span style={{ color: 'var(--g)' }}>${fmt(itemSell)}/pax</span>
-      <span style={{ color: '#9CA3AF' }}>Cost: ${fmt(itemCost)}/pax</span>
-      <span style={{ color: markupColor(itemSell, itemCost) }}>Markup: {itemMk}%</span>
-    </div>
-  );
 }
 
 export default function SelectedExperiencesPanel({ brief, selectedProducts, photos, onToggleProduct }: Props) {
@@ -148,7 +127,6 @@ export default function SelectedExperiencesPanel({ brief, selectedProducts, phot
                 <div key={item.code} className="td-draft-day" style={{ marginBottom: 8 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t)', marginBottom: 3 }}>{item.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--m)', lineHeight: 1.5 }}>{shortDesc}</div>
-                  <ExperiencePricing code={item.code} pn={pn} />
                 </div>
               );
             })}
@@ -188,7 +166,6 @@ export default function SelectedExperiencesPanel({ brief, selectedProducts, phot
                         {ii > 0 && <div className="td-item-divider" />}
                         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t)', marginBottom: 3 }}>{item.name}</div>
                         <div style={{ fontSize: 11, color: 'var(--m)', lineHeight: 1.5 }}>{shortDesc}</div>
-                        <ExperiencePricing code={item.code} pn={pn} />
                       </div>
                     );
                   })}

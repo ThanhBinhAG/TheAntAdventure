@@ -26,6 +26,7 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
 
   const activeTierN = paxToTierN(briefPax);
   const curN = paxToExactN(briefPax);
+  const usesOpenRate = briefPax > 10;
   const codes = selectedProducts.map((p) => p.code);
   const totalD = totalDurationDays(selectedProducts);
 
@@ -101,6 +102,12 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
             )}
             <div className="td-pricing-note">
               <b>Live pricing from Pricing Library</b> · Sell prices include {markup}% markup
+              {usesOpenRate && (
+                <>
+                  {' '}
+                  · Using <b>10+ rate</b> × {briefPax} guests
+                </>
+              )}
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table className="tbl">
@@ -108,9 +115,17 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
                   <tr>
                     <th>Experience</th>
                     {PRICING_TIERS.map(({ n, label }) => (
-                      <th key={n} style={{ textAlign: 'right', ...(n === activeTierN ? { background: 'var(--gl)', color: 'var(--g)' } : {}) }}>
+                      <th
+                        key={n}
+                        style={{
+                          textAlign: 'right',
+                          ...(n === activeTierN
+                            ? { background: 'var(--gl)', color: 'var(--g)' }
+                            : {}),
+                        }}
+                      >
                         {label}
-                        {n === activeTierN ? ' ★' : ''}
+                        {n === activeTierN ? (usesOpenRate ? ' ★ (applied)' : ' ★') : ''}
                       </th>
                     ))}
                   </tr>

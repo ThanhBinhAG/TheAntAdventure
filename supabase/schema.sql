@@ -84,6 +84,7 @@ create table if not exists products (
   level           text,                            -- app: lvl
   description     text,                            -- app: desc
   usp             text,
+  notes_to_sales  text,                            -- app: notesToSales (staff-only)
   price_from      text,                            -- app: price (display string)
   region          text,                            -- north | central | south | national
   created_at      timestamptz default now(),
@@ -580,15 +581,116 @@ create table if not exists photos (
   caption         text,
   region          text,
   product_code    text references products(code) on delete set null,  -- app: product
-  url             text,
+  slot            smallint check (slot is null or slot in (1, 2)),  -- tour preview slot; null = pool
+  url             text,                            -- display variant public URL
+  thumb_url       text,                            -- thumbnail variant public URL
+  storage_path    text,                            -- gallery/PH-001/display.webp
+  display_bytes   integer,                         -- compressed display.webp size in bytes
   created_at      timestamptz default now()
 );
+
+create unique index if not exists photos_product_slot_unique
+  on photos (product_code, slot)
+  where product_code is not null and slot is not null;
 
 create table if not exists photo_tags (
   photo_id        text not null references photos(id) on delete cascade,
   tag             text not null,
   primary key (photo_id, tag)
 );
+
+-- ============================================================
+--  MODULE 13b · ATTRACTION SCHEDULE
+-- ============================================================
+
+create table if not exists attractions (
+  id              text primary key,                -- ATT-N-001
+  region          text not null check (region in ('north', 'central', 'south')),
+  type            text not null,                   -- museum | heritage | temple | landmark | nature
+  name            text not null,
+  dest            text not null,
+  hours           text,
+  closed          text,
+  admission       text,
+  duration        smallint default 0,
+  best_time       text,
+  crowd           text,
+  book_req        boolean default false,
+  seasonal        text,
+  notes           text,
+  alert           text,
+  phone           text default '',
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+
+create table if not exists attraction_photos (
+  attraction_id   text not null references attractions(id) on delete cascade,
+  photo_id        text not null references photos(id) on delete cascade,
+  sort_order      smallint default 0,
+  is_featured     boolean not null default false,
+  primary key (attraction_id, photo_id)
+);
+
+insert into attractions (
+  id, region, type, name, dest, hours, closed, admission, duration,
+  best_time, crowd, book_req, seasonal, notes, alert, phone
+) values
+('ATT-N-001','north','museum','Vietnam Museum of Ethnology','Hanoi','Tue–Sun 08:30–17:30','Monday','40,000 VND / ~$2','90','Morning (09:00–11:00)','Moderate; quietest weekday mornings',false,'No seasonal closures','One of Vietnam''s finest museums. Outdoor exhibits close in heavy rain. Allow extra time for outdoor folk houses.','CLOSED MONDAYS','+84 24 3756 2193'),
+  ('ATT-N-002','north','landmark','Ho Chi Minh Mausoleum','Hanoi','Tue–Thu, Sat–Sun 07:30–10:30 (summer) / 08:00–11:00 (winter)','Monday & Friday ALWAYS + Sep–Nov maintenance','Free','60','Early (07:30 open)','Very busy on weekends; go at opening',false,'CLOSED Sep–Nov for annual maintenance','Smart dress required. No shorts, sleeveless, hats. Bags stored at entrance. Solemn silence maintained.','CLOSED Mon & Fri + CLOSED Sep–Nov',''),
+  ('ATT-N-003','north','museum','Vietnam National Museum of History','Hanoi','Tue–Sun 08:00–17:00','Monday','40,000 VND','75','Morning','Light to moderate',false,'No seasonal closures','Two buildings (ancient & modern). Good A/C. Allow 75 mins for both buildings.','CLOSED MONDAYS','+84 24 3824 5344'),
+  ('ATT-N-004','north','museum','Vietnam Museum of Fine Arts','Hanoi','Tue–Sun 08:30–17:00','Monday','40,000 VND','60','Morning (avoid lunch hour)','Usually quiet',false,'No seasonal closures','3 floors. Folk art, lacquerware, sculpture. Often overlooked by tourists — excellent for art lovers.','CLOSED MONDAYS',''),
+  ('ATT-N-005','north','museum','Women''s Museum of Vietnam','Hanoi','Tue–Sun 08:00–17:00','Monday','30,000 VND','45','Any time','Usually quiet',false,'No seasonal closures','Fascinating exhibits on women''s roles in Vietnamese history and war. Hidden gem in Old Quarter.','CLOSED MONDAYS',''),
+  ('ATT-N-006','north','museum','Vietnam Military History Museum','Hanoi','Tue–Sun 08:00–17:00 (closed 11:30–13:00)','Monday','40,000 VND','60','Morning','Moderate; busier on weekends',false,'Outdoor exhibits affected in heavy rain','Features B-52 wreckage, military hardware. Closed for lunch 11:30–13:00 daily.','CLOSED MONDAYS + LUNCH 11:30–13:00',''),
+  ('ATT-N-007','north','museum','Hoa Lo Prison Museum (Hanoi Hilton)','Hanoi','Daily 08:00–17:00','No regular closure','30,000 VND','45','Morning (before tour groups arrive)','Busy 09:30–12:00',false,'No seasonal closures','Open daily — good backup if Mausoleum is closed. Emotional and powerful. Guides highly recommended.','OPEN DAILY','+84 24 3934 2253'),
+  ('ATT-N-008','north','museum','Museum of the Vietnamese Revolution','Hanoi','Tue–Sun 08:00–12:00, 14:00–17:00','Monday + lunch break','20,000 VND','45','Morning or afternoon','Very light',false,'No seasonal closures','Chronological exhibits from 1930–1975 revolution. Often combined with History Museum nearby.','CLOSED MONDAYS',''),
+  ('ATT-N-009','north','heritage','Hoan Kiem Lake & Ngoc Son Temple','Hanoi','Temple 08:00–18:00 daily','None','30,000 VND (temple)','45','Early morning (06:30–08:00) or evening','Busy at all times; quietest pre-8am',false,'No seasonal closures','Lake always accessible. Temple on island requires entrance fee. Morning exercise culture best observed 06:00–07:30.','OPEN DAILY',''),
+  ('ATT-N-010','north','museum','Vietnam Museum of Nature','Hanoi','Tue–Sun 08:30–17:00','Monday','30,000 VND','45','Morning','Usually very quiet',false,'No closures','Small museum covering geology, flora, fauna of Vietnam. Less visited — very pleasant for nature lovers.','CLOSED MONDAYS',''),
+  ('ATT-N-011','north','heritage','Ha Long Bay UNESCO Site','Halong Bay','Cruise departures 08:00–12:00','None but may suspend in typhoon season (Jul–Oct)','Per cruise package','1440','Nov–Apr (dry season, clear skies)','Busy year-round; less Nov–Jan',true,'Strong winds Oct; typhoon risk Jul–Sep. Some caves close Nov–Mar.','Book cruise 4+ weeks in advance in high season. Kayaking at Luon Cave best at low tide.','BOOK IN ADVANCE · CHECK WEATHER SEP–OCT',''),
+  ('ATT-N-012','north','museum','Quang Ninh Museum','Halong Bay','Tue–Sun 08:00–17:00','Monday','Free','45','Morning','Very light',false,'No closures','Modern museum covering geology and history of Quang Ninh province. Excellent architecture.','CLOSED MONDAYS',''),
+  ('ATT-N-013','north','heritage','Trang An Scenic Landscape Complex','Ninh Binh','Daily 07:00–17:00','None','200,000 VND','180','Morning (07:00–10:00 before tour buses)','Busy 09:00–14:00; very crowded weekends',false,'Can flood Sep–Oct; beautiful but misty in winter','3-hour boat circuit. No motorised boats. Allow 3 hours. Avoid peak hours. Bring sun protection.','ARRIVE EARLY — BUSY BY 09:30',''),
+  ('ATT-N-014','north','museum','Hoa Lu Ancient Capital','Ninh Binh','Daily 07:00–17:30','None','20,000 VND','60','Morning','Light to moderate',false,'No closures','First capital of Vietnam. Two well-preserved temples (Dinh and Le dynasties). Often paired with Trang An.','OPEN DAILY',''),
+  ('ATT-N-015','north','museum','Sapa Museum','Sapa','Daily 07:30–11:30, 13:30–17:30','None officially but irregular hours','Free','30','Morning','Light',false,'Fog common Nov–Mar; very cold Dec–Feb','Small but informative on ethnic minority cultures. Worth 30 mins before trekking. Irregular hours — call ahead.','VERIFY HOURS BEFORE VISITING',''),
+  ('ATT-C-001','central','museum','Museum of Royal Fine Arts (Hue)','Hue','Daily 07:00–17:30','None','40,000 VND','60','Morning','Moderate',false,'No seasonal closures','Located inside the Hue Citadel complex. Features imperial furniture, porcelain, royal objects. Combine with Citadel visit.','OPEN DAILY',''),
+  ('ATT-C-002','central','heritage','Hue Imperial Citadel (Forbidden Purple City)','Hue','Daily 07:00–17:30 (summer) / 07:00–17:00 (winter)','None','200,000 VND','180','Early morning (07:00–09:00)','Very busy 09:00–13:00; calmer after 14:30',false,'Flooding risk Sep–Nov; check conditions','UNESCO. Allow 3 hours for full citadel. Hire electric cart for elderly/mobility limited guests. Audio guide available.','OPEN DAILY · FLOOD RISK SEP–NOV','+84 234 3501 143'),
+  ('ATT-C-003','central','museum','Hue Museum of History','Hue','Tue–Sun 07:00–17:30','Monday','20,000 VND','45','Morning','Very light',false,'No seasonal closures','Good context for the Citadel visit. Covers Nguyen Dynasty artefacts. Often skipped by tourists — worthwhile.','CLOSED MONDAYS',''),
+  ('ATT-C-004','central','museum','Hue Museum of Traditional Huế Medicine','Hue','Mon–Sat 07:30–11:30, 13:30–17:00','Sunday','Free','30','Morning','Very quiet',false,'No closures','Niche but fascinating for wellness-oriented guests. Traditional herbal remedies and royal medicine.','CLOSED SUNDAYS',''),
+  ('ATT-C-005','central','heritage','My Son Sanctuary (Cham Ruins)','Hoi An & Da Nang','Daily 06:30–17:00 (no entry after 16:30)','None but check monsoon season','150,000 VND','120','07:00–09:00 (beat crowds + heat)','Very busy 09:00–13:00; quieter after 14:30',false,'Avoid midday Jun–Aug (extreme heat). Some paths close Oct–Nov (flooding)','UNESCO. No entry after 16:30. Early morning essential in summer. Electric buggy available. Bring water.','NO ENTRY AFTER 16:30 · ARRIVE EARLY IN SUMMER',''),
+  ('ATT-C-006','central','museum','Museum of Cham Sculpture (Da Nang)','Hoi An & Da Nang','Daily 07:00–17:00','None','60,000 VND','60','Morning or afternoon','Light to moderate',false,'No seasonal closures','Outstanding collection of Cham artefacts — best in the world. Essential companion to My Son visit. Well-curated, good A/C.','OPEN DAILY',''),
+  ('ATT-C-007','central','museum','Hoi An Museum of History and Culture','Hoi An & Da Nang','Daily 08:00–17:00','None','Covered by Ancient Town ticket','30','Morning','Moderate in town centre',false,'Flooding Oct–Nov — some streets impassable','Inside the Ancient Town. Part of the combined ticket (5 sites). Small but informative. Combine with Assembly Halls.','OPEN DAILY · FLOOD RISK OCT–NOV',''),
+  ('ATT-C-008','central','museum','Museum of Trade Ceramics (Hoi An)','Hoi An & Da Nang','Daily 08:00–17:00','None','Covered by Ancient Town ticket','30','Morning or afternoon','Light',false,'No closures','Covers 200 years of Hoi An''s role in Asian ceramics trade. Small, well-presented. Good A/C.','OPEN DAILY',''),
+  ('ATT-C-009','central','museum','Museum of Sa Huỳnh Culture (Hoi An)','Hoi An & Da Nang','Daily 08:00–17:00','None','Covered by Ancient Town ticket','30','Morning','Very light',false,'No closures','Pre-Cham culture artefacts. Very niche — good for archaeology-minded guests.','OPEN DAILY',''),
+  ('ATT-C-010','central','heritage','Phong Nha Cave (Son Doong Region)','Phong Nha','Daily 07:30–16:00 (last entry 15:30)','None officially; check Oct–Nov floods','150,000 VND (Phong Nha) / varies','120','Morning, before tourist boats fill up','Busy Feb–Aug; peaks Apr–May & Jul–Aug',true,'CLOSED Oct–Nov some years due to flooding. Book 3+ weeks ahead in peak.','UNESCO. Boat tour inside cave. Combine with Paradise Cave (additional ticket). Book boatman in advance.','BOOK IN ADVANCE · CHECK OCT–NOV CLOSURES',''),
+  ('ATT-C-011','central','museum','Quang Binh Museum (Phong Nha)','Phong Nha','Mon–Fri 07:30–11:30, 13:30–17:00','Weekend','Free','30','Weekday morning','Very quiet',false,'No closures','Covers wartime history of Quang Binh province. Small but contextually useful. Weekend closure is strict.','CLOSED WEEKENDS',''),
+  ('ATT-S-001','south','museum','War Remnants Museum (Ho Chi Minh City)','Ho Chi Minh City','Daily 07:30–18:00','None','40,000 VND','90','Morning (before emotional fatigue sets in)','Very busy 08:30–12:00; calmer after 14:00',false,'No seasonal closures','Emotionally intense. Allow 1.5 hours. Discuss with clients beforehand — not suitable for all guests. Photography allowed.','OPEN DAILY · EMOTIONALLY INTENSE — PREPARE CLIENTS','+84 28 3930 5587'),
+  ('ATT-S-002','south','museum','Ho Chi Minh City Museum','Ho Chi Minh City','Daily 07:30–18:00','None','30,000 VND','60','Morning','Moderate',false,'No closures','Former Gia Long Palace. Covers colonial and revolutionary history. Hidden tunnels in basement. Well-maintained.','OPEN DAILY',''),
+  ('ATT-S-003','south','museum','Museum of Vietnamese History (Saigon)','Ho Chi Minh City','Mon–Sat 08:00–17:00 (closed Tue lunch 11:00–13:30)','Tuesday lunch break','30,000 VND','60','Morning','Light to moderate',false,'No closures','Adjacent to Botanical Garden. Good chronological overview from prehistoric to 1975. Water puppetry shows on site.','TUE LUNCH CLOSED 11:00–13:30',''),
+  ('ATT-S-004','south','museum','Independence Palace (Reunification Palace)','Ho Chi Minh City','Daily 07:30–11:00, 13:00–16:00','Public holidays may affect','40,000 VND','75','Morning session','Busy on weekends; moderate weekdays',false,'No closures','Former presidential palace. The original 1975 tank crash site is preserved. War room in basement fascinating.','OPEN DAILY · LUNCH BREAK 11:00–13:00','+84 28 3822 3652'),
+  ('ATT-S-005','south','museum','Fine Arts Museum (Ho Chi Minh City)','Ho Chi Minh City','Tue–Sun 09:00–17:00','Monday','30,000 VND','60','Morning','Very light — a hidden gem',false,'No closures','Beautiful colonial building. Three floors of Vietnamese art from traditional to contemporary. Peaceful and underrated.','CLOSED MONDAYS',''),
+  ('ATT-S-006','south','heritage','Cu Chi Tunnels (Ben Duoc or Ben Dinh)','Ho Chi Minh City','Daily 07:30–17:00','None','110,000 VND','120','Morning (cooler, less crowded)','Very busy weekends; moderate weekdays',false,'Hot and humid May–Sep; bring water','Ben Duoc (farther) is more authentic and less crowded than Ben Dinh. Wear comfortable clothes. Claustrophobic tunnels — warn guests.','OPEN DAILY · ARRIVE BEFORE 09:30 ON WEEKENDS',''),
+  ('ATT-S-007','south','museum','Mekong Delta Eco Museum (Can Tho)','Can Tho','Daily 07:30–17:00','None','20,000 VND','45','Morning before floating market visits','Very light',false,'Flooding possible Sep–Nov','Covers Mekong river ecology and delta communities. Small but informative. Good orientation before river tours.','OPEN DAILY',''),
+  ('ATT-S-008','south','museum','Can Tho Museum','Can Tho','Tue–Sun 08:00–11:30, 13:30–17:00','Monday','Free','40','Morning','Very quiet',false,'No closures','History of the Mekong Delta and Can Tho province. Combine with floating market visit (Cai Rang) for context.','CLOSED MONDAYS',''),
+  ('ATT-S-009','south','museum','Da Lat Museum (Lam Dong Province Museum)','Da Lat','Mon–Fri 07:30–11:30, 13:30–17:00','Weekends','Free','30','Weekday morning','Very quiet',false,'No closures; cool year-round (1,500m altitude)','Covers highland ecology and ethnic minority culture. Useful background before trekking/village visits.','CLOSED WEEKENDS',''),
+  ('ATT-S-010','south','museum','Khanh Hoa Museum (Nha Trang)','Nha Trang','Tue–Sun 08:00–11:30, 14:00–17:00','Monday','Free','30','Morning','Very light',false,'No seasonal closures','Overview of Cham culture and Khanh Hoa province history. Pair with Po Nagar Cham Towers visit nearby.','CLOSED MONDAYS',''),
+  ('ATT-S-011','south','heritage','Po Nagar Cham Towers (Nha Trang)','Nha Trang','Daily 06:00–17:30','None','22,000 VND','45','Early morning (06:00–08:00) for best light and quiet','Busy 09:00–12:00',false,'Hot Apr–Aug; some festive ceremonies in spring','Active religious site — dress modestly, sarongs provided at entrance. Photography respectfully.','OPEN DAILY · DRESS CODE REQUIRED',''),
+  ('ATT-S-012','south','museum','Con Dao Prison & Museum','Con Dao','Daily 07:30–11:30, 13:30–17:00','None','Free','60','Morning','Very light (Con Dao is remote)',false,'Accessible year-round by plane; sea rough Jun–Sep','Harrowing colonial-era prison complex. Very moving. Revolutionary cemetery also worth visiting. Context essential.','OPEN DAILY · EMOTIONALLY INTENSE','')
+on conflict (id) do update set
+  region = excluded.region,
+  type = excluded.type,
+  name = excluded.name,
+  dest = excluded.dest,
+  hours = excluded.hours,
+  closed = excluded.closed,
+  admission = excluded.admission,
+  duration = excluded.duration,
+  best_time = excluded.best_time,
+  crowd = excluded.crowd,
+  book_req = excluded.book_req,
+  seasonal = excluded.seasonal,
+  notes = excluded.notes,
+  alert = excluded.alert,
+  phone = excluded.phone,
+  updated_at = now();
 
 -- ============================================================
 --  MODULE 14 · GUIDE CALENDAR
@@ -715,6 +817,11 @@ create index if not exists idx_suppliers_status on suppliers(status);
 create index if not exists idx_products_region on products(region);
 create index if not exists idx_products_category on products(category);
 
+create index if not exists idx_attractions_region on attractions(region);
+create index if not exists idx_attractions_type on attractions(type);
+create index if not exists idx_attractions_dest on attractions(dest);
+create index if not exists idx_attraction_photos_photo on attraction_photos(photo_id);
+
 -- ============================================================
 --  MODULE · WEATHER (live weekly forecast cache)
 -- ============================================================
@@ -763,6 +870,197 @@ create index if not exists idx_weather_cache_expires on weather_forecast_cache(e
 create index if not exists idx_weather_fetch_log_at on weather_fetch_log(fetched_at desc);
 
 -- ============================================================
+--  MODULE 21 · PRICING CATALOGS (Essentials + Accommodation)
+-- ============================================================
+--  Imported from the two source Excel workbooks; replace-all per workbook.
+--  Existing projects: run supabase/migrate-pricing-catalogs.sql instead.
+
+create table if not exists pricing_settings (
+  id              text primary key,
+  workbook        text not null check (workbook in ('essentials', 'accommodation')),
+  sheet           text not null default '',
+  key             text not null,
+  label           text not null default '',
+  value_num       numeric,
+  value_text      text default '',
+  sort_order      smallint default 0,
+  updated_at      timestamptz default now()
+);
+
+create table if not exists pricing_ess_products (
+  code            text primary key,
+  seq             smallint default 0,
+  category        text default '',
+  name            text not null,
+  duration_days   numeric,
+  overnight       text default '',
+  journeys        text default '',
+  incl_7s         text default '',
+  incl_16s        text default '',
+  incl_29s        text default '',
+  incl_35s        text default '',
+  guide_main      numeric,
+  guide_assistant numeric,
+  guide_overnight numeric,
+  truck_price     numeric,
+  sort_order      smallint default 0,
+  updated_at      timestamptz default now()
+);
+
+create table if not exists pricing_ess_cost_lines (
+  id              text primary key,
+  product_code    text not null references pricing_ess_products(code) on delete cascade,
+  group_label     text default '',
+  label           text not null,
+  kind            text not null default 'component'
+                    check (kind in ('component', 'hotel', 'selling_group', 'selling_pax', 'surcharge')),
+  p1  numeric, p2  numeric, p3  numeric, p4  numeric, p5  numeric,
+  p6  numeric, p7  numeric, p8  numeric, p9  numeric, p10 numeric,
+  p11 numeric, p12 numeric, p13 numeric, p14 numeric, p15 numeric,
+  p16 numeric, p17 numeric, p18 numeric, p19 numeric, p20 numeric,
+  sort_order      smallint default 0,
+  updated_at      timestamptz default now()
+);
+
+create table if not exists pricing_ess_services (
+  id              text primary key,
+  block           text default '',
+  label           text not null,
+  unit            text default '',
+  amount          numeric,
+  amount2         numeric,
+  notes           text default '',
+  sort_order      smallint default 0,
+  updated_at      timestamptz default now()
+);
+
+create table if not exists pricing_ess_car_rates (
+  id              text primary key,
+  category        text default '',
+  tour_title      text default '',
+  route           text default '',
+  km              numeric,
+  duration        text default '',
+  s7              numeric,
+  s16             numeric,
+  s29             numeric,
+  s35             numeric,
+  s45             numeric,
+  sort_order      smallint default 0,
+  updated_at      timestamptz default now()
+);
+
+create table if not exists pricing_ess_hotel_rates (
+  id              text primary key,
+  sheet           text not null default '',
+  property        text default '',
+  section         text default '',
+  room_type       text not null,
+  variant_a       text default '',
+  variant_b       text default '',
+  vnd_a           numeric,
+  vnd_b           numeric,
+  usd_a           numeric,
+  usd_b           numeric,
+  sell_a          numeric,
+  sell_b          numeric,
+  notes           text default '',
+  sort_order      smallint default 0,
+  updated_at      timestamptz default now()
+);
+
+create table if not exists pricing_ess_notes (
+  id              text primary key,
+  sheet           text not null default '',
+  section         text default '',
+  label           text default '',
+  detail          text default '',
+  sort_order      smallint default 0,
+  updated_at      timestamptz default now()
+);
+
+create table if not exists pricing_acc_properties (
+  id                    text primary key,
+  region                text default '',
+  location              text default '',
+  name                  text not null,
+  website               text default '',
+  address               text default '',
+  ownership             text default '',
+  stars                 text default '',
+  type                  text default '',
+  reservations_contact  text default '',
+  sales_contact         text default '',
+  factsheet_link        text default '',
+  contract_renewal      text default '',
+  bank_account          text default '',
+  approved              text default '',
+  sort_order            smallint default 0,
+  updated_at            timestamptz default now()
+);
+
+create table if not exists pricing_acc_room_rates (
+  id              text primary key,
+  sheet           text not null default '',
+  location        text default '',
+  property_name   text not null,
+  room_type       text not null,
+  season          text default '',
+  period_from     text default '',
+  period_to       text default '',
+  year_label      text default '',
+  vnd_cost        numeric,
+  usd_cost        numeric,
+  sell_price      numeric,
+  margin          numeric,
+  notes           text default '',
+  sort_order      integer default 0,
+  updated_at      timestamptz default now()
+);
+
+create table if not exists pricing_acc_cruise_rates (
+  id              text primary key,
+  sheet           text not null default '',
+  region          text default '',
+  location        text default '',
+  property_name   text not null,
+  stars           text default '',
+  type            text default 'Cruise',
+  room_type       text default '',
+  phone           text default '',
+  email           text default '',
+  cost_2026       numeric,
+  cost_2027       numeric,
+  sell_2026       numeric,
+  sell_2027       numeric,
+  markup_pct      numeric,
+  margin          numeric,
+  sort_order      smallint default 0,
+  updated_at      timestamptz default now()
+);
+
+create table if not exists pricing_catalog_imports (
+  id              text primary key,
+  workbook        text not null check (workbook in ('essentials', 'accommodation')),
+  file_name       text not null,
+  sheet_count     smallint default 0,
+  row_count       integer default 0,
+  warning_count   smallint default 0,
+  imported_at     timestamptz default now()
+);
+
+create index if not exists idx_pricing_settings_workbook on pricing_settings(workbook);
+create index if not exists idx_pricing_cost_lines_product on pricing_ess_cost_lines(product_code);
+create index if not exists idx_pricing_hotel_rates_sheet on pricing_ess_hotel_rates(sheet);
+create index if not exists idx_pricing_notes_sheet on pricing_ess_notes(sheet);
+create index if not exists idx_pricing_acc_props_region on pricing_acc_properties(region);
+create index if not exists idx_pricing_acc_props_type on pricing_acc_properties(type);
+create index if not exists idx_pricing_acc_rates_sheet on pricing_acc_room_rates(sheet);
+create index if not exists idx_pricing_acc_rates_property on pricing_acc_room_rates(property_name);
+create index if not exists idx_pricing_acc_cruise_sheet on pricing_acc_cruise_rates(sheet);
+create index if not exists idx_pricing_imports_workbook on pricing_catalog_imports(workbook, imported_at desc);
+
+-- ============================================================
 --  ROW LEVEL SECURITY (development — tighten before production)
 -- ============================================================
 
@@ -777,9 +1075,13 @@ begin
     'comms','finance','accounts_receivable','accounts_payable','tax_reports',
     'staff','salary_records','tasks','contracts','feedback',
     'suppliers','supplier_tags','cruises','transport','restaurants',
-    'photos','photo_tags','cal_events',
+    'photos','photo_tags','attractions','attraction_photos','cal_events',
     'chat_channels','chat_messages','chat_reactions','dev_notes',
-    'weather_destinations','weather_forecast_cache','weather_fetch_log'
+    'weather_destinations','weather_forecast_cache','weather_fetch_log',
+    'pricing_settings','pricing_ess_products','pricing_ess_cost_lines','pricing_ess_services',
+    'pricing_ess_car_rates','pricing_ess_hotel_rates','pricing_ess_notes',
+    'pricing_acc_properties','pricing_acc_room_rates','pricing_acc_cruise_rates',
+    'pricing_catalog_imports'
   ] loop
     execute format('alter table %I enable row level security', t);
     execute format('drop policy if exists dev_allow_all on %I', t);
@@ -865,6 +1167,10 @@ drop trigger if exists trg_updated_at on cal_events;
 create trigger trg_updated_at before update on cal_events
   for each row execute procedure set_updated_at();
 
+drop trigger if exists trg_updated_at on attractions;
+create trigger trg_updated_at before update on attractions
+  for each row execute procedure set_updated_at();
+
 drop trigger if exists trg_updated_at on dev_notes;
 create trigger trg_updated_at before update on dev_notes
   for each row execute procedure set_updated_at();
@@ -872,6 +1178,73 @@ create trigger trg_updated_at before update on dev_notes
 drop trigger if exists trg_updated_at on weather_destinations;
 create trigger trg_updated_at before update on weather_destinations
   for each row execute procedure set_updated_at();
+
+-- ============================================================
+--  MODULE 14 · PHOTO STORAGE (Supabase Storage bucket)
+-- ============================================================
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'photos',
+  'photos',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do nothing;
+
+drop policy if exists photos_public_read on storage.objects;
+create policy photos_public_read on storage.objects
+  for select to public
+  using (bucket_id = 'photos');
+
+drop policy if exists photos_auth_insert on storage.objects;
+create policy photos_auth_insert on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'photos' and (
+      (storage.foldername(name))[1] = 'guides'
+      or (
+        (storage.foldername(name))[1] = 'gallery'
+        and (storage.foldername(name))[2] in ('tours', 'attractions', 'loose')
+      )
+    )
+  );
+
+drop policy if exists photos_auth_update on storage.objects;
+create policy photos_auth_update on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'photos' and (
+      (storage.foldername(name))[1] = 'guides'
+      or (
+        (storage.foldername(name))[1] = 'gallery'
+        and (storage.foldername(name))[2] in ('tours', 'attractions', 'loose')
+      )
+    )
+  )
+  with check (
+    bucket_id = 'photos' and (
+      (storage.foldername(name))[1] = 'guides'
+      or (
+        (storage.foldername(name))[1] = 'gallery'
+        and (storage.foldername(name))[2] in ('tours', 'attractions', 'loose')
+      )
+    )
+  );
+
+drop policy if exists photos_auth_delete on storage.objects;
+create policy photos_auth_delete on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'photos' and (
+      (storage.foldername(name))[1] = 'guides'
+      or (
+        (storage.foldername(name))[1] = 'gallery'
+        and (storage.foldername(name))[2] in ('tours', 'attractions', 'loose')
+      )
+    )
+  );
 
 -- ============================================================
 --  END OF SCHEMA v5.0

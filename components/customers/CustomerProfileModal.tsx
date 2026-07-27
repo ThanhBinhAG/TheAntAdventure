@@ -4,10 +4,10 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
 import { createInquiryLeadForCustomer } from '@/lib/customer-onboarding';
-import { getClientLeads, getClientPipeline } from '@/lib/crm-utils';
+import { getClientLeads, getClientPipeline, getCustomerBookings } from '@/lib/crm-utils';
 import { npsBadgeClass, npsIcon } from '@/lib/page-helpers';
 import { useStore } from '@/hooks/useStore';
-import type { Booking, Comm, Customer, Lead } from '@/lib/types';
+import type { Comm, Customer, Lead } from '@/lib/types';
 
 const TABS = ['overview', 'pipeline', 'communications', 'bookings', 'notes', 'feedback'] as const;
 type Tab = (typeof TABS)[number];
@@ -104,11 +104,10 @@ export default function CustomerProfileModal({
     [customer.id, leads]
   );
 
-  const custBookings = useMemo(() => {
-    return (customer.bookings || [])
-      .map((bid) => bookings.find((b) => b.id === bid))
-      .filter(Boolean) as Booking[];
-  }, [customer.bookings, bookings]);
+  const custBookings = useMemo(
+    () => getCustomerBookings(customer, bookings),
+    [customer, bookings]
+  );
 
   function logComm() {
     if (!commForm.subj.trim()) {

@@ -6,6 +6,8 @@ import { SALES_PEOPLE } from '@/lib/customer-form';
 import { customerMatchesSearch, getClientPipeline } from '@/lib/crm-utils';
 import { npsBadgeClass, npsIcon } from '@/lib/page-helpers';
 import { useStore } from '@/hooks/useStore';
+import { usePagination } from '@/hooks/usePagination';
+import PaginationBar from '@/components/PaginationBar';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import CustomerProfileModal from '@/components/customers/CustomerProfileModal';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
@@ -63,6 +65,9 @@ export default function Customers() {
     }
     return list;
   }, [customers, leads, search, sourceF, countryF, salesF, typeF, stageF]);
+
+  const pagination = usePagination(filtered, undefined, [search, sourceF, countryF, salesF, typeF, stageF]);
+  const { paginatedItems } = pagination;
 
   const profileCustomer = profileId ? customers.find((c) => c.id === profileId) : null;
   const editCustomer = editId ? customers.find((c) => c.id === editId) : null;
@@ -179,7 +184,7 @@ export default function Customers() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => {
+              {paginatedItems.map((c) => {
                 const p = getClientPipeline(c.id, leads);
                 const isB2B = c.clientType === 'b2b';
                 const cfb = feedback.filter((f) => f.custId === c.id);
@@ -280,6 +285,7 @@ export default function Customers() {
               })}
             </tbody>
           </table>
+          <PaginationBar {...pagination} />
         </div>
       </div>
 

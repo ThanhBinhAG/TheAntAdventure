@@ -7,7 +7,7 @@ import { PAGE_TITLES, QUICK_NAV_PAGES } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
 import { useSupabasePanel } from '@/lib/SupabaseContext';
-import { createClient } from '@/lib/supabase/client';
+import { AiCopilotTrigger } from '@/components/AiCopilot';
 import type { PageSlug } from '@/lib/types';
 
 interface TopbarProps {
@@ -62,10 +62,9 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
 
   const handleLogout = async () => {
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
+      await fetch('/api/auth/logout', { method: 'POST' });
     } catch {
-      /* redirect even if signOut fails */
+      /* redirect even if logout fails */
     }
     router.push('/login');
     router.refresh();
@@ -111,6 +110,7 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, marginLeft: 8 }}>
         <div style={{ display: 'flex', gap: 4 }}>
+          <AiCopilotTrigger />
           <button
             className="btn btn-s btn-sm crm-supabase-topbtn"
             type="button"
@@ -138,11 +138,15 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
           </button>
           <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
         </div>
-        <div id="last-backup-label" style={{ fontSize: 10, color: 'var(--m)', whiteSpace: 'nowrap' }}>
+        <div
+          id="last-backup-label"
+          style={{ fontSize: 10, color: 'var(--m)', whiteSpace: 'nowrap' }}
+          title={supabase?.autoSync?.status === 'error' ? supabase.autoSync.lastError ?? undefined : undefined}
+        >
           {supabase?.remoteEnabled && supabase.autoSync?.status === 'synced' && supabase.autoSync.lastSyncedAt
             ? `Supabase saved: ${supabase.autoSync.lastSyncedAt} · `
             : supabase?.remoteEnabled && supabase.autoSync?.status === 'error'
-              ? 'Supabase save failed · '
+              ? `Supabase save failed${supabase.autoSync.lastError ? `: ${supabase.autoSync.lastError}` : ''} · `
               : supabase?.remoteEnabled
                 ? 'Auto-sync on · '
                 : ''}

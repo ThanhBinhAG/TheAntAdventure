@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Topbar, { QuickNav } from '@/components/Topbar';
 import AiCopilot from '@/components/AiCopilot';
+import { AiCopilotProvider } from '@/components/AiCopilotContext';
 import { StoreProvider } from '@/components/StoreProvider';
 
 export default function CRMLayout({ children }: { children: React.ReactNode }) {
@@ -11,15 +12,17 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <StoreProvider>
-      <div className="crm-app">
-        <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
-        <div id="main">
-          <Topbar onMenuToggle={() => setMenuOpen((v) => !v)} />
-          <QuickNav />
-          <div id="content">{children}</div>
+      <AiCopilotProvider>
+        <div className="crm-app">
+          <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
+          <div id="main">
+            <Topbar onMenuToggle={() => setMenuOpen((v) => !v)} />
+            <QuickNav />
+            <div id="content">{children}</div>
+          </div>
+          <AiCopilot />
         </div>
-        <AiCopilot />
-      </div>
+      </AiCopilotProvider>
     </StoreProvider>
   );
 }

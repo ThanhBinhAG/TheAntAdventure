@@ -12,6 +12,7 @@ Schema reference: [`DATABASE.md`](./DATABASE.md)
 | `supabase/schema.sql` | Create 35+ relational tables, indexes, dev RLS |
 | `supabase/import-v5-data.sql` | Seed / production data (run after schema) |
 | `supabase/verify-counts-v5.sql` | Verify row counts after import |
+| `supabase/migrate-photo-storage.sql` | Photo Storage bucket + `photos.thumb_url` / `storage_path` (existing projects) |
 
 ## 1. Supabase SQL Editor (in order)
 
@@ -185,6 +186,21 @@ npm run dev
 2. Supabase → **Authentication** → **Bot and Abuse Protection** → bật Turnstile, dán secret key.
 3. `.env.local` / production env: `NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY=<site-key>`
 
+### JWT access / refresh (khuyến nghị)
+
+App dùng **Supabase Auth JWT** trong cookie HttpOnly (`@supabase/ssr`). Middleware gọi `getUser()` để refresh session — không tự mint access/refresh riêng cho user thường.
+
+Trên Supabase Dashboard → **Authentication** → **Settings** (hoặc **Sessions**):
+
+| Setting | Khuyến nghị | Ghi chú |
+|---------|-------------|---------|
+| JWT expiry (access token) | **900** giây (15 phút) | Token ngắn hạn; cookie được middleware làm mới |
+| Refresh token | Giữ mặc định Supabase | Dùng để cấp access mới khi hết hạn |
+
+Sau khi đổi JWT expiry, user đang đăng nhập có thể cần **logout rồi login lại**.
+
+Login đi qua `POST /api/auth/login` (rate-limit theo IP: tối đa ~10 lần thất bại / 15 phút). Logout: `POST /api/auth/logout`.
+
 ## 7. Troubleshooting / Debug mode
 
 Khi login fail (SSL, không kết nối Supabase, env sai), bật debug tạm trên server:
@@ -205,8 +221,10 @@ npm run build && pm2 restart crm
 ### Bước 2 — Trang diagnostics (browser)
 
 ```
-https://your-domain.com/system/debug?token=<SYSTEM_DEBUG_TOKEN>
+https://your-domain.com/system/debug
 ```
+
+Nhập `SYSTEM_DEBUG_TOKEN` trên form (token được gửi qua header `X-Debug-Token`, không dùng query string để tránh rò rỉ Referer/log).
 
 Trang hiển thị:
 - Check env, proxy headers (nginx), Supabase Auth/REST reachability từ **phía server**
@@ -266,3 +284,56 @@ suppliers, supplier_tags, cruises, transport, restaurants,
 photos, photo_tags, cal_events,
 chat_channels, chat_messages, chat_reactions, dev_notes
 ```
+
+## 8. Photo Storage (Gallery + Guides)
+
+### One-time migration (existing projects)
+
+Run `supabase/migrate-photo-storage.sql` in SQL Editor after `photos` table exists.
+
+### Upload paths (required convention)
+
+| Use | Storage path |
+|-----|----------------|
+| Tour display | `gallery/tours/{tourCode}/{photoId}/display.webp` |
+| Tour thumbnail | `gallery/tours/{tourCode}/{photoId}/thumb.webp` |
+| Attraction display | `gallery/attractions/{attractionId}/{photoId}/display.webp` |
+| Attraction thumbnail | `gallery/attractions/{attractionId}/{photoId}/thumb.webp` |
+| Loose display | `gallery/loose/{photoId}/display.webp` |
+| Loose thumbnail | `gallery/loose/{photoId}/thumb.webp` |
+| Guide avatar | `guides/{guideId}/avatar.webp` |
+
+Bucket: **`photos`** (public). Max file size after compression: 5 MB.
+
+### Upload via app
+
+Gallery → **+ Add Photo** compresses and uploads thumb + display variants client-side, then auto-syncs `photos` row (`url`, `thumb_url`, `storage_path`).
+
+Guides → edit form → **Avatar photo** uploads to `guides/{guideId}/avatar.webp`.
+
+For existing `gallery/{photoId}/...` objects, run:
+
+- Dry run: `npm run photos:migrate-owner-paths`
+- Apply: `npm run photos:migrate-owner-paths:apply`
+- Optional cleanup after verification: `tsx scripts/migrate-photo-storage-owner-paths.ts --apply --delete-legacy`
+
+### Rollout gates (recommended)
+
+1. Run dry-run migration and inspect skipped/failed counts.
+2. Apply migration and confirm `photos.storage_path` now points to owner-grouped paths.
+3. Verify Gallery upload in all 3 modes: tour, attraction quick add, loose.
+4. Delete a migrated image and confirm both object variants are removed.
+5. Only then run `--delete-legacy` cleanup.
+
+### Manual upload via Supabase Dashboard
+
+1. Storage → bucket `photos` → upload files at paths above.
+2. Table Editor → `photos`: set `url` (display public URL), `thumb_url`, `storage_path` to match.
+3. Reload app (hydrate pulls remote data).
+
+### Free tier notes
+
+- **1 GB** file storage — target ~400 KB per gallery photo (2 WebP variants).
+- **5 GB** egress/month — use thumbnails in grids; `next/image` lazy-loads where enabled.
+- Owner-grouped paths make Supabase Storage easier to audit at scale (`tours`/`attractions`/`loose`).
+- Legacy `picsum.photos` URLs in `photos.url` are not migrated — re-upload via Gallery UI.

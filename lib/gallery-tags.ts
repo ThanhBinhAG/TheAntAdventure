@@ -32,20 +32,20 @@ export const ALL_GALLERY_TAXONOMY_TAGS = Object.values(GALLERY_TAG_TAXONOMY).fla
 
 export type GalleryPhotoForm = {
   caption: string;
-  url: string;
-  url2: string;
   caption2: string;
   region: string;
   product: string;
   tags: string[];
+  file?: File | null;
+  file2?: File | null;
 };
 
 export const EMPTY_GALLERY_PHOTO_FORM: GalleryPhotoForm = {
   caption: '',
-  url: '',
-  url2: '',
   caption2: '',
   region: 'north',
   product: '',
   tags: [],
+  file: null,
+  file2: null,
 };

@@ -1,0 +1,559 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { useStore } from '@/hooks/useStore';
+import type { Attraction } from '@/lib/types';
+import type { GalleryPhoto } from '@/lib/tour-design-types';
+import {
+  galleryUrlForAttraction,
+  nextAttractionId,
+  photosLinkedToAttraction,
+} from '@/lib/attractions-helpers';
+import { photoThumbUrl } from '@/lib/gallery-helpers';
+import { saveNewLoosePhoto, saveNewLoosePhotosBatch } from '@/lib/gallery-loose-save';
+import { pushTablesToSupabase } from '@/lib/db/hydrate';
+import { createClient } from '@/lib/supabase/client';
+import { deleteGalleryPhotoFiles } from '@/lib/storage/upload-gallery-photo';
+import GalleryPhotoModal, { type GalleryPhotoSavePayload } from '@/components/gallery/GalleryPhotoModal';
+
+export type AttractionFormData = {
+  id: string;
+  region: Attraction['region'];
+  type: string;
+  name: string;
+  dest: string;
+  hours: string;
+  closed: string;
+  admission: string;
+  duration: number;
+  best_time: string;
+  crowd: string;
+  book_req: boolean;
+  seasonal: string;
+  notes: string;
+  alert: string;
+  phone: string;
+  photoIds: string[];
+  linkedPhotoIds: string[];
+};
+
+const EMPTY: AttractionFormData = {
+  id: '',
+  region: 'north',
+  type: 'museum',
+  name: '',
+  dest: '',
+  hours: '',
+  closed: '',
+  admission: '',
+  duration: 60,
+  best_time: '',
+  crowd: '',
+  book_req: false,
+  seasonal: '',
+  notes: '',
+  alert: '',
+  phone: '',
+  photoIds: [],
+  linkedPhotoIds: [],
+};
+
+type Props = {
+  open: boolean;
+  mode: 'add' | 'edit';
+  attraction?: Attraction | null;
+  attractions: Attraction[];
+  photos: GalleryPhoto[];
+  defaultRegion?: Attraction['region'];
+  onClose: () => void;
+  onSave: (data: AttractionFormData) => void;
+  onDelete?: (id: string) => void;
+  nextId?: string;
+};
+
+export default function AttractionEditModal({
+  open,
+  mode,
+  attraction,
+  attractions,
+  photos,
+  defaultRegion = 'north',
+  onClose,
+  onSave,
+  onDelete,
+  nextId,
+}: Props) {
+  const products = useStore((s) => s.products);
+  const storePhotos = useStore((s) => s.photos) as GalleryPhoto[];
+
+  const [form, setForm] = useState<AttractionFormData>(EMPTY);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddSaving, setQuickAddSaving] = useState(false);
+  const [quickAddStatus, setQuickAddStatus] = useState('');
+  const [quickRemoveMode, setQuickRemoveMode] = useState(false);
+  const [selectedRemoveIds, setSelectedRemoveIds] = useState<string[]>([]);
+  const [removingPhotoId, setRemovingPhotoId] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    if (mode === 'edit' && attraction) {
+      const linked = attraction.linkedPhotoIds?.length
+        ? attraction.linkedPhotoIds
+        : (attraction.photoIds ?? []);
+      setForm({
+        id: attraction.id,
+        region: attraction.region,
+        type: attraction.type,
+        name: attraction.name,
+        dest: attraction.dest,
+        hours: attraction.hours,
+        closed: attraction.closed,
+        admission: attraction.admission,
+        duration: attraction.duration,
+        best_time: attraction.best_time,
+        crowd: attraction.crowd,
+        book_req: attraction.book_req,
+        seasonal: attraction.seasonal,
+        notes: attraction.notes,
+        alert: attraction.alert,
+        phone: attraction.phone,
+        photoIds: [...(attraction.photoIds ?? [])],
+        linkedPhotoIds: [...linked],
+      });
+      return;
+    }
+    const region = defaultRegion;
+    setForm({
+      ...EMPTY,
+      id: nextId || nextAttractionId(attractions, region),
+      region,
+    });
+  }, [open, mode, attraction, nextId, defaultRegion, attractions]);
+
+  const allPhotos = storePhotos.length ? storePhotos : photos;
+
+  const pickablePhotos = useMemo(() => {
+    if (!form.linkedPhotoIds.length) return [];
+    return photosLinkedToAttraction(allPhotos, {
+      linkedPhotoIds: form.linkedPhotoIds,
+      photoIds: form.photoIds,
+    });
+  }, [allPhotos, form.linkedPhotoIds, form.photoIds]);
+
+  const galleryHref =
+    form.id && mode === 'edit' ? galleryUrlForAttraction(form.id, form.name) : '';
+
+  if (!open) return null;
+
+  function setRegion(region: Attraction['region']) {
+    setForm((f) => ({
+      ...f,
+      region,
+      id: mode === 'add' ? nextAttractionId(attractions, region) : f.id,
+    }));
+  }
+
+  function toggleFeatured(photoId: string) {
+    setForm((f) => {
+      const has = f.photoIds.includes(photoId);
+      if (has) return { ...f, photoIds: f.photoIds.filter((id) => id !== photoId) };
+      if (f.photoIds.length >= 4) return f;
+      return { ...f, photoIds: [...f.photoIds, photoId] };
+    });
+  }
+
+  function syncFormFromStore(attractionId: string) {
+    const latest = useStore.getState().attractions.find((a) => a.id === attractionId);
+    if (!latest) return;
+    const linked = latest.linkedPhotoIds?.length ? latest.linkedPhotoIds : (latest.photoIds ?? []);
+    setForm((f) => ({
+      ...f,
+      linkedPhotoIds: [...linked],
+      photoIds: [...(latest.photoIds ?? [])],
+    }));
+  }
+
+  async function handleQuickAddSave(data: GalleryPhotoSavePayload) {
+    if (mode !== 'edit' || !form.id) return;
+    setQuickAddSaving(true);
+    setQuickAddStatus('');
+    try {
+      if (data.looseBatch?.length) {
+        await saveNewLoosePhotosBatch(data.looseBatch, data, {
+          attractionId: form.id,
+          defaultRegion: form.region,
+          onStatus: setQuickAddStatus,
+        });
+      } else {
+        await saveNewLoosePhoto(data, {
+          attractionId: form.id,
+          defaultRegion: form.region,
+          onStatus: setQuickAddStatus,
+        });
+      }
+      syncFormFromStore(form.id);
+      setQuickAddOpen(false);
+      setQuickAddStatus('');
+    } catch (err) {
+      setQuickAddStatus(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setQuickAddSaving(false);
+    }
+  }
+
+  async function handleQuickRemoveMany(photoIds: string[]) {
+    if (!form.id || mode !== 'edit') return;
+    const ids = [...new Set(photoIds)].filter((id) => allPhotos.some((p) => p.id === id));
+    if (!ids.length) return;
+    setRemovingPhotoId(ids[0] ?? 'batch');
+    setQuickAddStatus('');
+    try {
+      for (const id of ids) {
+        try {
+          await deleteGalleryPhotoFiles(createClient(), id, {
+            kind: 'attraction',
+            attractionId: form.id,
+          });
+        } catch {
+          // best-effort storage cleanup; keep deleting metadata
+        }
+      }
+
+      const removingSet = new Set(ids);
+      const state = useStore.getState();
+      useStore.setState({
+        photos: (state.photos as GalleryPhoto[]).filter((p) => !removingSet.has(p.id)),
+        attractions: state.attractions.map((a) => {
+          const linked = (a.linkedPhotoIds ?? []).filter((id) => !removingSet.has(id));
+          const featured = (a.photoIds ?? []).filter((id) => !removingSet.has(id));
+          if (linked.length === (a.linkedPhotoIds ?? []).length && featured.length === (a.photoIds ?? []).length) {
+            return a;
+          }
+          return { ...a, linkedPhotoIds: linked, photoIds: featured };
+        }),
+      });
+      syncFormFromStore(form.id);
+      setSelectedRemoveIds([]);
+      setQuickRemoveMode(false);
+
+      const photosResult = await pushTablesToSupabase(['photos'], false);
+      if (!photosResult.ok) {
+        throw new Error(photosResult.error ?? 'Không lưu được metadata ảnh lên Supabase');
+      }
+      const attractionsResult = await pushTablesToSupabase(['attractions'], false);
+      if (!attractionsResult.ok) {
+        throw new Error(attractionsResult.error ?? 'Không lưu được liên kết attraction lên Supabase');
+      }
+    } catch (err) {
+      setQuickAddStatus(err instanceof Error ? err.message : 'Failed to sync photo removal');
+    } finally {
+      setRemovingPhotoId('');
+    }
+  }
+
+  function handleSave() {
+    if (!form.name.trim()) {
+      alert('Attraction name is required.');
+      return;
+    }
+    if (!form.dest.trim()) {
+      alert('Destination is required.');
+      return;
+    }
+    if (!form.id.trim()) {
+      alert('ID is missing — pick a region and try again.');
+      return;
+    }
+    const duplicate = attractions.some((a) => a.id === form.id && a.id !== attraction?.id);
+    if (duplicate) {
+      alert(`ID ${form.id} already exists. Change region to get a new ID.`);
+      return;
+    }
+    const linked = form.linkedPhotoIds ?? [];
+    const featured = form.photoIds.filter((id) => linked.includes(id)).slice(0, 4);
+    onSave({ ...form, photoIds: featured });
+  }
+
+  function handleDelete() {
+    if (!attraction || !onDelete) return;
+    if (!confirm(`Delete "${attraction.name}"? This cannot be undone.`)) return;
+    onDelete(attraction.id);
+    onClose();
+  }
+
+  return (
+    <>
+      <div className="overlay open prod-form-overlay" onClick={onClose}>
+        <div className="modal att-edit-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-hd">
+            <span className="modal-title">{mode === 'edit' ? 'Edit Attraction' : 'Add Attraction'}</span>
+            <button type="button" className="modal-x att-edit-close-btn" onClick={onClose} aria-label="Close modal">
+              ✕
+            </button>
+          </div>
+          <div className="modal-body att-edit-body">
+            <div className="att-edit-grid">
+              <div className="fg">
+                <label className="lbl">ID</label>
+                <input value={form.id} readOnly className="att-id-readonly" />
+              </div>
+              <div className="fg">
+                <label className="lbl">Region</label>
+                <select
+                  value={form.region}
+                  onChange={(e) => setRegion(e.target.value as Attraction['region'])}
+                >
+                  <option value="north">Northern Vietnam</option>
+                  <option value="central">Central Vietnam</option>
+                  <option value="south">Southern Vietnam</option>
+                </select>
+              </div>
+              <div className="fg">
+                <label className="lbl">Type</label>
+                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                  <option value="museum">Museum</option>
+                  <option value="heritage">Heritage Site</option>
+                  <option value="temple">Temple / Pagoda</option>
+                  <option value="landmark">Landmark</option>
+                  <option value="nature">Nature Site</option>
+                </select>
+              </div>
+              <div className="fg">
+                <label className="lbl">Destination *</label>
+                <input
+                  value={form.dest}
+                  placeholder="e.g. Hanoi"
+                  onChange={(e) => setForm({ ...form, dest: e.target.value })}
+                />
+              </div>
+              <div className="fg att-edit-span2">
+                <label className="lbl">Name *</label>
+                <input
+                  value={form.name}
+                  placeholder="Attraction name"
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+              </div>
+              <div className="fg">
+                <label className="lbl">Phone</label>
+                <input value={form.phone} placeholder="+84 …" onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </div>
+              <div className="fg">
+                <label className="lbl">Admission</label>
+                <input value={form.admission} onChange={(e) => setForm({ ...form, admission: e.target.value })} />
+              </div>
+              <div className="fg att-edit-span2">
+                <label className="lbl">Hours</label>
+                <input
+                  value={form.hours}
+                  placeholder="Tue–Sun 08:30–17:30"
+                  onChange={(e) => setForm({ ...form, hours: e.target.value })}
+                />
+              </div>
+              <div className="fg att-edit-span2">
+                <label className="lbl">Closed</label>
+                <input
+                  value={form.closed}
+                  placeholder="Monday, None, …"
+                  onChange={(e) => setForm({ ...form, closed: e.target.value })}
+                />
+              </div>
+              <div className="fg">
+                <label className="lbl">Visit duration (min)</label>
+                <input type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })} />
+              </div>
+              <div className="fg">
+                <label className="lbl">Best time</label>
+                <input value={form.best_time} onChange={(e) => setForm({ ...form, best_time: e.target.value })} />
+              </div>
+              <div className="fg att-edit-span2">
+                <label className="lbl">Crowd tips</label>
+                <input value={form.crowd} onChange={(e) => setForm({ ...form, crowd: e.target.value })} />
+              </div>
+              <div className="fg att-edit-span2">
+                <label className="lbl">Seasonal notes</label>
+                <input value={form.seasonal} onChange={(e) => setForm({ ...form, seasonal: e.target.value })} />
+              </div>
+              <div className="fg att-edit-span2">
+                <label className="lbl">Alert badge (non-closure info)</label>
+                <input value={form.alert} onChange={(e) => setForm({ ...form, alert: e.target.value })} />
+              </div>
+              <div className="fg att-edit-span2">
+                <label className="lbl att-edit-checkbox-label">
+                  <input
+                    type="checkbox"
+                    className="att-edit-checkbox-input"
+                    checked={form.book_req}
+                    onChange={(e) => setForm({ ...form, book_req: e.target.checked })}
+                  />
+                  <span>Booking required</span>
+                </label>
+              </div>
+              <div className="fg att-edit-span2">
+                <label className="lbl">Description</label>
+                <textarea rows={4} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              </div>
+            </div>
+
+            <div className={`att-edit-photos${quickRemoveMode ? ' remove-mode' : ''}`}>
+              <div className="att-edit-photos-hd">
+                <div className="att-expand-label">Gallery photos (max 4 featured)</div>
+                <div className="att-edit-photos-actions">
+                  {pickablePhotos.length > 0 && (
+                    <span className="att-edit-photos-count">
+                      {form.linkedPhotoIds.length} linked · {form.photoIds.length}/4 featured
+                    </span>
+                  )}
+                  {mode === 'edit' && (
+                    <button
+                      type="button"
+                      className="btn btn-s btn-sm"
+                      onClick={() => setQuickAddOpen(true)}
+                      disabled={Boolean(removingPhotoId)}
+                    >
+                      + Quick Add Photo
+                    </button>
+                  )}
+                  {mode === 'edit' && pickablePhotos.length > 0 && (
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${quickRemoveMode ? 'btn-danger att-remove-toggle-on' : 'btn-s'}`}
+                      disabled={Boolean(removingPhotoId)}
+                      onClick={() => {
+                        setQuickRemoveMode((v) => !v);
+                        setSelectedRemoveIds([]);
+                      }}
+                    >
+                      {quickRemoveMode ? 'Cancel Remove' : 'Quick Remove'}
+                    </button>
+                  )}
+                  {quickRemoveMode && (
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      disabled={!selectedRemoveIds.length || Boolean(removingPhotoId)}
+                      onClick={() => void handleQuickRemoveMany(selectedRemoveIds)}
+                    >
+                      Delete Selected ({selectedRemoveIds.length})
+                    </button>
+                  )}
+                </div>
+              </div>
+              {!pickablePhotos.length ? (
+                <div className="att-photo-empty att-photo-empty-rich">
+                  <div className="att-photo-empty-icon">🖼</div>
+                  <p>
+                    {mode === 'add'
+                      ? 'Save this attraction first, then add photos via Quick Add or Photo Gallery.'
+                      : 'No photos linked yet. Quick add a photo here or open Photo Gallery.'}
+                  </p>
+                  <div className="att-edit-empty-actions">
+                    {mode === 'edit' && (
+                      <button type="button" className="btn btn-p btn-sm" onClick={() => setQuickAddOpen(true)}>
+                        + Quick Add Photo
+                      </button>
+                    )}
+                    {galleryHref && (
+                      <a href={galleryHref} className="btn btn-s btn-sm">
+                        Open Gallery
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className={`att-edit-photos-hint${quickRemoveMode ? ' remove-mode' : ''}`}>
+                    {quickRemoveMode
+                      ? 'Remove mode: click photos to select, then click Delete Selected.'
+                      : 'Click a photo to toggle featured on the schedule.'}
+                  </p>
+                  <div className="att-edit-photo-picks">
+                    {pickablePhotos.map((p) => {
+                      const featured = form.photoIds.includes(p.id);
+                      const selectedForRemove = selectedRemoveIds.includes(p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          className={`att-edit-photo-pick-wrap${featured ? ' featured' : ''}${quickRemoveMode && selectedForRemove ? ' remove-selected' : ''}`}
+                        >
+                          <button
+                            type="button"
+                            className={`att-edit-photo-pick${featured ? ' selected' : ' pool-only'}${quickRemoveMode ? ' remove-mode' : ''}${quickRemoveMode && selectedForRemove ? ' remove-selected' : ''}`}
+                            onClick={() => {
+                              if (quickRemoveMode) {
+                                setSelectedRemoveIds((prev) =>
+                                  prev.includes(p.id) ? prev.filter((id) => id !== p.id) : [...prev, p.id]
+                                );
+                                return;
+                              }
+                              toggleFeatured(p.id);
+                            }}
+                            title={p.caption || p.id}
+                          >
+                            <span
+                              className="att-edit-photo-preview"
+                              style={photoThumbUrl(p) ? { backgroundImage: `url(${photoThumbUrl(p)})` } : undefined}
+                            />
+                            <span className="att-edit-photo-cap">{p.caption || p.id}</span>
+                            <span className="att-edit-photo-status">
+                              {quickRemoveMode
+                                ? (selectedForRemove ? 'Selected to delete' : 'Click to select')
+                                : (featured ? 'Featured' : 'Not shown')}
+                            </span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="att-edit-gallery-links">
+                    {galleryHref && (
+                      <a href={galleryHref} className="att-edit-gallery-link">
+                        Manage all photos in Gallery →
+                      </a>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="modal-ft att-edit-ft">
+            {mode === 'edit' && onDelete && (
+              <button type="button" className="btn btn-danger btn-sm att-edit-delete" onClick={handleDelete}>
+                Delete
+              </button>
+            )}
+            <div className="att-edit-ft-actions">
+              <button type="button" className="btn btn-s" onClick={onClose}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-p"
+                disabled={!form.id || !form.name.trim() || !form.dest.trim()}
+                onClick={handleSave}
+              >
+                {mode === 'edit' ? 'Save Changes' : 'Add Attraction'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <GalleryPhotoModal
+        open={quickAddOpen}
+        mode="addLoose"
+        defaultRegion={form.region}
+        products={products}
+        existingPhotos={allPhotos}
+        saving={quickAddSaving}
+        saveStatus={quickAddStatus}
+        onClose={() => {
+          if (quickAddSaving) return;
+          setQuickAddOpen(false);
+          setQuickAddStatus('');
+        }}
+        onSave={handleQuickAddSave}
+      />
+    </>
+  );
+}

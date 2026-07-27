@@ -52,6 +52,11 @@ export const PROPOSAL_CANCELLATION_POLICY = [
   { notice: '45 – 59 days', charge: '50% of total tour cost.' },
   { notice: '30 – 44 days', charge: '75% of total tour cost.' },
   { notice: '0 – 29 days / No Show', charge: '100% of total tour cost.' },
+  {
+    notice: 'Cruises & Flights',
+    charge:
+      'Supplier cancellation terms for cruises and domestic flights may supersede the schedule above and will be advised at time of booking.',
+  },
 ];
 
 export const PROPOSAL_AMENDMENT_POLICY = [

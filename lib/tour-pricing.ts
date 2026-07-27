@@ -19,11 +19,6 @@ export function findProductPricing(productCode: string): ProductPricing | undefi
   return getPricingCatalog().find((t) => t.productCode === productCode);
 }
 
-/** @deprecated Use findProductPricing — kept for existing call sites */
-export function findTaaTour(productCode: string): ProductPricing | undefined {
-  return findProductPricing(productCode);
-}
-
 export function paxToTierN(pax: number): number {
   if (pax <= 1) return 1;
   if (pax === 2) return 2;

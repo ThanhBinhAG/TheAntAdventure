@@ -1,12 +1,23 @@
 import { withoutAutoSyncAsync } from './auto-sync';
 import { pushSnapshotToSupabase } from './sync-push';
+import { appLog } from '../system/app-logger';
 import { isRemoteDataEnabled, isRemoteDataEnabled as remoteEnabled } from '../env';
+import { mergeAttractionSeeds } from '../ensure-attraction-seeds';
 import { mergeRequiredProducts } from '../ensure-core-products';
 import { mergeSupplierSeeds } from '../ensure-supplier-seeds';
-import { mergeProductPricing } from '../product-pricing-helpers';
-import * as seeds from '../seeds';
+import { pruneProductPricingToProducts } from '../product-pricing-helpers';
 import { useStore } from '../store';
-import type { BackupData, ChatMessages, CruiseSupplier, ExtendedSupplier, Hotel, RestaurantSupplier, TransportSupplier } from '../types';
+import type {
+  BackupData,
+  ChatMessages,
+  CruiseSupplier,
+  ExtendedSupplier,
+  Hotel,
+  ProductPricing,
+  RestaurantSupplier,
+  TransportSupplier,
+  Attraction,
+} from '../types';
 import {
   countBackupRows,
   MESSAGES_TABLE,
@@ -47,6 +58,7 @@ async function fetchRemoteBackup(): Promise<Partial<BackupData> | null> {
 
   const backup: Partial<BackupData> = {};
   let totalRows = 0;
+  let fetchedAnyTable = false;
 
   for (const [key, value] of results) {
     if (key === 'messages') {
@@ -54,13 +66,16 @@ async function fetchRemoteBackup(): Promise<Partial<BackupData> | null> {
         backup.messages = value as ChatMessages;
         totalRows += Object.keys(value).length;
       }
-    } else if (Array.isArray(value) && value.length > 0) {
+      fetchedAnyTable = true;
+    } else if (Array.isArray(value)) {
+      // Always attach arrays (including empty) so a wiped product_pricing is not treated as "missing".
       (backup as Record<string, unknown>)[key] = value;
       totalRows += value.length;
+      fetchedAnyTable = true;
     }
   }
 
-  return totalRows > 0 ? backup : null;
+  return fetchedAnyTable || totalRows > 0 ? backup : null;
 }
 
 function baselineFromBackup(backup: BackupData): Partial<Record<SyncArrayTable, number>> {
@@ -133,9 +148,13 @@ export async function hydrateFromSupabase(): Promise<boolean> {
       const mergedProducts = remote?.products
         ? mergeRequiredProducts(remote.products as never[])
         : mergeRequiredProducts(state.products);
-      const mergedPricing = mergeProductPricing(
-        (remote?.productPricing as never[] | undefined) ?? state.productPricing,
-        seeds.SEED_PRODUCT_PRICING
+      // Supabase is source of truth — do not re-seed legacy TAA pricing on hydrate.
+      const rawPricing: ProductPricing[] = Array.isArray(remote?.productPricing)
+        ? (remote.productPricing as ProductPricing[])
+        : state.productPricing;
+      const mergedPricing = pruneProductPricingToProducts(rawPricing, mergedProducts);
+      const mergedAttractions = mergeAttractionSeeds(
+        (remote?.attractions as Attraction[] | undefined) ?? state.attractions
       );
       const mergedSuppliers = mergeSupplierSeeds({
         hotels: (remote?.hotels as Hotel[] | undefined) ?? state.hotels,
@@ -151,6 +170,7 @@ export async function hydrateFromSupabase(): Promise<boolean> {
           ...remote,
           products: mergedProducts,
           productPricing: mergedPricing,
+          attractions: mergedAttractions,
           hotels: mergedSuppliers.hotels,
           transport: mergedSuppliers.transport,
           restaurants: mergedSuppliers.restaurants,
@@ -163,6 +183,7 @@ export async function hydrateFromSupabase(): Promise<boolean> {
         useStore.setState({
           products: mergedProducts,
           productPricing: mergedPricing,
+          attractions: mergedAttractions,
           hotels: mergedSuppliers.hotels,
           transport: mergedSuppliers.transport,
           restaurants: mergedSuppliers.restaurants,
@@ -177,7 +198,7 @@ export async function hydrateFromSupabase(): Promise<boolean> {
     return true;
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Hydrate failed';
-    console.warn('[CRM] Supabase hydrate failed:', e);
+    appLog('hydrate', 'Supabase hydrate failed', { level: 'warn', error: e });
     markHydrationFailed(message);
     return false;
   }

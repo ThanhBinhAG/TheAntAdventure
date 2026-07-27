@@ -2,6 +2,7 @@ import type { Product, ProductPricing, ProductPricingInclusions } from './types'
 import type { TaaTour } from './seeds/taa-tours';
 
 export type PricingStatus = 'complete' | 'incomplete' | 'missing';
+export type PricingStatusFilter = PricingStatus | '';
 
 export interface PricingTableRow {
   num: number;
@@ -114,42 +115,64 @@ export function pricingStatus(row: ProductPricing | undefined): PricingStatus {
   return 'missing';
 }
 
+export function matchesPricingStatusFilter(
+  productCode: string,
+  pricingByCode: Map<string, ProductPricing>,
+  filter: PricingStatusFilter
+): boolean {
+  if (!filter) return true;
+  return pricingStatus(pricingByCode.get(productCode)) === filter;
+}
+
+/**
+ * Product-first Price List rows. Orphan pricing (no matching Tour Product) is omitted
+ * so legacy seed/orphan codes do not dominate after a catalogue replace.
+ * Products without a pricing row, or with an all-zero stub, are flagged `missingProduct`
+ * so staff can Edit pricing later.
+ */
 export function buildPricingTableRows(products: Product[], pricing: ProductPricing[]): PricingTableRow[] {
-  const productByCode = new Map(products.map((p) => [p.code, p]));
   const pricingByCode = new Map(pricing.map((p) => [p.productCode, p]));
-  const codes = new Set([...productByCode.keys(), ...pricingByCode.keys()]);
   let num = 0;
 
-  return [...codes]
-    .sort((a, b) => a.localeCompare(b))
-    .map((code) => {
+  return [...products]
+    .sort((a, b) => a.code.localeCompare(b.code))
+    .map((product) => {
       num += 1;
-      const product = productByCode.get(code);
-      const row = pricingByCode.get(code) ?? emptyProductPricing(code);
+      const stored = pricingByCode.get(product.code);
+      const row = stored ?? emptyProductPricing(product.code);
+      const status = pricingStatus(stored);
       return {
         num,
-        productCode: code,
-        name: product?.name ?? '(orphan pricing — no product)',
-        region: product ? regionToFilterLabel(product.region) : '—',
-        duration: product?.dur ?? '—',
-        category: product?.cat ?? '—',
-        level: product?.lvl ?? '—',
+        productCode: product.code,
+        name: product.name,
+        region: regionToFilterLabel(product.region),
+        duration: product.dur || '—',
+        category: product.cat || '—',
+        level: product.lvl || '—',
         pricing: row,
-        orphanPricing: !product && !!pricingByCode.get(code),
-        missingProduct: !!product && !pricingByCode.get(code),
+        orphanPricing: false,
+        missingProduct: status === 'missing',
       };
     });
+}
+
+/** Count pricing rows whose product code is not in the catalogue (for banners / hygiene). */
+export function countOrphanPricing(products: Product[], pricing: ProductPricing[]): number {
+  const codes = new Set(products.map((p) => p.code));
+  return pricing.filter((r) => !codes.has(r.productCode)).length;
 }
 
 export function pricingUrlForProduct(code: string): string {
   return `/pricing?product=${encodeURIComponent(code)}`;
 }
 
-/** Merge remote pricing with seed defaults so legacy rows are never lost */
-export function mergeProductPricing(remote: ProductPricing[] | undefined, seed: ProductPricing[]): ProductPricing[] {
-  const byCode = new Map((remote ?? []).map((p) => [p.productCode, p]));
-  for (const row of seed) {
-    if (!byCode.has(row.productCode)) byCode.set(row.productCode, row);
-  }
-  return [...byCode.values()].sort((a, b) => a.productCode.localeCompare(b.productCode));
+/** Drop pricing rows that do not belong to any current product code. */
+export function pruneProductPricingToProducts(
+  pricing: ProductPricing[],
+  products: { code: string }[]
+): ProductPricing[] {
+  const codes = new Set(products.map((p) => p.code));
+  return pricing
+    .filter((r) => codes.has(r.productCode))
+    .sort((a, b) => a.productCode.localeCompare(b.productCode));
 }

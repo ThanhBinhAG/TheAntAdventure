@@ -24,6 +24,7 @@ import {
 import { getDurationPillLabel } from '@/lib/product-display';
 import { pricingStatus, pricingUrlForProduct } from '@/lib/product-pricing-helpers';
 import { galleryUrlForProduct, productPhotoSlotStatus } from '@/lib/gallery-helpers';
+import type { GalleryPhoto } from '@/lib/tour-design-types';
 import { getLibPriceLabel } from '@/lib/tour-pricing';
 import Link from 'next/link';
 import { useStore } from '@/hooks/useStore';
@@ -73,7 +74,7 @@ export default function ProductFormModal({
   onDismissError,
 }: ProductFormModalProps) {
   const allProducts = useStore((s) => s.products);
-  const photos = useStore((s) => s.photos);
+  const photos = useStore((s) => s.photos) as GalleryPhoto[];
   const existingCodes = useMemo(() => allProducts.map((p) => p.code), [allProducts]);
   const [form, setForm] = useState<ProductFormState>(() => emptyProductForm('north', existingCodes));
   const pricingRow = useStore((s) =>
@@ -248,7 +249,7 @@ export default function ProductFormModal({
 
           <FormSection
             title="Card tags & classification"
-            hint="These fields control the badges, product code, and labels shown on Product Library cards."
+            hint="Product code follows Portfolio Excel: AA-{region}-{dest}-{activity}-{duration}-{seq} (e.g. AA-SV-SGN-CULI-EVE-01)."
           >
             <div className="prod-form-grid prod-form-grid-4">
               <div className="fg">
@@ -313,7 +314,7 @@ export default function ProductFormModal({
                 />
               </div>
               <div className="fg">
-                <label className="lbl">Code type {isNew ? '(auto)' : ''}</label>
+                <label className="lbl">Code type {isNew ? '(activity–duration)' : ''}</label>
                 <div className="prod-form-type-seg-row">
                   <select
                     value={form.typeSegment}
@@ -421,6 +422,19 @@ export default function ProductFormModal({
                 onChange={(e) => setForm((f) => ({ ...f, logic: e.target.value }))}
                 placeholder="Internal itinerary logic or supplier notes…"
                 rows={2}
+              />
+            </div>
+            <div className="fg" style={{ marginTop: 12 }}>
+              <label className="lbl">
+                Notes to Sales{' '}
+                <span className="prod-form-field-hint">Internal — not shown on client proposals</span>
+              </label>
+              <textarea
+                value={form.notesToSales}
+                onChange={(e) => setForm((f) => ({ ...f, notesToSales: e.target.value }))}
+                placeholder="Sales bullets from the portfolio (inclusions, operators, selling tips)…"
+                rows={4}
+                className="prod-form-notes-sales"
               />
             </div>
           </FormSection>

@@ -51,7 +51,7 @@ export default function OutlineWorkflowPanel({
       </div>
 
       <div className="outline-workflow-timeline">
-        <span className={`outline-wf-step${outlineStatus === 'draft' ? ' on' : outlineRevision > 0 || outlineStatus !== 'draft' ? ' done' : ''}`}>
+        <span className={`outline-wf-step${outlineStatus === 'draft' ? ' on' : ' done'}`}>
           Draft
         </span>
         <span className="outline-wf-arrow">→</span>

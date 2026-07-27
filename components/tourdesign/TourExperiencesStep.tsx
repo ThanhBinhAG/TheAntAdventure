@@ -197,7 +197,7 @@ export default function TourExperiencesStep({
         <GuestProfileCard brief={brief} clientType={clientType} custName={custName} onEditBrief={onEditBrief} />
 
         {libTab === 'pkg' ? (
-          <PackagePreviewPanel pkg={activePreview} brief={brief} onUsePackage={openPackage} />
+          <PackagePreviewPanel pkg={activePreview} brief={brief} photos={photos} onUsePackage={openPackage} />
         ) : (
           <SelectedExperiencesPanel brief={brief} selectedProducts={selectedProducts} photos={photos} onToggleProduct={onToggleProduct} />
         )}

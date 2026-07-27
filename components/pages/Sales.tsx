@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { STAGE_COLORS, STAGE_PROB_V22, fmt, KANBAN_STAGES } from '@/lib/constants';
 import { getCustomerName } from '@/lib/crm-utils';
+import { ensureBookingForConfirmedLead } from '@/lib/booking-from-lead';
 import { patchOutlineApproved, outlineStatusLabel } from '@/lib/tour-design-lead';
 import { applyOutlineWorkflowPatch } from '@/lib/tour-outline-workflow';
 import { getTourDraftForLead } from '@/lib/tour-design-leads';
@@ -25,6 +26,8 @@ import {
 } from '@/lib/sales-lead-utils';
 import { localTodayIso } from '@/lib/date-utils';
 import { useStore } from '@/hooks/useStore';
+import { usePagination } from '@/hooks/usePagination';
+import PaginationBar from '@/components/PaginationBar';
 import { useLanguage } from '@/hooks/useLanguage';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
@@ -32,6 +35,8 @@ import type { SalesKey } from '@/lib/i18n/pages/sales';
 import type { Lead, TourDraft } from '@/lib/types';
 
 const LOST_REASONS = ['Price too high', 'Chose competitor', 'Dates unavailable', 'No response', 'Changed plans', 'Other'];
+
+const STAGE_SELECT_OPTIONS = [...KANBAN_STAGES, 'Lost'] as const;
 
 const TIME_FILTER_MODES: SalesTimeFilterMode[] = [
   'all',
@@ -220,7 +225,7 @@ ${tsf('aiEmailSignature')}`;
           onChange={(e) => onStageChange(lead.id, e.target.value)}
           onClick={(e) => e.stopPropagation()}
         >
-          {['Inquiry', 'Pending', 'Designing', 'Quoted', 'Negotiation', 'Confirmed', 'Completed', 'Lost'].map((st) => (
+          {STAGE_SELECT_OPTIONS.map((st) => (
             <option key={st} value={st}>
               {tStage(st)}
             </option>
@@ -293,6 +298,51 @@ ${tsf('aiEmailSignature')}`;
   );
 }
 
+function ListFollowUpCell({
+  lead,
+  today,
+  onUpdate,
+}: {
+  lead: Lead;
+  today: string;
+  onUpdate: (id: string, data: Partial<Lead>) => void;
+}) {
+  const { tc } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const [fupDate, setFupDate] = useState(lead.followUpDate || '');
+  const [fupAction, setFupAction] = useState(lead.nextAction || '');
+  const overdue = isFollowUpOverdue(lead, today);
+
+  useEffect(() => {
+    setFupDate(lead.followUpDate || '');
+    setFupAction(lead.nextAction || '');
+  }, [lead.followUpDate, lead.nextAction]);
+
+  return (
+    <td style={{ fontSize: 12, color: overdue ? 'var(--red)' : 'var(--m)', fontWeight: overdue ? 600 : 400 }}>
+      <div>{lead.followUpDate || '—'}</div>
+      <button type="button" className="pipe-fup-btn" style={{ marginTop: 4 }} onClick={() => setOpen(!open)}>
+        📅 {lead.followUpDate ? tc('editFollowUp') : tc('setFollowUp')}
+      </button>
+      {open && (
+        <div className="pipe-fup-form" style={{ marginTop: 6 }}>
+          <input type="date" value={fupDate} onChange={(e) => setFupDate(e.target.value)} />
+          <input type="text" value={fupAction} onChange={(e) => setFupAction(e.target.value)} placeholder={`${tc('nextAction')}…`} />
+          <button
+            type="button"
+            onClick={() => {
+              onUpdate(lead.id, { followUpDate: fupDate, nextAction: fupAction });
+              setOpen(false);
+            }}
+          >
+            ✓ {tc('save')}
+          </button>
+        </div>
+      )}
+    </td>
+  );
+}
+
 function SortableTh({
   field,
   label,
@@ -323,6 +373,8 @@ export default function Sales() {
   const customers = useStore((s) => s.customers);
   const tourDrafts = useStore((s) => s.tourDrafts);
   const updateLead = useStore((s) => s.updateLead);
+  const addBooking = useStore((s) => s.addBooking);
+  const bookings = useStore((s) => s.bookings);
   const upsertTourDraft = useStore((s) => s.upsertTourDraft);
   const addComm = useStore((s) => s.addComm);
   const { saveFromForm } = useRegisterCustomer();
@@ -401,6 +453,16 @@ export default function Sales() {
 
   const listLeads = useMemo(() => sortLeads(filteredLeads, listSort, customers), [filteredLeads, listSort, customers]);
 
+  const listPagination = usePagination(listLeads, undefined, [
+    search,
+    timeFilter,
+    stageFilter,
+    custIdFilter,
+    listSort,
+    groupByMonth,
+  ]);
+  const { paginatedItems: pageLeads } = listPagination;
+
   const filtersActive = hasActiveFilters(search, timeFilter, stageFilter) || !!custIdFilter;
 
   function clearFilters() {
@@ -438,6 +500,16 @@ export default function Sales() {
       });
     } else {
       updateLead(leadId, { stage: newStage, probability: STAGE_PROB_V22[newStage] ?? 10 });
+      if (newStage === 'Confirmed') {
+        const lead = leads.find((l) => l.id === leadId);
+        if (lead) {
+          const booking = ensureBookingForConfirmedLead(
+            { ...lead, stage: 'Confirmed', probability: STAGE_PROB_V22.Confirmed },
+            bookings
+          );
+          if (booking) addBooking(booking);
+        }
+      }
     }
   }
 
@@ -462,7 +534,6 @@ export default function Sales() {
   }
 
   function renderLeadRow(l: Lead) {
-    const prob = l.probability ?? STAGE_PROB_V22[l.stage] ?? 10;
     const weighted = Math.round(getLeadWeightedValue(l));
     const lostReason = (l.lostReason as string) || '';
     return (
@@ -482,13 +553,20 @@ export default function Sales() {
         <td style={{ fontWeight: 600, color: 'var(--g)' }}>{l.value > 0 ? `$${fmt(l.value)}` : '—'}</td>
         <td style={{ fontWeight: 700, color: 'var(--pur)' }}>{weighted > 0 ? `$${fmt(weighted)}` : '—'}</td>
         <td style={{ fontSize: 12, color: 'var(--m)' }}>{l.month || '—'}</td>
-        <td style={{ fontSize: 12, color: isFollowUpOverdue(l, today) ? 'var(--red)' : 'var(--m)', fontWeight: isFollowUpOverdue(l, today) ? 600 : 400 }}>
-          {l.followUpDate || '—'}
-        </td>
+        <ListFollowUpCell lead={l} today={today} onUpdate={updateLead} />
         <td>
-          <span className={`bdg ${STAGE_COLORS[l.stage] || 'bdg-w'}`} style={{ fontSize: 10 }}>
-            {tStage(l.stage)}
-          </span>
+          <select
+            className="pipe-stage-select"
+            value={l.stage}
+            onChange={(e) => moveStage(l.id, e.target.value)}
+            aria-label={tc('stage')}
+          >
+            {STAGE_SELECT_OPTIONS.map((st) => (
+              <option key={st} value={st}>
+                {tStage(st)}
+              </option>
+            ))}
+          </select>
         </td>
         <td style={{ fontSize: 12 }}>{l.owner || 'Tai Pham'}</td>
         <td style={{ fontSize: 11.5, color: 'var(--m)' }}>{lostReason ? tLostReason(lostReason) : '—'}</td>
@@ -707,7 +785,7 @@ export default function Sales() {
                 </thead>
                 <tbody>
                   {groupByMonth
-                    ? groupLeadsByTravelMonth(listLeads).flatMap((group) => [
+                    ? groupLeadsByTravelMonth(pageLeads).flatMap((group) => [
                         <tr key={`group-${group.label}`} className="sales-group-row">
                           <td colSpan={11}>
                             {group.label === 'TBD' ? tsf('travelMonthUndetermined') : group.label} ({group.leads.length})
@@ -715,10 +793,11 @@ export default function Sales() {
                         </tr>,
                         ...group.leads.map((l) => renderLeadRow(l)),
                       ])
-                    : listLeads.map((l) => renderLeadRow(l))}
+                    : pageLeads.map((l) => renderLeadRow(l))}
                 </tbody>
               </table>
             )}
+            <PaginationBar {...listPagination} />
           </div>
         </div>
       )}

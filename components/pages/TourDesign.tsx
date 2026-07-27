@@ -53,6 +53,7 @@ export default function TourDesign() {
   const tourDrafts = useStore((s) => s.tourDrafts);
   const tourOutlineDays = useStore((s) => s.tourOutlineDays);
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
+  const hotels = useStore((s) => s.hotels);
   const addLead = useStore((s) => s.addLead);
   const updateLead = useStore((s) => s.updateLead);
   const addComm = useStore((s) => s.addComm);
@@ -678,6 +679,8 @@ export default function TourDesign() {
           outlineRows={outlineRows}
           markupPct={markupPct}
           leadId={leadId || undefined}
+          galleryPhotos={photos}
+          hotelsCatalog={hotels}
           onSavePipeline={saveAsLead}
           onReset={resetDesign}
           onBack={() => goToStep(3)}

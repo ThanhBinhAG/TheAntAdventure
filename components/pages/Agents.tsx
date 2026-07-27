@@ -2,16 +2,17 @@
 
 import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
+import {
+  isActivePipelineLead,
+  isEarnedCommissionStage,
+  summarizeAgentCommissions,
+} from '@/lib/agents-commission';
 import { TIER_BG, TIER_COLORS } from '@/lib/page-helpers';
 import { useStore } from '@/hooks/useStore';
+import { usePagination } from '@/hooks/usePagination';
+import PaginationBar from '@/components/PaginationBar';
 import type { Agent } from '@/lib/types';
 import AgentFormModal from '@/components/agents/AgentFormModal';
-
-const EARNED_STAGES = ['Confirmed', 'Completed', 'On Tour'] as const;
-
-function isActivePipelineLead(stage: string): boolean {
-  return stage !== 'Lost' && stage !== 'Completed';
-}
 
 export default function Agents() {
   const agents = useStore((s) => s.agents);
@@ -40,20 +41,15 @@ export default function Agents() {
 
   const totalAgents = agents.filter((a) => a.id !== 'AGT-001').length;
   const activeAgents = agents.filter((a) => a.id !== 'AGT-001' && a.status === 'Active').length;
-  const summaryRows = useMemo(() => {
-    let grandGross = 0;
-    let grandComm = 0;
-    const rows = agents.map((a) => {
-      const agLeads = leads.filter((l) => l.agentId === a.id && EARNED_STAGES.includes(l.stage as (typeof EARNED_STAGES)[number]));
-      const gross = agLeads.reduce((s, l) => s + (l.value || 0), 0);
-      const comm = Math.round(gross * (a.commissionPct / 100));
-      const net = gross - comm;
-      grandGross += gross;
-      grandComm += comm;
-      return { agent: a, gross, comm, net, bookings: agLeads.length };
-    });
-    return { rows, grandGross, grandComm, grandNet: grandGross - grandComm };
-  }, [agents, leads]);
+  const summaryRows = useMemo(
+    () => summarizeAgentCommissions(agents, leads),
+    [agents, leads]
+  );
+
+  const agentsPagination = usePagination(filtered, undefined, [search, view]);
+  const summaryPagination = usePagination(summaryRows.rows, undefined, [search, view]);
+  const { paginatedItems: agentsPage } = agentsPagination;
+  const { paginatedItems: summaryPage } = summaryPagination;
 
   const totalEarnedComm = summaryRows.grandComm;
 
@@ -156,7 +152,7 @@ export default function Agents() {
     const pipelineLeads = leads.filter((l) => l.agentId === a.id && isActivePipelineLead(l.stage));
     const pipelineValue = pipelineLeads.reduce((s, l) => s + (l.value || 0), 0);
     const pipelineComm = Math.round(pipelineValue * (a.commissionPct / 100));
-    const earnedLeads = leads.filter((l) => l.agentId === a.id && EARNED_STAGES.includes(l.stage as (typeof EARNED_STAGES)[number]));
+    const earnedLeads = leads.filter((l) => l.agentId === a.id && isEarnedCommissionStage(l.stage));
     const earnedGross = earnedLeads.reduce((s, l) => s + (l.value || 0), 0);
     const earnedComm = Math.round(earnedGross * (a.commissionPct / 100));
     const leadsForAgent = leads.filter((l) => l.agentId === a.id);
@@ -337,7 +333,10 @@ export default function Agents() {
       </div>
 
       {view === 'grid' ? (
-        <div className="agents-grid">{filtered.length ? filtered.map(renderAgentCard) : <div style={{ color: 'var(--m)', padding: 20 }}>No agents found.</div>}</div>
+        <>
+          <div className="agents-grid">{agentsPage.length ? agentsPage.map(renderAgentCard) : <div style={{ color: 'var(--m)', padding: 20 }}>No agents found.</div>}</div>
+          <PaginationBar {...agentsPagination} />
+        </>
       ) : (
         <div className="card" style={{ marginBottom: 20, padding: 0, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
@@ -360,7 +359,7 @@ export default function Agents() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((a) => {
+                {agentsPage.map((a) => {
                   const agLeads = leads.filter((l) => l.agentId === a.id);
                   const pipeline = agLeads.reduce((s, l) => s + (l.value || 0), 0);
                   const comm = Math.round(pipeline * (a.commissionPct / 100));
@@ -414,6 +413,7 @@ export default function Agents() {
               </tbody>
             </table>
           </div>
+          <PaginationBar {...agentsPagination} />
         </div>
       )}
 
@@ -436,7 +436,7 @@ export default function Agents() {
               </tr>
             </thead>
             <tbody>
-              {summaryRows.rows.map(({ agent: a, gross, comm, net, bookings }) => {
+              {summaryPage.map(({ agent: a, gross, comm, net, bookings }) => {
                 const tc = TIER_COLORS[a.tier] || '#6B7F74';
                 const tb = TIER_BG[a.tier] || '#f9f9f9';
                 return (
@@ -467,6 +467,7 @@ export default function Agents() {
             </tbody>
           </table>
         </div>
+        <PaginationBar {...summaryPagination} />
       </div>
 
       {profile && (

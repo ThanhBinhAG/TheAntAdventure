@@ -18,9 +18,15 @@ interface PricingEditModalProps {
 }
 
 const PAX_COLS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+const DEFAULT_OPEN_PAX = 10;
 
 function clonePricing(base: ProductPricing): ProductPricing {
   return { ...base, incl: { ...base.incl } };
+}
+
+function clampOpenPax(value: number): number {
+  if (!Number.isFinite(value) || value < DEFAULT_OPEN_PAX) return DEFAULT_OPEN_PAX;
+  return Math.floor(value);
 }
 
 export default function PricingEditModal({
@@ -32,6 +38,7 @@ export default function PricingEditModal({
   onSave,
 }: PricingEditModalProps) {
   const [form, setForm] = useState<ProductPricing | null>(null);
+  const [openPax, setOpenPax] = useState(DEFAULT_OPEN_PAX);
   const originalRef = useRef<ProductPricing | null>(null);
 
   useEffect(() => {
@@ -39,6 +46,7 @@ export default function PricingEditModal({
       const cloned = clonePricing(pricing);
       originalRef.current = cloned;
       setForm(cloned);
+      setOpenPax(DEFAULT_OPEN_PAX);
     }
   }, [open, pricing]);
 
@@ -64,6 +72,9 @@ export default function PricingEditModal({
     });
   };
 
+  const openRate = (form.p10 as number) || 0;
+  const groupTotal = openRate * openPax;
+
   return (
     <div className="overlay open prod-form-overlay" onClick={onClose}>
       <div className="modal prod-form-modal pricing-edit-modal" onClick={(e) => e.stopPropagation()}>
@@ -85,7 +96,8 @@ export default function PricingEditModal({
             <div className="prod-form-section-hd">
               <h3 className="prod-form-section-title">Sell price by group size</h3>
               <p className="prod-form-section-hint">
-                USD per guest · Giá bán theo số khách trong nhóm (1 = solo, 10 = nhóm lớn)
+                USD per guest · 1 = solo · last column is the open rate for that group size or larger ·
+                group total = rate × entered pax
               </p>
             </div>
 
@@ -100,7 +112,19 @@ export default function PricingEditModal({
                           n === 1 ? 'pricing-edit-th-solo' : n === 10 ? 'pricing-edit-th-group' : undefined
                         }
                       >
-                        {n}
+                        {n === 10 ? (
+                          <input
+                            type="number"
+                            min={DEFAULT_OPEN_PAX}
+                            step={1}
+                            className="pricing-edit-pax-input"
+                            value={openPax}
+                            onChange={(e) => setOpenPax(clampOpenPax(Number(e.target.value)))}
+                            aria-label="Open-tier group size in pax"
+                          />
+                        ) : (
+                          n
+                        )}
                         <span className="pricing-edit-th-unit">pax</span>
                       </th>
                     ))}
@@ -115,17 +139,28 @@ export default function PricingEditModal({
                           n === 1 ? 'pricing-edit-td-solo' : n === 10 ? 'pricing-edit-td-group' : undefined
                         }
                       >
-                        <span className="pricing-edit-currency">$</span>
-                        <input
-                          type="number"
-                          min={0}
-                          step={1}
-                          className="pricing-edit-input"
-                          value={form[`p${n}` as keyof ProductPricing] as number || ''}
-                          onChange={(e) => setSell(n, Number(e.target.value) || 0)}
-                          placeholder="0"
-                          aria-label={`Sell price for ${n} pax`}
-                        />
+                        <div className="pricing-edit-cell">
+                          <span className="pricing-edit-currency">$</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            className="pricing-edit-input"
+                            value={form[`p${n}` as keyof ProductPricing] as number || ''}
+                            onChange={(e) => setSell(n, Number(e.target.value) || 0)}
+                            placeholder="0"
+                            aria-label={
+                              n === 10
+                                ? `Sell price per guest for ${openPax}+ pax`
+                                : `Sell price for ${n} pax`
+                            }
+                          />
+                        </div>
+                        {n === 10 ? (
+                          <div className="pricing-edit-group-total" title={`${openRate} × ${openPax}`}>
+                            × {openPax} = ${groupTotal.toLocaleString('en-US')}
+                          </div>
+                        ) : null}
                       </td>
                     ))}
                   </tr>

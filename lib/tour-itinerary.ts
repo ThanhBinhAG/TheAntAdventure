@@ -59,7 +59,7 @@ function buildTimedDayGroups(products: Product[]): ItineraryDay[] {
   let dayNum = 1;
   let halfDayBuffer: Product | null = null;
 
-  products.forEach((p) => {
+  for (const p of products) {
     const dur = parseDuration(p.dur);
     if (dur >= 2) {
       if (halfDayBuffer) {
@@ -94,7 +94,7 @@ function buildTimedDayGroups(products: Product[]): ItineraryDay[] {
       }
       days.push({ n: dayNum++, items: [p], label: p.dest || '' });
     }
-  });
+  }
 
   if (halfDayBuffer) {
     days.push({ n: dayNum++, items: [halfDayBuffer], label: halfDayBuffer.dest || '' });

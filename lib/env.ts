@@ -55,6 +55,27 @@ export function getWeatherCronSecret() {
   return (process.env.WEATHER_CRON_SECRET ?? '').trim();
 }
 
+/** Server-only — break-glass username (not an email; never expose to client) */
+export function getBreakGlassUsername() {
+  return (process.env.BREAK_GLASS_USERNAME ?? '').trim();
+}
+
+/** Server-only — break-glass password */
+export function getBreakGlassPassword() {
+  return (process.env.BREAK_GLASS_PASSWORD ?? '').trim();
+}
+
+/** Server-only — HMAC secret for bg_session cookie */
+export function getBreakGlassSessionSecret() {
+  return (process.env.BREAK_GLASS_SESSION_SECRET ?? '').trim();
+}
+
+export function isBreakGlassConfigured() {
+  return Boolean(
+    getBreakGlassUsername() && getBreakGlassPassword() && getBreakGlassSessionSecret(),
+  );
+}
+
 /** Server-only — base URL for absolute asset links in PDF generation */
 export function getAppUrl() {
   return (process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3006').trim();

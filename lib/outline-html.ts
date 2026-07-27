@@ -1,4 +1,4 @@
-/** Shared palette — matches Material/OUTLINE TO SEND TO GUESTS.pdf */
+/** Shared palette — matches Personal/Material/OUTLINE TO SEND TO GUESTS.pdf */
 export const OUTLINE_HEADER_BG = '#00CCFF';
 export const OUTLINE_BORDER = '#BFBFBF';
 export const OUTLINE_TEXT = '#000000';

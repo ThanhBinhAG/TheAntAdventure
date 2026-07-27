@@ -6,6 +6,8 @@ import { fmt } from '@/lib/constants';
 import { getCustomerName } from '@/lib/crm-utils';
 import { parseMoneyInput } from '@/lib/money';
 import { useStore } from '@/hooks/useStore';
+import { usePagination } from '@/hooks/usePagination';
+import PaginationBar from '@/components/PaginationBar';
 import type { Booking } from '@/lib/types';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -97,6 +99,9 @@ export default function Bookings() {
       }),
     [bookings, customers, search, statusF, monthF]
   );
+
+  const pagination = usePagination(filtered, undefined, [search, statusF, monthF]);
+  const { paginatedItems } = pagination;
 
   const saveNewBooking = () => {
     if (!newBk.custId || !newBk.tour) {
@@ -226,7 +231,7 @@ export default function Bookings() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((b) => {
+              {paginatedItems.map((b) => {
                 const bal = b.total - b.deposit;
                 const isOnTour = b.status === 'On Tour';
                 const changes = (b.changes as BookingChange[]) || [];
@@ -273,6 +278,7 @@ export default function Bookings() {
               })}
             </tbody>
           </table>
+          <PaginationBar {...pagination} />
         </div>
       </div>
 

@@ -22,7 +22,7 @@ export default function PhotoStack({ photos, productCode, height = 105, classNam
       {photos.map((p, i) => {
         const img = (
           <img
-            src={p.url}
+            src={p.thumbUrl || p.url}
             alt={p.caption || 'Experience photo'}
             loading="lazy"
             style={{ width: '100%', height, objectFit: 'cover', display: 'block' }}

@@ -4,7 +4,7 @@ import { waitForImages } from '../lib/print-window';
 
 describe('print-window', () => {
   it('waitForImages resolves immediately when no images', async () => {
-    const doc = { images: [] as HTMLImageElement[] } as Document;
+    const doc = { images: [] as HTMLImageElement[] } as unknown as Document;
     await assert.doesNotReject(() => waitForImages(doc));
   });
 

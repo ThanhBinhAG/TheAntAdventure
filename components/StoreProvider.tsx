@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AutoSyncListener } from '@/components/AutoSyncListener';
+import { appLog } from '@/lib/system/app-logger';
 import {
   getAutoSyncState,
   subscribeAutoSync,
@@ -87,7 +88,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const status = await quickSupabasePing();
         if (!cancelled) setConn(status);
       } catch (e) {
-        console.warn('[CRM] Supabase background init failed:', e);
+        appLog('store-provider', 'Supabase background init failed', { level: 'warn', error: e });
         if (!cancelled) {
           setConn({
             ok: false,

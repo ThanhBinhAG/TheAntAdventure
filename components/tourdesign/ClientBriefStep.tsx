@@ -1,12 +1,14 @@
 'use client';
 
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { AGENT_DATALIST, SALES_PEOPLE } from '@/lib/customer-form';
 import { buildBriefSummaryHtml } from '@/lib/tour-brief-summary';
 import type { TourBrief } from '@/lib/tour-design-types';
 import type { Customer } from '@/lib/types';
 
 const CHILD_TAGS = ['Infant 0-2', 'Toddler 3-5', 'Child 6-9', 'Pre-teen 10-12', 'Teen 13-17'];
+const PAX_PRESETS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+const CUSTOM_PAX_VALUE = 'custom';
 
 const REGIONS = [
   { id: 'north', label: 'Northern Vietnam' },
@@ -62,6 +64,39 @@ export default function ClientBriefStep({
   const custName = customers.find((c) => c.id === custId)?.name;
   const summary = buildBriefSummaryHtml(brief, clientType, custName);
   const showChildren = brief.children > 0;
+  const isCustomPax = brief.pax > 10;
+  const [paxMode, setPaxMode] = useState<'preset' | 'custom'>(isCustomPax ? 'custom' : 'preset');
+  const [customPaxInput, setCustomPaxInput] = useState(String(isCustomPax ? brief.pax : 12));
+
+  useEffect(() => {
+    if (brief.pax > 10) {
+      setPaxMode('custom');
+      setCustomPaxInput(String(brief.pax));
+    } else {
+      setPaxMode('preset');
+    }
+  }, [brief.pax]);
+
+  function setPax(n: number) {
+    setBrief((b) => ({ ...b, pax: n, adults: n }));
+  }
+
+  function handlePaxSelect(value: string) {
+    if (value === CUSTOM_PAX_VALUE) {
+      const n = Math.max(11, Number(customPaxInput) || 12);
+      setCustomPaxInput(String(n));
+      setPax(n);
+      return;
+    }
+    setPax(Number(value));
+  }
+
+  function handleCustomPaxChange(raw: string) {
+    setCustomPaxInput(raw);
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 11) return;
+    setPax(Math.floor(n));
+  }
 
   function addChildTag(tag: string) {
     setBrief((b) => ({
@@ -121,14 +156,43 @@ export default function ClientBriefStep({
           )}
           <div className="fg">
             <label className="lbl">Number of Guests</label>
-            <select value={brief.pax} onChange={(e) => setBrief({ ...brief, pax: +e.target.value, adults: +e.target.value })}>
-              {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                  {n === 12 ? '+' : ''}
-                </option>
-              ))}
-            </select>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <select
+                style={{ flex: 1 }}
+                value={paxMode === 'custom' ? CUSTOM_PAX_VALUE : String(brief.pax)}
+                onChange={(e) => handlePaxSelect(e.target.value)}
+                aria-label="Number of guests"
+              >
+                {PAX_PRESETS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+                <option value={CUSTOM_PAX_VALUE}>Custom (11+)</option>
+              </select>
+              {paxMode === 'custom' && (
+                <input
+                  type="number"
+                  min={11}
+                  step={1}
+                  value={customPaxInput}
+                  onChange={(e) => handleCustomPaxChange(e.target.value)}
+                  onBlur={() => {
+                    const n = Math.max(11, Math.floor(Number(customPaxInput) || 11));
+                    setCustomPaxInput(String(n));
+                    setPax(n);
+                  }}
+                  style={{ width: 88 }}
+                  aria-label="Custom guest count"
+                  title="Groups of 11+ use the catalog 10+ rate per guest"
+                />
+              )}
+            </div>
+            {paxMode === 'custom' && (
+              <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>
+                Uses catalog 10+ rate × {brief.pax} guests
+              </div>
+            )}
           </div>
           <div className="fg">
             <label className="lbl">Travel Style</label>

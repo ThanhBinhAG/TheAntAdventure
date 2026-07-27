@@ -1,5 +1,6 @@
 import type { Product } from '@/lib/types';
 import type { GalleryPhoto } from '@/lib/tour-design-types';
+import { photoDisplayUrl, photoThumbUrl, photosForProductSlots } from '@/lib/gallery-helpers';
 
 export const VPHOTO: Record<string, string[]> = {
   hanoi: [
@@ -75,7 +76,7 @@ export const VPHOTO: Record<string, string[]> = {
   ],
 };
 
-export type ResolvedPhoto = { url: string; caption?: string; photoId?: string };
+export type ResolvedPhoto = { url: string; thumbUrl?: string; caption?: string; photoId?: string };
 
 function destinationKey(product: Pick<Product, 'dest' | 'name' | 'region'>): string {
   const d = (product.dest || '').toLowerCase();
@@ -133,10 +134,12 @@ export function resolveProductPhotos(
   count = 2,
   dayN = 0
 ): ResolvedPhoto[] {
-  const linked = allPhotos.filter((p) => p.product === product.code && p.url);
+  const { slot1, slot2, pool } = photosForProductSlots(allPhotos, product.code);
+  const ordered: GalleryPhoto[] = [slot1, slot2, ...pool].filter((p): p is GalleryPhoto => Boolean(p));
   const fallback = getDestinationPhotoPool(product, dayN);
-  const result: ResolvedPhoto[] = linked.slice(0, count).map((p) => ({
-    url: p.url!,
+  const result: ResolvedPhoto[] = ordered.slice(0, count).map((p) => ({
+    url: photoDisplayUrl(p)!,
+    thumbUrl: photoThumbUrl(p),
     caption: p.caption,
     photoId: p.id,
   }));
@@ -148,4 +151,59 @@ export function resolveProductPhotos(
     }
   }
   return result.slice(0, count);
+}
+
+function dayMatchScore(text: string, keywords: string[]): number {
+  const lower = text.toLowerCase();
+  return keywords.reduce((score, keyword) => (lower.includes(keyword) ? score + 1 : score), 0);
+}
+
+function dayKeywords(dayTitle: string, hotelStr: string): string[] {
+  return `${dayTitle} ${hotelStr}`
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 4);
+}
+
+/** Package preview: prefer gallery photos in package region, then picsum fallback. */
+export function resolvePackageDayPhotos(
+  dayTitle: string,
+  pkgTag: string,
+  hotelStr: string,
+  allPhotos: GalleryPhoto[],
+  dayN: number,
+  count: number
+): ResolvedPhoto[] {
+  const keywords = dayKeywords(dayTitle, hotelStr);
+  const region = pkgTag === 'full' ? '' : pkgTag;
+  const candidates = allPhotos
+    .filter((p) => photoDisplayUrl(p) && (!region || p.region === region))
+    .map((p) => {
+      const haystack = `${p.caption} ${(p.tags || []).join(' ')} ${p.product || ''}`;
+      return { p, score: dayMatchScore(haystack, keywords) };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const picked: ResolvedPhoto[] = [];
+  for (const { p } of candidates) {
+    const url = photoDisplayUrl(p)!;
+    if (picked.some((r) => r.url === url)) continue;
+    picked.push({
+      url,
+      thumbUrl: photoThumbUrl(p),
+      caption: p.caption,
+      photoId: p.id,
+    });
+    if (picked.length >= count) break;
+  }
+
+  if (picked.length < count) {
+    const fallbackUrls = getDayPhotos(dayTitle, pkgTag, hotelStr, dayN, count - picked.length);
+    for (const url of fallbackUrls) {
+      if (!picked.some((r) => r.url === url)) picked.push({ url });
+      if (picked.length >= count) break;
+    }
+  }
+
+  return picked.slice(0, count);
 }

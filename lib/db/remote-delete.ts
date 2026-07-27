@@ -1,4 +1,5 @@
 import { isRemoteDataEnabled, isSupabaseReadOnly } from '../env';
+import { appLog } from '../system/app-logger';
 import { db } from './supabase';
 
 /** Explicit remote delete when user removes a product in the UI. */
@@ -9,7 +10,11 @@ export async function deleteProductFromRemote(code: string): Promise<void> {
     await db.product_pricing.deleteRemote(code);
     await db.products.deleteRemote(code);
   } catch (e) {
-    console.warn('[CRM] Failed to delete product from Supabase:', code, e);
+    appLog('remote-delete', 'Failed to delete product from Supabase', {
+      level: 'warn',
+      error: e,
+      meta: { code },
+    });
   }
 }
 
@@ -20,6 +25,27 @@ export async function deleteProductPricingFromRemote(productCode: string): Promi
   try {
     await db.product_pricing.deleteRemote(productCode);
   } catch (e) {
-    console.warn('[CRM] Failed to delete product_pricing from Supabase:', productCode, e);
+    appLog('remote-delete', 'Failed to delete product_pricing from Supabase', {
+      level: 'warn',
+      error: e,
+      meta: { productCode },
+    });
+  }
+}
+
+/** Delete gallery photos linked to a product code (by photo id). */
+export async function deletePhotosFromRemote(photoIds: string[]): Promise<void> {
+  if (!isRemoteDataEnabled() || isSupabaseReadOnly() || !photoIds.length) return;
+
+  for (const id of photoIds) {
+    try {
+      await db.photos.deleteRemote(id);
+    } catch (e) {
+      appLog('remote-delete', 'Failed to delete photo from Supabase', {
+        level: 'warn',
+        error: e,
+        meta: { id },
+      });
+    }
   }
 }

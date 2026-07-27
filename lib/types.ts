@@ -118,6 +118,8 @@ export interface BookingItineraryDay {
 export interface Booking {
   id: string;
   custId: string;
+  /** Pipeline lead that created this booking (Confirmed auto-bridge). */
+  leadId?: string;
   tour: string;
   pax: number;
   start: string;
@@ -144,6 +146,29 @@ export interface Agent {
   currency: string;
   status: string;
   notes: string;
+}
+
+export interface Attraction {
+  id: string;
+  region: 'north' | 'central' | 'south';
+  type: string;
+  name: string;
+  dest: string;
+  hours: string;
+  closed: string;
+  admission: string;
+  duration: number;
+  best_time: string;
+  crowd: string;
+  book_req: boolean;
+  seasonal: string;
+  notes: string;
+  alert: string;
+  phone: string;
+  /** Up to 4 featured photos shown on the attraction schedule card */
+  photoIds: string[];
+  /** Full photo pool linked from Photo Gallery (unlimited) */
+  linkedPhotoIds: string[];
 }
 
 export interface Guide {
@@ -179,6 +204,8 @@ export interface Product {
   lvl: string;
   desc: string;
   usp: string;
+  /** Staff-only sales bullets from portfolio; not for client proposals. */
+  notesToSales?: string;
   price: string;
   region: string;
   nameVn?: string;
@@ -259,6 +286,7 @@ export interface BackupData {
   leads: Lead[];
   bookings: Booking[];
   agents: Agent[];
+  attractions: Attraction[];
   guides: Guide[];
   products: Product[];
   productPricing: ProductPricing[];
@@ -393,6 +421,8 @@ export type PageSlug =
   | 'products'
   | 'gallery'
   | 'pricing'
+  | 'pricing-essentials'
+  | 'pricing-accommodation'
   | 'bookings'
   | 'contracts'
   | 'suppliers'

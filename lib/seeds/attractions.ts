@@ -167,4 +167,4 @@ export const ATTRACTION_DATA = [
    seasonal:'Accessible year-round by plane; sea rough Jun–Sep',notes:'Harrowing colonial-era prison complex. Very moving. Revolutionary cemetery also worth visiting. Context essential.',alert:'OPEN DAILY · EMOTIONALLY INTENSE'}
 ];
 
-export type Attraction = (typeof ATTRACTION_DATA)[number];
+export type AttractionSeed = (typeof ATTRACTION_DATA)[number];

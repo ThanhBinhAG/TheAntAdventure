@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useMemo } from 'react';
-import { NAV_SECTIONS } from '@/lib/constants';
+import { useEffect, useMemo, useState } from 'react';
+import { NAV_SECTIONS, type NavItem } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
 import { countActiveTasks } from '@/lib/planner-task-utils';
@@ -30,6 +30,26 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     () => countTourDesignAttention(leads, tourDrafts),
     [leads, tourDrafts]
   );
+
+  const groupPages = useMemo(
+    () =>
+      new Set(
+        NAV_SECTIONS.flatMap((s) => s.items)
+          .filter((i) => i.children?.length)
+          .flatMap((i) => i.children!.map((c) => c.page))
+      ),
+    []
+  );
+  const [openGroup, setOpenGroup] = useState<PageSlug | null>(null);
+
+  // Keep the group holding the active page open across navigations.
+  useEffect(() => {
+    if (!groupPages.has(current)) return;
+    const owner = NAV_SECTIONS.flatMap((s) => s.items).find((i) =>
+      i.children?.some((c) => c.page === current)
+    );
+    if (owner) setOpenGroup(owner.page);
+  }, [current, groupPages]);
 
   const chatUnread = useMemo(() => {
     let count = 0;
@@ -80,7 +100,19 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         {NAV_SECTIONS.map((section) => (
           <div key={section.en}>
             <div className="sb-sec">{language === 'vi' ? section.vi : section.en}</div>
-            {section.items.map((item) => (
+            {section.items.map((item) =>
+              item.children?.length ? (
+                <NavGroup
+                  key={item.page}
+                  item={item}
+                  current={current}
+                  open={openGroup === item.page}
+                  label={t(item.en, item.vi)}
+                  onToggle={() => setOpenGroup((prev) => (prev === item.page ? null : item.page))}
+                  onNavigate={onClose}
+                  translate={t}
+                />
+              ) : (
               <Link
                 key={item.page}
                 href={`/${item.page}`}
@@ -102,10 +134,60 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                   <span className="sb-chat-badge">{chatUnread}</span>
                 )}
               </Link>
-            ))}
+              )
+            )}
           </div>
         ))}
       </div>
     </>
+  );
+}
+
+interface NavGroupProps {
+  item: NavItem;
+  current: PageSlug;
+  open: boolean;
+  label: string;
+  onToggle: () => void;
+  onNavigate: () => void;
+  translate: (en: string, vi: string) => string;
+}
+
+function NavGroup({ item, current, open, label, onToggle, onNavigate, translate }: NavGroupProps) {
+  const children = item.children ?? [];
+  const activeChild = children.find((c) => c.page === current);
+
+  return (
+    <div className={`sb-group${open ? ' open' : ''}`}>
+      <button
+        type="button"
+        className={`sbi sb-group-head${activeChild ? ' on' : ''}`}
+        onClick={onToggle}
+        aria-expanded={open}
+        title={label}
+      >
+        <span className="sb-icon">{item.icon}</span>
+        <span className="sb-label">{label}</span>
+        <span className={`sb-caret${open ? ' open' : ''}`}>▸</span>
+      </button>
+
+      {open && (
+        <div className="sb-subnav">
+          {children.map((child) => (
+            <Link
+              key={child.page}
+              href={`/${child.page}`}
+              className={`sbi sb-subitem${current === child.page ? ' on' : ''}`}
+              title={translate(child.en, child.vi)}
+              onClick={onNavigate}
+            >
+              <span className="sb-icon sb-subicon">{child.icon}</span>
+              <span className="sb-label">{translate(child.en, child.vi)}</span>
+              {child.badge && child.badgeType === 'new' && <span className="sb-new">{child.badge}</span>}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

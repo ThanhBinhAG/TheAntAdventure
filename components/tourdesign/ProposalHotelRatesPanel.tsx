@@ -5,13 +5,23 @@ import type { ProposalHotelRate } from '@/lib/proposal-types';
 interface Props {
   rates: ProposalHotelRate[];
   onChange: (rates: ProposalHotelRate[]) => void;
+  title: string;
+  /** When true, hotel name is editable (Option B). */
+  editableHotelName?: boolean;
+  emptyHint?: string;
 }
 
-export default function ProposalHotelRatesPanel({ rates, onChange }: Props) {
+export default function ProposalHotelRatesPanel({
+  rates,
+  onChange,
+  title,
+  editableHotelName = false,
+  emptyHint = 'No hotels detected from outline. Add hotel names in the Outline step to enable B2B hotel pricing.',
+}: Props) {
   if (!rates.length) {
     return (
       <div style={{ fontSize: 12, color: 'var(--m)', padding: '10px 0' }}>
-        No hotels detected from outline. Add hotel names in the Outline step to enable B2B hotel pricing.
+        {emptyHint}
       </div>
     );
   }
@@ -23,10 +33,8 @@ export default function ProposalHotelRatesPanel({ rates, onChange }: Props) {
   }
 
   return (
-    <div className="td-proposal-hotels">
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--gd)', marginBottom: 8 }}>
-        B2B Hotel Rates (Section C) — enter net rate per night
-      </div>
+    <div className="td-proposal-hotels" style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--gd)', marginBottom: 8 }}>{title}</div>
       <div style={{ overflowX: 'auto' }}>
         <table className="tbl" style={{ fontSize: 11.5 }}>
           <thead>
@@ -43,8 +51,23 @@ export default function ProposalHotelRatesPanel({ rates, onChange }: Props) {
             {rates.map((h) => (
               <tr key={h.id}>
                 <td>
-                  <div style={{ fontWeight: 600 }}>{h.hotelName}</div>
-                  <div style={{ fontSize: 10.5, color: 'var(--m)' }}>{h.location}</div>
+                  {editableHotelName ? (
+                    <>
+                      <input
+                        className="inp-sm"
+                        value={h.hotelName}
+                        onChange={(e) => update(h.id, { hotelName: e.target.value })}
+                        placeholder="5★ hotel name"
+                        style={{ width: '100%', minWidth: 140, fontWeight: 600 }}
+                      />
+                      <div style={{ fontSize: 10.5, color: 'var(--m)', marginTop: 2 }}>{h.location}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontWeight: 600 }}>{h.hotelName}</div>
+                      <div style={{ fontSize: 10.5, color: 'var(--m)' }}>{h.location}</div>
+                    </>
+                  )}
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {h.stayFrom} – {h.stayTo}

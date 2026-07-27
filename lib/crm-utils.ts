@@ -1,4 +1,4 @@
-import type { Customer, Lead } from './types';
+import type { Booking, Customer, Lead } from './types';
 import { STAGE_ORDER } from './constants';
 
 export interface GetClientLeadsOptions {
@@ -23,6 +23,20 @@ export function getClientLeads(
       if (stageDiff !== 0) return stageDiff;
       return a.id.localeCompare(b.id);
     });
+}
+
+/** Prefer bookings.cust_id; also include legacy customer.bookings[] IDs. */
+export function getCustomerBookings(
+  customer: Pick<Customer, 'id' | 'bookings'>,
+  bookings: Booking[]
+): Booking[] {
+  const byCust = bookings.filter((b) => b.custId === customer.id);
+  const seen = new Set(byCust.map((b) => b.id));
+  const legacyIds = customer.bookings ?? [];
+  const legacy = legacyIds
+    .map((id) => bookings.find((b) => b.id === id))
+    .filter((b): b is Booking => b != null && !seen.has(b.id));
+  return [...byCust, ...legacy];
 }
 
 export function customerMatchesSearch(customer: Customer, query: string): boolean {

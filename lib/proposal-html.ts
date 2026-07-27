@@ -6,7 +6,6 @@ import {
   PROPOSAL_B2B_FOOTER_NOTE,
   PROPOSAL_CANCELLATION_POLICY,
   PROPOSAL_FLIGHT_NOTE,
-  PROPOSAL_FOOTER,
   PROPOSAL_IMPORTANT_NOTES,
   PROPOSAL_PAYMENT_TERMS,
   PROPOSAL_TAGLINE_B2C,
@@ -16,6 +15,13 @@ const BRAND = '#2E7D52';
 const BRAND_DARK = '#1a5c38';
 const MUTED = '#6B7F74';
 const BORDER = '#E2E8E4';
+const EXCL_HEADER = '#545454';
+const FLIGHTS_HEADER = '#4A6FA5';
+const HOTELS_B_HEADER = '#8B6913';
+const ROW_ALT = '#F6F6F6';
+const ROW_GREEN = '#ECF6F0';
+const ROW_GREEN_ALT = '#D5E9D9';
+const ROW_BLUE = '#E7ECF5';
 
 function esc(s: string): string {
   return s
@@ -146,47 +152,112 @@ function buildBriefItinerary(doc: ProposalDoc): string {
     )
     .join('');
 
-  return `${sectionTitle('Brief Itinerary')}
+  return `${sectionTitle('Brief Itinerary at a Glance')}
   <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
     <thead><tr>${thCell('Day', 'center')}${thCell('Date')}${thCell('Destination')}${thCell('Theme')}${thCell('Hotel (4★)')}</tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
 
+function buildDayPhotoSidebar(d: import('./proposal-types').ProposalDayDetail): string {
+  const urls = (d.imageUrls || []).slice(0, 2);
+  if (!urls.length) {
+    return `<td style="width:28%;vertical-align:top;background:#E8F5EE;border-left:1px solid ${BORDER};padding:12px 10px;text-align:center">
+      <div style="font-weight:700;font-size:12px;color:${BRAND_DARK}">Day ${d.dayNumber}</div>
+    </td>`;
+  }
+  const imgs = urls
+    .map(
+      (url) =>
+        `<img src="${esc(url)}" alt="" style="width:100%;height:auto;max-height:118px;object-fit:cover;border-radius:2px;display:block;margin:0 0 8px" />`
+    )
+    .join('');
+  return `<td style="width:28%;vertical-align:top;background:#E8F5EE;border-left:1px solid ${BORDER};padding:12px 10px 6px;text-align:center">
+      <div style="font-weight:700;font-size:12px;color:${BRAND_DARK};margin-bottom:8px">Day ${d.dayNumber}</div>
+      ${imgs}
+    </td>`;
+}
+
+function buildDayPhotoInline(d: import('./proposal-types').ProposalDayDetail): string {
+  const urls = (d.imageUrls || []).slice(0, 2);
+  if (!urls.length) return '';
+  const images = urls
+    .map(
+      (url) =>
+        `<img src="${esc(url)}" alt="" style="width:100%;height:140px;object-fit:cover;border-radius:4px;display:block" />`
+    )
+    .join('');
+  return `<div style="display:grid;grid-template-columns:repeat(${urls.length},1fr);gap:8px;margin:10px 0 4px">${images}</div>`;
+}
+
 function buildDetailedProgram(doc: ProposalDoc): string {
   if (!doc.days.length) return '';
+  const layout = doc.detailedProgramLayout === 'inline' ? 'inline' : 'sidebar';
+
   const blocks = doc.days
-    .map(
-      (d) => `
-    <div style="page-break-inside:avoid;margin-bottom:18px;border-bottom:1px solid ${BORDER};padding-bottom:14px">
-      <div style="font-weight:700;font-size:13px;color:${BRAND_DARK};margin-bottom:6px">DAY ${d.dayNumber} | ${esc(d.dateLabel)} | ${esc(d.destination)}</div>
-      <div style="font-weight:600;font-size:12px;margin-bottom:8px;color:#1a2e23">${esc(d.title)}</div>
-      <div style="font-size:11.5px;line-height:1.65;color:#1a2e23;white-space:pre-wrap">${esc(d.body)}</div>
-      <div style="margin-top:8px;font-size:11px;color:${MUTED}"><b>Hotel:</b> ${esc(d.hotel)}</div>
-      <div style="font-size:11px;color:${MUTED}"><b>Meals:</b> ${esc(d.meals)}</div>
-    </div>`
-    )
+    .map((d) => {
+      const header = `<div style="font-weight:700;font-size:13px;color:${BRAND_DARK};margin-bottom:6px">DAY ${d.dayNumber} | ${esc(d.dateLabel)} | ${esc(d.destination)}</div>`;
+      const title = `<div style="font-weight:600;font-size:12px;margin-bottom:8px;color:${BRAND_DARK}">${esc(d.title)}</div>`;
+      const body = `<div style="font-size:11.5px;line-height:1.65;color:#1a2e23;white-space:pre-wrap">${esc(d.body)}</div>`;
+      const meta = `<div style="margin-top:10px;font-size:11px;color:#1a2e23"><b style="color:${BRAND_DARK}">Hotel:</b> ${esc(d.hotel)}</div>
+      <div style="font-size:11px;color:#1a2e23"><b style="color:${BRAND_DARK}">Meals:</b> ${esc(d.meals)}</div>`;
+
+      if (layout === 'inline') {
+        return `
+    <div style="page-break-inside:avoid;margin-bottom:14px;border:1px solid ${BORDER};border-radius:4px;padding:14px 14px 12px;background:#fff">
+      ${header}
+      ${title}
+      ${body}
+      ${buildDayPhotoInline(d)}
+      ${meta}
+    </div>`;
+      }
+
+      const photoCol = buildDayPhotoSidebar(d);
+      return `
+    <div style="page-break-inside:avoid;margin-bottom:14px;border:1px solid ${BORDER};border-radius:4px;overflow:hidden;background:#fff">
+      <table style="width:100%;border-collapse:collapse">
+        <tr>
+          <td style="width:72%;vertical-align:top;padding:14px 14px 12px">
+            ${header}
+            ${title}
+            ${body}
+            ${meta}
+          </td>
+          ${photoCol}
+        </tr>
+      </table>
+    </div>`;
+    })
     .join('');
 
   return `${sectionTitle('Detailed Program')}${blocks}`;
 }
 
 function buildInclusions(doc: ProposalDoc): string {
-  const incl = doc.inclusions.map((l) => `<tr><td style="padding:5px 8px;border-bottom:1px solid ${BORDER};color:${BRAND};width:24px">✓</td><td style="padding:5px 8px;border-bottom:1px solid ${BORDER}">${esc(l)}</td></tr>`).join('');
-  const excl = doc.exclusions.map((l) => `<tr><td style="padding:5px 8px;border-bottom:1px solid ${BORDER};color:#c0392b;width:24px">✗</td><td style="padding:5px 8px;border-bottom:1px solid ${BORDER}">${esc(l)}</td></tr>`).join('');
+  const max = Math.max(doc.inclusions.length, doc.exclusions.length);
+  const rows: string[] = [];
+  for (let i = 0; i < max; i++) {
+    const incl = doc.inclusions[i];
+    const excl = doc.exclusions[i];
+    const bg = i % 2 ? ROW_ALT : '#fff';
+    rows.push(`<tr>
+      <td style="padding:7px 10px;border:1px solid ${BORDER};background:${bg};width:24px;color:${BRAND};font-weight:700;vertical-align:top">${incl ? '✓' : ''}</td>
+      <td style="padding:7px 10px;border:1px solid ${BORDER};background:${bg};font-size:11px;vertical-align:top;width:46%">${incl ? esc(incl) : ''}</td>
+      <td style="padding:7px 10px;border:1px solid ${BORDER};background:${ROW_GREEN};width:24px;color:#c0392b;font-weight:700;vertical-align:top">${excl ? '✗' : ''}</td>
+      <td style="padding:7px 10px;border:1px solid ${BORDER};background:${ROW_GREEN};font-size:11px;vertical-align:top">${excl ? esc(excl) : ''}</td>
+    </tr>`);
+  }
 
   return `${sectionTitle('Inclusions &amp; Exclusions')}
-  <table style="width:100%;border-collapse:collapse">
-    <tr>
-      <td style="width:50%;vertical-align:top;padding-right:12px">
-        <div style="font-weight:700;font-size:11px;margin-bottom:6px;color:${BRAND_DARK}">INCLUSIONS</div>
-        <table style="width:100%">${incl}</table>
-      </td>
-      <td style="width:50%;vertical-align:top;padding-left:12px">
-        <div style="font-weight:700;font-size:11px;margin-bottom:6px;color:${BRAND_DARK}">EXCLUSIONS</div>
-        <table style="width:100%">${excl}</table>
-      </td>
-    </tr>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
+    <thead>
+      <tr>
+        <th colspan="2" style="padding:8px 10px;border:1px solid ${BORDER};background:${BRAND};color:#fff;font-size:11px;font-weight:700;text-align:left;letter-spacing:0.4px">INCLUSIONS</th>
+        <th colspan="2" style="padding:8px 10px;border:1px solid ${BORDER};background:${EXCL_HEADER};color:#fff;font-size:11px;font-weight:700;text-align:left;letter-spacing:0.4px">EXCLUSIONS</th>
+      </tr>
+    </thead>
+    <tbody>${rows.join('')}</tbody>
   </table>`;
 }
 
@@ -198,91 +269,125 @@ function buildB2CPricing(doc: ProposalDoc): string {
   <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
     <thead><tr>${thCell('Package')}${thCell('Per Person (USD)', 'right')}${thCell(`Total ${p.pax} Pax (USD)`, 'right')}</tr></thead>
     <tbody>
-      <tr style="background:#F7F8F6">
+      <tr style="background:${ROW_GREEN_ALT}">
         ${tdCell(`<b>${esc(p.packageLabel)}</b><br><span style="font-size:10.5px;color:${MUTED}">${esc(doc.accommodationOptionA)} · Private Touring · Domestic Flights · All Taxes Included</span>`)}
-        ${tdCell(`$${fmt(p.perPerson)}`, { align: 'right', bold: true })}
-        ${tdCell(`$${fmt(p.groupTotal)}`, { align: 'right', bold: true })}
+        ${tdCell(`$${fmt(p.perPerson)}`, { align: 'right', bold: true, bg: ROW_GREEN_ALT })}
+        ${tdCell(`$${fmt(p.groupTotal)}`, { align: 'right', bold: true, bg: ROW_GREEN_ALT })}
       </tr>
     </tbody>
   </table>
   <div style="font-size:10.5px;color:${MUTED};font-style:italic">All prices are quoted in USD and include applicable taxes. Rates are valid for the travel dates specified and subject to availability at time of booking confirmation.</div>`;
 }
 
+function thCellColored(text: string, bg: string, align: 'left' | 'right' | 'center' = 'left'): string {
+  return `<th style="padding:7px 10px;border:1px solid ${BORDER};text-align:${align};font-weight:700;font-size:11px;background:${bg};color:#fff">${esc(text)}</th>`;
+}
+
+function buildHotelRatesTable(
+  rates: import('./proposal-types').ProposalHotelRate[],
+  total: number,
+  emptyHint: string,
+  headerBg = BRAND
+): string {
+  const hotelRows = rates
+    .map(
+      (h, i) =>
+        `<tr style="background:${i % 2 ? ROW_ALT : '#fff'}"><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(h.hotelName || 'TBC')}</td><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(h.location)}</td><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(h.stayFrom)} – ${esc(h.stayTo)}</td><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(h.roomType)}</td><td style="padding:6px 10px;border:1px solid ${BORDER};text-align:center">${h.nights}</td><td style="padding:6px 10px;border:1px solid ${BORDER};text-align:right">$${fmt(h.ratePerNight)}</td><td style="padding:6px 10px;border:1px solid ${BORDER};text-align:right"><b>$${fmt(h.ratePerNight * h.nights)}</b></td></tr>`
+    )
+    .join('');
+
+  return `<table style="width:100%;border-collapse:collapse;margin-bottom:8px;font-size:11px">
+    <thead><tr>${thCellColored('Hotel', headerBg)}${thCellColored('Location', headerBg)}${thCellColored('Stay', headerBg)}${thCellColored('Room Type', headerBg)}${thCellColored('Nts', headerBg, 'center')}${thCellColored('Price/Night', headerBg, 'right')}${thCellColored('Total (USD)', headerBg, 'right')}</tr></thead>
+    <tbody>${hotelRows || `<tr><td colspan="7" style="padding:10px;color:${MUTED}">${esc(emptyHint)}</td></tr>`}</tbody>
+    <tfoot><tr style="background:${ROW_GREEN}"><td colspan="6" style="padding:7px 10px;border:1px solid ${BORDER};font-weight:700">TOTAL HOTELS</td><td style="padding:7px 10px;border:1px solid ${BORDER};text-align:right;font-weight:700">$${fmt(total)}</td></tr></tfoot>
+  </table>`;
+}
+
 function buildB2BPricing(doc: ProposalDoc): string {
   if (doc.pricing.kind !== 'b2b') return '';
   const p = doc.pricing;
-  const hotelRows = p.hotelRates
-    .map(
-      (h) =>
-        `<tr><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(h.hotelName)}</td><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(h.location)}</td><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(h.stayFrom)} – ${esc(h.stayTo)}</td><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(h.roomType)}</td><td style="padding:6px 10px;border:1px solid ${BORDER};text-align:center">${h.nights}</td><td style="padding:6px 10px;border:1px solid ${BORDER};text-align:right">$${fmt(h.ratePerNight)}</td><td style="padding:6px 10px;border:1px solid ${BORDER};text-align:right"><b>$${fmt(h.ratePerNight * h.nights)}</b></td></tr>`
-    )
-    .join('');
+  const optionALabel = /4/.test(doc.accommodationOptionA)
+    ? doc.accommodationOptionA.includes('Boutique') || doc.accommodationOptionA.includes('★')
+      ? doc.accommodationOptionA
+      : '4-Star Boutique'
+    : '4-Star Boutique';
+  const optionBLabel = /5/.test(doc.accommodationOptionB)
+    ? doc.accommodationOptionB.includes('Luxury') || doc.accommodationOptionB.includes('★')
+      ? doc.accommodationOptionB
+      : '5-Star Luxury'
+    : '5-Star Luxury';
 
   return `${sectionTitle('Sample Quotation — B2B Net Rates')}
   <div style="font-size:11px;color:${MUTED};margin-bottom:10px">All prices USD · ${esc(p.seasonNote)}</div>
 
   <div style="font-weight:700;font-size:11.5px;color:${BRAND_DARK};margin:12px 0 6px">A. TOURINGS</div>
   <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
-    <thead><tr>${thCell('Service Description')}${thCell('Per Pax (USD)', 'right')}${thCell(`Total ${p.pax} Pax (USD)`, 'right')}</tr></thead>
+    <thead><tr>${thCellColored('Service Description', BRAND)}${thCellColored('Per Pax (USD)', BRAND, 'right')}${thCellColored(`Total ${p.pax} Pax (USD)`, BRAND, 'right')}</tr></thead>
     <tbody>
       <tr><td style="padding:7px 10px;border:1px solid ${BORDER}">Ground arrangements — private tour (transfers, guide, vehicle, activities &amp; entrance fees as per program)</td><td style="padding:7px 10px;border:1px solid ${BORDER};text-align:right">$${fmt(p.touringsPerPax)}</td><td style="padding:7px 10px;border:1px solid ${BORDER};text-align:right"><b>$${fmt(p.touringsTotal)}</b></td></tr>
-      <tr style="background:#E8F5EE"><td style="padding:7px 10px;border:1px solid ${BORDER};font-weight:700" colspan="2">TOTAL TOURINGS</td><td style="padding:7px 10px;border:1px solid ${BORDER};text-align:right;font-weight:700">$${fmt(p.touringsTotal)}</td></tr>
+      <tr style="background:${ROW_GREEN}"><td style="padding:7px 10px;border:1px solid ${BORDER};font-weight:700" colspan="2">TOTAL TOURINGS</td><td style="padding:7px 10px;border:1px solid ${BORDER};text-align:right;font-weight:700">$${fmt(p.touringsTotal)}</td></tr>
     </tbody>
   </table>
 
-  <div style="font-weight:700;font-size:11.5px;color:${BRAND_DARK};margin:12px 0 6px">B. DOMESTIC FLIGHTS</div>
+  <div style="font-weight:700;font-size:11.5px;color:${FLIGHTS_HEADER};margin:12px 0 6px">B. DOMESTIC FLIGHTS</div>
   <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
-    <thead><tr>${thCell('Service Description')}${thCell('Per Pax (USD)', 'right')}${thCell(`Total ${p.pax} Pax (USD)`, 'right')}</tr></thead>
+    <thead><tr>${thCellColored('Service Description', FLIGHTS_HEADER)}${thCellColored('Per Pax (USD)', FLIGHTS_HEADER, 'right')}${thCellColored(`Total ${p.pax} Pax (USD)`, FLIGHTS_HEADER, 'right')}</tr></thead>
     <tbody>
       <tr><td style="padding:7px 10px;border:1px solid ${BORDER}">Domestic flights as per program · Economy class</td><td style="padding:7px 10px;border:1px solid ${BORDER};text-align:right">$${fmt(p.flightsPerPax)}</td><td style="padding:7px 10px;border:1px solid ${BORDER};text-align:right"><b>$${fmt(p.flightsTotal)}</b></td></tr>
-      <tr style="background:#E8F5EE"><td style="padding:7px 10px;border:1px solid ${BORDER};font-weight:700" colspan="2">TOTAL FLIGHTS</td><td style="padding:7px 10px;border:1px solid ${BORDER};text-align:right;font-weight:700">$${fmt(p.flightsTotal)}</td></tr>
+      <tr style="background:${ROW_BLUE}"><td style="padding:7px 10px;border:1px solid ${BORDER};font-weight:700" colspan="2">TOTAL FLIGHTS</td><td style="padding:7px 10px;border:1px solid ${BORDER};text-align:right;font-weight:700">$${fmt(p.flightsTotal)}</td></tr>
     </tbody>
   </table>
 
-  <div style="font-weight:700;font-size:11.5px;color:${BRAND_DARK};margin:12px 0 6px">C. HOTELS — OPTION A (${esc(doc.accommodationOptionA)})</div>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:8px;font-size:11px">
-    <thead><tr>${thCell('Hotel')}${thCell('Location')}${thCell('Stay')}${thCell('Room Type')}${thCell('Nts', 'center')}${thCell('Price/Night', 'right')}${thCell('Total (USD)', 'right')}</tr></thead>
-    <tbody>${hotelRows || `<tr><td colspan="7" style="padding:10px;color:${MUTED}">Add hotel rates in the Export step.</td></tr>`}</tbody>
-    <tfoot><tr style="background:#E8F5EE"><td colspan="6" style="padding:7px 10px;border:1px solid ${BORDER};font-weight:700">TOTAL HOTELS</td><td style="padding:7px 10px;border:1px solid ${BORDER};text-align:right;font-weight:700">$${fmt(p.hotelsTotal)}</td></tr></tfoot>
-  </table>
-  <div style="font-size:10.5px;color:${MUTED};font-style:italic;margin-top:6px">${PROPOSAL_B2B_FOOTER_NOTE}</div>`;
+  <div style="font-weight:700;font-size:11.5px;color:${BRAND_DARK};margin:12px 0 6px">C. HOTELS — OPTION A (${esc(optionALabel)})</div>
+  ${buildHotelRatesTable(p.hotelRatesOptionA, p.hotelsTotalOptionA, 'Add hotel rates in the Export step.', BRAND)}
+
+  <div style="font-weight:700;font-size:11.5px;color:${HOTELS_B_HEADER};margin:12px 0 6px">C. HOTELS — OPTION B (${esc(optionBLabel)})</div>
+  ${buildHotelRatesTable(p.hotelRatesOptionB, p.hotelsTotalOptionB, 'Enter Option B (5★) hotel names and net rates in the Export step.', HOTELS_B_HEADER)}
+
+  <div style="font-size:10.5px;color:${MUTED};font-style:italic;margin-top:10px">${PROPOSAL_B2B_FOOTER_NOTE}</div>
+  <div style="margin-top:16px;text-align:center;font-size:10px;color:${MUTED}">THE ANT ADVENTURES · sales@theantadventures.com · www.theantadventures.com</div>`;
+}
+
+function kvTable(rows: [string, string][], labelWidth = '30%'): string {
+  return `<table style="width:100%;border-collapse:collapse;margin-bottom:14px">${rows
+    .map(
+      ([l, v], i) =>
+        `<tr style="background:${i % 2 ? ROW_ALT : '#fff'}"><td style="padding:7px 10px;border:1px solid ${BORDER};font-weight:700;width:${labelWidth};color:${BRAND_DARK};vertical-align:top;font-size:11px">${esc(l)}</td><td style="padding:7px 10px;border:1px solid ${BORDER};font-size:11px;vertical-align:top;line-height:1.55">${esc(v)}</td></tr>`
+    )
+    .join('')}</table>`;
 }
 
 function buildLegalSections(): string {
-  const payment = PROPOSAL_PAYMENT_TERMS.map(
-    (r) => `<tr><td style="padding:6px 10px;border:1px solid ${BORDER};font-weight:600;width:30%">${esc(r.label)}</td><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(r.detail)}</td></tr>`
-  ).join('');
-
-  const cancel = PROPOSAL_CANCELLATION_POLICY.map(
-    (r) => `<tr><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(r.notice)}</td><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(r.charge)}</td></tr>`
-  ).join('');
-
-  const amend = PROPOSAL_AMENDMENT_POLICY.map(
-    (r) => `<tr><td style="padding:6px 10px;border:1px solid ${BORDER};font-weight:600;width:34%">${esc(r.label)}</td><td style="padding:6px 10px;border:1px solid ${BORDER}">${esc(r.detail)}</td></tr>`
-  ).join('');
-
-  const notes = PROPOSAL_IMPORTANT_NOTES.map(
-    (n) => `<div style="margin-bottom:10px"><div style="font-weight:700;font-size:11.5px;color:${BRAND_DARK}">${esc(n.title)}</div><div style="font-size:11px;line-height:1.6;color:#1a2e23">${esc(n.body)}</div></div>`
-  ).join('');
+  const paymentRows: [string, string][] = PROPOSAL_PAYMENT_TERMS.map((r) => [r.label, r.detail]);
+  const cancelRows: [string, string][] = [
+    ['Notice Required', 'Notice must be submitted in writing to sales@theantadventures.com.'],
+    ...PROPOSAL_CANCELLATION_POLICY.map((r) => [r.notice, r.charge] as [string, string]),
+  ];
+  const amendRows: [string, string][] = PROPOSAL_AMENDMENT_POLICY.map((r) => [r.label, r.detail]);
+  const noteRows: [string, string][] = PROPOSAL_IMPORTANT_NOTES.map((n) => [n.title, n.body]);
 
   return `
   ${sectionTitle('Payment Terms')}
-  <table style="width:100%;border-collapse:collapse;margin-bottom:14px">${payment}</table>
+  ${kvTable(paymentRows)}
   ${sectionTitle('Cancellation Policy')}
-  <div style="font-size:11px;margin-bottom:6px">Notice must be submitted in writing to sales@theantadventures.com.</div>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:14px">
-    <thead><tr>${thCell('Notice Required')}${thCell('Charge')}</tr></thead>
-    <tbody>${cancel}</tbody>
-  </table>
+  ${kvTable(cancelRows, '34%')}
   ${sectionTitle('Amendment Policy')}
-  <table style="width:100%;border-collapse:collapse;margin-bottom:14px">${amend}</table>
+  ${kvTable(amendRows, '34%')}
   ${sectionTitle('Important Notes')}
-  ${notes}`;
+  ${kvTable(noteRows, '28%')}
+  <div style="margin-top:16px;text-align:center;font-size:10px;color:${MUTED}">THE ANT ADVENTURES · sales@theantadventures.com · www.theantadventures.com</div>`;
 }
 
 export function buildProposalHTML(doc: ProposalDoc, origin = ''): string {
-  const logoUrl = doc.logoUrl.startsWith('http') ? doc.logoUrl : `${origin.replace(/\/$/, '')}${doc.logoUrl}`;
-  const docWithLogo = { ...doc, logoUrl };
+  const base = origin.replace(/\/$/, '');
+  const logoUrl = doc.logoUrl.startsWith('http') ? doc.logoUrl : `${base}${doc.logoUrl}`;
+  const days = doc.days.map((d) => ({
+    ...d,
+    imageUrls: (d.imageUrls || []).map((url) =>
+      url.startsWith('http') || url.startsWith('data:') ? url : `${base}${url.startsWith('/') ? '' : '/'}${url}`
+    ),
+  }));
+  const docWithLogo = { ...doc, logoUrl, days };
 
   const body = [
     buildCover(docWithLogo),
@@ -299,25 +404,28 @@ export function buildProposalHTML(doc: ProposalDoc, origin = ''): string {
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>${esc(doc.quoteRef)} — ${esc(doc.tourTitle)}</title>
+<title></title>
 <style>
-  @page { size: A4; margin: 14mm 12mm 18mm; }
+  @page { size: A4; margin: 14mm 12mm 16mm; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
-  body { font-family: Calibri, 'DM Sans', Arial, Helvetica, sans-serif; font-size: 12px; color: #1a2e23; line-height: 1.5; margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: Calibri, 'DM Sans', Arial, Helvetica, sans-serif; font-size: 12px; color: #1a2e23; line-height: 1.5; }
   table { border-collapse: collapse; }
+  @media print {
+    a[href]::after { content: none !important; }
+  }
 </style>
 </head>
 <body>
-<div style="max-width:760px;margin:0 auto;padding:8px 0 24px">
+<div style="max-width:760px;margin:0 auto;padding:4px 0 8px">
 ${body}
-<div style="margin-top:28px;padding-top:12px;border-top:2px solid ${BRAND};text-align:center;font-size:10px;color:${MUTED}">${PROPOSAL_FOOTER}</div>
 </div>
 </body>
 </html>`;
 }
 
 export function printProposal(doc: ProposalDoc, origin = ''): void {
-  openPrintWindow(buildProposalHTML(doc, origin), `${doc.quoteRef} — ${doc.tourTitle}`);
+  openPrintWindow(buildProposalHTML(doc, origin), '');
 }
 
 export function downloadProposalWord(doc: ProposalDoc, origin = ''): void {

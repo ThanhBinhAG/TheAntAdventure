@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import ModulesView from '@/components/products/ModulesView';
+import PortfolioImportModal from '@/components/products/PortfolioImportModal';
 import ProductFormModal from '@/components/products/ProductFormModal';
 import ProductLibrary from '@/components/products/ProductLibrary';
 import { validateProductCodeInput } from '@/lib/product-code';
+import type { PricingStatusFilter } from '@/lib/product-pricing-helpers';
 import { useStore } from '@/hooks/useStore';
 import type { Product } from '@/lib/types';
 
@@ -12,6 +14,7 @@ type ViewTab = 'library' | 'modules';
 
 export default function Products() {
   const products = useStore((s) => s.products);
+  const productPricing = useStore((s) => s.productPricing);
   const addProduct = useStore((s) => s.addProduct);
   const updateProduct = useStore((s) => s.updateProduct);
   const deleteProduct = useStore((s) => s.deleteProduct);
@@ -26,12 +29,14 @@ export default function Products() {
   const [duration, setDuration] = useState('');
   const [category, setCategory] = useState('');
   const [destFilter, setDestFilter] = useState('');
+  const [pricingStatus, setPricingStatus] = useState<PricingStatusFilter>('');
 
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const exitPickMode = () => {
     setPickMode(false);
@@ -170,6 +175,7 @@ export default function Products() {
       {(viewTab === 'library' || (pickMode && returnTab === 'library')) && (
         <ProductLibrary
           products={products}
+          productPricing={productPricing}
           search={libSearch}
           onSearchChange={setLibSearch}
           region={region}
@@ -180,10 +186,13 @@ export default function Products() {
           onCategoryChange={setCategory}
           destFilter={destFilter}
           onDestFilterChange={setDestFilter}
+          pricingStatus={pricingStatus}
+          onPricingStatusChange={setPricingStatus}
           pickMode={pickMode}
           expandedCode={expandedCode}
           onToggleExpand={handleToggleExpand}
           onPickProduct={openFormForProduct}
+          onImportPortfolio={() => setImportOpen(true)}
         />
       )}
 
@@ -214,6 +223,17 @@ export default function Products() {
         }}
         onSave={handleSave}
         onDelete={!isNew ? handleDelete : undefined}
+      />
+
+      <PortfolioImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={(count) => {
+          alert(
+            `Imported ${count} products to Supabase.\n` +
+              'Empty pricing rows were created for each product (linked by code). Open Pricing to enter tiers later.'
+          );
+        }}
       />
     </div>
   );

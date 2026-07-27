@@ -1,13 +1,25 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import PricingEditModal from '@/components/pricing/PricingEditModal';
 import { fmt } from '@/lib/constants';
 import { useStore } from '@/hooks/useStore';
-import { buildPricingTableRows, emptyProductPricing, type PricingTableRow } from '@/lib/product-pricing-helpers';
+import {
+  buildPricingTableRows,
+  countOrphanPricing,
+  emptyProductPricing,
+  type PricingTableRow,
+} from '@/lib/product-pricing-helpers';
 import { isSelectableProduct } from '@/lib/product-display';
+import {
+  buildPricingFilterSummary,
+  downloadPricingXlsx,
+  paxColumnLabel,
+  pricingExportFilename,
+} from '@/lib/pricing-export';
+import { printPricing } from '@/lib/pricing-html';
 import {
   ICO_EMOJIS,
   ICO_KEYS,
@@ -24,6 +36,13 @@ import {
 } from '@/lib/pricing-utils';
 
 type PricingTab = 'pricelist' | 'costbuilder' | 'markup';
+
+function formatPdfDownloadError(message: string): string {
+  if (/libnspr4|libnss3|browser process|Code:\s*127|shared libraries|could not start Chromium/i.test(message)) {
+    return `${message}\n\nWSL/Linux: run \`bash scripts/setup-pdf-deps-wsl.sh\`, restart \`npm run dev\`, or use Print / Save PDF.`;
+  }
+  return message;
+}
 
 export default function Pricing() {
   const searchParams = useSearchParams();
@@ -54,6 +73,8 @@ export default function Pricing() {
 
   const [mkCost, setMkCost] = useState(500);
   const [mkPctVal, setMkPctVal] = useState(25);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   useEffect(() => {
     if (highlightCode) setSearch(highlightCode);
@@ -65,12 +86,20 @@ export default function Pricing() {
     }
   }, [highlightCode, productPricing.length, search]);
 
-  const allRows = useMemo(
-    () => buildPricingTableRows(products.filter(isSelectableProduct), productPricing),
-    [products, productPricing]
+  const selectableProducts = useMemo(
+    () => products.filter(isSelectableProduct),
+    [products]
   );
 
-  const orphanCount = allRows.filter((r) => r.orphanPricing).length;
+  const allRows = useMemo(
+    () => buildPricingTableRows(selectableProducts, productPricing),
+    [selectableProducts, productPricing]
+  );
+
+  const orphanCount = useMemo(
+    () => countOrphanPricing(selectableProducts, productPricing),
+    [selectableProducts, productPricing]
+  );
   const missingCount = allRows.filter((r) => r.missingProduct).length;
 
   const filtered = useMemo(() => {
@@ -98,6 +127,69 @@ export default function Pricing() {
     setEditRow(null);
   };
 
+  const exportOptions = useMemo(
+    () => ({
+      currency,
+      showCost,
+      filterSummary: buildPricingFilterSummary({ search, region, category, duration }),
+    }),
+    [currency, showCost, search, region, category, duration]
+  );
+
+  const handleDownloadExcel = useCallback(() => {
+    if (filtered.length === 0) {
+      alert('No products to export — adjust filters or add pricing rows.');
+      return;
+    }
+    setExportError('');
+    downloadPricingXlsx(filtered, exportOptions);
+  }, [filtered, exportOptions]);
+
+  const handlePrintPdf = useCallback(() => {
+    if (filtered.length === 0) {
+      alert('No products to export — adjust filters or add pricing rows.');
+      return;
+    }
+    setExportError('');
+    printPricing(filtered, { ...exportOptions, logoUrl: '/Logo-3.svg' }, window.location.origin);
+  }, [filtered, exportOptions]);
+
+  const handleDownloadPdf = useCallback(async () => {
+    if (filtered.length === 0) {
+      alert('No products to export — adjust filters or add pricing rows.');
+      return;
+    }
+    setPdfLoading(true);
+    setExportError('');
+    try {
+      const res = await fetch('/api/pricing/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rows: filtered,
+          currency: exportOptions.currency,
+          showCost: exportOptions.showCost,
+          filterSummary: exportOptions.filterSummary,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = pricingExportFilename(exportOptions.currency).replace('.xlsx', '.pdf');
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(formatPdfDownloadError(e instanceof Error ? e.message : 'PDF export failed.'));
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [filtered, exportOptions]);
+
   return (
     <div>
       <div className="tabs">
@@ -121,11 +213,15 @@ export default function Pricing() {
               <div className="card-body" style={{ padding: '10px 16px', fontSize: 12 }}>
                 {missingCount > 0 && (
                   <span style={{ marginRight: 16 }}>
-                    ⚠ {missingCount} product(s) without pricing — add tiers in Edit pricing.
+                    ⚠ {missingCount} product(s) without pricing — open Edit pricing to enter tiers later
+                    (imported Tour Products start empty).
                   </span>
                 )}
                 {orphanCount > 0 && (
-                  <span>⚠ {orphanCount} pricing row(s) without matching product in Tour Products.</span>
+                  <span>
+                    ⚠ {orphanCount} stale pricing row(s) with no matching Tour Product (hidden from this
+                    list).
+                  </span>
                 )}
               </div>
             </div>
@@ -207,7 +303,22 @@ export default function Pricing() {
                 <button className="btn btn-s btn-sm" type="button" onClick={() => { setSearch(''); setRegion(''); setCategory(''); setDuration(''); }}>
                   Clear Filters
                 </button>
+                <div style={{ width: 1, height: 18, background: 'var(--b)', margin: '0 2px' }} />
+                <button className="btn btn-p btn-sm" type="button" onClick={handleDownloadExcel} disabled={filtered.length === 0}>
+                  Download Excel
+                </button>
+                <button className="btn btn-s btn-sm" type="button" onClick={handleDownloadPdf} disabled={pdfLoading || filtered.length === 0}>
+                  {pdfLoading ? 'Generating PDF…' : 'Download PDF'}
+                </button>
+                <button className="btn btn-s btn-sm" type="button" onClick={handlePrintPdf} disabled={filtered.length === 0}>
+                  Print / Save PDF
+                </button>
               </div>
+              {exportError && (
+                <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, fontSize: 12, color: '#991B1B', whiteSpace: 'pre-wrap' }}>
+                  {exportError}
+                </div>
+              )}
             </div>
           </div>
 
@@ -228,7 +339,7 @@ export default function Pricing() {
                     <th style={{ textAlign: 'center' }}>INCLUDED</th>
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
                       <th key={n} style={{ textAlign: 'right', ...(n === 1 ? { background: '#FFF8EC', color: '#D97706' } : n === 10 ? { background: '#EBF7F1', color: '#1a5c38' } : {}) }}>
-                        {n} PAX
+                        {paxColumnLabel(n)}
                       </th>
                     ))}
                     <th />

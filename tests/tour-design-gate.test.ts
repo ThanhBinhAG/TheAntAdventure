@@ -92,21 +92,23 @@ describe('tour outline workflow', () => {
   it('applyOutlineWorkflowPatch merges draft and updates lead', () => {
     const draft = { ...baseDraft };
     const patch = patchOutlineSent(draft, 'CUS-1', 'Jane Doe', 'Tai');
-    let savedDraft: TourDraft | null = null;
-    let leadPatch: Partial<Lead> | null = null;
+    const holder: { draft: TourDraft | null; lead: Partial<Lead> | null } = {
+      draft: null,
+      lead: null,
+    };
 
     const merged = applyOutlineWorkflowPatch('LD-100', draft, patch, {
       upsertTourDraft: (d) => {
-        savedDraft = d;
+        holder.draft = d;
       },
       updateLead: (_id, data) => {
-        leadPatch = data;
+        holder.lead = data;
       },
     });
 
     assert.equal(merged.outlineStatus, 'sent');
-    assert.equal(savedDraft?.outlineStatus, 'sent');
-    assert.equal(leadPatch?.stage, 'Pending');
+    assert.equal(holder.draft?.outlineStatus, 'sent');
+    assert.equal(holder.lead?.stage, 'Pending');
   });
 
   it('patchOutlineApproved sets approved status and Designing stage', () => {

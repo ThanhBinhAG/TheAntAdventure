@@ -1,7 +1,7 @@
 import { isAutoSyncEnabled, isRemoteDataEnabled, isSupabaseReadOnly } from '../env';
 import type { BackupData } from '../types';
 import { TABLE_TO_STORE_KEY, SYNC_ARRAY_TABLES, type SyncArrayTable } from './sync-config';
-import { isSyncAllowed } from './sync-lifecycle';
+import { isSyncAllowed, subscribeHydration } from './sync-lifecycle';
 import { pushSnapshotToSupabase, pushTablesToSupabase } from './sync-push';
 
 export type AutoSyncStatus = 'idle' | 'pending' | 'syncing' | 'synced' | 'error' | 'blocked';
@@ -20,6 +20,7 @@ let syncInFlight = false;
 let pendingAfterFlight = false;
 let pendingTables: Set<SyncArrayTable> = new Set();
 let pendingMessages = false;
+let hydrationListenerReady = false;
 
 const listeners = new Set<(state: AutoSyncState) => void>();
 
@@ -79,9 +80,37 @@ function canAutoSync() {
   );
 }
 
+function queueDebouncedFlush() {
+  setSyncState({ status: 'pending', lastError: null });
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null;
+    void flushAutoSync();
+  }, DEBOUNCE_MS);
+}
+
+function ensureHydrationListener() {
+  if (hydrationListenerReady) return;
+  hydrationListenerReady = true;
+  subscribeHydration((state) => {
+    if (state.phase === 'ready' && (pendingTables.size > 0 || pendingMessages)) {
+      if (!isRemoteDataEnabled() || !isAutoSyncEnabled() || isSupabaseReadOnly()) return;
+      queueDebouncedFlush();
+    }
+  });
+}
+
 /** Queue sync for specific tables (debounced) */
 export function scheduleAutoSync(changed?: { tables?: SyncArrayTable[]; messages?: boolean }) {
+  ensureHydrationListener();
   if (!isRemoteDataEnabled() || !isAutoSyncEnabled() || isSupabaseReadOnly()) return;
+
+  if (changed?.tables) changed.tables.forEach((t) => pendingTables.add(t));
+  if (changed?.messages) pendingMessages = true;
+  if (!changed) {
+    pendingTables = new Set();
+    pendingMessages = true;
+  }
 
   if (!isSyncAllowed()) {
     setSyncState({
@@ -93,20 +122,7 @@ export function scheduleAutoSync(changed?: { tables?: SyncArrayTable[]; messages
 
   if (!canAutoSync()) return;
 
-  if (changed?.tables) changed.tables.forEach((t) => pendingTables.add(t));
-  if (changed?.messages) pendingMessages = true;
-  if (!changed) {
-    pendingTables = new Set();
-    pendingMessages = true;
-  }
-
-  setSyncState({ status: 'pending', lastError: null });
-
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    debounceTimer = null;
-    void flushAutoSync();
-  }, DEBOUNCE_MS);
+  queueDebouncedFlush();
 }
 
 async function flushAutoSync() {

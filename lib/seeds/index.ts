@@ -19,3 +19,4 @@ export * from './devNotes';
 export * from './messages';
 export * from './feedback';
 export * from './contracts';
+export * from './attractions';

@@ -1,11 +1,14 @@
 import { getSupabaseClient } from '../supabase';
-import type { Booking, ChatMessages, Hotel } from '../types';
+import type { Booking, ChatMessages, Hotel, Attraction } from '../types';
 import {
   agentToRow,
   apToRow,
   arToRow,
+  assembleAttractions,
   assembleBookings,
   assembleHotels,
+  attractionPhotoRows,
+  attractionToRow,
   bookingToRow,
   calEventToRow,
   commToRow,
@@ -28,6 +31,7 @@ import {
   rowToAgent,
   rowToAp,
   rowToAr,
+  rowToAttraction,
   rowToCalEvent,
   rowToComm,
   rowToContract,
@@ -101,6 +105,7 @@ const HANDLERS: Record<SyncArrayTable, TableHandler> = {
   },
   bookings: { table: 'bookings', pk: 'id', toRow: (r) => bookingToRow(r as never), fromRow: (r) => r },
   agents: { table: 'agents', pk: 'id', toRow: (r) => agentToRow(r as never), fromRow: (r) => ({ ...rowToAgent(r) }) },
+  attractions: { table: 'attractions', pk: 'id', toRow: attractionToRow, fromRow: (r) => rowToAttraction(r) },
   guides: { table: 'guides', pk: 'id', toRow: (r) => guideToRow(r as never), fromRow: (r) => ({ ...rowToGuide(r) }) },
   products: { table: 'products', pk: 'code', toRow: (r) => productToRow(r as never), fromRow: (r) => ({ ...rowToProduct(r) }) },
   product_pricing: {
@@ -414,6 +419,71 @@ async function syncHotelRooms(hotel: Hotel) {
   }
 }
 
+async function syncAttractionPhotos(attraction: Attraction) {
+  const client = supabase();
+  if (!client) return;
+
+  const { error: delErr } = await client
+    .from('attraction_photos')
+    .delete()
+    .eq('attraction_id', attraction.id);
+  if (delErr) throw delErr;
+
+  const rows = attractionPhotoRows(attraction);
+  if (!rows.length) return;
+
+  const { error: insErr } = await client.from('attraction_photos').insert(rows);
+  if (insErr) throw insErr;
+}
+
+async function getAttractions(): Promise<Attraction[]> {
+  const client = supabase();
+  if (!client) return [];
+
+  const [attRes, linkRes] = await Promise.all([
+    client.from('attractions').select('*'),
+    client.from('attraction_photos').select('*'),
+  ]);
+  if (attRes.error) throw attRes.error;
+  if (linkRes.error) throw linkRes.error;
+
+  return assembleAttractions(
+    (attRes.data ?? []) as Row[],
+    (linkRes.data ?? []) as Row[]
+  ) as unknown as Attraction[];
+}
+
+async function syncAttractions(rows: Row[], options: SyncTableOptions = {}): Promise<SyncTableResult> {
+  const client = supabase();
+  if (!client) return { skippedOrphanDelete: false };
+
+  const attractions = rows as unknown as Attraction[];
+  const localIds = attractions.map((a) => a.id);
+
+  if (attractions.length) {
+    const { error } = await client.from('attractions').upsert(
+      attractions.map((a) => attractionToRow(a as unknown as Row)),
+      { onConflict: 'id' }
+    );
+    if (error) throw error;
+
+    for (const attraction of attractions) {
+      await syncAttractionPhotos(attraction);
+    }
+  }
+
+  const skipOrphans = shouldSkipOrphanDelete('attractions', localIds.length, options.force);
+  if (!skipOrphans) {
+    await deleteOrphans('attractions', 'id', localIds);
+    return { skippedOrphanDelete: false };
+  }
+
+  return {
+    skippedOrphanDelete: true,
+    warning: buildOrphanSkipWarning('attractions', localIds.length),
+  };
+}
+
 async function syncHotels(rows: Row[], options: SyncTableOptions = {}): Promise<SyncTableResult> {
   const client = supabase();
   if (!client) return { skippedOrphanDelete: false };
@@ -492,6 +562,20 @@ function makeTableApi(table: SyncArrayTable) {
         if (error) throw error;
       },
       count: () => countTable('hotels'),
+    };
+  }
+
+  if (table === 'attractions') {
+    return {
+      getAll: () => getAttractions(),
+      syncTable: (rows: Row[], options?: SyncTableOptions) => syncAttractions(rows, options),
+      deleteRemote: async (id: string) => {
+        const client = supabase();
+        if (!client) return;
+        const { error } = await client.from('attractions').delete().eq('id', id);
+        if (error) throw error;
+      },
+      count: () => countTable('attractions'),
     };
   }
 
@@ -651,12 +735,4 @@ export const db = {
       };
     }
   },
-};
-
-export const legacyDb = {
-  customers: db.customers,
-  leads: db.leads,
-  bookings: db.bookings,
-  agents: db.agents,
-  guides: db.guides,
 };

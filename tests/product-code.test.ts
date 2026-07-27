@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  activityCodeToken,
   buildProductCode,
   deriveDestinationOptions,
+  durationCodeToken,
   filterDestinationSuggestions,
   formatCodeBreakdown,
   isServiceOnlyDestination,
@@ -14,12 +16,39 @@ import {
 
 const existingHanHd = ['AA-NV-HAN-HD-01', 'AA-NV-HAN-HD-02', 'AA-NV-HAN-TRF-01'];
 
-test('suggestTypeSegment: half day transfer', () => {
-  assert.equal(suggestTypeSegment('north', 'Half Day', 'Transfer'), 'TRF');
+test('durationCodeToken maps portfolio durations', () => {
+  assert.equal(durationCodeToken('Half Day'), 'HD');
+  assert.equal(durationCodeToken('Full Day'), 'FD');
+  assert.equal(durationCodeToken('Evening (3–4 hours)'), 'EVE');
+  assert.equal(durationCodeToken('2 Days 1 Night'), '2D1N');
 });
 
-test('suggestTypeSegment: half day default', () => {
-  assert.equal(suggestTypeSegment('north', 'Half Day', 'Cultural'), 'HD');
+test('activityCodeToken maps Excel activity prefixes', () => {
+  assert.equal(activityCodeToken('Culinary'), 'CULI');
+  assert.equal(activityCodeToken('Cultural'), 'CT');
+  assert.equal(activityCodeToken('Boat / River'), 'BOA');
+  assert.equal(activityCodeToken('Transfer'), 'TRF');
+  assert.equal(activityCodeToken('Experience'), null);
+});
+
+test('suggestTypeSegment: Excel culinary evening', () => {
+  assert.equal(suggestTypeSegment('south', 'Evening (3–4 hours)', 'Culinary'), 'CULI-EVE');
+});
+
+test('suggestTypeSegment: Excel boat evening', () => {
+  assert.equal(suggestTypeSegment('south', 'Evening (2–3 hours)', 'Boat'), 'BOA-EVE');
+});
+
+test('suggestTypeSegment: Excel city tour full day', () => {
+  assert.equal(suggestTypeSegment('south', 'Full Day', 'Cultural'), 'CT-FD');
+});
+
+test('suggestTypeSegment: duration-only half day (Experience)', () => {
+  assert.equal(suggestTypeSegment('south', 'Half Day', 'Experience'), 'HD');
+});
+
+test('suggestTypeSegment: half day transfer', () => {
+  assert.equal(suggestTypeSegment('north', 'Half Day', 'Transfer'), 'TRF');
 });
 
 test('suggestTypeSegment: services visa', () => {
@@ -37,6 +66,7 @@ test('suggestTypeSegment: cruise 2D1N', () => {
 test('resolveDestCode maps catalog labels', () => {
   assert.equal(resolveDestCode('Hanoi'), 'HAN');
   assert.equal(resolveDestCode('Halong Bay'), 'HAL');
+  assert.equal(resolveDestCode('Ho Chi Minh City'), 'SGN');
   assert.equal(resolveDestCode('Unknown Place'), null);
 });
 
@@ -46,10 +76,31 @@ test('nextSequence increments from existing codes', () => {
 
 test('buildProductCode assigns next sequence for tour', () => {
   const code = buildProductCode(
-    { region: 'north', dest: 'Hanoi', dur: 'Half Day', cat: 'Cultural' },
+    { region: 'north', dest: 'Hanoi', dur: 'Half Day', cat: 'Experience' },
     existingHanHd
   );
   assert.equal(code, 'AA-NV-HAN-HD-03');
+});
+
+test('buildProductCode Excel south culinary evening', () => {
+  const code = buildProductCode(
+    {
+      region: 'south',
+      dest: 'Ho Chi Minh City',
+      dur: 'Evening (3–4 hours)',
+      cat: 'Culinary',
+    },
+    []
+  );
+  assert.equal(code, 'AA-SV-SGN-CULI-EVE-01');
+});
+
+test('buildProductCode Excel south city full day', () => {
+  const code = buildProductCode(
+    { region: 'south', dest: 'Ho Chi Minh City', dur: 'Full Day', cat: 'Cultural' },
+    ['AA-SV-SGN-CT-FD-01']
+  );
+  assert.equal(code, 'AA-SV-SGN-CT-FD-02');
 });
 
 test('buildProductCode for transfer half day', () => {
@@ -96,6 +147,14 @@ test('parseProductCode for AA tour', () => {
   });
 });
 
+test('parseProductCode for Excel CULI-EVE', () => {
+  const parts = parseProductCode('AA-SV-SGN-CULI-EVE-01');
+  assert.equal(parts?.regionCode, 'SV');
+  assert.equal(parts?.destCode, 'SGN');
+  assert.equal(parts?.typeSegment, 'CULI-EVE');
+  assert.equal(parts?.sequence, '01');
+});
+
 test('parseProductCode for multi-segment type', () => {
   const parts = parseProductCode('AA-NV-HAL-CRU-2D1N-01');
   assert.equal(parts?.typeSegment, 'CRU-2D1N');
@@ -115,6 +174,7 @@ test('parseProductCode for service', () => {
 
 test('formatCodeBreakdown', () => {
   assert.equal(formatCodeBreakdown('AA-NV-HAN-HD-02'), 'AA · NV · HAN · HD · 02');
+  assert.equal(formatCodeBreakdown('AA-SV-SGN-CULI-EVE-01'), 'AA · SV · SGN · CULI-EVE · 01');
   assert.equal(formatCodeBreakdown('SV-SGN-HD-01'), 'SV · SGN-HD · 01');
 });
 

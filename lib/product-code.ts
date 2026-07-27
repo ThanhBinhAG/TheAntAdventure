@@ -60,21 +60,38 @@ const DEST_SEARCH_ALIASES: Record<string, string[]> = {
   ntr: ['Nha Trang', 'Nha Trang / Ninh Van Bay'],
 };
 
+/**
+ * Portfolio Excel type segments: usually `{ACTIVITY}-{DURATION}` or duration-only.
+ * Examples from South portfolio: CULI-EVE, BOA-EVE, CT-FD, HD.
+ */
 export const TYPE_SEGMENT_OPTIONS = [
   'HD',
   'FD',
+  'EVE',
   'TRF',
-  '2D',
-  '3D',
-  'SEA-HD',
-  'ECO-HD',
-  'CT-FD',
-  'DAY-FD',
-  'ADV-FD',
-  'FLT-FD',
-  'BOA-EVE',
+  'TRF-HD',
+  'TRF-FD',
+  'CULI-HD',
+  'CULI-FD',
   'CULI-EVE',
+  'BOA-HD',
+  'BOA-FD',
+  'BOA-EVE',
+  'CT-HD',
+  'CT-FD',
+  'CT-EVE',
+  'NAT-HD',
+  'NAT-FD',
+  'NAT-EVE',
+  'ADV-HD',
+  'ADV-FD',
+  'CYC-HD',
+  'CYC-FD',
+  'PHO-HD',
+  'PHO-FD',
+  'CRU-FD',
   'CRU-2D1N',
+  'CRU-4D3N',
   'NAT-2D1N',
   'COM-2D1N',
   'HMS-2D1N',
@@ -84,13 +101,67 @@ export const TYPE_SEGMENT_OPTIONS = [
   'PHO-3D2N',
   'TRK-3D2N',
   'LUX-4D3N',
-  'CRU-4D3N',
   'JEP-4D3N',
+  '2D1N',
+  '3D2N',
+  '4D3N',
   'SVC-VOA',
   'SGN-HD',
 ] as const;
 
 export type TypeSegment = (typeof TYPE_SEGMENT_OPTIONS)[number];
+
+/** Duration token in product codes (Excel: EVE / FD / HD / 2D1N …). */
+export function durationCodeToken(dur: string): string {
+  switch (dur) {
+    case 'Half Day':
+      return 'HD';
+    case 'Full Day':
+      return 'FD';
+    case 'Evening (2–3 hours)':
+    case 'Evening (3–4 hours)':
+      return 'EVE';
+    case '2 Days 1 Night':
+      return '2D1N';
+    case '3 Days 2 Nights':
+      return '3D2N';
+    case '4 Days 3 Nights':
+      return '4D3N';
+    case 'Service':
+      return 'SVC';
+    default:
+      return 'HD';
+  }
+}
+
+/**
+ * Activity token from category (Excel: CULI, BOA, CT, …).
+ * Returns null when the Excel portfolio would use duration-only (e.g. HD).
+ */
+export function activityCodeToken(cat: string): string | null {
+  const c = cat.trim().toLowerCase();
+  if (!c) return null;
+  if (c.includes('visa')) return 'SVC';
+  if (c.includes('transfer')) return 'TRF';
+  if (c.includes('culin') || c.includes('food') || c.includes('street food')) return 'CULI';
+  if (c.includes('boat') || c.includes('cruise') || c.includes('river')) {
+    if (c.includes('cruise')) return 'CRU';
+    return 'BOA';
+  }
+  if (c.includes('cycl')) return 'CYC';
+  if (c.includes('photo')) return 'PHO';
+  if (c.includes('trek') || c.includes('hike')) return 'TRK';
+  if (c.includes('beach')) return 'BCH';
+  if (c.includes('luxury') || c.includes('wellness')) return 'LUX';
+  if (c.includes('jeep') || c.includes('scenic')) return 'JEP';
+  if (c.includes('community') || c.includes('homestay') || c.includes('slow travel')) return 'COM';
+  if (c.includes('adventure')) return 'ADV';
+  if (c.includes('nature') || c.includes('eco')) return 'NAT';
+  if (c.includes('cultur') || c.includes('histor') || c.includes('city')) return 'CT';
+  if (c.includes('art') || c.includes('craft')) return 'CT';
+  // Generic "Experience" / "Service" → duration-only, matching CCH/MKG HD rows in Excel
+  return null;
+}
 
 export interface ProductCodeInput {
   region: string;
@@ -212,59 +283,34 @@ export function filterDestinationSuggestions(
     .map((s) => s.label);
 }
 
-function catIncludes(cat: string, ...needles: string[]): boolean {
-  const lower = cat.toLowerCase();
-  return needles.some((n) => lower.includes(n.toLowerCase()));
-}
-
+/**
+ * Suggest the middle type segment for product codes, matching Portfolio Excel:
+ * `AA-{region}-{dest}-{typeSegment}-{seq}` where typeSegment is
+ * `{ACTIVITY}-{DURATION}` (e.g. CULI-EVE, CT-FD) or duration-only (e.g. HD).
+ */
 export function suggestTypeSegment(region: string, dur: string, cat: string): string {
-  if (region === 'services') {
-    if (cat === 'Visa' || catIncludes(cat, 'visa')) return 'SVC-VOA';
+  if (region === 'services' || dur === 'Service') {
+    const c = cat.trim().toLowerCase();
+    if (c.includes('visa')) return 'SVC-VOA';
     return 'SGN-HD';
   }
 
-  if (dur === 'Half Day') {
-    if (cat === 'Transfer' || catIncludes(cat, 'transfer')) return 'TRF';
-    return 'HD';
+  const durTok = durationCodeToken(dur);
+  const act = activityCodeToken(cat);
+
+  // Transfers: Excel-style TRF (half day) or TRF-{DUR}
+  if (act === 'TRF') {
+    if (durTok === 'HD') return 'TRF';
+    return `TRF-${durTok}`;
   }
 
-  if (dur === 'Full Day') {
-    if (catIncludes(cat, 'cultural', 'history')) return 'CT-FD';
-    if (catIncludes(cat, 'nature', 'adventure')) return 'DAY-FD';
-    return 'FD';
+  // Homestay shorthand used in older multi-day codes
+  if (act === 'COM' && durTok === '2D1N' && cat.toLowerCase().includes('homestay')) {
+    return 'HMS-2D1N';
   }
 
-  if (dur === 'Evening (2–3 hours)') return 'BOA-EVE';
-  if (dur === 'Evening (3–4 hours)') return 'CULI-EVE';
-
-  if (dur === '2 Days 1 Night') {
-    if (catIncludes(cat, 'cruise')) return 'CRU-2D1N';
-    if (catIncludes(cat, 'community', 'slow travel')) return 'HMS-2D1N';
-    if (catIncludes(cat, 'community', 'culture')) return 'COM-2D1N';
-    if (catIncludes(cat, 'nature')) return 'NAT-2D1N';
-    return '2D';
-  }
-
-  if (dur === '3 Days 2 Nights') {
-    if (catIncludes(cat, 'luxury')) return 'LUX-3D2N';
-    if (catIncludes(cat, 'adventure')) return 'ADV-3D2N';
-    if (catIncludes(cat, 'beach')) return 'BCH-3D2N';
-    return '3D';
-  }
-
-  if (dur === '4 Days 3 Nights') {
-    if (catIncludes(cat, 'cruise')) return 'CRU-4D3N';
-    if (catIncludes(cat, 'adventure', 'scenic')) return 'JEP-4D3N';
-    if (catIncludes(cat, 'luxury', 'wellness', 'leisure')) return 'LUX-4D3N';
-    return 'LUX-4D3N';
-  }
-
-  if (dur === 'Service') {
-    if (cat === 'Visa' || catIncludes(cat, 'visa')) return 'SVC-VOA';
-    return 'SGN-HD';
-  }
-
-  return 'HD';
+  if (act) return `${act}-${durTok}`;
+  return durTok;
 }
 
 export function buildCodePrefix(input: ProductCodeInput): string | null {

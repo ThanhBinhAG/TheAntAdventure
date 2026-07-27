@@ -95,6 +95,9 @@ erDiagram
 | 18 | Guide calendar | `cal_events` | |
 | 19 | Team Chat | `chat_channels`, `chat_messages`, `chat_reactions` | |
 | 20 | Dev Notes | `dev_notes` | |
+| 21 | Pricing → Essentials | `pricing_ess_products` | `pricing_ess_cost_lines`, `pricing_ess_services`, `pricing_ess_car_rates`, `pricing_ess_hotel_rates`, `pricing_ess_notes` |
+| 22 | Pricing → Accommodation & Cruises | `pricing_acc_properties` | `pricing_acc_room_rates`, `pricing_acc_cruise_rates` |
+| 23 | Pricing (chung cả 2 workbook) | `pricing_settings` | `pricing_catalog_imports` |
 
 *Các trang About, Culture, Regulations, Weather, Attractions — nội d dung tĩnh, không cần bảng riêng (hoặc CMS sau).*
 
@@ -141,6 +144,7 @@ erDiagram
 | Cột DB | App field |
 |--------|-----------|
 | cust_id | custId |
+| lead_id | leadId *(optional — Confirmed auto-booking bridge)* |
 | start_date | start |
 | end_date | end |
 | guide_name | guide |
@@ -260,6 +264,26 @@ Mapping đầy đủ trong SQL comments — xem [`schema.sql`](../supabase/schem
 |--------|-----------|
 | product_code | product |
 | tags[] | bảng `photo_tags` |
+
+### 3.13 Pricing catalogs (`pricing_*`)
+
+Dữ liệu import từ 2 file Excel trong [`Personal/Material/pricing/`](../Personal/Material/pricing/). Mỗi lần import là **replace-all theo workbook**: xóa sạch bảng của workbook đó rồi ghi lại toàn bộ, mô phỏng đúng cách Excel ghi đè.
+
+| Bảng | Nguồn (sheet) | Ghi chú |
+|------|---------------|---------|
+| `pricing_ess_products` | List of Products + Guide Fee + Truck Provider | PK là `code` (`ESM01`, `02-ESM01`…) |
+| `pricing_ess_cost_lines` | Essential SG &Mekong_2026 | `p1..p20` = 20 cột pax C..V; FK → products |
+| `pricing_ess_services` | Services | Rate lẻ theo block |
+| `pricing_ess_car_rates` | Car Provider | 5 hạng xe `s7..s45` |
+| `pricing_ess_hotel_rates` | Hotel_* | 2 biến thể giá (`variant_a` / `variant_b`, ví dụ Sun–Fri / Sat) |
+| `pricing_ess_notes` | Guideline + sheet dạng ghi chú tự do | |
+| `pricing_acc_properties` | All Properties | Tách tên / website / địa chỉ từ 1 ô gộp |
+| `pricing_acc_room_rates` | North / Central / South Vietnam Hotels | Giá theo mùa; nối với property qua `property_name` |
+| `pricing_acc_cruise_rates` | Ha Long Bay / Mekong Cruises | Giá cabin 2026 & 2027 |
+| `pricing_settings` | Ô exchange rate / markup / VAT rải rác | Khóa theo `workbook` + `sheet` |
+| `pricing_catalog_imports` | — | Nhật ký import (file, số sheet, số dòng, số cảnh báo) |
+
+Đọc/ghi qua [`lib/pricing/catalog-db.ts`](../lib/pricing/catalog-db.ts) (client Supabase + RLS), **không** đi qua Zustand full-sync vì riêng bảng giá phòng đã hơn 1.000 dòng.
 
 ---
 

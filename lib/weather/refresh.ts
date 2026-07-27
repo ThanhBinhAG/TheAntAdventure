@@ -3,8 +3,10 @@ import { WEATHER_DESTINATIONS } from './coordinates';
 import {
   ensureDestinationsSeeded,
   getLastSuccessfulFetchWithin,
+  getTodayVnDate,
   isCacheStale,
   logWeatherFetch,
+  prunePastForecastDates,
   upsertWeeklyCache,
 } from './cache';
 import { fetchWeeklyForecastFromApi } from './open-meteo';
@@ -57,6 +59,7 @@ export async function refreshWeeklyForecast(options?: {
     }
 
     const upserted = await upsertWeeklyCache(rows);
+    await prunePastForecastDates(getTodayVnDate());
     const fetchedAt = rows[0]?.fetched_at ?? new Date().toISOString();
     const durationMs = Date.now() - start;
 

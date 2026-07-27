@@ -20,6 +20,8 @@ union all select 'feedback', count(*), 5 from feedback
 union all select 'contracts', count(*), 1 from contracts
 union all select 'photos', count(*), 12 from photos
 union all select 'photo_tags', count(*), 48 from photo_tags
+union all select 'attractions', count(*), 38 from attractions
+union all select 'attraction_photos', count(*), 0 from attraction_photos
 union all select 'suppliers', count(*), 12 from suppliers
 union all select 'supplier_tags', count(*), 35 from supplier_tags
 union all select 'cruises', count(*), 1 from cruises

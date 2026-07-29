@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { formatBytes } from '@/lib/gallery-helpers';
+import { formatBytes } from '@/lib/gallery/gallery-helpers';
 
 interface Props {
   label: string;

@@ -4,11 +4,11 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { STAGE_COLORS, STAGE_PROB_V22, fmt, KANBAN_STAGES } from '@/lib/constants';
-import { getCustomerName } from '@/lib/crm-utils';
-import { ensureBookingForConfirmedLead } from '@/lib/booking-from-lead';
-import { patchOutlineApproved, outlineStatusLabel } from '@/lib/tour-design-lead';
-import { applyOutlineWorkflowPatch } from '@/lib/tour-outline-workflow';
-import { getTourDraftForLead } from '@/lib/tour-design-leads';
+import { getCustomerName } from '@/lib/core/crm-utils';
+import { ensureBookingForConfirmedLead } from '@/lib/sales/booking-from-lead';
+import { patchOutlineApproved, outlineStatusLabel } from '@/lib/tour-design/tour-design-lead';
+import { applyOutlineWorkflowPatch } from '@/lib/tour-design/tour-outline-workflow';
+import { getTourDraftForLead } from '@/lib/tour-design/tour-design-leads';
 import {
   PIPELINE_CARDS_LIMIT,
   filterLeadsByTime,
@@ -23,8 +23,8 @@ import {
   type ListSortState,
   type SalesTimeFilterMode,
   type SalesTimeFilterState,
-} from '@/lib/sales-lead-utils';
-import { localTodayIso } from '@/lib/date-utils';
+} from '@/lib/sales/sales-lead-utils';
+import { localTodayIso } from '@/lib/core/date-utils';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
 import PaginationBar from '@/components/PaginationBar';

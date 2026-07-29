@@ -4,8 +4,8 @@ import { constants } from 'node:fs';
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
 import { getAppUrl } from '@/lib/env';
-import { buildPricingHTML, type PricingHtmlMeta } from '@/lib/pricing-html';
-import type { PricingTableRow } from '@/lib/product-pricing-helpers';
+import { buildPricingHTML, type PricingHtmlMeta } from '@/lib/pricing/pricing-html';
+import type { PricingTableRow } from '@/lib/products/product-pricing-helpers';
 
 const LINUX_CHROME_CANDIDATES = [
   '/usr/bin/google-chrome-stable',

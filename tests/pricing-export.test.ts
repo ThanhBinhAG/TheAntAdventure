@@ -5,9 +5,9 @@ import {
   buildPricingSheetData,
   paxColumnLabel,
   pricingExportFilename,
-} from '../lib/pricing-export';
-import { buildPricingHTML } from '../lib/pricing-html';
-import type { PricingTableRow } from '../lib/product-pricing-helpers';
+} from '../lib/pricing/pricing-export';
+import { buildPricingHTML } from '../lib/pricing/pricing-html';
+import type { PricingTableRow } from '../lib/products/product-pricing-helpers';
 
 const sampleRow: PricingTableRow = {
   num: 1,

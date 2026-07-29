@@ -7,8 +7,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { NAV_SECTIONS, type NavItem } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
-import { countActiveTasks } from '@/lib/planner-task-utils';
-import { countTourDesignAttention } from '@/lib/tour-design-leads';
+import { countActiveTasks } from '@/lib/planner/planner-task-utils';
+import { countTourDesignAttention } from '@/lib/tour-design/tour-design-leads';
 import type { Lead, PageSlug, Task, TourDraft } from '@/lib/types';
 
 interface SidebarProps {

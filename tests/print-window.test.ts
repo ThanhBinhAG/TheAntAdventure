@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { waitForImages } from '../lib/print-window';
+import { waitForImages } from '../lib/core/print-window';
 
 describe('print-window', () => {
   it('waitForImages resolves immediately when no images', async () => {

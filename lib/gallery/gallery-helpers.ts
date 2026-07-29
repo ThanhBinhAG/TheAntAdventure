@@ -1,4 +1,5 @@
-import type { GalleryPhoto } from '@/lib/tour-design-types';
+import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
+import type { Product } from '@/lib/types';
 import { thumbPathFromDisplayPath } from '@/lib/storage/photo-paths';
 
 export function isStoragePhoto(p: GalleryPhoto): boolean {
@@ -29,8 +30,15 @@ export function photoThumbUrl(p: GalleryPhoto): string | undefined {
   return undefined;
 }
 
-export function photosForProduct(allPhotos: GalleryPhoto[], productCode: string): GalleryPhoto[] {
-  return allPhotos.filter((p) => p.product === productCode);
+export function photosForProductIds(
+  allPhotos: GalleryPhoto[],
+  product: Pick<Product, 'photoIds' | 'linkedPhotoIds'>
+): GalleryPhoto[] {
+  const ids =
+    product.linkedPhotoIds?.length
+      ? product.linkedPhotoIds
+      : (product.photoIds ?? []);
+  return photosForAttractionByIds(allPhotos, ids);
 }
 
 export type ProductPhotoSlots = {
@@ -39,39 +47,38 @@ export type ProductPhotoSlots = {
   pool: GalleryPhoto[];
 };
 
-export function photosForProductSlots(allPhotos: GalleryPhoto[], productCode: string): ProductPhotoSlots {
-  const linked = photosForProduct(allPhotos, productCode);
-  const withUrl = (p: GalleryPhoto) => Boolean(photoDisplayUrl(p));
+/** Featured (photoIds) map to preview slots; remaining linked = pool. */
+export function photosForProductSlots(
+  allPhotos: GalleryPhoto[],
+  product: Pick<Product, 'photoIds' | 'linkedPhotoIds'>
+): ProductPhotoSlots {
+  const byId = new Map(allPhotos.map((p) => [p.id, p]));
+  const withUrl = (p: GalleryPhoto | undefined): p is GalleryPhoto => Boolean(p && photoDisplayUrl(p));
 
-  let slot1 = linked.find((p) => p.slot === 1 && withUrl(p)) ?? null;
-  let slot2 = linked.find((p) => p.slot === 2 && withUrl(p)) ?? null;
+  const featured = (product.photoIds ?? [])
+    .map((id) => byId.get(id))
+    .filter(withUrl)
+    .slice(0, 2);
+  const slot1 = featured[0] ?? null;
+  const slot2 = featured[1] ?? null;
 
+  const featuredSet = new Set(featured.map((p) => p.id));
+  const linked =
+    product.linkedPhotoIds?.length
+      ? product.linkedPhotoIds
+      : (product.photoIds ?? []);
   const pool: GalleryPhoto[] = [];
-  for (const p of linked) {
-    if (p.slot === 1 || p.slot === 2) continue;
+  for (const id of linked) {
+    if (featuredSet.has(id)) continue;
+    const p = byId.get(id);
     if (withUrl(p)) pool.push(p);
-  }
-
-  // Legacy: photos without explicit slot — assign first two to slots if empty
-  if (!slot1 || !slot2) {
-    const legacy = linked.filter((p) => !p.slot && withUrl(p));
-    if (!slot1 && legacy[0]) slot1 = legacy[0];
-    if (!slot2 && legacy[1]) slot2 = legacy[1];
-    const used = new Set([slot1?.id, slot2?.id].filter(Boolean));
-    for (const p of legacy) {
-      if (!used.has(p.id)) pool.push(p);
-    }
   }
 
   return { slot1, slot2, pool };
 }
 
-export function galleryUrlForProduct(productCode: string): string {
-  return `/gallery?product=${encodeURIComponent(productCode)}`;
-}
-
 export function galleryUrlForAttraction(attractionId: string, _name?: string, photoId?: string): string {
-  const params = new URLSearchParams({ attraction: attractionId, tab: 'loose' });
+  const params = new URLSearchParams({ attraction: attractionId });
   if (photoId) params.set('photo', photoId);
   return `/gallery?${params.toString()}`;
 }
@@ -87,13 +94,13 @@ export function photosForAttractionByIds<T extends { id: string }>(
 
 export const TOUR_PREVIEW_PHOTO_SLOTS = 2;
 
-export function productPhotoSlotStatus(photos: GalleryPhoto[], productCode: string) {
-  const { slot1, slot2 } = photosForProductSlots(photos, productCode);
-  const linked = (slot1 ? 1 : 0) + (slot2 ? 1 : 0);
+export function productPhotoSlotStatus(product: Pick<Product, 'photoIds' | 'linkedPhotoIds'>) {
+  const featured = (product.photoIds ?? []).slice(0, TOUR_PREVIEW_PHOTO_SLOTS);
+  const linked = featured.length;
   return {
     linked,
     needed: TOUR_PREVIEW_PHOTO_SLOTS,
-    complete: Boolean(slot1 && slot2),
+    complete: linked >= TOUR_PREVIEW_PHOTO_SLOTS,
   };
 }
 
@@ -106,4 +113,12 @@ export function formatBytes(bytes?: number | null): string {
 
 export function photoSizeLabel(p: GalleryPhoto): string {
   return formatBytes(p.displayBytes);
+}
+
+export function nextPhotoId(photos: { id: string }[]): string {
+  const max = photos.reduce((n, p) => {
+    const num = parseInt(p.id.replace(/^PH-/, ''), 10);
+    return Number.isFinite(num) ? Math.max(n, num) : n;
+  }, 0);
+  return `PH-${String(max + 1).padStart(3, '0')}`;
 }

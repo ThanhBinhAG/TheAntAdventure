@@ -11,15 +11,15 @@ import {
   countOrphanPricing,
   emptyProductPricing,
   type PricingTableRow,
-} from '@/lib/product-pricing-helpers';
-import { isSelectableProduct } from '@/lib/product-display';
+} from '@/lib/products/product-pricing-helpers';
+import { isSelectableProduct } from '@/lib/products/product-display';
 import {
   buildPricingFilterSummary,
   downloadPricingXlsx,
   paxColumnLabel,
   pricingExportFilename,
-} from '@/lib/pricing-export';
-import { printPricing } from '@/lib/pricing-html';
+} from '@/lib/pricing/pricing-export';
+import { printPricing } from '@/lib/pricing/pricing-html';
 import {
   ICO_EMOJIS,
   ICO_KEYS,
@@ -33,7 +33,7 @@ import {
   getCostUSD,
   getSpUSD,
   mkPct,
-} from '@/lib/pricing-utils';
+} from '@/lib/pricing/pricing-utils';
 
 type PricingTab = 'pricelist' | 'costbuilder' | 'markup';
 
@@ -422,9 +422,6 @@ export default function Pricing() {
                                     View in Tour Products
                                   </Link>
                                 )}
-                                <Link href={`/gallery?product=${encodeURIComponent(t.productCode)}`} className="btn btn-s btn-sm">
-                                  Photo gallery
-                                </Link>
                               </div>
                             </td>
                           </tr>

@@ -10,7 +10,7 @@ cp .env.example .env.local   # Windows: copy .env.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) → redirects to `/dashboard`.
+Open [http://localhost:3006](http://localhost:3006) → redirects to `/dashboard`.
 
 ## Environment variables
 
@@ -46,27 +46,49 @@ Full schema documentation: **[`docs/DATABASE.md`](docs/DATABASE.md)**
 
 ## Architecture
 
+Each meaningful folder has an [`AGENTS.md`](AGENTS.md) overview (Role / Contents / Boundaries). Read the nearest one when editing that subtree.
+
 ```
-app/                    # Next.js App Router
-components/             # Page UI (26 routes)
-lib/db/                 # Supabase adapter, mappers, auto-sync
-lib/seeds/              # Local seed data
-lib/store.ts            # Zustand store
-supabase/               # PostgreSQL schema + data
-docs/DATABASE.md        # ER diagram & table reference
-docs/SUPABASE-SETUP.md  # Supabase install & connect
+app/                         # Next.js App Router (CRM shell, login, API)
+components/                  # UI — pages/, domain widgets, layout chrome
+  tour-design/               # Tour Design wizard (URL slug still /tourdesign)
+  gallery/                   # Photo library UI + StorageImage
+hooks/                       # React hooks (store, language, pagination…)
+tests/                       # Unit tests (tsx --test)
+
+lib/
+  store.ts · types.ts        # Zustand store + shared entity types
+  constants.ts · env.ts      # NAV_SECTIONS, env helpers
+  core/                      # Shared helpers (crm-utils, dates, money, print)
+  customers/ · sales/        # Client onboarding, leads, bookings, agents
+  tour-design/ · proposals/  # Tour builder, outline gate, proposal PDF/HTML
+  pricing/ · products/       # Price lists, XLSX, catalogue, product codes
+  gallery/ · attractions/    # Photos, tags, bulk upload, attraction helpers
+  suppliers/ · contracts/    # Supplier filters/seeds, contract HTML
+  outline/ · planner/        # Outline rich text/HTML, daily tasks
+  dashboard/ · context/      # Dashboard metrics, Supabase React context
+  db/ · supabase/ · auth/    # Sync, mappers, client, session
+  weather/ · storage/        # Open-Meteo, photo upload paths
+  system/ · i18n/ · seeds/   # Logging, diagnostics, i18n, seed data
+
+supabase/                    # PostgreSQL schema + seed SQL
+docs/DATABASE.md             # ER diagram & table reference
+docs/SUPABASE-SETUP.md       # Supabase install & connect
 ```
 
-## Pages (26 routes)
+Domain logic lives under `lib/<domain>/`. Import explicitly, e.g. `@/lib/sales/sales-lead-utils`, `@/lib/tour-design/tour-pricing`.
 
-`/dashboard` · `/planner` · `/customers` · `/agents` · `/sales` · `/tourdesign` · `/products` · `/gallery` · `/pricing` · `/bookings` · `/contracts` · `/suppliers` · `/guides` · `/weather` · `/attractions` · `/posttour` · `/finance` · `/tax` · `/salary` · `/about` · `/culture` · `/regulations` · `/hr` · `/ai` · `/devnotes` · `/teamchat`
+## Pages (28 routes)
+
+`/dashboard` · `/planner` · `/customers` · `/agents` · `/sales` · `/tourdesign` · `/products` · `/gallery` · `/pricing` · `/pricing-essentials` · `/pricing-accommodation` · `/bookings` · `/contracts` · `/suppliers` · `/guides` · `/weather` · `/attractions` · `/posttour` · `/finance` · `/tax` · `/salary` · `/about` · `/culture` · `/regulations` · `/hr` · `/ai` · `/devnotes` · `/teamchat`
 
 ## Scripts
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dev` | Development server |
+| `npm run dev` | Development server (port **3006**) |
 | `npm run build` | Production build |
+| `npm run typecheck` | TypeScript (`tsc --noEmit`) |
 | `npm run test` | Unit tests (`tests/`) |
 
 Private notes, legacy HTML, and one-off migration tools live in **`Personal/`** (gitignored — local only).

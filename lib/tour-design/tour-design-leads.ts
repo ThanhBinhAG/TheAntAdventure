@@ -1,4 +1,4 @@
-import type { Lead, OutlineStatus, TourDraft } from './types';
+import type { Lead, OutlineStatus, TourDraft } from '../types';
 
 export function getTourDraftForLead(leadId: string, tourDrafts: TourDraft[]): TourDraft | undefined {
   return tourDrafts.find((d) => d.leadId === leadId);

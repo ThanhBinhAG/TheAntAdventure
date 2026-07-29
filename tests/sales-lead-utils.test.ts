@@ -10,7 +10,7 @@ import {
   normalizeLeadMonth,
   parseLeadTravelMonth,
   sortLeads,
-} from '../lib/sales-lead-utils';
+} from '../lib/sales/sales-lead-utils';
 import type { Customer, Lead } from '../lib/types';
 
 const customers: Customer[] = [

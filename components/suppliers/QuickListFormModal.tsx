@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { nextSupplierId } from '@/lib/supplier-utils';
+import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
 import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/lib/types';
 
 export type QuickListKind = 'transport' | 'restaurant' | 'cruise';

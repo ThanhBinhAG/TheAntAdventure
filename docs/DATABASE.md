@@ -58,7 +58,10 @@ erDiagram
   bookings ||--o{ feedback : "booking_id"
   booking_itinerary ||--o{ booking_activities : "itinerary_id"
   finance ||--o{ accounts_receivable : "finance_id"
-  products ||--o{ photos : "product_code"
+  products ||--o{ product_photos : "product_code"
+  photos ||--o{ product_photos : "photo_id"
+  photos ||--o{ attraction_photos : "photo_id"
+  photos ||--o{ photo_tags : "photo_id"
   suppliers ||--o{ supplier_tags : "supplier_id"
   suppliers ||--o{ cruises : "supplier_id"
   suppliers ||--o{ transport : "supplier_id"
@@ -91,7 +94,7 @@ erDiagram
 | 14 | Post-tour / Feedback | `feedback` | |
 | 15 | Suppliers (extended) | `suppliers` | `supplier_tags` |
 | 16 | Suppliers tabs | `cruises`, `transport`, `restaurants` | → `suppliers` (optional) |
-| 17 | Gallery | `photos` | `photo_tags` |
+| 17 | Gallery / Photo Library | `photos` | `photo_tags`, `product_photos` |
 | 18 | Guide calendar | `cal_events` | |
 | 19 | Team Chat | `chat_channels`, `chat_messages`, `chat_reactions` | |
 | 20 | Dev Notes | `dev_notes` | |
@@ -258,12 +261,15 @@ Mapping đầy đủ trong SQL comments — xem [`schema.sql`](../supabase/schem
 
 10 kênh seed: general, sales, operations, finance, guides, devnotes, tai, linh, minh, huong.
 
-### 3.12 `photos` + `photo_tags`
+### 3.12 `photos` + `photo_tags` + `product_photos`
 
 | Cột DB | App field |
 |--------|-----------|
-| product_code | product |
-| tags[] | bảng `photo_tags` |
+| (photos độc lập) | `GalleryPhoto` — không còn `product` / `slot` |
+| `photo_tags.tag` | `tags[]` |
+| `product_photos` | `Product.photoIds` (featured) + `linkedPhotoIds` (pool) |
+
+Attractions vẫn dùng `attraction_photos` tương tự.
 
 ### 3.13 Pricing catalogs (`pricing_*`)
 

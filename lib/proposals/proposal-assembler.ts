@@ -1,29 +1,30 @@
-import { addDays, localTodayIso } from './date-utils';
-import { REG_LABELS } from './page-helpers';
-import { ICO_KEYS, INCL_YES } from './pricing-utils';
-import { findProductPricing, paxToTierN, sumSellForProducts } from './tour-pricing';
-import { TOUR_PACKAGES } from './seeds/tourPackages';
-import { SEED_STAFF } from './seeds/staff';
-import { fmtOutlineDate } from './outline-html';
+import { addDays, localTodayIso } from '../core/date-utils';
+import { REG_LABELS } from '../core/page-helpers';
+import { ICO_KEYS, INCL_YES } from '../pricing/pricing-utils';
+import { findProductPricing, paxToTierN, sumSellForProducts } from '../tour-design/tour-pricing';
+import { TOUR_PACKAGES } from '../seeds/tourPackages';
+import { SEED_STAFF } from '../seeds/staff';
+import { fmtOutlineDate } from '../outline/outline-html';
 import {
   buildDayGroups,
   formatDayDateLabel,
+  formatIsoDateShort,
   resolveTravelStart,
   stripMarkdown,
   totalDurationDays,
-} from './tour-itinerary';
+} from '../tour-design/tour-itinerary';
 import {
-  getDayPhotos,
   resolvePackageDayPhotos,
   resolveProductPhotos,
-} from './tour-photos';
-import type { GalleryPhoto, TourBrief } from './tour-design-types';
-import type { Hotel, Product, ProductPricing, TourOutlineDay } from './types';
+} from '../gallery/tour-photos';
+import type { GalleryPhoto, TourBrief } from '../tour-design/tour-design-types';
+import type { ExperienceOverride, Hotel, Product, ProductPricing, TourOutlineDay } from '../types';
 import type {
   AssembleProposalInput,
   ProposalB2BPricing,
   ProposalB2CPricing,
   ProposalDayDetail,
+  ProposalDaySegment,
   ProposalDoc,
   ProposalFlightRow,
   ProposalHotelRate,
@@ -237,50 +238,122 @@ function buildItineraryFromPackage(brief: TourBrief, packageId: string) {
   return { glance, days };
 }
 
+function productSegmentBody(
+  p: Product,
+  experienceOverrides: Record<string, ExperienceOverride>
+): string {
+  const ov = experienceOverrides[p.code];
+  const desc = stripMarkdown(ov?.desc?.trim() || p.desc || p.usp || p.name);
+  const note = ov?.clientNote?.trim();
+  if (note) return `${desc}\n\nNote: ${note}`;
+  return desc;
+}
+
 function buildItineraryFromProducts(
   brief: TourBrief,
-  products: Product[]
+  products: Product[],
+  experienceOverrides: Record<string, ExperienceOverride> = {}
 ): { glance: ProposalItineraryRow[]; days: ProposalDayDetail[] } {
   const timed = products.filter((p) => !isFlightProduct(p));
-  const dayGroups = buildDayGroups(timed);
+  const dayGroups = buildDayGroups(timed, experienceOverrides);
   const glance: ProposalItineraryRow[] = [];
   const days: ProposalDayDetail[] = [];
 
   for (const g of dayGroups) {
     const primary = g.items[0];
-    const dateLabel = formatDayDateLabel(brief.startDate, brief.travelMonth, g.n);
-    const isoPart = dateLabel.includes(',') ? dateLabel.split('—')[1]?.trim() : dateLabel;
+    const primaryOv = primary ? experienceOverrides[primary.code] : undefined;
+    const displayN =
+      typeof primaryOv?.dayIndex === 'number' && primaryOv.dayIndex >= 1
+        ? primaryOv.dayIndex
+        : g.n;
+    const autoLabel = formatDayDateLabel(brief.startDate, brief.travelMonth, displayN);
+    let dateLabel: string;
+    if (primaryOv?.date?.trim()) {
+      dateLabel = formatIsoDateShort(primaryOv.date.trim());
+    } else {
+      dateLabel = autoLabel.includes(',')
+        ? autoLabel.split('—')[1]?.trim() || autoLabel
+        : autoLabel;
+    }
     const title =
       g.multiDay && g.dayOf && g.totalDays
         ? `${primary?.name || 'Experience'} (Day ${g.dayOf}/${g.totalDays})`
-        : g.items.map((p) => p.name).join(' · ') || `Day ${g.n}`;
-    const body = g.items
-      .map((p) => stripMarkdown(p.desc || p.usp || p.name))
-      .filter(Boolean)
-      .join('\n\n');
+        : g.items.map((p) => p.name).join(' · ') || `Day ${displayN}`;
+    const bodyParts = g.items.map((p) => productSegmentBody(p, experienceOverrides));
+    const body = bodyParts.filter(Boolean).join('\n\n');
     const destination = g.label || primary?.dest || '—';
     const hotel = '—';
 
+    const segments: ProposalDaySegment[] | undefined =
+      !g.multiDay && g.items.length > 1
+        ? g.items.map((p) => ({
+            title: p.name,
+            body: productSegmentBody(p, experienceOverrides) || 'Program details to be confirmed.',
+            imageUrls: [],
+            productCode: p.code,
+          }))
+        : undefined;
+
     glance.push({
-      dayNumber: g.n,
-      dateLabel: isoPart || `Day ${g.n}`,
+      dayNumber: displayN,
+      dateLabel: dateLabel || `Day ${displayN}`,
       destination,
       theme: title,
       hotel,
     });
     days.push({
-      dayNumber: g.n,
-      dateLabel: isoPart || `Day ${g.n}`,
+      dayNumber: displayN,
+      dateLabel: dateLabel || `Day ${displayN}`,
       destination,
       title,
       body: body || 'Program details to be confirmed.',
       hotel,
       meals: 'As per program',
       imageUrls: [],
+      ...(segments ? { segments } : {}),
     });
   }
 
   return { glance, days };
+}
+
+/** Overlay hotel / destination / meals from outline rows matched by day number. */
+function overlayOutlineMeta(
+  days: ProposalDayDetail[],
+  glance: ProposalItineraryRow[],
+  outlineRows: TourOutlineDay[]
+): { days: ProposalDayDetail[]; glance: ProposalItineraryRow[] } {
+  if (!outlineRows.length) return { days, glance };
+  const byDay = new Map(outlineRows.map((r) => [r.dayNumber, r]));
+
+  const nextDays = days.map((day) => {
+    const row = byDay.get(day.dayNumber);
+    if (!row) return day;
+    const hotel = stripHtmlToPlain(row.hotels);
+    const location = stripHtmlToPlain(row.location);
+    const activitiesPlain = stripHtmlToPlain(row.activities);
+    const meals = inferMealsFromText(activitiesPlain);
+    return {
+      ...day,
+      hotel: hotel && hotel !== '—' ? hotel : day.hotel,
+      destination: location || day.destination,
+      meals: meals !== 'As per program' ? meals : day.meals,
+    };
+  });
+
+  const nextGlance = glance.map((row) => {
+    const outline = byDay.get(row.dayNumber);
+    if (!outline) return row;
+    const hotel = stripHtmlToPlain(outline.hotels);
+    const location = stripHtmlToPlain(outline.location);
+    return {
+      ...row,
+      hotel: hotel && hotel !== '—' ? hotel : row.hotel,
+      destination: location || row.destination,
+    };
+  });
+
+  return { days: nextDays, glance: nextGlance };
 }
 
 function resolveRegionTag(brief: TourBrief, packageId: string | null): string {
@@ -310,6 +383,62 @@ function findProductsForDay(day: ProposalDayDetail, products: Product[]): Produc
   });
 }
 
+function findProductForSegment(
+  segment: ProposalDaySegment,
+  products: Product[]
+): Product | undefined {
+  if (segment.productCode) {
+    const byCode = products.find((p) => p.code === segment.productCode);
+    if (byCode) return byCode;
+  }
+  const title = (segment.title || '').toLowerCase();
+  return products.find((p) => !isFlightProduct(p) && p.name.toLowerCase() === title);
+}
+
+function collectPhotosForProduct(
+  product: Product | undefined,
+  day: ProposalDayDetail,
+  galleryPhotos: GalleryPhoto[],
+  regionTag: string,
+  count: number,
+  exclude: string[] = []
+): string[] {
+  const urls: string[] = [];
+  const seen = new Set(exclude);
+  const want = Math.max(count, 1);
+  const fetchN = want + seen.size + 2;
+
+  if (product) {
+    for (const ph of resolveProductPhotos(product, galleryPhotos, fetchN)) {
+      if (ph.url && !seen.has(ph.url)) {
+        urls.push(ph.url);
+        seen.add(ph.url);
+      }
+      if (urls.length >= want) return urls.slice(0, want);
+    }
+  }
+
+  if (urls.length < want) {
+    const title = product?.name || day.title || day.destination;
+    for (const ph of resolvePackageDayPhotos(
+      title,
+      regionTag,
+      day.hotel,
+      galleryPhotos,
+      day.dayNumber,
+      fetchN
+    )) {
+      if (ph.url && !seen.has(ph.url)) {
+        urls.push(ph.url);
+        seen.add(ph.url);
+      }
+      if (urls.length >= want) return urls.slice(0, want);
+    }
+  }
+
+  return urls.slice(0, want);
+}
+
 export function attachDayImages(
   days: ProposalDayDetail[],
   products: Product[],
@@ -319,11 +448,31 @@ export function attachDayImages(
 ): ProposalDayDetail[] {
   const regionTag = resolveRegionTag(brief, packageId);
   return days.map((day) => {
+    if (day.segments?.length) {
+      const perSegment = 2;
+      const used: string[] = [];
+      const segments = day.segments.map((seg) => {
+        const product = findProductForSegment(seg, products);
+        const imageUrls = collectPhotosForProduct(
+          product,
+          day,
+          galleryPhotos,
+          regionTag,
+          perSegment,
+          used
+        );
+        used.push(...imageUrls);
+        return { ...seg, imageUrls };
+      });
+      const imageUrls = segments.flatMap((s) => s.imageUrls);
+      return { ...day, segments, imageUrls };
+    }
+
     const urls: string[] = [];
     const matched = findProductsForDay(day, products);
 
     for (const p of matched) {
-      const photos = resolveProductPhotos(p, galleryPhotos, 2, day.dayNumber);
+      const photos = resolveProductPhotos(p, galleryPhotos, 2);
       for (const ph of photos) {
         if (ph.url && !urls.includes(ph.url)) urls.push(ph.url);
         if (urls.length >= 2) break;
@@ -342,18 +491,6 @@ export function attachDayImages(
       );
       for (const ph of pkgPhotos) {
         if (ph.url && !urls.includes(ph.url)) urls.push(ph.url);
-      }
-    }
-
-    if (urls.length < 2) {
-      for (const url of getDayPhotos(
-        day.title || day.destination,
-        regionTag,
-        day.hotel,
-        day.dayNumber,
-        2 - urls.length
-      )) {
-        if (!urls.includes(url)) urls.push(url);
       }
     }
 
@@ -688,6 +825,7 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
     galleryPhotos = [],
     hotelsCatalog = [],
     detailedProgramLayout = 'sidebar',
+    experienceOverrides = {},
   } = input;
 
   const variant: ProposalVariant = clientType === 'b2b' ? 'b2b' : 'b2c';
@@ -697,13 +835,23 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
   let glance: ProposalItineraryRow[] = [];
   let days: ProposalDayDetail[] = [];
 
-  if (outlineRows.length) {
+  const selectedProducts = codes.length
+    ? products.filter((p) => codes.includes(p.code))
+    : [];
+
+  if (selectedProducts.length) {
+    ({ glance, days } = buildItineraryFromProducts(
+      brief,
+      selectedProducts,
+      experienceOverrides
+    ));
+    ({ glance, days } = overlayOutlineMeta(days, glance, outlineRows));
+  } else if (outlineRows.length) {
     ({ glance, days } = buildItineraryFromOutline(brief, outlineRows));
   } else if (selectedPackageId) {
     ({ glance, days } = buildItineraryFromPackage(brief, selectedPackageId));
   } else if (products.length) {
-    const selected = products.filter((p) => codes.includes(p.code));
-    ({ glance, days } = buildItineraryFromProducts(brief, selected.length ? selected : products));
+    ({ glance, days } = buildItineraryFromProducts(brief, products, experienceOverrides));
   }
 
   days = attachDayImages(days, products, galleryPhotos, selectedPackageId, brief);

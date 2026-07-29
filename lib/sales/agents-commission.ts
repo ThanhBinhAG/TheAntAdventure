@@ -1,4 +1,4 @@
-import type { Agent, Lead } from './types';
+import type { Agent, Lead } from '../types';
 
 /** Lead stages that count toward earned B2B agent commission. */
 export const EARNED_STAGES = ['Confirmed', 'Completed', 'On Tour'] as const;

@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../supabase';
-import type { Booking, ChatMessages, Hotel, Attraction } from '../types';
+import type { Booking, ChatMessages, Hotel, Attraction, Product } from '../types';
 import {
   agentToRow,
   apToRow,
@@ -7,6 +7,7 @@ import {
   assembleAttractions,
   assembleBookings,
   assembleHotels,
+  assembleProducts,
   attractionPhotoRows,
   attractionToRow,
   bookingToRow,
@@ -24,6 +25,7 @@ import {
   messagesFromRows,
   messagesToRows,
   photoToRow,
+  productPhotoRows,
   productToRow,
   productPricingToRow,
   restaurantToRow,
@@ -419,6 +421,71 @@ async function syncHotelRooms(hotel: Hotel) {
   }
 }
 
+async function syncProductPhotos(product: Product) {
+  const client = supabase();
+  if (!client) return;
+
+  const { error: delErr } = await client
+    .from('product_photos')
+    .delete()
+    .eq('product_code', product.code);
+  if (delErr) throw delErr;
+
+  const rows = productPhotoRows(product);
+  if (!rows.length) return;
+
+  const { error: insErr } = await client.from('product_photos').insert(rows);
+  if (insErr) throw insErr;
+}
+
+async function getProducts(): Promise<Product[]> {
+  const client = supabase();
+  if (!client) return [];
+
+  const [prodRes, linkRes] = await Promise.all([
+    client.from('products').select('*'),
+    client.from('product_photos').select('*'),
+  ]);
+  if (prodRes.error) throw prodRes.error;
+  if (linkRes.error) throw linkRes.error;
+
+  return assembleProducts(
+    (prodRes.data ?? []) as Row[],
+    (linkRes.data ?? []) as Row[]
+  ) as unknown as Product[];
+}
+
+async function syncProducts(rows: Row[], options: SyncTableOptions = {}): Promise<SyncTableResult> {
+  const client = supabase();
+  if (!client) return { skippedOrphanDelete: false };
+
+  const products = rows as unknown as Product[];
+  const localIds = products.map((p) => p.code);
+
+  if (products.length) {
+    const { error } = await client.from('products').upsert(
+      products.map((p) => productToRow(p)),
+      { onConflict: 'code' }
+    );
+    if (error) throw error;
+
+    for (const product of products) {
+      await syncProductPhotos(product);
+    }
+  }
+
+  const skipOrphans = shouldSkipOrphanDelete('products', localIds.length, options.force);
+  if (!skipOrphans) {
+    await deleteOrphans('products', 'code', localIds);
+    return { skippedOrphanDelete: false };
+  }
+
+  return {
+    skippedOrphanDelete: true,
+    warning: buildOrphanSkipWarning('products', localIds.length),
+  };
+}
+
 async function syncAttractionPhotos(attraction: Attraction) {
   const client = supabase();
   if (!client) return;
@@ -576,6 +643,20 @@ function makeTableApi(table: SyncArrayTable) {
         if (error) throw error;
       },
       count: () => countTable('attractions'),
+    };
+  }
+
+  if (table === 'products') {
+    return {
+      getAll: () => getProducts(),
+      syncTable: (rows: Row[], options?: SyncTableOptions) => syncProducts(rows, options),
+      deleteRemote: async (id: string) => {
+        const client = supabase();
+        if (!client) return;
+        const { error } = await client.from('products').delete().eq('code', id);
+        if (error) throw error;
+      },
+      count: () => countTable('products'),
     };
   }
 

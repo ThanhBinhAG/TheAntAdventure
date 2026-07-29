@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { sanitizeOutlineHtml } from '../lib/outline-rich-text';
+import { sanitizeOutlineHtml } from '../lib/outline/outline-rich-text';
 
 describe('outline-rich-text', () => {
   it('escapes plain text and preserves line breaks', () => {

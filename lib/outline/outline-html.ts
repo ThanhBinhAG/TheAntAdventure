@@ -28,7 +28,7 @@ export function fmtOutlineDate(iso?: string): string {
 }
 
 import { outlineCellHtml } from './outline-rich-text';
-import { openPrintWindow } from './print-window';
+import { openPrintWindow } from '../core/print-window';
 
 const thStyle = `padding:7px 8px;border:1px solid ${OUTLINE_BORDER};text-align:left;font-weight:700;font-size:11px;text-transform:uppercase;background:${OUTLINE_HEADER_BG};color:${OUTLINE_TEXT};-webkit-print-color-adjust:exact;print-color-adjust:exact`;
 

@@ -6,8 +6,8 @@ import {
   isActivePipelineLead,
   isEarnedCommissionStage,
   summarizeAgentCommissions,
-} from '@/lib/agents-commission';
-import { TIER_BG, TIER_COLORS } from '@/lib/page-helpers';
+} from '@/lib/sales/agents-commission';
+import { TIER_BG, TIER_COLORS } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
 import PaginationBar from '@/components/PaginationBar';

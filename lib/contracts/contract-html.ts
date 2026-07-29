@@ -1,4 +1,4 @@
-import { openPrintWindow } from './print-window';
+import { openPrintWindow } from '../core/print-window';
 
 export type ContractDoc = {
   id: string;

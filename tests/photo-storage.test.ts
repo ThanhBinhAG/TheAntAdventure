@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { photoToRow, rowToPhoto } from '../lib/db/mappers';
+import { photoToRow, rowToPhoto, productPhotoRows, assembleProducts } from '../lib/db/mappers';
 import {
   formatBytes,
   isStoragePhoto,
@@ -8,9 +8,8 @@ import {
   photosForProductSlots,
   photoThumbUrl,
   productPhotoSlotStatus,
-} from '../lib/gallery-helpers';
-import { isNextImageOptimizable } from '../lib/storage-image-src';
-import { matchProductCode, parseBulkFileName } from '../lib/gallery-bulk-upload';
+} from '../lib/gallery/gallery-helpers';
+import { isNextImageOptimizable } from '../lib/gallery/storage-image-src';
 import {
   galleryDeleteCandidatePaths,
   galleryDisplayPath,
@@ -19,40 +18,25 @@ import {
   thumbPathFromDisplayPath,
 } from '../lib/storage/photo-paths';
 import { galleryImageFileSchema } from '../lib/storage/photo-variants';
-import { resolvePackageDayPhotos, resolveProductPhotos } from '../lib/tour-photos';
+import { resolvePackageDayPhotos, resolveProductPhotos } from '../lib/gallery/tour-photos';
 import type { Product } from '../lib/types';
 
 describe('photo-paths', () => {
-  it('builds loose gallery storage paths by default', () => {
-    assert.equal(galleryDisplayPath('PH-001'), 'gallery/loose/PH-001/display.webp');
-    assert.equal(galleryThumbPath('PH-001'), 'gallery/loose/PH-001/thumb.webp');
+  it('builds flat gallery storage paths', () => {
+    assert.equal(galleryDisplayPath('PH-001'), 'gallery/PH-001/display.webp');
+    assert.equal(galleryThumbPath('PH-001'), 'gallery/PH-001/thumb.webp');
     assert.deepEqual(galleryStoragePaths('PH-001'), [
-      'gallery/loose/PH-001/display.webp',
-      'gallery/loose/PH-001/thumb.webp',
-    ]);
-  });
-
-  it('builds owner-grouped paths', () => {
-    assert.equal(
-      galleryDisplayPath('PH-001', { kind: 'tour', tourCode: 'AA-NV-HAN-HD-01' }),
-      'gallery/tours/AA-NV-HAN-HD-01/PH-001/display.webp'
-    );
-    assert.equal(
-      galleryThumbPath('PH-001', { kind: 'attraction', attractionId: 'ATT-N-001' }),
-      'gallery/attractions/ATT-N-001/PH-001/thumb.webp'
-    );
-    assert.deepEqual(galleryStoragePaths('PH-001', { kind: 'loose' }), [
-      'gallery/loose/PH-001/display.webp',
-      'gallery/loose/PH-001/thumb.webp',
-    ]);
-  });
-
-  it('keeps legacy delete fallback', () => {
-    assert.deepEqual(galleryDeleteCandidatePaths('PH-001', { kind: 'loose' }), [
-      'gallery/loose/PH-001/display.webp',
-      'gallery/loose/PH-001/thumb.webp',
       'gallery/PH-001/display.webp',
       'gallery/PH-001/thumb.webp',
+    ]);
+  });
+
+  it('includes stored path in delete candidates', () => {
+    assert.deepEqual(galleryDeleteCandidatePaths('PH-001', 'gallery/tours/X/PH-001/display.webp'), [
+      'gallery/PH-001/display.webp',
+      'gallery/PH-001/thumb.webp',
+      'gallery/tours/X/PH-001/display.webp',
+      'gallery/tours/X/PH-001/thumb.webp',
     ]);
   });
 
@@ -66,13 +50,11 @@ describe('photo-paths', () => {
 });
 
 describe('photo mappers', () => {
-  it('round-trips thumb_url, storage_path, slot, display_bytes', () => {
+  it('round-trips thumb_url, storage_path, display_bytes (no product/slot)', () => {
     const app = {
       id: 'PH-001',
       caption: 'Test',
       region: 'north',
-      product: 'AA-NV-HAN-HD-01',
-      slot: 1 as const,
       url: 'https://proj.supabase.co/storage/v1/object/public/photos/gallery/PH-001/display.webp',
       thumbUrl: 'https://proj.supabase.co/storage/v1/object/public/photos/gallery/PH-001/thumb.webp',
       storagePath: 'gallery/PH-001/display.webp',
@@ -82,13 +64,37 @@ describe('photo mappers', () => {
     const row = photoToRow(app);
     assert.equal(row.thumb_url, app.thumbUrl);
     assert.equal(row.storage_path, app.storagePath);
-    assert.equal(row.slot, 1);
+    assert.equal(row.product_code, undefined);
+    assert.equal(row.slot, undefined);
     assert.equal(row.display_bytes, 142000);
     const back = rowToPhoto(row, ['Cultural']);
     assert.equal(back.thumbUrl, app.thumbUrl);
     assert.equal(back.storagePath, app.storagePath);
-    assert.equal(back.slot, 1);
     assert.equal(back.displayBytes, 142000);
+    assert.equal(back.product, undefined);
+  });
+
+  it('builds product_photos junction rows from featured + pool', () => {
+    const rows = productPhotoRows({
+      code: 'AA-1',
+      photoIds: ['PH-1', 'PH-2'],
+      linkedPhotoIds: ['PH-1', 'PH-2', 'PH-3'],
+    });
+    assert.equal(rows.length, 3);
+    assert.equal(rows.filter((r) => r.is_featured).length, 2);
+    assert.equal(rows.find((r) => r.photo_id === 'PH-3')?.is_featured, false);
+  });
+
+  it('assembles products with photo links', () => {
+    const products = assembleProducts(
+      [{ code: 'AA-1', name: 'Tour', logic: '', duration: '', category: '', destination: '', level: '', description: '', usp: '', notes_to_sales: '', price_from: '', region: 'north' }],
+      [
+        { product_code: 'AA-1', photo_id: 'PH-1', sort_order: 0, is_featured: true },
+        { product_code: 'AA-1', photo_id: 'PH-2', sort_order: 1, is_featured: false },
+      ]
+    );
+    assert.deepEqual(products[0]?.photoIds, ['PH-1']);
+    assert.deepEqual(products[0]?.linkedPhotoIds, ['PH-1', 'PH-2']);
   });
 });
 
@@ -120,18 +126,22 @@ describe('gallery-helpers storage urls', () => {
     assert.equal(formatBytes(null), '—');
   });
 
-  it('resolves explicit slots and pool', () => {
+  it('resolves featured slots and pool from product links', () => {
     const photos = [
-      { id: 'a', caption: 'A', region: 'north', product: 'T1', slot: 1 as const, url: 'https://x/a' },
-      { id: 'b', caption: 'B', region: 'north', product: 'T1', slot: 2 as const, url: 'https://x/b' },
-      { id: 'c', caption: 'C', region: 'north', product: 'T1', url: 'https://x/c' },
+      { id: 'a', caption: 'A', region: 'north', url: 'https://x/a' },
+      { id: 'b', caption: 'B', region: 'north', url: 'https://x/b' },
+      { id: 'c', caption: 'C', region: 'north', url: 'https://x/c' },
     ];
-    const slots = photosForProductSlots(photos, 'T1');
+    const product = {
+      photoIds: ['a', 'b'],
+      linkedPhotoIds: ['a', 'b', 'c'],
+    };
+    const slots = photosForProductSlots(photos, product);
     assert.equal(slots.slot1?.id, 'a');
     assert.equal(slots.slot2?.id, 'b');
     assert.equal(slots.pool.length, 1);
     assert.equal(slots.pool[0]?.id, 'c');
-    const status = productPhotoSlotStatus(photos, 'T1');
+    const status = productPhotoSlotStatus(product);
     assert.equal(status.complete, true);
     assert.equal(status.linked, 2);
   });
@@ -157,29 +167,6 @@ describe('storage-image-src', () => {
       isNextImageOptimizable('https://abc.supabase.co/storage/v1/object/public/photos/gallery/PH-1/thumb.webp'),
       true
     );
-  });
-});
-
-describe('gallery-bulk-upload parser', () => {
-  const codes = ['AA-NV-HAN-HD-01', 'AA-NV-HAN-HD-02'];
-
-  it('parses slot filenames', () => {
-    const p1 = parseBulkFileName('AA-NV-HAN-HD-01_1.jpg', codes);
-    assert.equal(p1.status, 'ok');
-    assert.equal(p1.productCode, 'AA-NV-HAN-HD-01');
-    assert.equal(p1.slot, 1);
-
-    const p2 = parseBulkFileName('AA-NV-HAN-HD-01_2.webp', codes);
-    assert.equal(p2.slot, 2);
-
-    const p3 = parseBulkFileName('AA-NV-HAN-HD-01_3.png', codes);
-    assert.equal(p3.slot, null);
-    assert.equal(p3.poolIndex, 3);
-  });
-
-  it('matches longest product code prefix', () => {
-    assert.equal(matchProductCode('AA-NV-HAN-HD-01', codes), 'AA-NV-HAN-HD-01');
-    assert.equal(matchProductCode('UNKNOWN_1', codes), null);
   });
 });
 
@@ -218,15 +205,17 @@ describe('resolveProductPhotos', () => {
     name: 'Hanoi tour',
     dest: 'Hanoi',
     region: 'north',
+    photoIds: ['s1', 's2'],
+    linkedPhotoIds: ['s1', 's2', 'pool'],
   } as Product;
 
-  it('prefers slot 1 and 2 over pool order', () => {
+  it('prefers featured photoIds over pool order', () => {
     const resolved = resolveProductPhotos(
       product,
       [
-        { id: 'pool', caption: 'Pool', region: 'north', product: product.code, url: 'https://x/pool' },
-        { id: 's2', caption: 'Two', region: 'north', product: product.code, slot: 2, url: 'https://x/2' },
-        { id: 's1', caption: 'One', region: 'north', product: product.code, slot: 1, url: 'https://x/1' },
+        { id: 'pool', caption: 'Pool', region: 'north', url: 'https://x/pool' },
+        { id: 's2', caption: 'Two', region: 'north', url: 'https://x/2' },
+        { id: 's1', caption: 'One', region: 'north', url: 'https://x/1' },
       ],
       2
     );

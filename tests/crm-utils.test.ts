@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { customerMatchesSearch, getClientLeads, getClientPipeline, getCustomerBookings } from '../lib/crm-utils';
+import { customerMatchesSearch, getClientLeads, getClientPipeline, getCustomerBookings } from '../lib/core/crm-utils';
 import type { Booking, Customer, Lead } from '../lib/types';
 
 const leads: Lead[] = [

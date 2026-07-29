@@ -5,7 +5,7 @@ import {
   deriveDestinationOptions,
   filterDestinationSuggestions,
   resolveDestCode,
-} from '@/lib/product-code';
+} from '@/lib/products/product-code';
 
 interface DestinationComboboxProps {
   value: string;

@@ -7,7 +7,7 @@ import {
   leadMatchesCalendarMonth,
   leadMatchesTravelMonth,
   toursByMonth,
-} from '../lib/dashboard-metrics';
+} from '../lib/dashboard/dashboard-metrics';
 import type { Customer, Lead } from '../lib/types';
 
 const customers: Customer[] = [

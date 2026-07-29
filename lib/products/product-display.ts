@@ -1,4 +1,4 @@
-import type { Product } from './types';
+import type { Product } from '../types';
 
 export function isSelectableProduct(p: Product): boolean {
   return !p.status || p.status === 'active';

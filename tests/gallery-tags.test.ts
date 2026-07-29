@@ -4,7 +4,7 @@ import {
   ALL_GALLERY_TAXONOMY_TAGS,
   EMPTY_GALLERY_PHOTO_FORM,
   GALLERY_TAG_TAXONOMY,
-} from '../lib/gallery-tags';
+} from '../lib/gallery/gallery-tags';
 
 test('GALLERY_TAG_TAXONOMY has expected categories', () => {
   assert.ok(GALLERY_TAG_TAXONOMY.REGION.includes('Hanoi'));
@@ -26,7 +26,7 @@ test('ALL_GALLERY_TAXONOMY_TAGS flattens every category without duplicates', () 
 
 test('EMPTY_GALLERY_PHOTO_FORM defaults', () => {
   assert.equal(EMPTY_GALLERY_PHOTO_FORM.region, 'north');
-  assert.equal(EMPTY_GALLERY_PHOTO_FORM.product, '');
+  assert.equal(EMPTY_GALLERY_PHOTO_FORM.caption, '');
   assert.deepEqual(EMPTY_GALLERY_PHOTO_FORM.tags, []);
   assert.equal(EMPTY_GALLERY_PHOTO_FORM.file, null);
 });

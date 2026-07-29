@@ -1,6 +1,6 @@
 'use client';
 
-import { GALLERY_TAG_TAXONOMY } from '@/lib/gallery-tags';
+import { GALLERY_TAG_TAXONOMY } from '@/lib/gallery/gallery-tags';
 
 interface Props {
   selected: string[];

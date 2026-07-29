@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOutlineHTML, fmtOutlineDate } from '../lib/outline-html';
+import { buildOutlineHTML, fmtOutlineDate } from '../lib/outline/outline-html';
 
 describe('outline-html', () => {
   it('fmtOutlineDate formats ISO date as en-GB short', () => {

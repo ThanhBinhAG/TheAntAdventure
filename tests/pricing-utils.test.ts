@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { fmtPx, getCostUSD, getSpUSD, mkPct, PL_FX_BASE } from '../lib/pricing-utils';
+import { fmtPx, getCostUSD, getSpUSD, mkPct, PL_FX_BASE } from '../lib/pricing/pricing-utils';
 import type { ProductPricing } from '../lib/types';
 
 const row: ProductPricing = {

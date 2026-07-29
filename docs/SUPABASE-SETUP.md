@@ -285,37 +285,33 @@ photos, photo_tags, cal_events,
 chat_channels, chat_messages, chat_reactions, dev_notes
 ```
 
-## 8. Photo Storage (Gallery + Guides)
+## 8. Photo Storage (Library + Guides)
 
-### One-time migration (existing projects)
+### One-time migrations (existing projects)
 
-Run `supabase/migrate-photo-storage.sql` in SQL Editor after `photos` table exists.
+1. Run `supabase/migrate-photo-storage.sql` if the Storage bucket is not set up yet.
+2. Run `supabase/migrate-photo-library.sql` to create `product_photos`, backfill from `photos.product_code`/`slot`, drop those columns, and flatten Storage RLS for `gallery/{photoId}/…`.
+3. If Tour Product photos vanish on refresh with `new row violates row-level security policy for table "product_photos"`, run `supabase/fix-product-photos-rls.sql` (or re-run `rls-authenticated.sql`). An older copy of the photo-library migration enabled RLS without creating `authenticated_access`.
 
 ### Upload paths (required convention)
 
 | Use | Storage path |
 |-----|----------------|
-| Tour display | `gallery/tours/{tourCode}/{photoId}/display.webp` |
-| Tour thumbnail | `gallery/tours/{tourCode}/{photoId}/thumb.webp` |
-| Attraction display | `gallery/attractions/{attractionId}/{photoId}/display.webp` |
-| Attraction thumbnail | `gallery/attractions/{attractionId}/{photoId}/thumb.webp` |
-| Loose display | `gallery/loose/{photoId}/display.webp` |
-| Loose thumbnail | `gallery/loose/{photoId}/thumb.webp` |
+| Library display | `gallery/{photoId}/display.webp` |
+| Library thumbnail | `gallery/{photoId}/thumb.webp` |
 | Guide avatar | `guides/{guideId}/avatar.webp` |
 
-Bucket: **`photos`** (public). Max file size after compression: 5 MB.
+Bucket: **`photos`** (public). Max file size after Sharp compression: 5 MB (bucket limit).
 
 ### Upload via app
 
-Gallery → **+ Add Photo** compresses and uploads thumb + display variants client-side, then auto-syncs `photos` row (`url`, `thumb_url`, `storage_path`).
+Gallery → **Upload photos** sends the file to `POST /api/photos/upload`. The server uses **Sharp** to create WebP thumb (≤400px) + display (≤1280px), uploads both to Storage, and upserts the `photos` row (+ `photo_tags`).
 
-Guides → edit form → **Avatar photo** uploads to `guides/{guideId}/avatar.webp`.
+Tour Products attach photos via **Photo Library picker** → `product_photos` (not ownership on the photo row).
 
-For existing `gallery/{photoId}/...` objects, run:
+Guides → edit form → **Avatar photo** still uploads client-side to `guides/{guideId}/avatar.webp`.
 
-- Dry run: `npm run photos:migrate-owner-paths`
-- Apply: `npm run photos:migrate-owner-paths:apply`
-- Optional cleanup after verification: `tsx scripts/migrate-photo-storage-owner-paths.ts --apply --delete-legacy`
+Legacy owner-grouped paths (`gallery/tours/…`, `gallery/attractions/…`, `gallery/loose/…`) remain readable via stored `url` / `storage_path`; new uploads use the flat layout.
 
 ### Rollout gates (recommended)
 

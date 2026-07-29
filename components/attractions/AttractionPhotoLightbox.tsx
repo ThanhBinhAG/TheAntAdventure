@@ -1,8 +1,8 @@
 'use client';
 
-import type { GalleryPhoto } from '@/lib/tour-design-types';
-import { photoDisplayUrl } from '@/lib/gallery-helpers';
-import StorageImage from '@/components/media/StorageImage';
+import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
+import { photoDisplayUrl } from '@/lib/gallery/gallery-helpers';
+import StorageImage from '@/components/gallery/StorageImage';
 
 type Photo = GalleryPhoto;
 

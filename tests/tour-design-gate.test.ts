@@ -1,17 +1,17 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { isExperiencesBlocked } from '../lib/tour-design-gate';
+import { isExperiencesBlocked } from '../lib/tour-design/tour-design-gate';
 import {
   countPendingTourDesignLeads,
   countOutlineAwaitingApproval,
   countTourDesignAttention,
   getOutlineAwaitingApproval,
-} from '../lib/tour-design-leads';
+} from '../lib/tour-design/tour-design-leads';
 import {
   applyOutlineWorkflowPatch,
   patchOutlineApproved,
   patchOutlineSent,
-} from '../lib/tour-outline-workflow';
+} from '../lib/tour-design/tour-outline-workflow';
 import type { Lead, TourDraft } from '../lib/types';
 
 const baseLead: Lead = {

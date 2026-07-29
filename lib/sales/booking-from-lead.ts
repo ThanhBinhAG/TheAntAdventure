@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Booking, Lead } from './types';
+import type { Booking, Lead } from '../types';
 
 const leadForBookingSchema = z.object({
   id: z.string().min(1),

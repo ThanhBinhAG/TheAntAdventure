@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
-import { buildContractHTML, downloadContractWord, printContract } from '@/lib/contract-html';
+import { buildContractHTML, downloadContractWord, printContract } from '@/lib/contracts/contract-html';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
 import PaginationBar from '@/components/PaginationBar';

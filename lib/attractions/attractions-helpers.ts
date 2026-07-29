@@ -1,6 +1,6 @@
 import { useStore } from '@/hooks/useStore';
-import type { Attraction } from './types';
-import type { GalleryPhoto } from './tour-design-types';
+import type { Attraction } from '../types';
+import type { GalleryPhoto } from '../tour-design/tour-design-types';
 
 const DAY_ABBREV: Record<string, string> = {
   monday: 'Mon',
@@ -68,7 +68,7 @@ export function getAttractionHighlight(
 }
 
 export function galleryUrlForAttraction(attractionId: string, _name?: string, photoId?: string): string {
-  const params = new URLSearchParams({ attraction: attractionId, tab: 'loose' });
+  const params = new URLSearchParams({ attraction: attractionId });
   if (photoId) params.set('photo', photoId);
   return `/gallery?${params.toString()}`;
 }
@@ -83,7 +83,7 @@ export function photosForAttraction(
   return ids.map((id) => byId.get(id)).filter((p): p is GalleryPhoto => Boolean(p && (p.url || p.thumbUrl)));
 }
 
-/** All loose photos linked to an attraction pool (excludes tour product photos). */
+/** All photos linked to an attraction pool. */
 export function photosLinkedToAttraction(
   allPhotos: GalleryPhoto[],
   attraction: Pick<Attraction, 'linkedPhotoIds' | 'photoIds'>
@@ -95,7 +95,7 @@ export function photosLinkedToAttraction(
   const byId = new Map(allPhotos.map((p) => [p.id, p]));
   return ids
     .map((id) => byId.get(id))
-    .filter((p): p is GalleryPhoto => Boolean(p && !p.product && (p.url || p.thumbUrl)));
+    .filter((p): p is GalleryPhoto => Boolean(p && (p.url || p.thumbUrl)));
 }
 
 export function linkPhotoToAttraction(attractionId: string, photoId: string) {

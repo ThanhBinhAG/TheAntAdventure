@@ -5,7 +5,7 @@ import {
   EMPTY_CUSTOMER_FORM,
   formToCustomer,
   type CustomerFormData,
-} from '../lib/customer-form';
+} from '../lib/customers/customer-form';
 import type { Customer } from '../lib/types';
 
 const sampleCustomer: Customer = {

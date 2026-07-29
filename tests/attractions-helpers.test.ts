@@ -10,9 +10,9 @@ import {
   photosForAttraction,
   photosLinkedToAttraction,
   truncateCell,
-} from '../lib/attractions-helpers';
+} from '../lib/attractions/attractions-helpers';
 import type { Attraction } from '../lib/types';
-import type { GalleryPhoto } from '../lib/tour-design-types';
+import type { GalleryPhoto } from '../lib/tour-design/tour-design-types';
 
 function attraction(partial: Partial<Attraction> & Pick<Attraction, 'id' | 'region' | 'name'>): Attraction {
   return {
@@ -67,18 +67,18 @@ test('getAttractionHighlight flags closed-today and warnings', () => {
 test('galleryUrlForAttraction builds query string', () => {
   assert.equal(
     galleryUrlForAttraction('ATT-N-001'),
-    '/gallery?attraction=ATT-N-001&tab=loose'
+    '/gallery?attraction=ATT-N-001'
   );
   assert.equal(
     galleryUrlForAttraction('ATT-N-001', 'Temple', 'PH-1'),
-    '/gallery?attraction=ATT-N-001&tab=loose&photo=PH-1'
+    '/gallery?attraction=ATT-N-001&photo=PH-1'
   );
 });
 
 test('photosForAttraction and photosLinkedToAttraction resolve by id', () => {
   const photos: GalleryPhoto[] = [
-    { id: 'P1', caption: 'Tour', region: 'north', product: 'AA-1', url: 'https://a/1.jpg' },
-    { id: 'P2', caption: 'Loose', region: 'north', url: 'https://a/2.jpg' },
+    { id: 'P1', caption: 'One', region: 'north', url: 'https://a/1.jpg' },
+    { id: 'P2', caption: 'Two', region: 'north', url: 'https://a/2.jpg' },
     { id: 'P3', caption: 'Thumb', region: 'north', thumbUrl: 'https://a/3.jpg' },
   ];
   const att = attraction({
@@ -92,7 +92,6 @@ test('photosForAttraction and photosLinkedToAttraction resolve by id', () => {
     photosForAttraction(photos, att).map((p) => p.id),
     ['P1', 'P2']
   );
-  // Linked pool excludes tour product photos
   assert.deepEqual(
     photosLinkedToAttraction(photos, att).map((p) => p.id),
     ['P2', 'P3']

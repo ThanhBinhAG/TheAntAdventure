@@ -6,7 +6,7 @@ import {
   EXTENDED_TAG_OPTIONS,
   emptyExtendedSupplier,
   nextSupplierId,
-} from '@/lib/supplier-utils';
+} from '@/lib/suppliers/supplier-utils';
 import type { ExtendedSupplier } from '@/lib/types';
 
 interface Props {

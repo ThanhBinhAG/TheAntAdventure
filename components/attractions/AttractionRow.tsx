@@ -8,10 +8,10 @@ import {
   getAttractionHighlight,
   getNonDuplicateAlert,
   photosForAttraction,
-} from '@/lib/attractions-helpers';
+} from '@/lib/attractions/attractions-helpers';
 import AttractionExpandPanel from './AttractionExpandPanel';
 
-import type { GalleryPhoto } from '@/lib/tour-design-types';
+import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 
 type Props = {
   attraction: Attraction;

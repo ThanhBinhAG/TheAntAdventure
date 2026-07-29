@@ -6,7 +6,7 @@ import { useRef } from 'react';
 import { PAGE_TITLES, QUICK_NAV_PAGES } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
-import { useSupabasePanel } from '@/lib/SupabaseContext';
+import { useSupabasePanel } from '@/lib/context/SupabaseContext';
 import { AiCopilotTrigger } from '@/components/AiCopilot';
 import type { PageSlug } from '@/lib/types';
 

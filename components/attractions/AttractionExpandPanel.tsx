@@ -1,10 +1,10 @@
 'use client';
 
 import type { Attraction } from '@/lib/types';
-import type { GalleryPhoto } from '@/lib/tour-design-types';
-import { photoDisplayUrl, photoThumbUrl } from '@/lib/gallery-helpers';
-import { getNonDuplicateAlert } from '@/lib/attractions-helpers';
-import StorageImage from '@/components/media/StorageImage';
+import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
+import { photoDisplayUrl, photoThumbUrl } from '@/lib/gallery/gallery-helpers';
+import { getNonDuplicateAlert } from '@/lib/attractions/attractions-helpers';
+import StorageImage from '@/components/gallery/StorageImage';
 
 type Props = {
   attraction: Attraction;

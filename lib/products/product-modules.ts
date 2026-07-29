@@ -1,4 +1,4 @@
-import { getSellPrice } from '@/lib/tour-pricing';
+import { getSellPrice } from '@/lib/tour-design/tour-pricing';
 import type { Product } from '@/lib/types';
 
 export const MODULE_REGIONS = ['north', 'central', 'south'] as const;

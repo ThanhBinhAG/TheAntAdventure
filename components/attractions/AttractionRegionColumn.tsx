@@ -15,7 +15,7 @@ const REG_COLORS: Record<string, [string, string]> = {
   south: ['#E1F0FF', '#0c5464'],
 };
 
-import type { GalleryPhoto } from '@/lib/tour-design-types';
+import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 
 type Props = {
   region: string;

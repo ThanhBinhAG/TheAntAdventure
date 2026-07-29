@@ -6,7 +6,7 @@ import {
   STAGE_ORDER,
   STAGE_PROB_V22,
 } from '../lib/constants';
-import { getLeadWeightedValue } from '../lib/sales-lead-utils';
+import { getLeadWeightedValue } from '../lib/sales/sales-lead-utils';
 import type { Lead } from '../lib/types';
 
 test('KANBAN_STAGES includes On Tour between Confirmed and Completed', () => {

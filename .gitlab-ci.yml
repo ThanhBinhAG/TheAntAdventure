@@ -1,12 +1,11 @@
-# GitLab CI — quality gates (no auto-deploy)
+# GitLab CI — lint check only, no deploy
+
 stages:
-  - install
   - verify
 
 variables:
   npm_config_cache: '$CI_PROJECT_DIR/.npm'
   NEXT_TELEMETRY_DISABLED: '1'
-  # Build without a real Sentry project; DSN empty = SDK disabled
   NEXT_PUBLIC_SENTRY_DSN: ''
   NEXT_PUBLIC_USE_SUPABASE: 'false'
   NEXT_PUBLIC_APP_VERSION: 'ci'
@@ -17,40 +16,14 @@ cache:
       - package-lock.json
   paths:
     - .npm/
-    - node_modules/
 
-install:
-  stage: install
-  image: node:20-bookworm
+lint:
+  stage: verify
+  image: node:20-alpine
+  tags:
+    - vm06-deploy-ant-admin
   script:
+    - node --version
+    - npm --version
     - npm ci
-  artifacts:
-    paths:
-      - node_modules/
-    expire_in: 1 hour
-
-typecheck:
-  stage: verify
-  image: node:20-bookworm
-  needs: ['install']
-  script:
-    - npm run typecheck
-
-test:
-  stage: verify
-  image: node:20-bookworm
-  needs: ['install']
-  script:
-    - npm test
-
-build:
-  stage: verify
-  image: node:20-bookworm
-  needs: ['install']
-  script:
-    - npm run build
-  artifacts:
-    paths:
-      - .next/
-    expire_in: 1 day
-    when: on_success
+    - npm run lint

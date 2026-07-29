@@ -1,6 +1,6 @@
-import { useStore } from './store';
-import type { ProductPricing } from './types';
-import { getCostFromRow, getSellFromRow, priceLabelFromRow } from './product-pricing-helpers';
+import { useStore } from '../store';
+import type { ProductPricing } from '../types';
+import { getCostFromRow, getSellFromRow, priceLabelFromRow } from '../products/product-pricing-helpers';
 
 export const PRICING_TIERS: { n: number; label: string }[] = [
   { n: 1, label: 'Solo' },

@@ -1,4 +1,4 @@
-import type { TourBrief } from './tour-design-types';
+import type { TourBrief } from '../tour-design/tour-design-types';
 
 export type ProposalVariant = 'b2c' | 'b2b';
 
@@ -27,6 +27,14 @@ export interface ProposalItineraryRow {
   hotel: string;
 }
 
+export interface ProposalDaySegment {
+  title: string;
+  body: string;
+  imageUrls: string[];
+  /** Product code for photo matching when packing multiple experiences into one day. */
+  productCode?: string;
+}
+
 export interface ProposalDayDetail {
   dayNumber: number;
   dateLabel: string;
@@ -36,6 +44,8 @@ export interface ProposalDayDetail {
   hotel: string;
   meals: string;
   imageUrls: string[];
+  /** When set (e.g. two half-days), Detailed Program renders each segment with its own title/photos. */
+  segments?: ProposalDaySegment[];
 }
 
 export interface ProposalHotelRate {
@@ -47,6 +57,26 @@ export interface ProposalHotelRate {
   roomType: string;
   nights: number;
   ratePerNight: number;
+}
+
+export interface ProposalOverviewRow {
+  label: string;
+  optionA: string;
+  optionB: string;
+}
+
+export interface ProposalPricingText {
+  packageLabel?: string;
+  b2bGroundDesc?: string;
+  b2bFlightsDesc?: string;
+  footnote?: string;
+}
+
+export interface ProposalLegalText {
+  paymentTerms?: string;
+  cancellation?: string;
+  amendment?: string;
+  importantNotes?: string;
 }
 
 export interface ProposalB2CPricing {
@@ -108,14 +138,22 @@ export interface ProposalDoc {
   logoUrl: string;
   /** Default `sidebar` matches Material samples; `inline` keeps the horizontal photo grid. */
   detailedProgramLayout: ProposalDetailedProgramLayout;
+  /** Editor overrides for cover booking table values (keyed by row label). */
+  bookingFields?: Record<string, string>;
+  /** Editor overrides for Tour Overview table rows. */
+  overviewRows?: ProposalOverviewRow[];
+  /** Editor overrides for pricing descriptive text (amounts stay computed). */
+  pricingText?: ProposalPricingText;
+  /** Editor overrides for B2C legal section prose (serialized blocks). */
+  legalText?: ProposalLegalText;
 }
 
 export interface AssembleProposalInput {
   brief: TourBrief;
   clientType: 'b2c' | 'b2b';
   customerName: string;
-  outlineRows: import('./types').TourOutlineDay[];
-  products: import('./types').Product[];
+  outlineRows: import('../types').TourOutlineDay[];
+  products: import('../types').Product[];
   selectedCodes: string[];
   selectedPackageId: string | null;
   markupPct: number;
@@ -128,8 +166,10 @@ export interface AssembleProposalInput {
   exclusionsOverride?: string[];
   specialNotesOverride?: string;
   logoUrl?: string;
-  productPricing?: import('./types').ProductPricing[];
-  galleryPhotos?: import('./tour-design-types').GalleryPhoto[];
-  hotelsCatalog?: import('./types').Hotel[];
+  productPricing?: import('../types').ProductPricing[];
+  galleryPhotos?: import('../tour-design/tour-design-types').GalleryPhoto[];
+  hotelsCatalog?: import('../types').Hotel[];
   detailedProgramLayout?: ProposalDetailedProgramLayout;
+  /** Per-product draft edits (desc / date / clientNote) from Step 2. */
+  experienceOverrides?: Record<string, import('../types').ExperienceOverride>;
 }

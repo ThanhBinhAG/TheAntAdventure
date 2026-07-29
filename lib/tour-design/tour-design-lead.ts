@@ -1,8 +1,8 @@
-import { localTodayIso } from './date-utils';
-import { formatLeadTravelMonth } from './sales-lead-utils';
-import { nextLeadId } from './customer-onboarding';
-import type { TourBrief } from './tour-design-types';
-import type { Comm, Customer, Lead, TourDraft } from './types';
+import { localTodayIso } from '../core/date-utils';
+import { formatLeadTravelMonth } from '../sales/sales-lead-utils';
+import type { TourBrief } from '../tour-design/tour-design-types';
+import { nextLeadId } from '../customers/customer-onboarding';
+import type { Comm, Customer, Lead, TourDraft } from '../types';
 
 export function buildOutlineComm(
   custId: string,

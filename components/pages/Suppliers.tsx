@@ -6,7 +6,7 @@ import HotelTab from '@/components/suppliers/HotelTab';
 import QuickListTab from '@/components/suppliers/QuickListTab';
 import SupplierFilterBar, { computeSupplierCounts, type SupTab } from '@/components/suppliers/SupplierFilterBar';
 import { useStore } from '@/hooks/useStore';
-import type { SupplierFilters } from '@/lib/supplier-utils';
+import type { SupplierFilters } from '@/lib/suppliers/supplier-utils';
 
 const TABS: { id: SupTab; label: string }[] = [
   { id: 'hotels', label: '🏨 Hotels' },

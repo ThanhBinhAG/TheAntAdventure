@@ -5,7 +5,7 @@ import {
   ensureBookingForConfirmedLead,
   findBookingForLead,
   nextBookingId,
-} from '../lib/booking-from-lead';
+} from '../lib/sales/booking-from-lead';
 import type { Booking, Lead } from '../lib/types';
 
 const lead: Lead = {

@@ -1,5 +1,5 @@
-import type { Product, ProductPricing, ProductPricingInclusions } from './types';
-import type { TaaTour } from './seeds/taa-tours';
+import type { Product, ProductPricing, ProductPricingInclusions } from '../types';
+import type { TaaTour } from '../seeds/taa-tours';
 
 export type PricingStatus = 'complete' | 'incomplete' | 'missing';
 export type PricingStatusFilter = PricingStatus | '';

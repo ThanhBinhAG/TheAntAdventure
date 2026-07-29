@@ -13,10 +13,10 @@ import { Bar } from 'react-chartjs-2';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FX, FX_SYM, STAGE_PROB_V22, STAGE_COLORS, fmt } from '@/lib/constants';
-import { computeDashboardMetrics } from '@/lib/dashboard-metrics';
-import { TIER_BG, TIER_COLORS } from '@/lib/page-helpers';
+import { computeDashboardMetrics } from '@/lib/dashboard/dashboard-metrics';
+import { TIER_BG, TIER_COLORS } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
-import { getCustomerName } from '@/lib/crm-utils';
+import { getCustomerName } from '@/lib/core/crm-utils';
 import type { Customer, Lead } from '@/lib/types';
 
 function ForecastBreakdown({ leads, customers }: { leads: Lead[]; customers: Customer[] }) {

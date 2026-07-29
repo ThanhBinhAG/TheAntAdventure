@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import QuickListFormModal, { type QuickListKind } from '@/components/suppliers/QuickListFormModal';
 import { useStore } from '@/hooks/useStore';
-import { filterByRegion, supplierMatchesSearch, type SupplierFilters } from '@/lib/supplier-utils';
+import { filterByRegion, supplierMatchesSearch, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/lib/types';
 
 type QuickRow = TransportSupplier | RestaurantSupplier | CruiseSupplier;

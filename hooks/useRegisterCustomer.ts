@@ -8,7 +8,7 @@ import {
   findDuplicateCustomerByEmail,
   registerNewCustomer,
   type RegisterNewCustomerResult,
-} from '@/lib/customer-onboarding';
+} from '@/lib/customers/customer-onboarding';
 import type { Customer } from '@/lib/types';
 
 export type CustomerSaveOutcome =

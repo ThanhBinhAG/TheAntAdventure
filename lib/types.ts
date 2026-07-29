@@ -75,6 +75,20 @@ export interface Lead {
 
 export type OutlineStatus = 'draft' | 'sent' | 'approved';
 
+/** Per-product draft edits on Step 2 Draft Itinerary (not catalog Product data). */
+export interface ExperienceOverride {
+  /** Edited narrative shown in draft + product-path export. */
+  desc?: string;
+  /** YYYY-MM-DD override for day label / export dateLabel. */
+  date?: string;
+  /** 1-based day number for display / export (may differ from packed day). */
+  dayIndex?: number;
+  /** Packing override: treat as full day (1) or half day (0.5). */
+  durOverride?: 'full' | 'half';
+  /** Client-facing note appended in proposal export. */
+  clientNote?: string;
+}
+
 export interface TourDraft {
   id: string;
   leadId: string;
@@ -87,6 +101,8 @@ export interface TourDraft {
   outlineRevision?: number;
   selectedCodes?: string[];
   selectedPackageId?: string | null;
+  /** Draft-scoped edits keyed by product code; persisted under brief_json.__experienceOverrides. */
+  experienceOverrides?: Record<string, ExperienceOverride>;
   markupPct?: number;
   clientType?: 'b2c' | 'b2b';
   currentStep?: number;
@@ -210,6 +226,10 @@ export interface Product {
   region: string;
   nameVn?: string;
   status?: 'active' | 'draft' | 'archived';
+  /** Up to 2 featured photos for card / proposal preview */
+  photoIds?: string[];
+  /** Full photo pool linked from Photo Library */
+  linkedPhotoIds?: string[];
 }
 
 export interface ProductPricingInclusions {

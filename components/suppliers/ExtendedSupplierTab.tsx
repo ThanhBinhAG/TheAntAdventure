@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import ExtSupplierCard from '@/components/suppliers/ExtSupplierCard';
 import ExtendedSupplierFormModal from '@/components/suppliers/ExtendedSupplierFormModal';
 import { useStore } from '@/hooks/useStore';
-import { filterExtendedSuppliers, preselectCategoryForTab, type SupplierFilters } from '@/lib/supplier-utils';
+import { filterExtendedSuppliers, preselectCategoryForTab, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { ExtendedSupplier } from '@/lib/types';
 
 export type ExtendedSection = 'logistics' | 'water' | 'adventure' | 'experience' | 'personnel';

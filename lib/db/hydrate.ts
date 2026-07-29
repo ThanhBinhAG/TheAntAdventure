@@ -2,10 +2,10 @@ import { withoutAutoSyncAsync } from './auto-sync';
 import { pushSnapshotToSupabase } from './sync-push';
 import { appLog } from '../system/app-logger';
 import { isRemoteDataEnabled, isRemoteDataEnabled as remoteEnabled } from '../env';
-import { mergeAttractionSeeds } from '../ensure-attraction-seeds';
-import { mergeRequiredProducts } from '../ensure-core-products';
-import { mergeSupplierSeeds } from '../ensure-supplier-seeds';
-import { pruneProductPricingToProducts } from '../product-pricing-helpers';
+import { mergeAttractionSeeds } from '../attractions/ensure-attraction-seeds';
+import { mergeRequiredProducts } from '../products/ensure-core-products';
+import { mergeSupplierSeeds } from '../suppliers/ensure-supplier-seeds';
+import { pruneProductPricingToProducts } from '../products/product-pricing-helpers';
 import { useStore } from '../store';
 import type {
   BackupData,

@@ -10,7 +10,7 @@ import {
   groupProductsForModules,
   isProductActive,
   moduleKeyToDur,
-} from '../lib/product-modules';
+} from '../lib/products/product-modules';
 
 function product(partial: Partial<Product> & Pick<Product, 'code' | 'name'>): Product {
   return {

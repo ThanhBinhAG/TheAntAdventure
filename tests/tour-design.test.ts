@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDayGroups, buildItinerary, parseDuration, totalDurationDays } from '../lib/tour-itinerary';
-import { productPhotoSlotStatus } from '../lib/gallery-helpers';
-import { resolveProductPhotos } from '../lib/tour-photos';
+import { buildDayGroups, buildItinerary, parseDuration, totalDurationDays } from '../lib/tour-design/tour-itinerary';
+import { productPhotoSlotStatus } from '../lib/gallery/gallery-helpers';
+import { resolveProductPhotos } from '../lib/gallery/tour-photos';
 import type { Product } from '../lib/types';
 
 const halfDay: Product = {
@@ -72,25 +72,40 @@ describe('tour-itinerary', () => {
     assert.equal(days.length, 1);
     assert.equal(days[0].items[0].code, 'A');
   });
+
+  it('durOverride half packs two full-day catalog products into one day', () => {
+    const a = { ...fullDay, code: 'F1' };
+    const b = { ...fullDay, code: 'F2' };
+    const overrides = {
+      F1: { durOverride: 'half' as const },
+      F2: { durOverride: 'half' as const },
+    };
+    const days = buildDayGroups([a, b], overrides);
+    assert.equal(days.length, 1);
+    assert.equal(days[0].items.length, 2);
+    assert.equal(totalDurationDays([a, b], overrides), 1);
+  });
 });
 
 describe('tour-photos', () => {
-  it('prefers gallery photos over fallback', () => {
+  it('prefers gallery photos when linked on product', () => {
+    const product = { ...halfDay, photoIds: ['P1'], linkedPhotoIds: ['P1'] };
     const photos = resolveProductPhotos(
-      halfDay,
-      [{ id: 'P1', caption: 'Gallery', region: 'north', product: 'A', url: 'https://example.com/1.jpg' }],
+      product,
+      [{ id: 'P1', caption: 'Gallery', region: 'north', url: 'https://example.com/1.jpg' }],
       2
     );
     assert.equal(photos[0].url, 'https://example.com/1.jpg');
-    assert.equal(photos.length, 2);
+    assert.equal(photos.length, 1);
   });
 
   it('uses two gallery photos when both linked to product', () => {
+    const product = { ...halfDay, photoIds: ['P1', 'P2'], linkedPhotoIds: ['P1', 'P2'] };
     const photos = resolveProductPhotos(
-      halfDay,
+      product,
       [
-        { id: 'P1', caption: 'Gallery 1', region: 'north', product: 'A', url: 'https://example.com/1.jpg' },
-        { id: 'P2', caption: 'Gallery 2', region: 'north', product: 'A', url: 'https://example.com/2.jpg' },
+        { id: 'P1', caption: 'Gallery 1', region: 'north', url: 'https://example.com/1.jpg' },
+        { id: 'P2', caption: 'Gallery 2', region: 'north', url: 'https://example.com/2.jpg' },
       ],
       2
     );
@@ -101,12 +116,11 @@ describe('tour-photos', () => {
 });
 
 describe('gallery-helpers', () => {
-  it('productPhotoSlotStatus counts linked photos', () => {
-    const all = [
-      { id: 'P1', caption: 'A', region: 'north', product: 'CODE', url: 'https://a.jpg' },
-      { id: 'P2', caption: 'B', region: 'north', product: 'CODE', url: 'https://b.jpg' },
-    ];
-    const status = productPhotoSlotStatus(all, 'CODE');
+  it('productPhotoSlotStatus counts featured photos', () => {
+    const status = productPhotoSlotStatus({
+      photoIds: ['P1', 'P2'],
+      linkedPhotoIds: ['P1', 'P2'],
+    });
     assert.equal(status.linked, 2);
     assert.equal(status.complete, true);
   });

@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
-import { createInquiryLeadForCustomer } from '@/lib/customer-onboarding';
-import { getClientLeads, getClientPipeline, getCustomerBookings } from '@/lib/crm-utils';
-import { npsBadgeClass, npsIcon } from '@/lib/page-helpers';
+import { createInquiryLeadForCustomer } from '@/lib/customers/customer-onboarding';
+import { getClientLeads, getClientPipeline, getCustomerBookings } from '@/lib/core/crm-utils';
+import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
 import type { Comm, Customer, Lead } from '@/lib/types';
 

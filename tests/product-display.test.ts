@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isSelectableProduct } from '../lib/product-display';
+import { isSelectableProduct } from '../lib/products/product-display';
 import type { Product } from '../lib/types';
 
 const base: Product = {

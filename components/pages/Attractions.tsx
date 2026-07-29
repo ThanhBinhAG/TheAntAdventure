@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
-import { nextAttractionId, photosForAttraction } from '@/lib/attractions-helpers';
+import { nextAttractionId, photosForAttraction } from '@/lib/attractions/attractions-helpers';
 import type { Attraction } from '@/lib/types';
 import AttractionEditModal, { type AttractionFormData } from '@/components/attractions/AttractionEditModal';
 import AttractionPhotoLightbox from '@/components/attractions/AttractionPhotoLightbox';
 import AttractionRegionColumn from '@/components/attractions/AttractionRegionColumn';
 import AttractionTable from '@/components/attractions/AttractionTable';
 
-import type { GalleryPhoto } from '@/lib/tour-design-types';
+import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 type ViewMode = 'grid' | 'columns';
 
 export default function Attractions() {

@@ -12,7 +12,7 @@ import {
   parseProductCode,
   resolveDestCode,
   suggestTypeSegment,
-} from '../lib/product-code';
+} from '../lib/products/product-code';
 
 const existingHanHd = ['AA-NV-HAN-HD-01', 'AA-NV-HAN-HD-02', 'AA-NV-HAN-TRF-01'];
 

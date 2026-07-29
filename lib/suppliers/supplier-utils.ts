@@ -1,4 +1,4 @@
-import type { ExtendedSupplier } from './types';
+import type { ExtendedSupplier } from '../types';
 
 export type SupplierFilters = {
   search: string;

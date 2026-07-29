@@ -7,8 +7,8 @@ import {
   SALES_PEOPLE,
   customerToForm,
   type CustomerFormData,
-} from '@/lib/customer-form';
-import { findDuplicateCustomerByEmail, formatDuplicateEmailMessage } from '@/lib/customer-onboarding';
+} from '@/lib/customers/customer-form';
+import { findDuplicateCustomerByEmail, formatDuplicateEmailMessage } from '@/lib/customers/customer-onboarding';
 import type { Customer } from '@/lib/types';
 
 const CHILD_TAGS = ['Infant 0–2', 'Toddler 3–5', 'Child 6–9', 'Pre-teen 10–12', 'Teen 13–17'];

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import HotelFormModal from '@/components/suppliers/HotelFormModal';
 import { useStore } from '@/hooks/useStore';
-import { filterByRegion, REG_BADGE, supplierMatchesSearch, type SupplierFilters } from '@/lib/supplier-utils';
+import { filterByRegion, REG_BADGE, supplierMatchesSearch, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { Hotel } from '@/lib/types';
 
 type Props = {

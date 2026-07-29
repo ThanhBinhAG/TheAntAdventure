@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseAnonKey, getSupabaseUrl } from './env';
-import { createClient } from './supabase/client';
+import { getSupabaseAnonKey, getSupabaseUrl } from '../env';
+import { createClient } from './client';
 
-export { isSupabaseConfigured } from './env';
+export { isSupabaseConfigured } from '../env';
 
 let supabase: SupabaseClient | null = null;
 

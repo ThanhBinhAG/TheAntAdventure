@@ -3,17 +3,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
 import type { Attraction } from '@/lib/types';
-import type { GalleryPhoto } from '@/lib/tour-design-types';
+import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import {
   galleryUrlForAttraction,
   nextAttractionId,
   photosLinkedToAttraction,
-} from '@/lib/attractions-helpers';
-import { photoThumbUrl } from '@/lib/gallery-helpers';
-import { saveNewLoosePhoto, saveNewLoosePhotosBatch } from '@/lib/gallery-loose-save';
+} from '@/lib/attractions/attractions-helpers';
+import { photoThumbUrl } from '@/lib/gallery/gallery-helpers';
+import { saveNewLoosePhoto, saveNewLoosePhotosBatch } from '@/lib/gallery/gallery-loose-save';
 import { pushTablesToSupabase } from '@/lib/db/hydrate';
-import { createClient } from '@/lib/supabase/client';
-import { deleteGalleryPhotoFiles } from '@/lib/storage/upload-gallery-photo';
+import { deletePhotoViaApi } from '@/lib/gallery/photo-api';
 import GalleryPhotoModal, { type GalleryPhotoSavePayload } from '@/components/gallery/GalleryPhotoModal';
 
 export type AttractionFormData = {
@@ -83,7 +82,6 @@ export default function AttractionEditModal({
   onDelete,
   nextId,
 }: Props) {
-  const products = useStore((s) => s.products);
   const storePhotos = useStore((s) => s.photos) as GalleryPhoto[];
 
   const [form, setForm] = useState<AttractionFormData>(EMPTY);
@@ -178,18 +176,33 @@ export default function AttractionEditModal({
     setQuickAddSaving(true);
     setQuickAddStatus('');
     try {
-      if (data.looseBatch?.length) {
-        await saveNewLoosePhotosBatch(data.looseBatch, data, {
-          attractionId: form.id,
-          defaultRegion: form.region,
-          onStatus: setQuickAddStatus,
-        });
+      if (data.files?.length && data.files.length > 1) {
+        await saveNewLoosePhotosBatch(
+          data.files.map((file) => ({
+            file,
+            caption: data.caption || file.name.replace(/\.[^.]+$/, ''),
+          })),
+          data,
+          {
+            attractionId: form.id,
+            defaultRegion: form.region,
+            onStatus: setQuickAddStatus,
+          }
+        );
       } else {
-        await saveNewLoosePhoto(data, {
-          attractionId: form.id,
-          defaultRegion: form.region,
-          onStatus: setQuickAddStatus,
-        });
+        await saveNewLoosePhoto(
+          {
+            caption: data.caption,
+            region: data.region,
+            tags: data.tags,
+            file: data.file ?? data.files?.[0] ?? null,
+          },
+          {
+            attractionId: form.id,
+            defaultRegion: form.region,
+            onStatus: setQuickAddStatus,
+          }
+        );
       }
       syncFormFromStore(form.id);
       setQuickAddOpen(false);
@@ -210,10 +223,8 @@ export default function AttractionEditModal({
     try {
       for (const id of ids) {
         try {
-          await deleteGalleryPhotoFiles(createClient(), id, {
-            kind: 'attraction',
-            attractionId: form.id,
-          });
+          const photo = allPhotos.find((p) => p.id === id);
+          await deletePhotoViaApi(id, photo?.storagePath);
         } catch {
           // best-effort storage cleanup; keep deleting metadata
         }
@@ -541,10 +552,8 @@ export default function AttractionEditModal({
 
       <GalleryPhotoModal
         open={quickAddOpen}
-        mode="addLoose"
+        mode="add"
         defaultRegion={form.region}
-        products={products}
-        existingPhotos={allPhotos}
         saving={quickAddSaving}
         saveStatus={quickAddStatus}
         onClose={() => {

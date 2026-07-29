@@ -6,7 +6,7 @@ import {
   localTodayIso,
   mondayWeekRange,
   weekDaysFromMonday,
-} from '../lib/date-utils';
+} from '../lib/core/date-utils';
 
 test('localIsoDate formats YYYY-MM-DD', () => {
   const d = new Date('2026-07-03T15:00:00+07:00');

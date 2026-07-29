@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { WR } from '@/lib/seeds/weather';
-import { REG_COLORS_HEX } from '@/lib/page-helpers';
+import { REG_COLORS_HEX } from '@/lib/core/page-helpers';
 import type { WeeklyWeatherResponse } from '@/lib/weather/types';
 
 type Props = {

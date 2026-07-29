@@ -1,7 +1,7 @@
-import { STAGE_ORDER, STAGE_PROB_V22 } from './constants';
-import { mondayWeekRange } from './date-utils';
-import { getCustomerName } from './crm-utils';
-import type { Customer, Lead } from './types';
+import { STAGE_ORDER, STAGE_PROB_V22 } from '../constants';
+import { mondayWeekRange } from '../core/date-utils';
+import { getCustomerName } from '../core/crm-utils';
+import type { Customer, Lead } from '../types';
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 

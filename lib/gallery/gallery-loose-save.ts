@@ -1,19 +1,18 @@
 import { useStore } from '@/hooks/useStore';
 import { pushTablesToSupabase } from '@/lib/db/hydrate';
-import type { GalleryPhotoSavePayload, LoosePhotoBatchItem } from '@/components/gallery/GalleryPhotoModal';
-import type { GalleryPhoto } from '@/lib/tour-design-types';
-import { linkPhotoToAttractionWithFeatured } from '@/lib/attractions-helpers';
-import { createClient } from '@/lib/supabase/client';
-import { uploadGalleryPhoto } from '@/lib/storage/upload-gallery-photo';
-import type { GalleryPhotoOwner } from '@/lib/storage/photo-paths';
+import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
+import { linkPhotoToAttractionWithFeatured } from '@/lib/attractions/attractions-helpers';
+import { nextPhotoId } from '@/lib/gallery/gallery-helpers';
+import { uploadPhotoViaApi } from '@/lib/gallery/photo-api';
 
 export function nextGalleryPhotoId(photos: GalleryPhoto[]): string {
-  const max = photos.reduce((n, p) => {
-    const num = parseInt(p.id.replace(/^PH-/, ''), 10);
-    return Number.isFinite(num) ? Math.max(n, num) : n;
-  }, 0);
-  return `PH-${String(max + 1).padStart(3, '0')}`;
+  return nextPhotoId(photos);
 }
+
+export type LoosePhotoBatchItem = {
+  file: File;
+  caption: string;
+};
 
 export type SaveLoosePhotoResult = {
   photoId: string;
@@ -25,32 +24,10 @@ export type SaveLoosePhotosBatchResult = {
   records: GalleryPhoto[];
 };
 
-async function uploadLooseRecord(
-  photoId: string,
-  file: File,
-  meta: { caption: string; region: string; tags: string[]; attractionId?: string }
-): Promise<GalleryPhoto> {
-  const supabase = createClient();
-  const owner: GalleryPhotoOwner = meta.attractionId
-    ? { kind: 'attraction', attractionId: meta.attractionId }
-    : { kind: 'loose' };
-  const uploaded = await uploadGalleryPhoto(supabase, photoId, file, owner);
-  return {
-    id: photoId,
-    caption: meta.caption.trim(),
-    region: meta.region,
-    tags: meta.tags,
-    url: uploaded.url,
-    thumbUrl: uploaded.thumbUrl,
-    storagePath: uploaded.storagePath,
-    displayBytes: uploaded.displayBytes,
-  };
-}
-
-/** Upload multiple loose photos, update store, optionally link each to an attraction pool. */
+/** Upload multiple library photos via Sharp API; optionally link to an attraction. */
 export async function saveNewLoosePhotosBatch(
   items: LoosePhotoBatchItem[],
-  data: Pick<GalleryPhotoSavePayload, 'region' | 'tags'>,
+  data: { region: string; tags: string[] },
   opts?: {
     attractionId?: string;
     defaultRegion?: string;
@@ -67,13 +44,13 @@ export async function saveNewLoosePhotosBatch(
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i]!;
-    opts?.onStatus?.(`Compressing and uploading photo ${i + 1} of ${items.length}…`);
+    opts?.onStatus?.(`Uploading photo ${i + 1} of ${items.length}…`);
     const photoId = nextGalleryPhotoId(photos);
-    const record = await uploadLooseRecord(photoId, item.file, {
-      caption: item.caption,
+    const record = await uploadPhotoViaApi(item.file, {
+      photoId,
+      caption: item.caption.trim(),
       region,
       tags,
-      attractionId: opts?.attractionId,
     });
     photos = [...photos, record];
     useStore.setState({ photos });
@@ -84,13 +61,8 @@ export async function saveNewLoosePhotosBatch(
     }
   }
 
-  opts?.onStatus?.('Saving metadata to Supabase…');
-  const photosResult = await pushTablesToSupabase(['photos'], false);
-  if (!photosResult.ok) {
-    throw new Error(photosResult.error ?? 'Không lưu được metadata ảnh lên Supabase');
-  }
-
   if (opts?.attractionId) {
+    opts?.onStatus?.('Saving attraction links…');
     const attractionsResult = await pushTablesToSupabase(['attractions'], false);
     if (!attractionsResult.ok) {
       throw new Error(attractionsResult.error ?? 'Không lưu được liên kết attraction lên Supabase');
@@ -100,9 +72,14 @@ export async function saveNewLoosePhotosBatch(
   return { photoIds: records.map((r) => r.id), records };
 }
 
-/** Upload a new loose photo, update store, optionally link to an attraction pool. */
 export async function saveNewLoosePhoto(
-  data: GalleryPhotoSavePayload,
+  data: {
+    caption: string;
+    region: string;
+    tags: string[];
+    file?: File | null;
+    looseBatch?: LoosePhotoBatchItem[];
+  },
   opts?: {
     attractionId?: string;
     defaultRegion?: string;
@@ -122,27 +99,19 @@ export async function saveNewLoosePhoto(
   const photos = useStore.getState().photos as GalleryPhoto[];
   const photoId = nextGalleryPhotoId(photos);
 
-  opts?.onStatus?.('Compressing and uploading…');
-  const record = await uploadLooseRecord(photoId, data.file, {
-    caption: data.caption,
+  opts?.onStatus?.('Uploading…');
+  const record = await uploadPhotoViaApi(data.file, {
+    photoId,
+    caption: data.caption.trim(),
     region: data.region || opts?.defaultRegion || 'north',
     tags: data.tags ?? [],
-    attractionId: opts?.attractionId,
   });
 
   useStore.setState({ photos: [...photos, record] });
 
   if (opts?.attractionId) {
     linkPhotoToAttractionWithFeatured(opts.attractionId, photoId);
-  }
-
-  opts?.onStatus?.('Saving metadata to Supabase…');
-  const photosResult = await pushTablesToSupabase(['photos'], false);
-  if (!photosResult.ok) {
-    throw new Error(photosResult.error ?? 'Không lưu được metadata ảnh lên Supabase');
-  }
-
-  if (opts?.attractionId) {
+    opts?.onStatus?.('Saving attraction links…');
     const attractionsResult = await pushTablesToSupabase(['attractions'], false);
     if (!attractionsResult.ok) {
       throw new Error(attractionsResult.error ?? 'Không lưu được liên kết attraction lên Supabase');

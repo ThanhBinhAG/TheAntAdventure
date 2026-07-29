@@ -1,5 +1,5 @@
-import type { Customer } from './types';
-import { DEFAULT_TOUR_BRIEF, type TourBrief } from './tour-design-types';
+import type { Customer } from '../types';
+import { DEFAULT_TOUR_BRIEF, type TourBrief } from '../tour-design/tour-design-types';
 
 export function customerToBrief(customer: Customer, existing?: Partial<TourBrief>): TourBrief {
   const base = { ...DEFAULT_TOUR_BRIEF, ...existing };

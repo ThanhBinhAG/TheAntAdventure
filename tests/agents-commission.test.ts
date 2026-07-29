@@ -6,7 +6,7 @@ import {
   isActivePipelineLead,
   isEarnedCommissionStage,
   summarizeAgentCommissions,
-} from '../lib/agents-commission';
+} from '../lib/sales/agents-commission';
 import type { Agent, Lead } from '../lib/types';
 
 const agent: Agent = {

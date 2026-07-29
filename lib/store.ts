@@ -1,8 +1,8 @@
 import { create, type StateCreator } from 'zustand';
-import { deletePhotosFromRemote, deleteProductFromRemote, deleteProductPricingFromRemote } from './db/remote-delete';
+import { deleteProductFromRemote, deleteProductPricingFromRemote } from './db/remote-delete';
 import { appLog } from './system/app-logger';
-import { rolloverTasks } from './planner-task-utils';
-import { localTodayIso } from './date-utils';
+import { rolloverTasks } from './planner/planner-task-utils';
+import { localTodayIso } from './core/date-utils';
 import type {
   Agent,
   Attraction,
@@ -25,7 +25,7 @@ import type {
   TourOutlineDay,
   TransportSupplier,
 } from './types';
-import { emptyProductPricing, priceLabelFromRow } from './product-pricing-helpers';
+import { emptyProductPricing, priceLabelFromRow } from './products/product-pricing-helpers';
 
 interface CRMState {
   customers: Customer[];
@@ -257,16 +257,11 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           products: s.products.map((p) => (p.code === code ? { ...p, ...data } : p)),
         })),
       deleteProduct: (code) => {
-        const linkedPhotoIds = (get().photos as { id?: string; product?: string }[])
-          .filter((p) => p.product === code && p.id)
-          .map((p) => String(p.id));
         set((s) => ({
           products: s.products.filter((p) => p.code !== code),
           productPricing: s.productPricing.filter((p) => p.productCode !== code),
-          photos: (s.photos as { product?: string }[]).filter((p) => p.product !== code),
         }));
         void deleteProductFromRemote(code);
-        void deletePhotosFromRemote(linkedPhotoIds);
       },
       setProductPricing: (productPricing) => set({ productPricing }),
       upsertProductPricing: (row, syncProductPrice = true) =>

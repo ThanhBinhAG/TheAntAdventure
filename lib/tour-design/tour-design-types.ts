@@ -78,11 +78,10 @@ export type GalleryPhoto = {
   id: string;
   caption: string;
   region: string;
-  product?: string;
-  slot?: 1 | 2;
   tags?: string[];
   url?: string;
   thumbUrl?: string;
   storagePath?: string;
   displayBytes?: number;
+  createdAt?: string;
 };

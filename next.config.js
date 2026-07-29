@@ -36,6 +36,10 @@ function buildImageRemotePatterns() {
 
 const nextConfig = {
   reactStrictMode: true,
+  // Sharp is a native addon — keep it external so Next does not bundle/break its package exports.
+  experimental: {
+    serverComponentsExternalPackages: ['sharp'],
+  },
   images: {
     remotePatterns: buildImageRemotePatterns(),
   },

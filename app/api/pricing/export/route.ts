@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { isProposalExportAuthorized } from '@/lib/proposal-auth';
-import { pricingExportFilename } from '@/lib/pricing-export';
-import { renderPricingPdf, type PricingPdfInput } from '@/lib/pricing-pdf';
-import type { PricingTableRow } from '@/lib/product-pricing-helpers';
-import type { PlCurrency } from '@/lib/pricing-utils';
+import { isProposalExportAuthorized } from '@/lib/proposals/proposal-auth';
+import { pricingExportFilename } from '@/lib/pricing/pricing-export';
+import { renderPricingPdf, type PricingPdfInput } from '@/lib/pricing/pricing-pdf';
+import type { PricingTableRow } from '@/lib/products/product-pricing-helpers';
+import type { PlCurrency } from '@/lib/pricing/pricing-utils';
 import { captureAppError } from '@/lib/system/app-logger';
 
 export async function POST(request: Request) {

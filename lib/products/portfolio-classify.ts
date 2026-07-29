@@ -1,5 +1,5 @@
-import { PRODUCT_DESTINATIONS, parseProductCode, type ProductRegion } from '@/lib/product-code';
-import { PRODUCT_CATEGORIES, PRODUCT_DURATIONS } from '@/lib/product-form';
+import { PRODUCT_DESTINATIONS, parseProductCode, type ProductRegion } from '@/lib/products/product-code';
+import { PRODUCT_CATEGORIES, PRODUCT_DURATIONS } from '@/lib/products/product-form';
 import type { Product } from '@/lib/types';
 
 /** Editable draft row after Excel parse + auto-classification. */

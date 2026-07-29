@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
-import { SALES_PEOPLE } from '@/lib/customer-form';
-import { customerMatchesSearch, getClientPipeline } from '@/lib/crm-utils';
-import { npsBadgeClass, npsIcon } from '@/lib/page-helpers';
+import { SALES_PEOPLE } from '@/lib/customers/customer-form';
+import { customerMatchesSearch, getClientPipeline } from '@/lib/core/crm-utils';
+import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
 import PaginationBar from '@/components/PaginationBar';

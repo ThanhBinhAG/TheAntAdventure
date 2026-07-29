@@ -1,6 +1,6 @@
-import type { Agent, Comm, Customer, Lead } from './types';
-import { localTodayIso } from './date-utils';
-import { formatLeadTravelMonth } from './sales-lead-utils';
+import type { Agent, Comm, Customer, Lead } from '../types';
+import { localTodayIso } from '../core/date-utils';
+import { formatLeadTravelMonth } from '../sales/sales-lead-utils';
 import { AGENT_DATALIST, customerToForm, type CustomerFormData, formToCustomer } from './customer-form';
 
 /** Map free-text agent / datalist labels → agents.id */

@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
-import { getCustomerName } from '@/lib/crm-utils';
-import { parseMoneyInput } from '@/lib/money';
+import { getCustomerName } from '@/lib/core/crm-utils';
+import { parseMoneyInput } from '@/lib/core/money';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
 import PaginationBar from '@/components/PaginationBar';

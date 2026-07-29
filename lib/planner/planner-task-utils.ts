@@ -1,5 +1,5 @@
 import type { Task } from '@/lib/types';
-import { daysAgoIso } from './date-utils';
+import { daysAgoIso } from '../core/date-utils';
 
 const TITLE_MAX = 80;
 

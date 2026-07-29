@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import type { PricingTableRow } from './product-pricing-helpers';
+import type { PricingTableRow } from '../products/product-pricing-helpers';
 import {
   ICO_KEYS,
   type PlCurrency,

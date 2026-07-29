@@ -1,4 +1,4 @@
-import { fmt } from './constants';
+import { fmt } from '../constants';
 
 export const TIER_COLORS: Record<string, string> = {
   Platinum: '#6B21A8',

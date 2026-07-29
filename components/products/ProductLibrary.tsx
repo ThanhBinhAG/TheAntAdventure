@@ -1,17 +1,15 @@
 'use client';
 
-import Link from 'next/link';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ProductCard from '@/components/products/ProductCard';
-import { deriveCategoriesFromProducts } from '@/lib/product-form';
+import { deriveCategoriesFromProducts } from '@/lib/products/product-form';
 import {
   matchesPricingStatusFilter,
   type PricingStatusFilter,
-} from '@/lib/product-pricing-helpers';
+} from '@/lib/products/product-pricing-helpers';
 import type { Product, ProductPricing } from '@/lib/types';
 
 const DURATION_OPTIONS = [
-  '',
   'Half Day',
   'Full Day',
   'Evening (2–3 hours)',
@@ -20,6 +18,20 @@ const DURATION_OPTIONS = [
   '3 Days 2 Nights',
   '4 Days 3 Nights',
   'Service',
+];
+
+const REGIONS = [
+  { value: 'north', label: 'Northern' },
+  { value: 'central', label: 'Central' },
+  { value: 'south', label: 'Southern' },
+  { value: 'services', label: 'Services' },
+] as const;
+
+const PRICING_OPTIONS: { value: PricingStatusFilter; label: string }[] = [
+  { value: '', label: 'All pricing' },
+  { value: 'complete', label: 'Full pricing' },
+  { value: 'incomplete', label: 'Partial' },
+  { value: 'missing', label: 'No pricing' },
 ];
 
 interface ProductLibraryProps {
@@ -38,10 +50,9 @@ interface ProductLibraryProps {
   pricingStatus: PricingStatusFilter;
   onPricingStatusChange: (v: PricingStatusFilter) => void;
   pickMode?: boolean;
-  expandedCode: string | null;
-  onToggleExpand: (code: string) => void;
+  onOpenDetail: (code: string) => void;
   onPickProduct?: (p: Product) => void;
-  onImportPortfolio?: () => void;
+  onShownCountChange?: (n: number) => void;
 }
 
 export default function ProductLibrary({
@@ -60,11 +71,11 @@ export default function ProductLibrary({
   pricingStatus,
   onPricingStatusChange,
   pickMode = false,
-  expandedCode,
-  onToggleExpand,
+  onOpenDetail,
   onPickProduct,
-  onImportPortfolio,
+  onShownCountChange,
 }: ProductLibraryProps) {
+  const [facetOpen, setFacetOpen] = useState(false);
   const categories = useMemo(() => deriveCategoriesFromProducts(products), [products]);
 
   const pricingByCode = useMemo(
@@ -78,7 +89,7 @@ export default function ProductLibrary({
       if (region && p.region !== region) return false;
       if (duration && p.dur !== duration) return false;
       if (category && !p.cat.toLowerCase().includes(category.toLowerCase())) return false;
-      if (destFilter && !p.dest.toLowerCase().includes(destFilter.toLowerCase())) return false;
+      if (destFilter && p.dest !== destFilter) return false;
       if (!matchesPricingStatusFilter(p.code, pricingByCode, pricingStatus)) return false;
       if (
         q &&
@@ -92,17 +103,40 @@ export default function ProductLibrary({
     });
   }, [products, search, region, duration, category, destFilter, pricingStatus, pricingByCode]);
 
-  const byDest = useMemo(() => {
-    const map: Record<string, Product[]> = {};
-    filtered.forEach((p) => {
+  useEffect(() => {
+    onShownCountChange?.(filtered.length);
+  }, [filtered.length, onShownCountChange]);
+
+  /** Destination counts from products matching all filters except dest (so sidebar stays useful). */
+  const destCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    products.forEach((p) => {
+      const q = search.toLowerCase();
+      if (region && p.region !== region) return;
+      if (duration && p.dur !== duration) return;
+      if (category && !p.cat.toLowerCase().includes(category.toLowerCase())) return;
+      if (!matchesPricingStatusFilter(p.code, pricingByCode, pricingStatus)) return;
+      if (
+        q &&
+        !p.name.toLowerCase().includes(q) &&
+        !p.desc.toLowerCase().includes(q) &&
+        !p.code.toLowerCase().includes(q) &&
+        !p.dest.toLowerCase().includes(q)
+      )
+        return;
       const key = p.dest || 'Other';
-      if (!map[key]) map[key] = [];
-      map[key].push(p);
+      map[key] = (map[key] || 0) + 1;
     });
     return map;
-  }, [filtered]);
+  }, [products, search, region, duration, category, pricingStatus, pricingByCode]);
 
-  const destCount = Object.keys(byDest).length;
+  const destList = useMemo(
+    () => Object.keys(destCounts).sort((a, b) => a.localeCompare(b)),
+    [destCounts]
+  );
+
+  const destTotal = useMemo(() => Object.values(destCounts).reduce((n, c) => n + c, 0), [destCounts]);
+
   const hasFilters = !!(search || region || duration || category || destFilter || pricingStatus);
 
   const clearFilters = () => {
@@ -114,166 +148,175 @@ export default function ProductLibrary({
     onPricingStatusChange('');
   };
 
-  return (
-    <div className="prod-page">
-      <div className={`prod-search-bar${pickMode ? ' prod-search-bar--active' : ''}`}>
-        <div className="prod-page-hd">
-          <div>
-            <h2 className="prod-page-title">Product Library</h2>
-            <p className="prod-page-sub">Browse and filter tour products by destination, region, and category.</p>
-          </div>
-          <div className="prod-stat-chips">
-            {onImportPortfolio && !pickMode && (
-              <button type="button" className="btn btn-s btn-sm" onClick={onImportPortfolio}>
-                Import Portfolio
-              </button>
-            )}
-            <span className="prod-stat-chip">
-              <strong>{filtered.length}</strong> shown
-            </span>
-            <span className="prod-stat-chip">
-              <strong>{destCount}</strong> destinations
-            </span>
-            <span className="prod-stat-chip muted">
-              <strong>{products.length}</strong> total
-            </span>
-          </div>
-        </div>
+  const activeChips: { key: string; label: string; clear: () => void }[] = [];
+  if (destFilter) activeChips.push({ key: 'dest', label: destFilter, clear: () => onDestFilterChange('') });
+  if (region) {
+    const label = REGIONS.find((r) => r.value === region)?.label || region;
+    activeChips.push({ key: 'region', label, clear: () => onRegionChange('') });
+  }
+  if (duration) activeChips.push({ key: 'dur', label: duration, clear: () => onDurationChange('') });
+  if (category) activeChips.push({ key: 'cat', label: category, clear: () => onCategoryChange('') });
+  if (pricingStatus) {
+    const label = PRICING_OPTIONS.find((o) => o.value === pricingStatus)?.label || pricingStatus;
+    activeChips.push({ key: 'price', label, clear: () => onPricingStatusChange('') });
+  }
+  if (search) activeChips.push({ key: 'q', label: `“${search}”`, clear: () => onSearchChange('') });
 
-        <div className="prod-filter-grid">
-          <div className="fg prod-search-field">
-            <label className="lbl">
-              {pickMode ? 'Find product to edit' : 'Search products'}
-            </label>
-            <input
-              placeholder="Name, code, destination… e.g. Halong, AA-NV-HAN"
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-          </div>
-          <div className="fg">
-            <label className="lbl">Region</label>
-            <select value={region} onChange={(e) => onRegionChange(e.target.value)} aria-label="Region">
-              <option value="">All Regions</option>
-              <option value="north">Northern</option>
-              <option value="central">Central</option>
-              <option value="south">Southern</option>
-              <option value="services">Services</option>
-            </select>
-          </div>
-          <div className="fg">
-            <label className="lbl">Duration</label>
-            <select value={duration} onChange={(e) => onDurationChange(e.target.value)} aria-label="Duration">
-              <option value="">All Durations</option>
-              {DURATION_OPTIONS.filter(Boolean).map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="fg">
-            <label className="lbl">Category</label>
-            <select value={category} onChange={(e) => onCategoryChange(e.target.value)} aria-label="Category">
-              <option value="">All Categories</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="fg">
-            <label className="lbl">Destination</label>
-            <input
-              className="prod-dest-filter"
-              placeholder="Filter destination…"
-              value={destFilter}
-              onChange={(e) => onDestFilterChange(e.target.value)}
-              aria-label="Destination filter"
-            />
-          </div>
-          <div className="fg">
-            <label className="lbl">Pricing</label>
-            <select
-              value={pricingStatus}
-              onChange={(e) => onPricingStatusChange(e.target.value as PricingStatusFilter)}
-              aria-label="Pricing status filter"
+  const facetPanel = (
+    <aside className="tp-facet">
+      <div className="tp-facet-block">
+        <div className="tp-facet-label">Destinations</div>
+        <button
+          type="button"
+          className={`tp-facet-item${destFilter === '' ? ' on' : ''}`}
+          onClick={() => onDestFilterChange('')}
+        >
+          <span>All destinations</span>
+          <span className="tp-facet-count">{destTotal}</span>
+        </button>
+        <div className="tp-facet-list">
+          {destList.map((dest) => (
+            <button
+              key={dest}
+              type="button"
+              className={`tp-facet-item${destFilter === dest ? ' on' : ''}`}
+              onClick={() => onDestFilterChange(destFilter === dest ? '' : dest)}
             >
-              <option value="">All pricing</option>
-              <option value="complete">Full pricing</option>
-              <option value="incomplete">Partial</option>
-              <option value="missing">No pricing</option>
-            </select>
-          </div>
-        </div>
-
-        {hasFilters && (
-          <div className="prod-filter-active">
-            <span>Filters active</span>
-            <button type="button" className="prod-filter-clear" onClick={clearFilters}>
-              Clear all
+              <span className="tp-facet-item-label">{dest}</span>
+              <span className="tp-facet-count">{destCounts[dest]}</span>
             </button>
-          </div>
-        )}
-
-        {pickMode && hasFilters && (
-          <div className="prod-search-context">
-            Showing <b>{filtered.length}</b> result{filtered.length !== 1 ? 's' : ''}
-            {search && (
-              <>
-                {' '}
-                for &ldquo;<b>{search}</b>&rdquo;
-              </>
-            )}
-            — click a card below to edit
-          </div>
-        )}
+          ))}
+        </div>
       </div>
 
-      {!pickMode && (
-        <div className="prod-quick-links">
-          <span>🏛 <b>Planning a site visit?</b></span>
-          <Link href="/attractions" className="btn btn-s btn-sm">
-            → Museum Hours & Closures
-          </Link>
-          <span>⭐ <b>Tour done?</b></span>
-          <Link href="/posttour" className="btn btn-s btn-sm">
-            → Post-Tour Feedback
-          </Link>
+      <div className="tp-facet-block">
+        <div className="tp-facet-label">Region</div>
+        <div className="tp-facet-pills">
+          <button
+            type="button"
+            className={`tp-facet-pill${region === '' ? ' on' : ''}`}
+            onClick={() => onRegionChange('')}
+          >
+            All
+          </button>
+          {REGIONS.map((r) => (
+            <button
+              key={r.value}
+              type="button"
+              className={`tp-facet-pill${region === r.value ? ' on' : ''}`}
+              onClick={() => onRegionChange(region === r.value ? '' : r.value)}
+            >
+              {r.label}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
-      <div className={`prod-list-panel${pickMode ? ' prod-pick-mode' : ''}`}>
+      <div className="tp-facet-block">
+        <div className="tp-facet-label">Duration</div>
+        <div className="tp-facet-pills">
+          <button
+            type="button"
+            className={`tp-facet-pill${duration === '' ? ' on' : ''}`}
+            onClick={() => onDurationChange('')}
+          >
+            All
+          </button>
+          {DURATION_OPTIONS.map((d) => (
+            <button
+              key={d}
+              type="button"
+              className={`tp-facet-pill${duration === d ? ' on' : ''}`}
+              onClick={() => onDurationChange(duration === d ? '' : d)}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="tp-facet-block">
+        <div className="tp-facet-label">Category</div>
+        <div className="tp-facet-pills">
+          <button
+            type="button"
+            className={`tp-facet-pill${category === '' ? ' on' : ''}`}
+            onClick={() => onCategoryChange('')}
+          >
+            All
+          </button>
+          {categories.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`tp-facet-pill${category === c ? ' on' : ''}`}
+              onClick={() => onCategoryChange(category === c ? '' : c)}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="tp-facet-block">
+        <div className="tp-facet-label">Pricing</div>
+        <div className="tp-facet-pills">
+          {PRICING_OPTIONS.map((o) => (
+            <button
+              key={o.value || 'all'}
+              type="button"
+              className={`tp-facet-pill${pricingStatus === o.value ? ' on' : ''}`}
+              onClick={() => onPricingStatusChange(pricingStatus === o.value ? '' : o.value)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+
+  return (
+    <div className={`tp-catalog${pickMode ? ' prod-pick-mode' : ''}`}>
+      <button type="button" className="tp-facet-toggle" onClick={() => setFacetOpen((o) => !o)}>
+        {facetOpen ? 'Hide filters' : 'Filters & destinations'}
+      </button>
+
+      <div className={`tp-facet-backdrop${facetOpen ? ' open' : ''}`} onClick={() => setFacetOpen(false)} />
+      <div className={`tp-facet-wrap${facetOpen ? ' open' : ''}`}>{facetPanel}</div>
+
+      <div className="tp-catalog-main">
         {pickMode && <div className="prod-pick-scrim" aria-hidden />}
-        <div className="prod-list-inner">
+        <div className="tp-catalog-inner">
+          {(activeChips.length > 0 || hasFilters) && (
+            <div className="tp-active-chips">
+              {activeChips.map((chip) => (
+                <button key={chip.key} type="button" className="tp-chip" onClick={chip.clear}>
+                  {chip.label} <span aria-hidden>×</span>
+                </button>
+              ))}
+              {hasFilters && (
+                <button type="button" className="tp-chip-clear" onClick={clearFilters}>
+                  Clear all
+                </button>
+              )}
+            </div>
+          )}
+
           {filtered.length === 0 ? (
-            <div className="prod-empty-state">No products match your search. Try different keywords or clear filters.</div>
+            <div className="tp-empty-state">No products match. Adjust filters or clear them.</div>
           ) : (
-            Object.keys(byDest)
-              .sort()
-              .map((dest) => (
-                <div key={dest} className="prod-dest-group">
-                  <div className="prod-dest-hd">
-                    <span className="prod-dest-name">📍 {dest}</span>
-                    <span className="prod-dest-count">
-                      {byDest[dest].length} product{byDest[dest].length > 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <div className="prod-grid">
-                    {byDest[dest].map((p) => (
-                      <ProductCard
-                        key={p.code}
-                        product={p}
-                        pickMode={pickMode}
-                        expanded={expandedCode === p.code}
-                        onToggleExpand={onToggleExpand}
-                        onPick={onPickProduct}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))
+            <div className="tp-grid">
+              {filtered.map((p) => (
+                <ProductCard
+                  key={p.code}
+                  product={p}
+                  pickMode={pickMode}
+                  onOpenDetail={onOpenDetail}
+                  onPick={onPickProduct}
+                />
+              ))}
+            </div>
           )}
         </div>
       </div>

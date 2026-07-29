@@ -1,5 +1,5 @@
-import { ATTRACTION_DATA } from './seeds/attractions';
-import type { Attraction } from './types';
+import { ATTRACTION_DATA } from '../seeds/attractions';
+import type { Attraction } from '../types';
 
 const SEED_PHONES: Record<string, string> = {
   'ATT-N-001': '+84 24 3756 2193',

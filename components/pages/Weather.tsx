@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import WeatherWeeklyGrid from '@/components/weather/WeatherWeeklyGrid';
 import { BEST_BY, DEFAULT_WEATHER, DESTINATIONS, MONTHS, TEMP_RANGES, WR } from '@/lib/seeds/weather';
-import { REG_COLORS_HEX } from '@/lib/page-helpers';
+import { REG_COLORS_HEX } from '@/lib/core/page-helpers';
 
 type WeatherData = Record<string, string[]>;
 type WeatherCode = keyof typeof WR;

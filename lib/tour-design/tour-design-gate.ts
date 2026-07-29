@@ -1,4 +1,4 @@
-import type { OutlineStatus } from './types';
+import type { OutlineStatus } from '../types';
 
 /** Block Tour Experiences until client approves outline (when a lead session has outline rows). */
 export function isExperiencesBlocked(

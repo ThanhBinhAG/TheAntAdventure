@@ -8,11 +8,11 @@ import {
   pricingStatus,
   pruneProductPricingToProducts,
   taaTourToProductPricing,
-} from '../lib/product-pricing-helpers';
+} from '../lib/products/product-pricing-helpers';
 import { TAA_TOURS } from '../lib/seeds/taa-tours';
 import { useStore } from '../lib/store';
 import type { Product, ProductPricing } from '../lib/types';
-import { findProductPricing, getLibPriceLabel, getSellPrice, paxToExactN, paxToTierN } from '../lib/tour-pricing';
+import { findProductPricing, getLibPriceLabel, getSellPrice, paxToExactN, paxToTierN } from '../lib/tour-design/tour-pricing';
 
 const sampleProduct: Product = {
   code: 'AA-NV-HAN-HD-02',
@@ -185,23 +185,22 @@ test('deleteProduct removes linked pricing row', () => {
   assert.equal(state.productPricing.length, 0);
 });
 
-test('deleteProduct cascades gallery photos for product code', () => {
+test('deleteProduct keeps library photos (only unlinks via product_photos cascade)', () => {
   useStore.setState({
-    products: [sampleProduct],
+    products: [{ ...sampleProduct, photoIds: ['PH-1'], linkedPhotoIds: ['PH-1'] }],
     productPricing: [samplePricing],
     photos: [
-      { id: 'PH-1', caption: 'A', region: 'north', product: sampleProduct.code, url: 'https://x/1.jpg' },
-      { id: 'PH-2', caption: 'B', region: 'north', product: 'OTHER', url: 'https://x/2.jpg' },
+      { id: 'PH-1', caption: 'A', region: 'north', url: 'https://x/1.jpg' },
+      { id: 'PH-2', caption: 'B', region: 'north', url: 'https://x/2.jpg' },
       { id: 'PH-3', caption: 'C', region: 'north', url: 'https://x/3.jpg' },
     ],
   });
   useStore.getState().deleteProduct(sampleProduct.code);
-  const photos = useStore.getState().photos as { id: string; product?: string }[];
-  assert.equal(photos.length, 2);
-  assert.ok(photos.every((p) => p.product !== sampleProduct.code));
+  const photos = useStore.getState().photos as { id: string }[];
+  assert.equal(photos.length, 3);
   assert.deepEqual(
     photos.map((p) => p.id).sort(),
-    ['PH-2', 'PH-3']
+    ['PH-1', 'PH-2', 'PH-3']
   );
 });
 

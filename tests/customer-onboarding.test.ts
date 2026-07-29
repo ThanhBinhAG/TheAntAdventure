@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { EMPTY_CUSTOMER_FORM } from '../lib/customer-form';
+import { EMPTY_CUSTOMER_FORM } from '../lib/customers/customer-form';
 import {
   buildCustomerFromForm,
   buildInquiryComm,
@@ -14,7 +14,7 @@ import {
   registerNewCustomer,
   resolveAgentId,
   salesOwnerFromForm,
-} from '../lib/customer-onboarding';
+} from '../lib/customers/customer-onboarding';
 import type { Agent, Customer, Lead } from '../lib/types';
 
 const sampleAgents: Agent[] = [

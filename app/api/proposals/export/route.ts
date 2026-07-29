@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { isProposalExportAuthorized } from '@/lib/proposal-auth';
-import { renderProposalPdf } from '@/lib/proposal-pdf';
-import type { ProposalDoc } from '@/lib/proposal-types';
+import { isProposalExportAuthorized } from '@/lib/proposals/proposal-auth';
+import { renderProposalPdf } from '@/lib/proposals/proposal-pdf';
+import type { ProposalDoc } from '@/lib/proposals/proposal-types';
 import { captureAppError } from '@/lib/system/app-logger';
 
 export async function POST(request: Request) {

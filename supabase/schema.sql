@@ -580,8 +580,6 @@ create table if not exists photos (
   id              text primary key,                -- PH-001
   caption         text,
   region          text,
-  product_code    text references products(code) on delete set null,  -- app: product
-  slot            smallint check (slot is null or slot in (1, 2)),  -- tour preview slot; null = pool
   url             text,                            -- display variant public URL
   thumb_url       text,                            -- thumbnail variant public URL
   storage_path    text,                            -- gallery/PH-001/display.webp
@@ -589,14 +587,19 @@ create table if not exists photos (
   created_at      timestamptz default now()
 );
 
-create unique index if not exists photos_product_slot_unique
-  on photos (product_code, slot)
-  where product_code is not null and slot is not null;
-
 create table if not exists photo_tags (
   photo_id        text not null references photos(id) on delete cascade,
   tag             text not null,
   primary key (photo_id, tag)
+);
+
+-- Tour products link to library photos via junction (not ownership on photos)
+create table if not exists product_photos (
+  product_code    text not null references products(code) on delete cascade,
+  photo_id        text not null references photos(id) on delete cascade,
+  sort_order      smallint default 0,
+  is_featured     boolean not null default false,
+  primary key (product_code, photo_id)
 );
 
 -- ============================================================
@@ -821,6 +824,7 @@ create index if not exists idx_attractions_region on attractions(region);
 create index if not exists idx_attractions_type on attractions(type);
 create index if not exists idx_attractions_dest on attractions(dest);
 create index if not exists idx_attraction_photos_photo on attraction_photos(photo_id);
+create index if not exists idx_product_photos_photo on product_photos(photo_id);
 
 -- ============================================================
 --  MODULE · WEATHER (live weekly forecast cache)
@@ -1075,7 +1079,7 @@ begin
     'comms','finance','accounts_receivable','accounts_payable','tax_reports',
     'staff','salary_records','tasks','contracts','feedback',
     'suppliers','supplier_tags','cruises','transport','restaurants',
-    'photos','photo_tags','attractions','attraction_photos','cal_events',
+    'photos','photo_tags','product_photos','attractions','attraction_photos','cal_events',
     'chat_channels','chat_messages','chat_reactions','dev_notes',
     'weather_destinations','weather_forecast_cache','weather_fetch_log',
     'pricing_settings','pricing_ess_products','pricing_ess_cost_lines','pricing_ess_services',
@@ -1206,7 +1210,6 @@ create policy photos_auth_insert on storage.objects
       (storage.foldername(name))[1] = 'guides'
       or (
         (storage.foldername(name))[1] = 'gallery'
-        and (storage.foldername(name))[2] in ('tours', 'attractions', 'loose')
       )
     )
   );
@@ -1219,7 +1222,6 @@ create policy photos_auth_update on storage.objects
       (storage.foldername(name))[1] = 'guides'
       or (
         (storage.foldername(name))[1] = 'gallery'
-        and (storage.foldername(name))[2] in ('tours', 'attractions', 'loose')
       )
     )
   )
@@ -1228,7 +1230,6 @@ create policy photos_auth_update on storage.objects
       (storage.foldername(name))[1] = 'guides'
       or (
         (storage.foldername(name))[1] = 'gallery'
-        and (storage.foldername(name))[2] in ('tours', 'attractions', 'loose')
       )
     )
   );
@@ -1241,7 +1242,6 @@ create policy photos_auth_delete on storage.objects
       (storage.foldername(name))[1] = 'guides'
       or (
         (storage.foldername(name))[1] = 'gallery'
-        and (storage.foldername(name))[2] in ('tours', 'attractions', 'loose')
       )
     )
   );

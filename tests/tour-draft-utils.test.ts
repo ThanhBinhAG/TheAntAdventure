@@ -4,7 +4,7 @@ import {
   addDaysToIsoDate,
   createOutlineDay,
   nextOutlineDateFromRows,
-} from '../lib/tour-draft-utils';
+} from '../lib/tour-design/tour-draft-utils';
 import type { TourOutlineDay } from '../lib/types';
 
 function row(dayNumber: number, date: string): TourOutlineDay {

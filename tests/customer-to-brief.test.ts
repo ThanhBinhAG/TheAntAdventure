@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { customerToBrief } from '../lib/customer-to-brief';
+import { customerToBrief } from '../lib/customers/customer-to-brief';
 import type { Customer } from '../lib/types';
 
 const sampleCustomer: Customer = {

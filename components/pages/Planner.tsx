@@ -10,9 +10,9 @@ import {
   TASK_STATUSES,
   truncateTaskText,
   type TaskStatusValue,
-} from '@/lib/planner-task-utils';
+} from '@/lib/planner/planner-task-utils';
 import type { Task } from '@/lib/types';
-import { addDays, localTodayIso, mondayOfWeek } from '@/lib/date-utils';
+import { addDays, localTodayIso, mondayOfWeek } from '@/lib/core/date-utils';
 import { useStore } from '@/hooks/useStore';
 
 const TEAM = ['Tai Pham', 'Linh N.', 'Minh T.', 'Huong L.', 'Khoa V.'];

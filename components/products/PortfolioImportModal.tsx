@@ -5,7 +5,7 @@ import {
   PRODUCT_CATEGORIES,
   PRODUCT_DURATIONS,
   PRODUCT_LEVELS,
-} from '@/lib/product-form';
+} from '@/lib/products/product-form';
 import { parsePortfolioFile } from '@/lib/products/portfolio-xlsx';
 import type { PortfolioDraftProduct } from '@/lib/products/portfolio-classify';
 import { replaceCatalogueFromDrafts } from '@/lib/products/replace-catalogue';

@@ -11,7 +11,7 @@ import {
   paxToTierN,
   sumCostForProducts,
   sumSellForProducts,
-} from '../lib/tour-pricing';
+} from '../lib/tour-design/tour-pricing';
 
 const samplePricing: ProductPricing = {
   productCode: 'AA-NV-HAN-HD-02',

@@ -2,9 +2,9 @@ import {
   ANNUAL_REVENUE_TARGET_USD,
   DASHBOARD_MONTH_ABBR,
   STAGE_PROB_V22,
-} from './constants';
-import { normalizeLeadMonth } from './sales-lead-utils';
-import type { Booking, Customer, Lead } from './types';
+} from '../constants';
+import { normalizeLeadMonth } from '../sales/sales-lead-utils';
+import type { Booking, Customer, Lead } from '../types';
 
 export const DASHBOARD_FUNNEL_STAGES = [
   'Inquiry',

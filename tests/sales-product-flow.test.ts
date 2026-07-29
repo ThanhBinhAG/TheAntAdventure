@@ -1,19 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { EMPTY_CUSTOMER_FORM, type CustomerFormData } from '../lib/customer-form';
-import { registerNewCustomer } from '../lib/customer-onboarding';
-import { isExperiencesBlocked } from '../lib/tour-design-gate';
+import { EMPTY_CUSTOMER_FORM, type CustomerFormData } from '../lib/customers/customer-form';
+import { registerNewCustomer } from '../lib/customers/customer-onboarding';
+import { isExperiencesBlocked } from '../lib/tour-design/tour-design-gate';
 import {
   applyOutlineWorkflowPatch,
   patchOutlineApproved,
   patchOutlineSent,
-} from '../lib/tour-outline-workflow';
-import { ensureTourDesignLead } from '../lib/tour-design-lead';
-import { DEFAULT_TOUR_BRIEF } from '../lib/tour-design-types';
+} from '../lib/tour-design/tour-outline-workflow';
+import { ensureTourDesignLead } from '../lib/tour-design/tour-design-lead';
+import { DEFAULT_TOUR_BRIEF } from '../lib/tour-design/tour-design-types';
 import { STAGE_PROB_V22 } from '../lib/constants';
-import { getLeadWeightedValue } from '../lib/sales-lead-utils';
-import { sumSellForProducts } from '../lib/tour-pricing';
-import { ensureBookingForConfirmedLead } from '../lib/booking-from-lead';
+import { getLeadWeightedValue } from '../lib/sales/sales-lead-utils';
+import { sumSellForProducts } from '../lib/tour-design/tour-pricing';
+import { ensureBookingForConfirmedLead } from '../lib/sales/booking-from-lead';
 import { useStore } from '../lib/store';
 import type { Lead, ProductPricing, TourDraft } from '../lib/types';
 

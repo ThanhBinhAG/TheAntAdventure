@@ -15,7 +15,8 @@ import type {
   TourDraft,
   TourOutlineDay,
 } from '../types';
-import { normalizeMoneyUSD } from '../money';
+import { normalizeMoneyUSD } from '../core/money';
+import { getExperienceOverridesFromBriefJson } from '../tour-design/tour-draft-utils';
 
 type Row = Record<string, unknown>;
 
@@ -430,6 +431,8 @@ export function rowToProduct(r: Row): Product {
     notesToSales: String(r.notes_to_sales ?? ''),
     price: String(r.price_from ?? ''),
     region: String(r.region ?? ''),
+    photoIds: [],
+    linkedPhotoIds: [],
   };
 }
 
@@ -628,13 +631,10 @@ export function supplierToRow(r: Row): Row {
 }
 
 export function photoToRow(r: Row): Row {
-  const slot = r.slot ?? r.slot_number;
   return {
     id: r.id,
     caption: r.caption ?? null,
     region: r.region ?? null,
-    product_code: fkOrNull(r.product ?? r.product_code),
-    slot: slot === 1 || slot === 2 ? slot : null,
     url: r.url ?? null,
     thumb_url: r.thumbUrl ?? r.thumb_url ?? null,
     storage_path: r.storagePath ?? r.storage_path ?? null,
@@ -750,19 +750,77 @@ export function rowToSupplier(r: Row, tags: string[] = []): Row {
 }
 
 export function rowToPhoto(r: Row, tags: string[] = []): Row {
-  const slot = r.slot;
   return {
     id: r.id,
     caption: r.caption,
     region: r.region,
-    product: r.product_code,
-    slot: slot === 1 || slot === 2 ? slot : undefined,
     url: r.url,
     thumbUrl: r.thumb_url,
     storagePath: r.storage_path,
     displayBytes: r.display_bytes != null ? Number(r.display_bytes) : undefined,
+    createdAt: r.created_at != null ? String(r.created_at) : undefined,
     tags,
   };
+}
+
+/** Attach product_photos junction onto product rows (featured + pool). */
+export function assembleProducts(baseRows: Row[], linkRows: Row[]): Row[] {
+  const photosByProduct = new Map<
+    string,
+    { photoId: string; sortOrder: number; isFeatured: boolean }[]
+  >();
+  for (const link of linkRows) {
+    const code = String(link.product_code);
+    if (!photosByProduct.has(code)) photosByProduct.set(code, []);
+    photosByProduct.get(code)!.push({
+      photoId: String(link.photo_id),
+      sortOrder: Number(link.sort_order ?? 0),
+      isFeatured: Boolean(link.is_featured),
+    });
+  }
+
+  return baseRows.map((r) => {
+    const base = rowToProduct(r);
+    const links = photosByProduct.get(String(base.code)) ?? [];
+    links.sort((a, b) => a.sortOrder - b.sortOrder);
+    const linkedPhotoIds = links.map((l) => l.photoId);
+    const featuredLinks = links.filter((l) => l.isFeatured);
+    const photoIds =
+      featuredLinks.length > 0
+        ? featuredLinks.map((l) => l.photoId).slice(0, 2)
+        : linkedPhotoIds.slice(0, 2);
+    return { ...base, linkedPhotoIds, photoIds };
+  });
+}
+
+/** Build junction rows for Supabase sync from a product's pool + featured sets. */
+export function productPhotoRows(product: {
+  code: string;
+  photoIds?: string[];
+  linkedPhotoIds?: string[];
+}): Row[] {
+  const linked =
+    product.linkedPhotoIds?.length
+      ? product.linkedPhotoIds
+      : (product.photoIds ?? []);
+  const featured = (product.photoIds ?? []).filter((id) => linked.includes(id)).slice(0, 2);
+  const featuredSet = new Set(featured);
+  const poolOnly = linked.filter((id) => !featuredSet.has(id));
+
+  return [
+    ...featured.map((photoId, i) => ({
+      product_code: product.code,
+      photo_id: photoId,
+      sort_order: i,
+      is_featured: true,
+    })),
+    ...poolOnly.map((photoId, i) => ({
+      product_code: product.code,
+      photo_id: photoId,
+      sort_order: featured.length + i,
+      is_featured: false,
+    })),
+  ];
 }
 
 export function taskToRow(r: Row): Row {
@@ -1106,11 +1164,13 @@ export function rowToStaffExtended(r: Row): StaffMember & Row {
 }
 
 export function rowToTourDraft(r: Row): TourDraft {
+  const briefJson = (r.brief_json as Record<string, unknown>) ?? undefined;
+  const experienceOverrides = getExperienceOverridesFromBriefJson(briefJson);
   return {
     id: String(r.id),
     leadId: String(r.lead_id ?? ''),
     custId: String(r.cust_id ?? ''),
-    briefJson: (r.brief_json as Record<string, unknown>) ?? undefined,
+    briefJson,
     outlineStatus: (r.outline_status as TourDraft['outlineStatus']) ?? 'draft',
     outlineNotes: r.outline_notes ? String(r.outline_notes) : undefined,
     outlineSentAt: r.outline_sent_at ? String(r.outline_sent_at) : undefined,
@@ -1118,6 +1178,7 @@ export function rowToTourDraft(r: Row): TourDraft {
     outlineRevision: r.outline_revision != null ? Number(r.outline_revision) : undefined,
     selectedCodes: Array.isArray(r.selected_codes) ? (r.selected_codes as string[]) : undefined,
     selectedPackageId: r.selected_package_id ? String(r.selected_package_id) : null,
+    experienceOverrides: Object.keys(experienceOverrides).length ? experienceOverrides : undefined,
     markupPct: r.markup_pct != null ? Number(r.markup_pct) : undefined,
     clientType: (r.client_type as TourDraft['clientType']) ?? undefined,
     currentStep: r.current_step != null ? Number(r.current_step) : undefined,

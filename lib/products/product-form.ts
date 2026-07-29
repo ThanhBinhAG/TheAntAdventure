@@ -2,13 +2,13 @@ import {
   buildProductCode,
   suggestTypeSegment,
   type TypeSegment,
-} from '@/lib/product-code';
+} from '@/lib/products/product-code';
 import {
   DUR_KEY_TO_PRODUCT_DUR,
   durToModuleKey,
   moduleKeyToDur,
   type ModuleDurKey,
-} from '@/lib/product-modules';
+} from '@/lib/products/product-modules';
 import type { Product } from '@/lib/types';
 
 export const PRODUCT_CATEGORIES = [
@@ -63,6 +63,8 @@ export interface ProductFormState {
   logic: string;
   price: string;
   status: 'active' | 'draft' | 'archived';
+  photoIds: string[];
+  linkedPhotoIds: string[];
 }
 
 export function emptyProductForm(region = 'north', existingCodes: string[] = []): ProductFormState {
@@ -92,6 +94,8 @@ export function emptyProductForm(region = 'north', existingCodes: string[] = [])
     logic: '',
     price: '',
     status: 'active',
+    photoIds: [],
+    linkedPhotoIds: [],
   };
 }
 
@@ -143,6 +147,8 @@ export function productToForm(p: Product): ProductFormState {
     logic: p.logic || '',
     price: p.price || '',
     status: p.status ?? 'active',
+    photoIds: [...(p.photoIds ?? [])],
+    linkedPhotoIds: [...(p.linkedPhotoIds ?? [])],
   };
 }
 
@@ -162,6 +168,8 @@ export function formToProduct(form: ProductFormState): Product {
     logic: form.logic.trim(),
     price: form.price.trim(),
     status: form.status,
+    photoIds: [...form.photoIds],
+    linkedPhotoIds: [...form.linkedPhotoIds],
   };
 }
 

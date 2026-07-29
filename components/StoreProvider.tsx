@@ -27,7 +27,7 @@ import { markHydrationFailed, updateBaselineCounts } from '@/lib/db/sync-lifecyc
 import { countBackupRows } from '@/lib/db/sync-config';
 import { isAutoSyncEnabled, isSupabaseReadOnly } from '@/lib/env';
 import { useStore } from '@/lib/store';
-import { SupabaseContext } from '@/lib/SupabaseContext';
+import { SupabaseContext } from '@/lib/context/SupabaseContext';
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [remote, setRemote] = useState(false);

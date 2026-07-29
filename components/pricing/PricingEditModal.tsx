@@ -5,7 +5,7 @@ import {
   ICO_EMOJIS,
   ICO_KEYS,
   ICO_LABELS,
-} from '@/lib/pricing-utils';
+} from '@/lib/pricing/pricing-utils';
 import type { ProductPricing, ProductPricingInclusions } from '@/lib/types';
 
 interface PricingEditModalProps {

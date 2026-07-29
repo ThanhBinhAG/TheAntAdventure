@@ -4,8 +4,8 @@ import { constants } from 'node:fs';
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
 import { getAppUrl } from '@/lib/env';
-import { buildProposalHTML } from '@/lib/proposal-html';
-import type { ProposalDoc } from '@/lib/proposal-types';
+import { buildProposalHTML } from '@/lib/proposals/proposal-html';
+import type { ProposalDoc } from '@/lib/proposals/proposal-types';
 
 const LINUX_CHROME_CANDIDATES = [
   '/usr/bin/google-chrome-stable',
@@ -87,6 +87,7 @@ export async function renderProposalPdf(doc: ProposalDoc): Promise<Buffer> {
     });
     const pdf = await page.pdf({
       format: 'A4',
+      preferCSSPageSize: true,
       printBackground: true,
       displayHeaderFooter: true,
       headerTemplate: '<div></div>',

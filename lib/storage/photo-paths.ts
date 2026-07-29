@@ -1,49 +1,36 @@
 export const PHOTOS_BUCKET = 'photos';
 
-export type GalleryPhotoOwner =
-  | { kind: 'tour'; tourCode: string }
-  | { kind: 'attraction'; attractionId: string }
-  | { kind: 'loose' };
-
 function sanitizePathSegment(value: string): string {
   return value.trim().replace(/[^\w.-]+/g, '-');
 }
 
-export function galleryOwnerBasePath(owner: GalleryPhotoOwner, photoId: string): string {
-  if (owner.kind === 'tour') {
-    return `gallery/tours/${sanitizePathSegment(owner.tourCode)}/${photoId}`;
-  }
-  if (owner.kind === 'attraction') {
-    return `gallery/attractions/${sanitizePathSegment(owner.attractionId)}/${photoId}`;
-  }
-  return `gallery/loose/${photoId}`;
+/** Flat library path: gallery/{photoId}/ */
+export function galleryOwnerBasePath(photoId: string): string {
+  return `gallery/${sanitizePathSegment(photoId)}`;
 }
 
-export function legacyGalleryDisplayPath(photoId: string): string {
-  return `gallery/${photoId}/display.webp`;
+export function galleryDisplayPath(photoId: string): string {
+  return `${galleryOwnerBasePath(photoId)}/display.webp`;
 }
 
-export function legacyGalleryThumbPath(photoId: string): string {
-  return `gallery/${photoId}/thumb.webp`;
+export function galleryThumbPath(photoId: string): string {
+  return `${galleryOwnerBasePath(photoId)}/thumb.webp`;
 }
 
-export function galleryDisplayPath(photoId: string, owner?: GalleryPhotoOwner): string {
-  return `${galleryOwnerBasePath(owner ?? { kind: 'loose' }, photoId)}/display.webp`;
+export function galleryStoragePaths(photoId: string): string[] {
+  return [galleryDisplayPath(photoId), galleryThumbPath(photoId)];
 }
 
-export function galleryThumbPath(photoId: string, owner?: GalleryPhotoOwner): string {
-  return `${galleryOwnerBasePath(owner ?? { kind: 'loose' }, photoId)}/thumb.webp`;
-}
-
-export function galleryStoragePaths(photoId: string, owner?: GalleryPhotoOwner): string[] {
-  return [galleryDisplayPath(photoId, owner), galleryThumbPath(photoId, owner)];
-}
-
-export function galleryDeleteCandidatePaths(photoId: string, owner?: GalleryPhotoOwner): string[] {
+/** Prefer stored storage_path; also try flat paths for cleanup. */
+export function galleryDeleteCandidatePaths(photoId: string, storagePath?: string | null): string[] {
   const out = new Set<string>();
-  for (const path of galleryStoragePaths(photoId, owner)) out.add(path);
-  out.add(legacyGalleryDisplayPath(photoId));
-  out.add(legacyGalleryThumbPath(photoId));
+  for (const path of galleryStoragePaths(photoId)) out.add(path);
+  if (storagePath) {
+    out.add(storagePath);
+    if (storagePath.endsWith('/display.webp')) {
+      out.add(`${storagePath.slice(0, -'display.webp'.length)}thumb.webp`);
+    }
+  }
   return [...out];
 }
 

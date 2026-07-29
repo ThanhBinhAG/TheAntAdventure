@@ -1,4 +1,4 @@
-import type { Comm, Lead, TourDraft } from './types';
+import type { Comm, Lead, TourDraft } from '../types';
 import type { OutlineWorkflowPatch } from './tour-design-lead';
 
 export type OutlineWorkflowStoreActions = {

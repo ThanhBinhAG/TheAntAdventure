@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { nextSupplierId } from '@/lib/supplier-utils';
+import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
 import type { Hotel, HotelRoom } from '@/lib/types';
 
 const EMPTY_ROOM = (): HotelRoom => ({

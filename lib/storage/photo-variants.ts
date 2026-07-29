@@ -1,3 +1,7 @@
+/**
+ * Client-side variants — guide avatars only.
+ * Gallery uploads go through POST /api/photos/upload (Sharp on the server).
+ */
 import imageCompression from 'browser-image-compression';
 import { z } from 'zod';
 
@@ -12,11 +16,6 @@ export const galleryImageFileSchema = z
     'Only JPEG, PNG, and WebP images are supported'
   );
 
-export type ImageVariants = {
-  thumb: File;
-  display: File;
-};
-
 async function compressVariant(file: File, maxWidthOrHeight: number, maxSizeMB: number, initialQuality: number): Promise<File> {
   return imageCompression(file, {
     maxSizeMB,
@@ -25,15 +24,6 @@ async function compressVariant(file: File, maxWidthOrHeight: number, maxSizeMB: 
     fileType: 'image/webp',
     initialQuality,
   });
-}
-
-export async function processImageVariants(file: File): Promise<ImageVariants> {
-  galleryImageFileSchema.parse(file);
-  const [thumb, display] = await Promise.all([
-    compressVariant(file, 400, 0.08, 0.75),
-    compressVariant(file, 1280, 0.4, 0.82),
-  ]);
-  return { thumb, display };
 }
 
 export async function processAvatarVariant(file: File): Promise<File> {

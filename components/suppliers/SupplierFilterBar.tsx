@@ -2,7 +2,7 @@
 
 import type { ExtendedSupplier, Hotel } from '@/lib/types';
 import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/lib/types';
-import type { SupplierFilters } from '@/lib/supplier-utils';
+import type { SupplierFilters } from '@/lib/suppliers/supplier-utils';
 
 export type SupTab =
   | 'hotels'

@@ -4,44 +4,46 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fmt } from '@/lib/constants';
-import { nextLeadId } from '@/lib/customer-onboarding';
-import { formatLeadTravelMonth } from '@/lib/sales-lead-utils';
-import { REG_LABELS } from '@/lib/page-helpers';
+import { nextLeadId } from '@/lib/customers/customer-onboarding';
+import { formatLeadTravelMonth } from '@/lib/sales/sales-lead-utils';
+import { REG_LABELS } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
-import ClientBriefStep from '@/components/tourdesign/ClientBriefStep';
-import OutlineStep from '@/components/tourdesign/OutlineStep';
-import TourExperiencesStep from '@/components/tourdesign/TourExperiencesStep';
-import PricingStep from '@/components/tourdesign/PricingStep';
-import ProposalExportStep from '@/components/tourdesign/ProposalExportStep';
+import ClientBriefStep from '@/components/tour-design/ClientBriefStep';
+import OutlineStep from '@/components/tour-design/OutlineStep';
+import TourExperiencesStep from '@/components/tour-design/TourExperiencesStep';
+import PricingStep from '@/components/tour-design/PricingStep';
+import ProposalExportStep from '@/components/tour-design/ProposalExportStep';
+import type { OverridePatch } from '@/components/tour-design/SelectedExperiencesPanel';
 import { TOUR_PACKAGES, type TourPackage } from '@/lib/seeds/tourPackages';
-import { getPackageSellPerPax } from '@/lib/proposal-assembler';
-import { customerToBrief } from '@/lib/customer-to-brief';
-import { isExperiencesBlocked } from '@/lib/tour-design-gate';
+import { getPackageSellPerPax } from '@/lib/proposals/proposal-assembler';
+import { customerToBrief } from '@/lib/customers/customer-to-brief';
+import { isExperiencesBlocked } from '@/lib/tour-design/tour-design-gate';
 import {
   ensureTourDesignLead,
   patchOutlineApproved,
   patchOutlineResent,
   patchOutlineRevise,
   patchOutlineSent,
-} from '@/lib/tour-design-lead';
+} from '@/lib/tour-design/tour-design-lead';
 import {
   getOutlineAwaitingApproval,
   getPendingTourDesignLeads,
   getTourDraftForLead,
-} from '@/lib/tour-design-leads';
-import { DEFAULT_TOUR_BRIEF, type TourBrief, type GalleryPhoto } from '@/lib/tour-design-types';
+} from '@/lib/tour-design/tour-design-leads';
+import { DEFAULT_TOUR_BRIEF, type TourBrief, type GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import {
   briefFromDraft,
   buildTourDraft,
   createOutlineDay,
+  resolveExperienceOverrides,
   tourDraftIdForLead,
-} from '@/lib/tour-draft-utils';
-import { outlineDocFromRows, printOutline } from '@/lib/outline-html';
-import { getCustomerName } from '@/lib/crm-utils';
-import type { OutlineStatus, Product, TourOutlineDay } from '@/lib/types';
-import { paxToTierN, sumSellForProducts } from '@/lib/tour-pricing';
+} from '@/lib/tour-design/tour-draft-utils';
+import { outlineDocFromRows, printOutline } from '@/lib/outline/outline-html';
+import { getCustomerName } from '@/lib/core/crm-utils';
+import type { ExperienceOverride, OutlineStatus, Product, TourOutlineDay } from '@/lib/types';
+import { paxToTierN, sumSellForProducts } from '@/lib/tour-design/tour-pricing';
 
 const STEPS = ['Client Brief', 'Outline', 'Tour Experiences', 'Pricing', 'AI Export'] as const;
 
@@ -71,6 +73,7 @@ export default function TourDesign() {
   const [brief, setBrief] = useState<TourBrief>({ ...DEFAULT_TOUR_BRIEF });
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
+  const [experienceOverrides, setExperienceOverrides] = useState<Record<string, ExperienceOverride>>({});
   const [outlineStatus, setOutlineStatus] = useState<OutlineStatus>('draft');
   const [outlineNotes, setOutlineNotes] = useState('');
   const [outlineSentAt, setOutlineSentAt] = useState<string | undefined>();
@@ -116,6 +119,7 @@ export default function TourDesign() {
         brief?: TourBrief;
         selectedCodes?: string[];
         selectedPackageId?: string | null;
+        experienceOverrides?: Record<string, ExperienceOverride>;
         markupPct?: number;
         clientType?: 'b2c' | 'b2b';
       },
@@ -135,6 +139,7 @@ export default function TourDesign() {
         outlineRevision: patch?.outlineRevision ?? outlineRevision,
         selectedCodes: patch?.selectedCodes ?? selectedCodes,
         selectedPackageId: patch?.selectedPackageId ?? selectedPackageId,
+        experienceOverrides: patch?.experienceOverrides ?? experienceOverrides,
         markupPct: patch?.markupPct ?? markupPct,
         clientType: patch?.clientType ?? clientType,
         currentStep: patch?.step ?? step,
@@ -154,6 +159,7 @@ export default function TourDesign() {
       outlineRows,
       selectedCodes,
       selectedPackageId,
+      experienceOverrides,
       markupPct,
       clientType,
       step,
@@ -185,6 +191,7 @@ export default function TourDesign() {
         setOutlineRevision(draft.outlineRevision ?? 0);
         setSelectedCodes(draft.selectedCodes ?? []);
         setSelectedPackageId(draft.selectedPackageId ?? null);
+        setExperienceOverrides(resolveExperienceOverrides(draft));
         setMarkupPct(draft.markupPct ?? 30);
         setClientType(draft.clientType ?? c?.clientType ?? 'b2c');
         const nextStep = urlStep ?? draft.currentStep ?? 0;
@@ -201,6 +208,7 @@ export default function TourDesign() {
         setOutlineApprovedAt(undefined);
         setOutlineRevision(0);
         setStep(urlStep ?? 0);
+        setExperienceOverrides({});
       }
     },
     [customers, tourDrafts, tourOutlineDays, updateLead]
@@ -251,6 +259,7 @@ export default function TourDesign() {
     outlineRevision,
     selectedCodes,
     selectedPackageId,
+    experienceOverrides,
     markupPct,
     clientType,
     step,
@@ -258,8 +267,63 @@ export default function TourDesign() {
   ]);
 
   const toggleProduct = (code: string) => {
-    setSelectedCodes((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]));
+    setSelectedCodes((prev) => {
+      if (prev.includes(code)) {
+        setExperienceOverrides((ov) => {
+          if (!(code in ov)) return ov;
+          const next = { ...ov };
+          delete next[code];
+          return next;
+        });
+        return prev.filter((c) => c !== code);
+      }
+      return [...prev, code];
+    });
     setSelectedPackageId(null);
+  };
+
+  const reorderCodes = (codes: string[]) => {
+    setSelectedCodes(codes);
+    setSelectedPackageId(null);
+  };
+
+  const patchOverride = (code: string, patch: OverridePatch) => {
+    setExperienceOverrides((prev) => {
+      const merged: ExperienceOverride = { ...prev[code] };
+      if ('desc' in patch) {
+        if (patch.desc?.trim()) merged.desc = patch.desc;
+        else delete merged.desc;
+      }
+      if ('date' in patch) {
+        if (patch.date?.trim()) merged.date = patch.date.trim();
+        else delete merged.date;
+      }
+      if ('clientNote' in patch) {
+        if (patch.clientNote?.trim()) merged.clientNote = patch.clientNote;
+        else delete merged.clientNote;
+      }
+      if ('dayIndex' in patch) {
+        if (typeof patch.dayIndex === 'number' && Number.isFinite(patch.dayIndex) && patch.dayIndex >= 1) {
+          merged.dayIndex = Math.floor(patch.dayIndex);
+        } else {
+          delete merged.dayIndex;
+        }
+      }
+      if ('durOverride' in patch) {
+        if (patch.durOverride === 'full' || patch.durOverride === 'half') {
+          merged.durOverride = patch.durOverride;
+        } else {
+          delete merged.durOverride;
+        }
+      }
+      if (!merged.desc && !merged.date && !merged.clientNote && merged.dayIndex == null && !merged.durOverride) {
+        if (!(code in prev)) return prev;
+        const copy = { ...prev };
+        delete copy[code];
+        return copy;
+      }
+      return { ...prev, [code]: merged };
+    });
   };
 
   function applyPackage(pkg: TourPackage) {
@@ -319,6 +383,7 @@ export default function TourDesign() {
         outlineRevision,
         selectedCodes,
         selectedPackageId,
+        experienceOverrides,
         markupPct,
         clientType,
         currentStep: step,
@@ -407,6 +472,7 @@ export default function TourDesign() {
     setBrief({ ...DEFAULT_TOUR_BRIEF });
     setSelectedCodes([]);
     setSelectedPackageId(null);
+    setExperienceOverrides({});
     setCustId('');
     setLeadId('');
     setClientType('b2c');
@@ -631,8 +697,14 @@ export default function TourDesign() {
             custName={custName}
             selectedCodes={selectedCodes}
             onToggleProduct={toggleProduct}
+            onReorderCodes={reorderCodes}
+            experienceOverrides={experienceOverrides}
+            onPatchOverride={patchOverride}
             onSelectPackage={applyPackage}
             selectedPackageId={selectedPackageId}
+            outlineRows={outlineRows}
+            markupPct={markupPct}
+            leadId={leadId || undefined}
             onEditBrief={() => goToStep(0)}
           />
           <div className="td-nav" style={{ marginTop: 14 }}>
@@ -676,6 +748,7 @@ export default function TourDesign() {
           selectedProducts={selectedProducts}
           selectedCodes={selectedCodes}
           selectedPackageId={selectedPackageId}
+          experienceOverrides={experienceOverrides}
           outlineRows={outlineRows}
           markupPct={markupPct}
           leadId={leadId || undefined}

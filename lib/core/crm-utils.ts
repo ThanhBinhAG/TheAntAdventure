@@ -1,5 +1,5 @@
-import type { Booking, Customer, Lead } from './types';
-import { STAGE_ORDER } from './constants';
+import type { Booking, Customer, Lead } from '../types';
+import { STAGE_ORDER } from '../constants';
 
 export interface GetClientLeadsOptions {
   includeLost?: boolean;

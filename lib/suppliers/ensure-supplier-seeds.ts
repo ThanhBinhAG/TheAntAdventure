@@ -1,7 +1,7 @@
-import { AA_HOTELS } from './seeds/hotels';
-import { SEED_EXTENDED_SUPPLIERS } from './seeds/extendedSuppliers';
-import { SEED_CRUISES, SEED_RESTAURANTS, SEED_TRANSPORT } from './seeds/suppliers';
-import type { CruiseSupplier, ExtendedSupplier, Hotel, RestaurantSupplier, TransportSupplier } from './types';
+import { AA_HOTELS } from '../seeds/hotels';
+import { SEED_EXTENDED_SUPPLIERS } from '../seeds/extendedSuppliers';
+import { SEED_CRUISES, SEED_RESTAURANTS, SEED_TRANSPORT } from '../seeds/suppliers';
+import type { CruiseSupplier, ExtendedSupplier, Hotel, RestaurantSupplier, TransportSupplier } from '../types';
 
 function clone<T>(rows: readonly T[]): T[] {
   return rows.map((row) => ({ ...row }));

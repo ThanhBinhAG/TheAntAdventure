@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildNoteTask, deriveTaskTitle, getTaskDisplayText, isTaskComplete, rolloverTasks, truncateTaskText } from '../lib/planner-task-utils';
+import { buildNoteTask, deriveTaskTitle, getTaskDisplayText, isTaskComplete, rolloverTasks, truncateTaskText } from '../lib/planner/planner-task-utils';
 
 test('deriveTaskTitle uses first line and truncates long text', () => {
   const long = 'a'.repeat(100);

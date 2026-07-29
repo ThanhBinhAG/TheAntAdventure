@@ -1,5 +1,5 @@
-import type { TourBrief } from '@/lib/tour-design-types';
-import { REG_LABELS } from '@/lib/page-helpers';
+import type { TourBrief } from '@/lib/tour-design/tour-design-types';
+import { REG_LABELS } from '@/lib/core/page-helpers';
 
 function labelIntlFlights(v: string) {
   if (v === 'incl-economy') return 'Included — Economy';

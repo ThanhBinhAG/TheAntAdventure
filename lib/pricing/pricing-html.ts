@@ -1,5 +1,5 @@
-import { openPrintWindow } from './print-window';
-import type { PricingTableRow } from './product-pricing-helpers';
+import { openPrintWindow } from '../core/print-window';
+import type { PricingTableRow } from '../products/product-pricing-helpers';
 import type { PricingExportOptions } from './pricing-export';
 import { paxColumnLabel } from './pricing-export';
 import {

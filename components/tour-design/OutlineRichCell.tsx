@@ -39,7 +39,7 @@ export default function OutlineRichCell({ value = '', placeholder, minRows = 4, 
       el.innerHTML = html;
       lastEmitted.current = value;
     }
-  }, []);
+  }, [value]);
 
   useEffect(() => {
     syncFromProp();

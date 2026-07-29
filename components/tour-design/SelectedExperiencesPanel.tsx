@@ -521,14 +521,12 @@ function DescEditor({
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState(plain);
-  const wasEditing = useRef(false);
+  const [wasEditing, setWasEditing] = useState(false);
 
-  useEffect(() => {
-    if (editing && !wasEditing.current) {
-      setDraft(stripMarkdown(overrideDesc !== undefined && overrideDesc !== '' ? overrideDesc : catalogDesc));
-    }
-    wasEditing.current = editing;
-  }, [editing, overrideDesc, catalogDesc]);
+  if (editing !== wasEditing) {
+    setWasEditing(editing);
+    if (editing) setDraft(plain);
+  }
 
   const tooLong = plain.length > DESC_CLAMP_CHARS;
   const shown = !expanded && tooLong ? plain.slice(0, DESC_CLAMP_CHARS) + '…' : plain;
@@ -611,9 +609,12 @@ function ClientNotesField({
   onPatchOverride: (code: string, patch: OverridePatch) => void;
 }) {
   const [draft, setDraft] = useState(value);
-  useEffect(() => {
+  const [previousValue, setPreviousValue] = useState(value);
+
+  if (value !== previousValue) {
+    setPreviousValue(value);
     setDraft(value);
-  }, [value]);
+  }
 
   return (
     <div className="td-client-notes">

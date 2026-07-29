@@ -47,14 +47,14 @@ export default function Gallery() {
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
   const [lightbox, setLightbox] = useState<GalleryPhoto | null>(null);
+  const [dismissedPhotoFilter, setDismissedPhotoFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (photoFilter) {
-      const p = photos.find((x) => x.id === photoFilter);
-      if (p) setLightbox(p);
-    }
-  }, [photoFilter, photos]);
+  const filteredPhotoLightbox =
+    photoFilter && dismissedPhotoFilter !== photoFilter
+      ? photos.find((photo) => photo.id === photoFilter) ?? null
+      : null;
+  const activeLightbox = filteredPhotoLightbox ?? lightbox;
 
   const filtered = useMemo(() => {
     let list = photos;
@@ -175,6 +175,7 @@ export default function Gallery() {
       });
       await pushTablesToSupabase(['attractions', 'products'], false);
       setModalOpen(false);
+      setDismissedPhotoFilter(photoFilter);
       setLightbox(null);
       setSelected((prev) => {
         const next = new Set(prev);
@@ -241,19 +242,25 @@ export default function Gallery() {
   }
 
   const lightboxIndex = useMemo(() => {
-    if (!lightbox) return -1;
-    return filtered.findIndex((p) => p.id === lightbox.id);
-  }, [lightbox, filtered]);
+    if (!activeLightbox) return -1;
+    return filtered.findIndex((p) => p.id === activeLightbox.id);
+  }, [activeLightbox, filtered]);
 
   function showLightboxAt(index: number) {
     const p = filtered[index];
-    if (p) setLightbox(p);
+    if (p) {
+      setDismissedPhotoFilter(null);
+      setLightbox(p);
+    }
   }
 
   useEffect(() => {
-    if (!lightbox) return;
+    if (!activeLightbox) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setLightbox(null);
+      if (e.key === 'Escape') {
+        setDismissedPhotoFilter(photoFilter);
+        setLightbox(null);
+      }
       if (e.key === 'ArrowLeft' && lightboxIndex > 0) showLightboxAt(lightboxIndex - 1);
       if (e.key === 'ArrowRight' && lightboxIndex >= 0 && lightboxIndex < filtered.length - 1) {
         showLightboxAt(lightboxIndex + 1);
@@ -262,7 +269,7 @@ export default function Gallery() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- navigate within filtered list
-  }, [lightbox, lightboxIndex, filtered]);
+  }, [activeLightbox, lightboxIndex, filtered]);
 
   return (
     <div className="phlib">
@@ -334,7 +341,14 @@ export default function Gallery() {
           return (
             <article key={p.id} className={`phlib-card${isSel ? ' selected' : ''}`}>
               <div className="phlib-card-media">
-                <button type="button" className="phlib-card-img-btn" onClick={() => setLightbox(p)}>
+                <button
+                  type="button"
+                  className="phlib-card-img-btn"
+                  onClick={() => {
+                    setDismissedPhotoFilter(null);
+                    setLightbox(p);
+                  }}
+                >
                   {thumb ? (
                     <StorageImage src={thumb} alt={p.caption} fill className="phlib-img" sizes="280px" />
                   ) : (
@@ -392,15 +406,23 @@ export default function Gallery() {
         onDelete={handleDelete}
       />
 
-      {lightbox && (
-        <div className="phlib-viewer-overlay" onClick={() => setLightbox(null)} role="dialog" aria-modal="true">
+      {activeLightbox && (
+        <div
+          className="phlib-viewer-overlay"
+          onClick={() => {
+            setDismissedPhotoFilter(photoFilter);
+            setLightbox(null);
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
           <div className="phlib-viewer" onClick={(e) => e.stopPropagation()}>
             <header className="phlib-viewer-bar">
               <div className="phlib-viewer-bar-text">
-                <strong className="phlib-viewer-caption">{lightbox.caption || lightbox.id}</strong>
-                <span className="phlib-viewer-id">{lightbox.id}</span>
-                {lightbox.displayBytes != null && (
-                  <span className="phlib-viewer-size">{formatBytes(lightbox.displayBytes)}</span>
+                <strong className="phlib-viewer-caption">{activeLightbox.caption || activeLightbox.id}</strong>
+                <span className="phlib-viewer-id">{activeLightbox.id}</span>
+                {activeLightbox.displayBytes != null && (
+                  <span className="phlib-viewer-size">{formatBytes(activeLightbox.displayBytes)}</span>
                 )}
                 {lightboxIndex >= 0 && (
                   <span className="phlib-viewer-pos">
@@ -413,7 +435,8 @@ export default function Gallery() {
                   type="button"
                   className="btn btn-sm btn-o"
                   onClick={() => {
-                    openEdit(lightbox);
+                    openEdit(activeLightbox);
+                    setDismissedPhotoFilter(photoFilter);
                     setLightbox(null);
                   }}
                 >
@@ -423,7 +446,10 @@ export default function Gallery() {
                   type="button"
                   className="phlib-viewer-close"
                   aria-label="Close"
-                  onClick={() => setLightbox(null)}
+                  onClick={() => {
+                    setDismissedPhotoFilter(photoFilter);
+                    setLightbox(null);
+                  }}
                 >
                   ✕
                 </button>
@@ -441,11 +467,11 @@ export default function Gallery() {
                   ‹
                 </button>
               )}
-              {(photoDisplayUrl(lightbox) || lightbox.url) ? (
+              {(photoDisplayUrl(activeLightbox) || activeLightbox.url) ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={photoDisplayUrl(lightbox) || lightbox.url}
-                  alt={lightbox.caption}
+                  src={photoDisplayUrl(activeLightbox) || activeLightbox.url}
+                  alt={activeLightbox.caption}
                   className="phlib-viewer-img"
                 />
               ) : (

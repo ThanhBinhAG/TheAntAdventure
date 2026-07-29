@@ -37,7 +37,7 @@ function fmtMoney(amt: number, cur: string) {
   return `${cur} ${Number(amt).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 }
 
-export function buildContractHTML(c: ContractDoc, _forExport = false): string {
+export function buildContractHTML(c: ContractDoc): string {
   const balDue = c.balanceDueDate ? fmtDate(c.balanceDueDate) : '30 days prior to departure';
   const pax = c.pax || 1;
   const total = c.total || 0;
@@ -176,7 +176,7 @@ export function buildContractHTML(c: ContractDoc, _forExport = false): string {
 }
 
 export function downloadContractWord(c: ContractDoc) {
-  const html = buildContractHTML(c, true);
+  const html = buildContractHTML(c);
   const wordDoc = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head><meta charset='utf-8'><style>body{font-family:Arial,sans-serif;font-size:13px;color:#1a2e23;margin:40px}table{border-collapse:collapse;width:100%}</style></head>
 <body>${html}</body></html>`;
@@ -191,7 +191,7 @@ export function downloadContractWord(c: ContractDoc) {
 
 export function printContract(c: ContractDoc) {
   openPrintWindow(
-    `<!DOCTYPE html><html><head><title>${c.id}</title></head><body>${buildContractHTML(c, true)}</body></html>`,
+    `<!DOCTYPE html><html><head><title>${c.id}</title></head><body>${buildContractHTML(c)}</body></html>`,
     c.id
   );
 }

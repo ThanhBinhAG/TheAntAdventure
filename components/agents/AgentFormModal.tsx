@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Agent } from '@/lib/types';
 
 export type AgentFormData = {
@@ -46,29 +46,34 @@ function nextAgentId(agents: Agent[]): string {
   return `AGT-${String(next).padStart(3, '0')}`;
 }
 
-export default function AgentFormModal({ open, mode, agent, agents, onClose, onSave }: AgentFormModalProps) {
-  const [form, setForm] = useState<AgentFormData>(EMPTY);
+function initialForm(mode: AgentFormModalProps['mode'], agent: AgentFormModalProps['agent'], agents: Agent[]): AgentFormData {
+  if (mode === 'edit' && agent) {
+    return {
+      id: agent.id,
+      name: agent.name,
+      country: agent.country,
+      tier: agent.tier,
+      commissionPct: agent.commissionPct,
+      currency: agent.currency,
+      contactName: agent.contactName !== '—' ? agent.contactName : '',
+      email: agent.email !== '—' ? agent.email : '',
+      phone: agent.phone !== '—' ? agent.phone : '',
+      notes: agent.notes || '',
+      status: agent.status,
+    };
+  }
+  return { ...EMPTY, id: nextAgentId(agents) };
+}
 
-  useEffect(() => {
-    if (!open) return;
-    if (mode === 'edit' && agent) {
-      setForm({
-        id: agent.id,
-        name: agent.name,
-        country: agent.country,
-        tier: agent.tier,
-        commissionPct: agent.commissionPct,
-        currency: agent.currency,
-        contactName: agent.contactName !== '—' ? agent.contactName : '',
-        email: agent.email !== '—' ? agent.email : '',
-        phone: agent.phone !== '—' ? agent.phone : '',
-        notes: agent.notes || '',
-        status: agent.status,
-      });
-    } else {
-      setForm({ ...EMPTY, id: nextAgentId(agents) });
-    }
-  }, [open, mode, agent, agents]);
+export default function AgentFormModal({ open, mode, agent, agents, onClose, onSave }: AgentFormModalProps) {
+  const formKey = `${open}-${mode}-${agent ? JSON.stringify(agent) : agents.map((item) => item.id).join(',')}`;
+  const [previousFormKey, setPreviousFormKey] = useState(formKey);
+  const [form, setForm] = useState<AgentFormData>(() => initialForm(mode, agent, agents));
+
+  if (formKey !== previousFormKey) {
+    setPreviousFormKey(formKey);
+    setForm(initialForm(mode, agent, agents));
+  }
 
   if (!open) return null;
 

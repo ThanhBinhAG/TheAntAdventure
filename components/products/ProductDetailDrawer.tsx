@@ -39,25 +39,21 @@ export default function ProductDetailDrawer({
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
   const storeProduct = useStore((s) => (p && !isPreview ? s.products.find((x) => x.code === p.code) : undefined));
   /** In preview mode, trust the draft as-is; in view mode, merge latest store row. */
-  const product = isPreview ? p : p && storeProduct ? { ...p, ...storeProduct } : p;
+  const product = useMemo(
+    () => (isPreview ? p : p && storeProduct ? { ...p, ...storeProduct } : p),
+    [isPreview, p, storeProduct]
+  );
   const pricingRow = useStore((s) =>
     product?.code ? s.productPricing.find((r) => r.productCode === product.code) : undefined
   );
-  const [heroIndex, setHeroIndex] = useState(0);
-
   useEffect(() => {
     if (!open) return;
-    setHeroIndex(0);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
-
-  useEffect(() => {
-    setHeroIndex(0);
-  }, [product?.photoIds?.join(','), product?.linkedPhotoIds?.join(',')]);
 
   const heroImages = useMemo(() => {
     if (!product) return [];
@@ -88,8 +84,6 @@ export default function ProductDetailDrawer({
   const pStatus = pricingStatus(pricingRow);
   const photoStatus = productPhotoSlotStatus(product);
   const badge = PRICING_BADGE[pStatus];
-  const currentHero = heroImages[heroIndex] ?? null;
-
   return (
     <>
       <div
@@ -120,33 +114,10 @@ export default function ProductDetailDrawer({
 
         <div className="tp-drawer-scroll">
           <div className="tp-drawer-hero">
-            {currentHero ? (
-              <StorageImage
-                src={currentHero.url}
-                alt={currentHero.alt}
-                fill
-                sizes="560px"
-                className="tp-drawer-hero-img"
-              />
-            ) : (
-              <div className="tp-drawer-hero-placeholder">
-                <span>🗺</span>
-                <span>No photos yet</span>
-              </div>
-            )}
-            {heroImages.length > 1 && (
-              <div className="tp-drawer-hero-dots">
-                {heroImages.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`tp-drawer-hero-dot${i === heroIndex ? ' on' : ''}`}
-                    onClick={() => setHeroIndex(i)}
-                    aria-label={`Photo ${i + 1}`}
-                  />
-                ))}
-              </div>
-            )}
+            <ProductHero
+              key={`${open}-${product.code}-${product.photoIds?.join(',') ?? ''}-${product.linkedPhotoIds?.join(',') ?? ''}`}
+              images={heroImages}
+            />
           </div>
 
           <div className="tp-drawer-tags">
@@ -211,6 +182,43 @@ export default function ProductDetailDrawer({
           </footer>
         )}
       </aside>
+    </>
+  );
+}
+
+function ProductHero({ images }: { images: { url: string; alt: string }[] }) {
+  const [heroIndex, setHeroIndex] = useState(0);
+  const currentHero = images[heroIndex] ?? null;
+
+  return (
+    <>
+      {currentHero ? (
+        <StorageImage
+          src={currentHero.url}
+          alt={currentHero.alt}
+          fill
+          sizes="560px"
+          className="tp-drawer-hero-img"
+        />
+      ) : (
+        <div className="tp-drawer-hero-placeholder">
+          <span>🗺</span>
+          <span>No photos yet</span>
+        </div>
+      )}
+      {images.length > 1 && (
+        <div className="tp-drawer-hero-dots">
+          {images.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              className={`tp-drawer-hero-dot${i === heroIndex ? ' on' : ''}`}
+              onClick={() => setHeroIndex(i)}
+              aria-label={`Photo ${i + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </>
   );
 }

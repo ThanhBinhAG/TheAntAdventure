@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import WeatherWeeklyGrid from '@/components/weather/WeatherWeeklyGrid';
 import { BEST_BY, DEFAULT_WEATHER, DESTINATIONS, MONTHS, TEMP_RANGES, WR } from '@/lib/seeds/weather';
 import { REG_COLORS_HEX } from '@/lib/core/page-helpers';
@@ -15,22 +15,23 @@ function getWR(code: string) {
   return WR[code as WeatherCode] || WR.G;
 }
 
+function getStoredWeatherData(): WeatherData {
+  if (typeof window === 'undefined') return { ...DEFAULT_WEATHER } as WeatherData;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as WeatherData) : ({ ...DEFAULT_WEATHER } as WeatherData);
+  } catch {
+    return { ...DEFAULT_WEATHER } as WeatherData;
+  }
+}
+
 export default function Weather() {
   const [tab, setTab] = useState<WeatherTab>('week');
   const [regionF, setRegionF] = useState('all');
-  const [weatherData, setWeatherData] = useState<WeatherData>(() => ({ ...DEFAULT_WEATHER } as WeatherData));
+  const [weatherData, setWeatherData] = useState<WeatherData>(getStoredWeatherData);
   const [editCell, setEditCell] = useState<{ destId: string; monthIdx: number } | null>(null);
   const [pendingCode, setPendingCode] = useState<string>('G');
   const [savedFlash, setSavedFlash] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setWeatherData(JSON.parse(raw) as WeatherData);
-    } catch {
-      /* ignore */
-    }
-  }, []);
 
   const dests = useMemo(
     () => DESTINATIONS.filter((d) => regionF === 'all' || d.region === regionF),

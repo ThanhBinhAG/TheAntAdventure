@@ -52,7 +52,8 @@ export default function WeatherWeeklyGrid({ region }: Props) {
   }, [region]);
 
   useEffect(() => {
-    load();
+    const initialLoad = setTimeout(() => void load(), 0);
+    return () => clearTimeout(initialLoad);
   }, [load]);
 
   async function handleRefresh() {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import Link from 'next/link';
 import * as Sentry from '@sentry/nextjs';
 
 type ErrorProps = {
@@ -30,9 +31,9 @@ export default function CrmError({ error, reset }: ErrorProps) {
         <button className="btn btn-p" type="button" onClick={() => reset()}>
           Try again
         </button>
-        <a className="btn" href="/dashboard">
+        <Link className="btn" href="/dashboard">
           Dashboard
-        </a>
+        </Link>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { AGENT_DATALIST, SALES_PEOPLE } from '@/lib/customers/customer-form';
 import { buildBriefSummaryHtml } from '@/lib/tour-design/tour-brief-summary';
 import type { TourBrief } from '@/lib/tour-design/tour-design-types';
@@ -65,17 +65,8 @@ export default function ClientBriefStep({
   const summary = buildBriefSummaryHtml(brief, clientType, custName);
   const showChildren = brief.children > 0;
   const isCustomPax = brief.pax > 10;
-  const [paxMode, setPaxMode] = useState<'preset' | 'custom'>(isCustomPax ? 'custom' : 'preset');
+  const paxMode = isCustomPax ? 'custom' : 'preset';
   const [customPaxInput, setCustomPaxInput] = useState(String(isCustomPax ? brief.pax : 12));
-
-  useEffect(() => {
-    if (brief.pax > 10) {
-      setPaxMode('custom');
-      setCustomPaxInput(String(brief.pax));
-    } else {
-      setPaxMode('preset');
-    }
-  }, [brief.pax]);
 
   function setPax(n: number) {
     setBrief((b) => ({ ...b, pax: n, adults: n }));
@@ -172,10 +163,11 @@ export default function ClientBriefStep({
               </select>
               {paxMode === 'custom' && (
                 <input
+                  key={brief.pax}
                   type="number"
                   min={11}
                   step={1}
-                  value={customPaxInput}
+                  defaultValue={brief.pax}
                   onChange={(e) => handleCustomPaxChange(e.target.value)}
                   onBlur={() => {
                     const n = Math.max(11, Math.floor(Number(customPaxInput) || 11));

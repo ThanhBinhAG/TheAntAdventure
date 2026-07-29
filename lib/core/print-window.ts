@@ -61,7 +61,9 @@ function preparePrintHtml(html: string): string {
 }
 
 /** Render HTML in a hidden iframe, open the print dialog, then remove the iframe. */
-export function openPrintWindow(html: string, _title = ''): void {
+export function openPrintWindow(html: string, title = ''): void {
+  // Retain the title argument for callers while deliberately stripping print chrome.
+  void title;
   const prepared = preparePrintHtml(html);
   const blob = new Blob([prepared], { type: 'text/html;charset=utf-8' });
   const blobUrl = URL.createObjectURL(blob);

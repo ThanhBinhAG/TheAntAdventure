@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import DestinationCombobox from '@/components/products/DestinationCombobox';
 import PhotoLibraryPicker from '@/components/gallery/PhotoLibraryPicker';
 import {
@@ -117,6 +117,9 @@ export default function ProductEditPanel({
   const [saveState, setSaveState] = useState<SaveUiState>('idle');
   const [saveKind, setSaveKind] = useState<'draft' | 'activate' | null>(null);
   const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null);
+  const productForm = product && !isNew ? productToForm(product) : emptyProductForm('north', existingCodes);
+  const formInputKey = open ? `${isNew}:${formFingerprint(productForm)}` : null;
+  const [previousFormInputKey, setPreviousFormInputKey] = useState<string | null>(formInputKey);
   const categories = useMemo(() => deriveCategoriesFromProducts(allProducts), [allProducts]);
   const suggestedTypeSegment = useMemo(
     () => suggestTypeSegment(form.region, form.dur, form.cat),
@@ -140,43 +143,26 @@ export default function ProductEditPanel({
     [existingCodes, isNew]
   );
 
-  const formRef = useRef(form);
-  formRef.current = form;
-
-  useEffect(() => {
-    if (!open) return;
-    const next =
-      product && !isNew ? productToForm(product) : emptyProductForm('north', existingCodes);
-    const current = formRef.current;
-    // Parent refreshes the same product after a successful save — keep Saved UI.
-    if (
-      product &&
-      !isNew &&
-      current.code === next.code &&
-      formFingerprint(current) === formFingerprint(next)
-    ) {
-      return;
+  if (formInputKey !== previousFormInputKey) {
+    setPreviousFormInputKey(formInputKey);
+    if (open && formFingerprint(form) !== formFingerprint(productForm)) {
+      setSaveError(null);
+      setSaveState('idle');
+      setSaveKind(null);
+      setSavedFingerprint(null);
+      setForm(productForm);
     }
-    setSaveError(null);
-    setSaveState('idle');
-    setSaveKind(null);
-    setSavedFingerprint(null);
-    setForm(next);
-    onDraftChange?.(draftFromForm(next));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once per open/product; ongoing drafts via form effect
-  }, [open, product, isNew, existingCodes]);
+  }
 
   useEffect(() => {
     if (!open) return;
     onDraftChange?.(draftFromForm(form));
   }, [form, open, onDraftChange]);
 
-  useEffect(() => {
-    if (saveState === 'saved' && dirty) {
-      setSaveState('idle');
-      setSaveKind(null);
-    }
-  }, [dirty, saveState]);
+  if (saveState === 'saved' && dirty) {
+    setSaveState('idle');
+    setSaveKind(null);
+  }
 
   useEffect(() => {
     if (saveState !== 'saving') return;

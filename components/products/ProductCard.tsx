@@ -28,7 +28,7 @@ export default function ProductCard({
 }: ProductCardProps) {
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
   const storeProduct = useStore((s) => s.products.find((x) => x.code === p.code));
-  const product = storeProduct ? { ...p, ...storeProduct } : p;
+  const product = useMemo(() => (storeProduct ? { ...p, ...storeProduct } : p), [p, storeProduct]);
   const pricingRow = useStore((s) => s.productPricing.find((r) => r.productCode === p.code));
   const [rbg, rfg] = REG_COLORS_HEX[p.region as keyof typeof REG_COLORS_HEX] || ['#f5f5f5', '#333'];
   const priceLabel = p.price || getLibPriceLabel(p.code, 2);

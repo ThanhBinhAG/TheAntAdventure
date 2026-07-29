@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { TourBrief } from '@/lib/tour-design/tour-design-types';
 import { getGuestPanelData, hasGuestBriefData } from '@/lib/tour-design/tour-brief-summary';
 
@@ -16,17 +16,14 @@ interface Props {
 export default function GuestProfileCard({ brief, clientType, custName, onEditBrief }: Props) {
   const { displayName, summaryLine, rows } = getGuestPanelData(brief, clientType, custName);
   const hasData = hasGuestBriefData(brief, clientType, custName);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
+  const [open, setOpen] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === '1') setOpen(true);
-      if (saved === '0') setOpen(false);
+      return saved === '1';
     } catch {
-      /* ignore */
+      return false;
     }
-  }, []);
+  });
 
   function toggle() {
     setOpen((prev) => {

@@ -24,7 +24,13 @@ export default function ProposalEditorModal({ open, doc, overrides, origin = '',
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const draftRef = useRef<ProposalContentOverrides>({});
   const [richActive, setRichActive] = useState(false);
-  const [iframeKey, setIframeKey] = useState(0);
+  const [resetRevision, setResetRevision] = useState(0);
+  const [previousOpen, setPreviousOpen] = useState(open);
+
+  if (open !== previousOpen) {
+    setPreviousOpen(open);
+    if (open) setRichActive(false);
+  }
 
   const initialDoc = useMemo(
     () => applyProposalContentOverrides(doc, hasProposalContentOverrides(overrides) ? overrides : null),
@@ -33,15 +39,12 @@ export default function ProposalEditorModal({ open, doc, overrides, origin = '',
 
   const srcDoc = useMemo(
     () => buildProposalEditableHTML(initialDoc, origin),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild only when modal opens or doc changes
-    [initialDoc, origin, iframeKey]
+    [initialDoc, origin]
   );
 
   useEffect(() => {
     if (open) {
       draftRef.current = hasProposalContentOverrides(overrides) ? { ...overrides } : snapshotFromDoc(doc);
-      setIframeKey((k) => k + 1);
-      setRichActive(false);
     }
   }, [open, doc, overrides]);
 
@@ -110,11 +113,11 @@ export default function ProposalEditorModal({ open, doc, overrides, origin = '',
         iDoc.body.replaceWith(iDoc.body.cloneNode(true));
       }
     };
-  }, [open, iframeKey, harvestFromIframe]);
+  }, [open, resetRevision, harvestFromIframe]);
 
   function handleResetAll() {
     draftRef.current = snapshotFromDoc(doc);
-    setIframeKey((k) => k + 1);
+    setResetRevision((revision) => revision + 1);
   }
 
   function handleSave() {
@@ -194,7 +197,7 @@ export default function ProposalEditorModal({ open, doc, overrides, origin = '',
 
         <div className="proposal-doc-canvas">
           <iframe
-            key={iframeKey}
+            key={resetRevision}
             ref={iframeRef}
             title="Proposal document editor"
             srcDoc={srcDoc}

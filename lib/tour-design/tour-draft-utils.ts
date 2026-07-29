@@ -186,6 +186,7 @@ export function buildTourDraft(input: {
 
 export function briefFromDraft(draft?: TourDraft | null): Partial<TourBrief> | undefined {
   if (!draft?.briefJson) return undefined;
-  const { [EXPERIENCE_OVERRIDES_KEY]: _omit, ...rest } = draft.briefJson;
-  return rest as unknown as Partial<TourBrief>;
+  const brief = { ...draft.briefJson };
+  delete brief[EXPERIENCE_OVERRIDES_KEY];
+  return brief as unknown as Partial<TourBrief>;
 }

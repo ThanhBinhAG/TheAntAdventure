@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { STAGE_COLORS, STAGE_PROB_V22, fmt, KANBAN_STAGES } from '@/lib/constants';
 import { getCustomerName } from '@/lib/core/crm-utils';
 import { ensureBookingForConfirmedLead } from '@/lib/sales/booking-from-lead';
@@ -63,7 +63,7 @@ function timeFilterLabel(mode: SalesTimeFilterMode, tsf: (key: SalesKey) => stri
 }
 
 function SalesPolicyView() {
-  const { tc, tsf } = useLanguage();
+  const { tsf } = useLanguage();
 
   const bookingItems = [
     ['30%', tsf('deposit30'), 'var(--g)'],
@@ -313,11 +313,6 @@ function ListFollowUpCell({
   const [fupAction, setFupAction] = useState(lead.nextAction || '');
   const overdue = isFollowUpOverdue(lead, today);
 
-  useEffect(() => {
-    setFupDate(lead.followUpDate || '');
-    setFupAction(lead.nextAction || '');
-  }, [lead.followUpDate, lead.nextAction]);
-
   return (
     <td style={{ fontSize: 12, color: overdue ? 'var(--red)' : 'var(--m)', fontWeight: overdue ? 600 : 400 }}>
       <div>{lead.followUpDate || '—'}</div>
@@ -368,7 +363,9 @@ function SortableTh({
 export default function Sales() {
   const { tc, tStage, tsf, tLostReason } = useLanguage();
   const searchParams = useSearchParams();
-  const urlInitRef = useRef(false);
+  const urlCustId = searchParams.get('custId');
+  const urlLeadId = searchParams.get('leadId');
+  const urlTab = searchParams.get('tab');
   const leads = useStore((s) => s.leads);
   const customers = useStore((s) => s.customers);
   const tourDrafts = useStore((s) => s.tourDrafts);
@@ -378,7 +375,9 @@ export default function Sales() {
   const upsertTourDraft = useStore((s) => s.upsertTourDraft);
   const addComm = useStore((s) => s.addComm);
   const { saveFromForm } = useRegisterCustomer();
-  const [tab, setTab] = useState<SalesTab>('pipeline');
+  const [tab, setTab] = useState<SalesTab>(() =>
+    urlLeadId ? 'list' : urlTab === 'list' || urlTab === 'pipeline' ? urlTab : 'pipeline'
+  );
   const [lostModal, setLostModal] = useState<{ leadId: string; reason: string; note: string } | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [createdClient, setCreatedClient] = useState<{
@@ -388,44 +387,26 @@ export default function Sales() {
     message: string;
   } | null>(null);
 
-  const today = localTodayIso();
+  const [today] = useState(localTodayIso);
   const [search, setSearch] = useState('');
-  const [custIdFilter, setCustIdFilter] = useState('');
-  const [highlightLeadId, setHighlightLeadId] = useState('');
+  const [custIdFilter, setCustIdFilter] = useState(() => urlCustId ?? '');
+  const [highlightLeadId, setHighlightLeadId] = useState(() => urlLeadId ?? '');
   const [timeFilter, setTimeFilter] = useState<SalesTimeFilterState>({ mode: 'all' });
   const [stageFilter, setStageFilter] = useState('');
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
   const [listSort, setListSort] = useState<ListSortState>({ field: 'followUp', direction: 'asc' });
   const [groupByMonth, setGroupByMonth] = useState(false);
 
-  useEffect(() => {
-    if (urlInitRef.current) return;
-    const urlCustId = searchParams.get('custId');
-    const urlLeadId = searchParams.get('leadId');
-    const urlTab = searchParams.get('tab');
-
-    if (urlLeadId) setTab('list');
-    else if (urlTab === 'list' || urlTab === 'pipeline') setTab(urlTab);
-
-    if (urlCustId) setCustIdFilter(urlCustId);
-    if (urlLeadId) setHighlightLeadId(urlLeadId);
-
-    urlInitRef.current = true;
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (highlightLeadId) {
-      const lead = leads.find((l) => l.id === highlightLeadId);
-      if (lead) {
-        setExpandedStages((prev) => new Set(prev).add(lead.stage));
-        if (!custIdFilter) setCustIdFilter(lead.custId);
-      }
-    }
-    if (custIdFilter && !search) {
-      const cust = customers.find((c) => c.id === custIdFilter);
-      if (cust) setSearch(cust.name);
-    }
-  }, [highlightLeadId, custIdFilter, leads, customers, search]);
+  const highlightedLead = useMemo(
+    () => leads.find((lead) => lead.id === highlightLeadId),
+    [leads, highlightLeadId]
+  );
+  const effectiveCustIdFilter = custIdFilter || highlightedLead?.custId || '';
+  const effectiveExpandedStages = useMemo(() => {
+    const stages = new Set(expandedStages);
+    if (highlightedLead) stages.add(highlightedLead.stage);
+    return stages;
+  }, [expandedStages, highlightedLead]);
 
   const travelMonths = useMemo(() => getUniqueTravelMonths(leads), [leads]);
 
@@ -433,7 +414,7 @@ export default function Sales() {
     let list = leads.filter((l) => l.stage !== 'Lost');
     list = filterLeadsByTime(list, timeFilter, today);
     if (stageFilter) list = list.filter((l) => l.stage === stageFilter);
-    if (custIdFilter) list = list.filter((l) => l.custId === custIdFilter);
+    if (effectiveCustIdFilter) list = list.filter((l) => l.custId === effectiveCustIdFilter);
     if (search.trim()) list = list.filter((l) => leadMatchesSearch(l, search, customers));
 
     if (highlightLeadId) {
@@ -444,7 +425,7 @@ export default function Sales() {
     }
 
     return list;
-  }, [leads, timeFilter, stageFilter, custIdFilter, search, customers, today, highlightLeadId]);
+  }, [leads, timeFilter, stageFilter, effectiveCustIdFilter, search, customers, today, highlightLeadId]);
 
   const activeLeads = filteredLeads.filter((l) => l.stage !== 'Lost' && l.stage !== 'Completed');
   const totalPipelineVal = activeLeads.reduce((s, l) => s + (l.value || 0), 0);
@@ -463,7 +444,7 @@ export default function Sales() {
   ]);
   const { paginatedItems: pageLeads } = listPagination;
 
-  const filtersActive = hasActiveFilters(search, timeFilter, stageFilter) || !!custIdFilter;
+  const filtersActive = hasActiveFilters(search, timeFilter, stageFilter) || !!effectiveCustIdFilter;
 
   function clearFilters() {
     setSearch('');
@@ -712,7 +693,7 @@ export default function Sales() {
               {KANBAN_STAGES.map((stage) => {
                 const stageLeads = filteredLeads.filter((l) => l.stage === stage);
                 const stageVal = stageLeads.reduce((acc, l) => acc + (l.value || 0), 0);
-                const expanded = expandedStages.has(stage);
+                const expanded = effectiveExpandedStages.has(stage);
                 const visibleLeads = expanded ? stageLeads : stageLeads.slice(0, PIPELINE_CARDS_LIMIT);
                 const hiddenCount = stageLeads.length - visibleLeads.length;
                 return (

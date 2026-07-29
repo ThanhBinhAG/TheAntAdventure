@@ -29,7 +29,10 @@ export function TurnstileWidget({ siteKey, onToken }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const onTokenRef = useRef(onToken);
-  onTokenRef.current = onToken;
+
+  useEffect(() => {
+    onTokenRef.current = onToken;
+  }, [onToken]);
 
   const renderWidget = useCallback(() => {
     if (!siteKey || !containerRef.current || !window.turnstile) return;

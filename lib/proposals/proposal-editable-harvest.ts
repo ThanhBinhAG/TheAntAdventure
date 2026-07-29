@@ -26,7 +26,7 @@ type MutableOverrides = {
   legalText: NonNullable<ProposalContentOverrides['legalText']>;
 };
 
-function createMutable(baseDoc: ProposalDoc): MutableOverrides {
+function createMutable(): MutableOverrides {
   return {
     bookingFields: {},
     overviewRows: [],
@@ -148,7 +148,7 @@ function applyField(m: MutableOverrides, path: string, value: string, baseDoc: P
 }
 
 export function harvestOverridesFromRoot(root: ParentNode, baseDoc: ProposalDoc): ProposalContentOverrides {
-  const m = createMutable(baseDoc);
+  const m = createMutable();
   root.querySelectorAll('[data-proposal-field]').forEach((node) => {
     const el = node as HTMLElement;
     const path = el.getAttribute('data-proposal-field');

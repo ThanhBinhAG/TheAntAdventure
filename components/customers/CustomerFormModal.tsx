@@ -33,45 +33,58 @@ interface CustomerFormModalProps {
   onSave: (payload: CustomerFormSavePayload) => boolean;
 }
 
+function initialForm(mode: CustomerFormModalProps['mode'], customer: CustomerFormModalProps['customer']) {
+  return customer && mode === 'edit' ? customerToForm(customer) : { ...EMPTY_CUSTOMER_FORM };
+}
+
 export default function CustomerFormModal({ open, mode, customer, customers, onClose, onSave }: CustomerFormModalProps) {
-  const [form, setForm] = useState<CustomerFormData>(EMPTY_CUSTOMER_FORM);
+  const formKey = `${open}-${mode}-${customer ? JSON.stringify(customer) : ''}`;
+  const [previousFormKey, setPreviousFormKey] = useState(formKey);
+  const [form, setForm] = useState<CustomerFormData>(() => initialForm(mode, customer));
   const [logInquiry, setLogInquiry] = useState(true);
   const [emailCheck, setEmailCheck] = useState<EmailCheckStatus>('idle');
   const [duplicateCustomer, setDuplicateCustomer] = useState<Customer | null>(null);
+  const [previousEmail, setPreviousEmail] = useState(form.email);
 
-  useEffect(() => {
-    if (!open) return;
-    setForm(customer && mode === 'edit' ? customerToForm(customer) : { ...EMPTY_CUSTOMER_FORM });
+  if (formKey !== previousFormKey) {
+    setPreviousFormKey(formKey);
+    setForm(initialForm(mode, customer));
     setLogInquiry(true);
     setEmailCheck('idle');
     setDuplicateCustomer(null);
-  }, [open, customer, mode]);
+  }
+
+  if (form.email !== previousEmail) {
+    setPreviousEmail(form.email);
+    setEmailCheck('idle');
+    setDuplicateCustomer(null);
+  }
 
   useEffect(() => {
-    if (!open) return;
-
     const email = form.email.trim();
-    if (!email) {
-      setEmailCheck('idle');
-      setDuplicateCustomer(null);
-      return;
-    }
+    if (!open || !email) return;
 
-    setEmailCheck('checking');
     const excludeId = mode === 'edit' && customer ? customer.id : undefined;
+    let resultTimer: ReturnType<typeof setTimeout> | undefined;
     const timer = setTimeout(() => {
-      const dup = findDuplicateCustomerByEmail(customers, email, excludeId);
-      if (dup) {
-        setEmailCheck('duplicate');
-        setDuplicateCustomer(dup);
-      } else {
-        setEmailCheck('available');
-        setDuplicateCustomer(null);
-      }
+      setEmailCheck('checking');
+      resultTimer = setTimeout(() => {
+        const dup = findDuplicateCustomerByEmail(customers, email, excludeId);
+        if (dup) {
+          setEmailCheck('duplicate');
+          setDuplicateCustomer(dup);
+        } else {
+          setEmailCheck('available');
+          setDuplicateCustomer(null);
+        }
+      }, 0);
     }, EMAIL_CHECK_DEBOUNCE_MS);
 
-    return () => clearTimeout(timer);
-  }, [form.email, customers, mode, customer?.id, open]);
+    return () => {
+      clearTimeout(timer);
+      if (resultTimer) clearTimeout(resultTimer);
+    };
+  }, [form.email, customers, mode, customer, open]);
 
   if (!open) return null;
 

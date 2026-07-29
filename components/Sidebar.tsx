@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NAV_SECTIONS, type NavItem } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
@@ -41,15 +41,18 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     []
   );
   const [openGroup, setOpenGroup] = useState<PageSlug | null>(null);
+  const [previousPage, setPreviousPage] = useState(current);
 
   // Keep the group holding the active page open across navigations.
-  useEffect(() => {
-    if (!groupPages.has(current)) return;
-    const owner = NAV_SECTIONS.flatMap((s) => s.items).find((i) =>
-      i.children?.some((c) => c.page === current)
-    );
-    if (owner) setOpenGroup(owner.page);
-  }, [current, groupPages]);
+  if (current !== previousPage) {
+    setPreviousPage(current);
+    if (groupPages.has(current)) {
+      const owner = NAV_SECTIONS.flatMap((s) => s.items).find((i) =>
+        i.children?.some((c) => c.page === current)
+      );
+      setOpenGroup(owner?.page ?? null);
+    }
+  }
 
   const chatUnread = useMemo(() => {
     let count = 0;

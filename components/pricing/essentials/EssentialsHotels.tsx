@@ -198,7 +198,6 @@ function HotelDetail({
                   {twoTier && (
                     <tr>
                       {[variantA, variantB, variantA, variantB, variantA, variantB].map((label, i) => (
-                        // eslint-disable-next-line react/no-array-index-key
                         <th key={`${label}-${i}`} className="pcx-num pcx-subhead">
                           {label}
                         </th>

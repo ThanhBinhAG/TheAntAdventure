@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
 import { stripMarkdown } from '@/lib/tour-design/tour-itinerary';
 import { paxToTierN, sumSellForProducts } from '@/lib/tour-design/tour-pricing';
@@ -22,6 +22,14 @@ import ProposalHotelRatesPanel from '@/components/tour-design/ProposalHotelRates
 import ProposalEditorModal from '@/components/tour-design/ProposalEditorModal';
 
 const API_KEY_STORAGE = 'ant_api_key';
+
+function readSavedApiKey(): string {
+  try {
+    return localStorage.getItem(API_KEY_STORAGE) || '';
+  } catch {
+    return '';
+  }
+}
 
 function formatPdfDownloadError(message: string): string {
   if (/libnspr4|libnss3|browser process|Code:\s*127|shared libraries|could not start Chromium/i.test(message)) {
@@ -65,8 +73,11 @@ export default function ProposalExportStep({
   onReset,
   onBack,
 }: Props) {
-  const [apiKey, setApiKey] = useState('');
-  const [keyStatus, setKeyStatus] = useState('No API key saved yet.');
+  const [apiKey, setApiKey] = useState(readSavedApiKey);
+  const [keyStatus, setKeyStatus] = useState(() => {
+    const key = readSavedApiKey();
+    return key ? '✓ API key saved on this device.' : 'No API key saved yet.';
+  });
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState('');
@@ -75,23 +86,26 @@ export default function ProposalExportStep({
   const [specialNotes, setSpecialNotes] = useState('');
   const [detailedProgramLayout, setDetailedProgramLayout] =
     useState<ProposalDetailedProgramLayout>('sidebar');
-  const [hotelRatesOptionA, setHotelRatesOptionA] = useState<ProposalHotelRate[]>([]);
-  const [hotelRatesOptionB, setHotelRatesOptionB] = useState<ProposalHotelRate[]>([]);
+  const hotelRateSeed = useMemo(() => {
+    const optionA = extractHotelBlocksFromOutline(brief, outlineRows);
+    return {
+      optionA,
+      optionB: seedOptionBHotelRates(optionA, hotelsCatalog),
+    };
+  }, [brief, outlineRows, hotelsCatalog]);
+  const hotelRateSeedKey = useMemo(() => JSON.stringify(hotelRateSeed), [hotelRateSeed]);
+  const [hotelRatesOptionA, setHotelRatesOptionA] = useState<ProposalHotelRate[]>(() => hotelRateSeed.optionA);
+  const [hotelRatesOptionB, setHotelRatesOptionB] = useState<ProposalHotelRate[]>(() => hotelRateSeed.optionB);
+  const [previousHotelRateSeedKey, setPreviousHotelRateSeedKey] = useState(hotelRateSeedKey);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [contentOverrides, setContentOverrides] = useState<ProposalContentOverrides>({});
 
-  useEffect(() => {
-    const k = localStorage.getItem(API_KEY_STORAGE) || '';
-    setApiKey(k);
-    setKeyStatus(k ? '✓ API key saved on this device.' : 'No API key saved yet.');
-  }, []);
-
-  useEffect(() => {
-    const optionA = extractHotelBlocksFromOutline(brief, outlineRows);
-    setHotelRatesOptionA(optionA);
-    setHotelRatesOptionB(seedOptionBHotelRates(optionA, hotelsCatalog));
-  }, [brief, outlineRows, hotelsCatalog]);
+  if (hotelRateSeedKey !== previousHotelRateSeedKey) {
+    setPreviousHotelRateSeedKey(hotelRateSeedKey);
+    setHotelRatesOptionA(hotelRateSeed.optionA);
+    setHotelRatesOptionB(hotelRateSeed.optionB);
+  }
 
   const assembledDoc: ProposalDoc = useMemo(
     () =>

@@ -185,8 +185,8 @@ async function syncTaggedTable(
   const localIds = rows.map((r, i) => String(r.id ?? `${handler.table}-${i}`));
   const baseRows = rows.map((r) => {
     const mapped = handler.toRow(r);
-    const { tags: _tags, ...rest } = mapped;
-    return rest;
+    delete mapped.tags;
+    return mapped;
   });
 
   if (baseRows.length) {
@@ -678,7 +678,9 @@ function makeTableApi(table: SyncArrayTable) {
   };
 }
 
-async function syncMessages(messages: ChatMessages, _options: SyncTableOptions = {}): Promise<SyncTableResult> {
+async function syncMessages(messages: ChatMessages, options: SyncTableOptions = {}): Promise<SyncTableResult> {
+  // Messages retain the generic sync-table signature; options do not affect message rows.
+  void options;
   const client = supabase();
   if (!client) return { skippedOrphanDelete: false };
 

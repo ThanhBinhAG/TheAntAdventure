@@ -38,6 +38,8 @@ export default function StorageImage({
   if (!useNext) {
     if (fill) {
       return (
+        // Raw storage URLs are intentionally rendered without Next optimization.
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
           alt={alt}
@@ -56,6 +58,8 @@ export default function StorageImage({
       );
     }
     return (
+      // Raw storage URLs are intentionally rendered without Next optimization.
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt={alt}

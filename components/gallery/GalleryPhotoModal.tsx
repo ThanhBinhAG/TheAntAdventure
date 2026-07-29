@@ -47,6 +47,21 @@ function ModalSection({ title, hint, children }: { title: string; hint?: string;
   );
 }
 
+function initialForm(mode: GalleryModalMode, initial: GalleryPhotoRecord | null | undefined, defaultRegion: string) {
+  if (mode === 'edit' && initial) {
+    return {
+      caption: initial.caption || '',
+      region: initial.region || defaultRegion,
+      tags: [...(initial.tags ?? [])],
+    };
+  }
+  return {
+    caption: EMPTY_GALLERY_PHOTO_FORM.caption,
+    region: defaultRegion,
+    tags: [],
+  };
+}
+
 export default function GalleryPhotoModal({
   open,
   mode,
@@ -58,34 +73,29 @@ export default function GalleryPhotoModal({
   onSave,
   onDelete,
 }: Props) {
-  const [caption, setCaption] = useState('');
-  const [region, setRegion] = useState(defaultRegion);
-  const [tags, setTags] = useState<string[]>([]);
+  const formKey = `${open}-${mode}-${initial ? JSON.stringify(initial) : ''}-${defaultRegion}`;
+  const [previousFormKey, setPreviousFormKey] = useState(formKey);
+  const initialValues = initialForm(mode, initial, defaultRegion);
+  const [caption, setCaption] = useState(initialValues.caption);
+  const [region, setRegion] = useState(initialValues.region);
+  const [tags, setTags] = useState<string[]>(initialValues.tags);
   const [customTag, setCustomTag] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [extraFiles, setExtraFiles] = useState<File[]>([]);
   const [replaceImage, setReplaceImage] = useState(false);
   const multiRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    if (mode === 'edit' && initial) {
-      setCaption(initial.caption || '');
-      setRegion(initial.region || defaultRegion);
-      setTags([...(initial.tags ?? [])]);
-      setFile(null);
-      setExtraFiles([]);
-      setReplaceImage(false);
-    } else {
-      setCaption(EMPTY_GALLERY_PHOTO_FORM.caption);
-      setRegion(defaultRegion);
-      setTags([]);
-      setFile(null);
-      setExtraFiles([]);
-      setReplaceImage(false);
-    }
+  if (formKey !== previousFormKey) {
+    const next = initialForm(mode, initial, defaultRegion);
+    setPreviousFormKey(formKey);
+    setCaption(next.caption);
+    setRegion(next.region);
+    setTags(next.tags);
     setCustomTag('');
-  }, [open, mode, initial, defaultRegion]);
+    setFile(null);
+    setExtraFiles([]);
+    setReplaceImage(false);
+  }
 
   const previewUrl = useMemo(() => {
     if (file) return URL.createObjectURL(file);
@@ -246,6 +256,7 @@ export default function GalleryPhotoModal({
               <GalleryRemovePhotoAction
                 disabled={saving}
                 onConfirm={() => onDelete(initial.id)}
+                resetKey={initial.id}
               />
             )}
             <div className="phlib-modal-ft-right">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 type Props = {
   onConfirm: () => void;
@@ -15,11 +15,15 @@ export default function GalleryRemovePhotoAction({
   buttonClassName = 'gallery-viewer-del',
   resetKey,
 }: Props) {
-  const [pending, setPending] = useState(false);
+  return <GalleryRemovePhotoActionBody key={resetKey} onConfirm={onConfirm} disabled={disabled} buttonClassName={buttonClassName} />;
+}
 
-  useEffect(() => {
-    setPending(false);
-  }, [resetKey]);
+function GalleryRemovePhotoActionBody({
+  onConfirm,
+  disabled = false,
+  buttonClassName = 'gallery-viewer-del',
+}: Omit<Props, 'resetKey'>) {
+  const [pending, setPending] = useState(false);
 
   if (pending) {
     return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PAGE_SIZE } from '@/lib/constants';
 
 export function usePagination<T>(
@@ -21,16 +21,20 @@ export function usePagination<T>(
 
   const total = items.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const [previousResetDeps, setPreviousResetDeps] = useState(resetDeps);
+  const resetChanged =
+    resetDeps.length !== previousResetDeps.length ||
+    resetDeps.some((dependency, index) => !Object.is(dependency, previousResetDeps[index]));
+  const nextPage = resetChanged ? 1 : Math.min(page, totalPages);
+
+  if (resetChanged) {
+    setPreviousResetDeps(resetDeps);
+  }
+  if (page !== nextPage) {
+    setPage(nextPage);
+  }
+
   const safePage = Math.min(page, totalPages);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, resetDeps);
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
 
   const paginatedItems = useMemo(() => {
     const start = (safePage - 1) * pageSize;

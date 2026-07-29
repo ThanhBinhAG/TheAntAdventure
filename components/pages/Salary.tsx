@@ -22,15 +22,14 @@ export default function Salary() {
   const [month, setMonth] = useState('May 2026');
 
   const payroll = useMemo(() => {
-    let grand = 0;
     const rows = staff.map((s) => {
       const base = (s.baseSalary as number) || 0;
       const bonus = s.dept === 'Sales & Product' ? Math.round(base * 0.05) : 0;
       const deductions = Math.round(base * 0.105);
       const total = base + bonus - deductions;
-      grand += total;
       return { ...s, base, bonus, deductions, total };
     });
+    const grand = rows.reduce((sum, row) => sum + row.total, 0);
     return { rows, grand };
   }, [staff]);
 

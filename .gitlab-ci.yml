@@ -6,9 +6,6 @@ stages:
 variables:
   npm_config_cache: '$CI_PROJECT_DIR/.npm'
   NEXT_TELEMETRY_DISABLED: '1'
-  NEXT_PUBLIC_SENTRY_DSN: ''
-  NEXT_PUBLIC_USE_SUPABASE: 'false'
-  NEXT_PUBLIC_APP_VERSION: 'ci'
 
 cache:
   key:

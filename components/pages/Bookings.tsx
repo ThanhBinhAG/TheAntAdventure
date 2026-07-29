@@ -138,7 +138,7 @@ export default function Bookings() {
     if (!selected) return;
     const now = new Date();
     const entry: BookingChange = {
-      id: `CHG-${Date.now()}`,
+      id: `CHG-${selected.id}-${((selected.changes as BookingChange[]) || []).length + 1}`,
       type,
       date: now.toISOString().split('T')[0],
       time: now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),

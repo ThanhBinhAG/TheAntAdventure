@@ -29,7 +29,6 @@ import {
   markHydrationFailed,
   markHydrationPending,
   markHydrationReady,
-  subscribeHydration,
   updateBaselineCounts,
 } from './sync-lifecycle';
 import { db as supabaseDb } from './supabase';

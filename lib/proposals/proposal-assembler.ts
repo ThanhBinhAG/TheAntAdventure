@@ -150,7 +150,7 @@ export function getPackageSellPerPax(packageId: string, pax: number, travelMonth
   return peak ? row.peak : row.off;
 }
 
-function resolveEffectiveCodes(selectedCodes: string[], packageId: string | null): string[] {
+function resolveEffectiveCodes(selectedCodes: string[]): string[] {
   if (selectedCodes.length) return selectedCodes;
   return [];
 }
@@ -829,7 +829,7 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
   } = input;
 
   const variant: ProposalVariant = clientType === 'b2b' ? 'b2b' : 'b2c';
-  const codes = resolveEffectiveCodes(selectedCodes, selectedPackageId);
+  const codes = resolveEffectiveCodes(selectedCodes);
   const preparedDate = localTodayIso();
 
   let glance: ProposalItineraryRow[] = [];

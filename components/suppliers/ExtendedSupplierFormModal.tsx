@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   EXTENDED_CATEGORY_OPTIONS,
   EXTENDED_TAG_OPTIONS,
@@ -40,6 +40,22 @@ function prefixForCat(cat: string): string {
   return map[cat] ?? 'SUP-X';
 }
 
+function initialForm(
+  mode: Props['mode'],
+  supplier: Props['supplier'],
+  defaultCat: string | undefined,
+  existing: ExtendedSupplier[]
+): ExtendedSupplier {
+  if (mode === 'edit' && supplier) {
+    return { ...supplier, tags: [...(supplier.tags || [])] };
+  }
+  const cat = defaultCat || 'visa';
+  return {
+    ...emptyExtendedSupplier(cat),
+    id: nextSupplierId(`${prefixForCat(cat)}-`, existing),
+  };
+}
+
 export default function ExtendedSupplierFormModal({
   open,
   mode,
@@ -49,20 +65,14 @@ export default function ExtendedSupplierFormModal({
   onClose,
   onSave,
 }: Props) {
-  const [form, setForm] = useState<ExtendedSupplier>(emptyExtendedSupplier());
+  const formKey = `${open}-${mode}-${supplier ? JSON.stringify(supplier) : `${defaultCat}-${existing.map((item) => item.id).join(',')}`}`;
+  const [previousFormKey, setPreviousFormKey] = useState(formKey);
+  const [form, setForm] = useState<ExtendedSupplier>(() => initialForm(mode, supplier, defaultCat, existing));
 
-  useEffect(() => {
-    if (!open) return;
-    if (mode === 'edit' && supplier) {
-      setForm({ ...supplier, tags: [...(supplier.tags || [])] });
-    } else {
-      const cat = defaultCat || 'visa';
-      setForm({
-        ...emptyExtendedSupplier(cat),
-        id: nextSupplierId(`${prefixForCat(cat)}-`, existing),
-      });
-    }
-  }, [open, mode, supplier, defaultCat, existing]);
+  if (formKey !== previousFormKey) {
+    setPreviousFormKey(formKey);
+    setForm(initialForm(mode, supplier, defaultCat, existing));
+  }
 
   if (!open) return null;
 

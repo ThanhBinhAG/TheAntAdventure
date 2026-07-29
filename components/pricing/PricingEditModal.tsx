@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   ICO_EMOJIS,
   ICO_KEYS,
@@ -37,18 +37,19 @@ export default function PricingEditModal({
   onClose,
   onSave,
 }: PricingEditModalProps) {
-  const [form, setForm] = useState<ProductPricing | null>(null);
+  const formKey = `${open}-${pricing ? JSON.stringify(pricing) : ''}`;
+  const [previousFormKey, setPreviousFormKey] = useState(formKey);
+  const [form, setForm] = useState<ProductPricing | null>(() => (pricing ? clonePricing(pricing) : null));
+  const [original, setOriginal] = useState<ProductPricing | null>(() => (pricing ? clonePricing(pricing) : null));
   const [openPax, setOpenPax] = useState(DEFAULT_OPEN_PAX);
-  const originalRef = useRef<ProductPricing | null>(null);
 
-  useEffect(() => {
-    if (open && pricing) {
-      const cloned = clonePricing(pricing);
-      originalRef.current = cloned;
-      setForm(cloned);
-      setOpenPax(DEFAULT_OPEN_PAX);
-    }
-  }, [open, pricing]);
+  if (formKey !== previousFormKey) {
+    const cloned = pricing ? clonePricing(pricing) : null;
+    setPreviousFormKey(formKey);
+    setOriginal(cloned);
+    setForm(cloned ? clonePricing(cloned) : null);
+    setOpenPax(DEFAULT_OPEN_PAX);
+  }
 
   if (!open || !form) return null;
 
@@ -62,7 +63,6 @@ export default function PricingEditModal({
   };
 
   const handleSave = () => {
-    const original = originalRef.current;
     if (!form || !original) return;
     onSave({
       ...original,

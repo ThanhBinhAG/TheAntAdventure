@@ -1,25 +1,22 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { DebugPanel } from '@/components/system/DebugPanel';
 
 const STORAGE_KEY = 'system-debug-token';
 
-export function DebugPanelClient() {
-  const [token, setToken] = useState('');
-  const [draft, setDraft] = useState('');
-  const [ready, setReady] = useState(false);
+function getStoredToken(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return sessionStorage.getItem(STORAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
 
-  useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(STORAGE_KEY) ?? '';
-      setToken(saved);
-      setDraft(saved);
-    } catch {
-      /* ignore */
-    }
-    setReady(true);
-  }, []);
+export function DebugPanelClient() {
+  const [token, setToken] = useState(getStoredToken);
+  const [draft, setDraft] = useState(getStoredToken);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -42,19 +39,6 @@ export function DebugPanelClient() {
       /* ignore */
     }
   };
-
-  if (!ready) {
-    return (
-      <div className="login-page">
-        <div className="login-card">
-          <div className="login-brand">
-            <div className="login-title">System Debug</div>
-            <div className="login-subtitle">Loading…</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (!token) {
     return (

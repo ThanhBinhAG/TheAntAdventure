@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 const LS_KEY = 'ant-ai-requirements';
 
@@ -55,22 +55,23 @@ const WRITING_TIPS = [
 
 const EMPTY: AIForm = { rules: '', suppliers: '', pricing: '', design: '', voice: '', extra: '', lastSaved: null };
 
+function getSavedForm(): AIForm {
+  if (typeof window === 'undefined') return EMPTY;
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : EMPTY;
+  } catch {
+    return EMPTY;
+  }
+}
+
 function statusLabel(val: string) {
   return val.trim() ? '✓ Set' : '— Empty';
 }
 
 export default function AI() {
-  const [form, setForm] = useState<AIForm>(EMPTY);
+  const [form, setForm] = useState<AIForm>(getSavedForm);
   const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (raw) setForm(JSON.parse(raw));
-    } catch {
-      /* ignore */
-    }
-  }, []);
 
   const set = (key: keyof AIForm, val: string) => setForm((f) => ({ ...f, [key]: val }));
 

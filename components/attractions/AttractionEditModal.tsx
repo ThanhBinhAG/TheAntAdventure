@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
 import type { Attraction } from '@/lib/types';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
@@ -70,6 +70,45 @@ type Props = {
   nextId?: string;
 };
 
+function initialForm(
+  mode: Props['mode'],
+  attraction: Props['attraction'],
+  attractions: Attraction[],
+  defaultRegion: Attraction['region'],
+  nextId?: string
+): AttractionFormData {
+  if (mode === 'edit' && attraction) {
+    const linked = attraction.linkedPhotoIds?.length
+      ? attraction.linkedPhotoIds
+      : (attraction.photoIds ?? []);
+    return {
+      id: attraction.id,
+      region: attraction.region,
+      type: attraction.type,
+      name: attraction.name,
+      dest: attraction.dest,
+      hours: attraction.hours,
+      closed: attraction.closed,
+      admission: attraction.admission,
+      duration: attraction.duration,
+      best_time: attraction.best_time,
+      crowd: attraction.crowd,
+      book_req: attraction.book_req,
+      seasonal: attraction.seasonal,
+      notes: attraction.notes,
+      alert: attraction.alert,
+      phone: attraction.phone,
+      photoIds: [...(attraction.photoIds ?? [])],
+      linkedPhotoIds: [...linked],
+    };
+  }
+  return {
+    ...EMPTY,
+    id: nextId || nextAttractionId(attractions, defaultRegion),
+    region: defaultRegion,
+  };
+}
+
 export default function AttractionEditModal({
   open,
   mode,
@@ -83,8 +122,11 @@ export default function AttractionEditModal({
   nextId,
 }: Props) {
   const storePhotos = useStore((s) => s.photos) as GalleryPhoto[];
-
-  const [form, setForm] = useState<AttractionFormData>(EMPTY);
+  const formKey = `${open}-${mode}-${attraction ? JSON.stringify(attraction) : `${nextId}-${defaultRegion}-${attractions.map((item) => item.id).join(',')}`}`;
+  const [previousFormKey, setPreviousFormKey] = useState(formKey);
+  const [form, setForm] = useState<AttractionFormData>(() =>
+    initialForm(mode, attraction, attractions, defaultRegion, nextId)
+  );
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddSaving, setQuickAddSaving] = useState(false);
   const [quickAddStatus, setQuickAddStatus] = useState('');
@@ -92,41 +134,10 @@ export default function AttractionEditModal({
   const [selectedRemoveIds, setSelectedRemoveIds] = useState<string[]>([]);
   const [removingPhotoId, setRemovingPhotoId] = useState('');
 
-  useEffect(() => {
-    if (!open) return;
-    if (mode === 'edit' && attraction) {
-      const linked = attraction.linkedPhotoIds?.length
-        ? attraction.linkedPhotoIds
-        : (attraction.photoIds ?? []);
-      setForm({
-        id: attraction.id,
-        region: attraction.region,
-        type: attraction.type,
-        name: attraction.name,
-        dest: attraction.dest,
-        hours: attraction.hours,
-        closed: attraction.closed,
-        admission: attraction.admission,
-        duration: attraction.duration,
-        best_time: attraction.best_time,
-        crowd: attraction.crowd,
-        book_req: attraction.book_req,
-        seasonal: attraction.seasonal,
-        notes: attraction.notes,
-        alert: attraction.alert,
-        phone: attraction.phone,
-        photoIds: [...(attraction.photoIds ?? [])],
-        linkedPhotoIds: [...linked],
-      });
-      return;
-    }
-    const region = defaultRegion;
-    setForm({
-      ...EMPTY,
-      id: nextId || nextAttractionId(attractions, region),
-      region,
-    });
-  }, [open, mode, attraction, nextId, defaultRegion, attractions]);
+  if (formKey !== previousFormKey) {
+    setPreviousFormKey(formKey);
+    setForm(initialForm(mode, attraction, attractions, defaultRegion, nextId));
+  }
 
   const allPhotos = storePhotos.length ? storePhotos : photos;
 

@@ -31,13 +31,14 @@ function useCatalog<T>(
   loader: () => Promise<T>,
   fallback: () => T
 ): CatalogState<T> {
+  const configured = isCatalogConfigured();
   const [data, setDataState] = useState<T>(fallback);
   const [lastImport, setLastImport] = useState<CatalogImportRecord | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(configured);
   const [error, setError] = useState<string | null>(null);
-  const configured = isCatalogConfigured();
 
   const reload = useCallback(async () => {
+    await Promise.resolve();
     if (!configured) {
       setLoading(false);
       setError('Supabase is not configured — imported pricing cannot be loaded.');
@@ -59,7 +60,10 @@ function useCatalog<T>(
   }, [configured, workbook]);
 
   useEffect(() => {
-    void reload();
+    const timer = window.setTimeout(() => {
+      void reload();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [reload]);
 
   const setData = useCallback((updater: (previous: T) => T) => {

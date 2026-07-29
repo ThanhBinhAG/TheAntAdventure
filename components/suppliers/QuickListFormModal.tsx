@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
 import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/lib/types';
 
@@ -61,26 +61,31 @@ interface Props {
   onSave: (row: QuickRow) => void;
 }
 
+function initialForm(mode: Props['mode'], row: Props['row'], cfg: (typeof CONFIG)[QuickListKind], existing: QuickRow[]) {
+  if (mode === 'edit' && row) {
+    const next: Record<string, string> = { id: row.id };
+    for (const field of cfg.fields) {
+      const value = (row as unknown as Record<string, unknown>)[field.key];
+      next[field.key] = value != null ? String(value) : '';
+    }
+    return next;
+  }
+  return {
+    id: nextSupplierId(cfg.idPrefix, existing),
+    ...Object.fromEntries(cfg.fields.map((field) => [field.key, ''])),
+  };
+}
+
 export default function QuickListFormModal({ open, kind, mode, row, existing, onClose, onSave }: Props) {
   const cfg = CONFIG[kind];
-  const [form, setForm] = useState<Record<string, string>>({});
+  const formKey = `${open}-${kind}-${mode}-${row ? JSON.stringify(row) : existing.map((item) => item.id).join(',')}`;
+  const [previousFormKey, setPreviousFormKey] = useState(formKey);
+  const [form, setForm] = useState<Record<string, string>>(() => initialForm(mode, row, cfg, existing));
 
-  useEffect(() => {
-    if (!open) return;
-    if (mode === 'edit' && row) {
-      const next: Record<string, string> = { id: row.id };
-      for (const f of cfg.fields) {
-        const val = (row as unknown as Record<string, unknown>)[f.key];
-        next[f.key] = val != null ? String(val) : '';
-      }
-      setForm(next);
-    } else {
-      setForm({
-        id: nextSupplierId(cfg.idPrefix, existing),
-        ...Object.fromEntries(cfg.fields.map((f) => [f.key, ''])),
-      });
-    }
-  }, [open, mode, row, kind, existing, cfg.fields, cfg.idPrefix]);
+  if (formKey !== previousFormKey) {
+    setPreviousFormKey(formKey);
+    setForm(initialForm(mode, row, cfg, existing));
+  }
 
   if (!open) return null;
 

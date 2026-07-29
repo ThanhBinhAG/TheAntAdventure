@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -170,6 +170,8 @@ export default function PhotoLibraryPicker({
   onChange,
 }: Props) {
   const isInline = variant === 'inline';
+  const pickerKey = `${isInline ? 'inline' : open}-${linkedPhotoIds.join(',')}-${featuredPhotoIds.join(',')}`;
+  const [previousPickerKey, setPreviousPickerKey] = useState(pickerKey);
   const [linked, setLinked] = useState<string[]>(linkedPhotoIds);
   const [featured, setFeatured] = useState<string[]>(featuredPhotoIds);
   const [region, setRegion] = useState('all');
@@ -180,15 +182,15 @@ export default function PhotoLibraryPicker({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
 
-  useEffect(() => {
-    if (!isInline && !open) return;
+  if (pickerKey !== previousPickerKey) {
+    setPreviousPickerKey(pickerKey);
     setLinked([...linkedPhotoIds]);
     setFeatured([...featuredPhotoIds]);
     if (!isInline) {
       setRegion('all');
       setQ('');
     }
-  }, [open, linkedPhotoIds, featuredPhotoIds, isInline]);
+  }
 
   const emit = (nextLinked: string[], nextFeatured: string[]) => {
     const payload: PhotoApply = {

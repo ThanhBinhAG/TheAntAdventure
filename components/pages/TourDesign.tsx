@@ -84,7 +84,6 @@ export default function TourDesign() {
 
   const urlInitRef = useRef<string | null>(null);
 
-  const activeLead = useMemo(() => leads.find((l) => l.id === leadId), [leads, leadId]);
   const experiencesBlocked = isExperiencesBlocked(leadId, outlineRows.length, outlineStatus);
   const pendingLeads = useMemo(() => getPendingTourDesignLeads(leads), [leads]);
   const awaitingOutline = useMemo(
@@ -241,10 +240,10 @@ export default function TourDesign() {
 
   useEffect(() => {
     if (!leadId || !custId) return;
-    setSaveState('saving');
     const timer = setTimeout(() => {
+      setSaveState('saving');
       persistDraft();
-      setSaveState('saved');
+      setTimeout(() => setSaveState('saved'), 0);
     }, 800);
     return () => clearTimeout(timer);
   }, [

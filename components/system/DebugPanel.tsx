@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DiagnosticsReport } from '@/lib/system/run-diagnostics';
 import type { DebugLogEntry } from '@/lib/system/debug-logger';
 
@@ -14,7 +14,7 @@ export function DebugPanel({ token }: DebugPanelProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const headers = { 'X-Debug-Token': token };
+  const headers = useMemo(() => ({ 'X-Debug-Token': token }), [token]);
 
   const runDiagnostics = useCallback(async () => {
     setLoading(true);
@@ -31,7 +31,7 @@ export function DebugPanel({ token }: DebugPanelProps) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [headers]);
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -43,13 +43,18 @@ export function DebugPanel({ token }: DebugPanelProps) {
     } catch {
       /* ignore refresh errors */
     }
-  }, [token]);
+  }, [headers]);
 
   useEffect(() => {
-    void runDiagnostics();
-    void fetchLogs();
+    const initialFetch = setTimeout(() => {
+      void runDiagnostics();
+      void fetchLogs();
+    }, 0);
     const id = setInterval(() => void fetchLogs(), 5000);
-    return () => clearInterval(id);
+    return () => {
+      clearTimeout(initialFetch);
+      clearInterval(id);
+    };
   }, [runDiagnostics, fetchLogs]);
 
   return (

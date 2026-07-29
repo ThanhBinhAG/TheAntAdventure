@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
 import type { Hotel, HotelRoom } from '@/lib/types';
 
@@ -27,9 +27,15 @@ interface Props {
   onSave: (hotel: Hotel) => void;
 }
 
-export default function HotelFormModal({ open, mode, hotel, existing, onClose, onSave }: Props) {
-  const [form, setForm] = useState<Hotel>({
-    id: '',
+function initialForm(mode: Props['mode'], hotel: Props['hotel'], existing: Hotel[]): Hotel {
+  if (mode === 'edit' && hotel) {
+    return {
+      ...hotel,
+      rooms: hotel.rooms.length ? hotel.rooms.map((room) => ({ ...room })) : [EMPTY_ROOM()],
+    };
+  }
+  return {
+    id: nextSupplierId('HTL-N-', existing),
     name: '',
     dest: '',
     cat: '',
@@ -37,28 +43,18 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
     region: 'north',
     rooms: [EMPTY_ROOM()],
     status: 'Active',
-  });
+  };
+}
 
-  useEffect(() => {
-    if (!open) return;
-    if (mode === 'edit' && hotel) {
-      setForm({
-        ...hotel,
-        rooms: hotel.rooms.length ? hotel.rooms.map((r) => ({ ...r })) : [EMPTY_ROOM()],
-      });
-    } else {
-      setForm({
-        id: nextSupplierId('HTL-N-', existing),
-        name: '',
-        dest: '',
-        cat: '',
-        stars: '★★★★',
-        region: 'north',
-        rooms: [EMPTY_ROOM()],
-        status: 'Active',
-      });
-    }
-  }, [open, mode, hotel, existing]);
+export default function HotelFormModal({ open, mode, hotel, existing, onClose, onSave }: Props) {
+  const formKey = `${open}-${mode}-${hotel ? JSON.stringify(hotel) : existing.map((item) => item.id).join(',')}`;
+  const [previousFormKey, setPreviousFormKey] = useState(formKey);
+  const [form, setForm] = useState<Hotel>(() => initialForm(mode, hotel, existing));
+
+  if (formKey !== previousFormKey) {
+    setPreviousFormKey(formKey);
+    setForm(initialForm(mode, hotel, existing));
+  }
 
   if (!open) return null;
 

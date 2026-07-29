@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
-import type { CalEvent, Guide } from '@/lib/types';
+import type { CalEvent } from '@/lib/types';
 
 const CAL_STATUS: Record<string, { cls: string; emoji: string; label: string }> = {
   booked: { cls: 'booked', emoji: '🩵', label: 'Booked' },

@@ -53,7 +53,8 @@ export default function Pricing() {
   const upsertProductPricing = useStore((s) => s.upsertProductPricing);
 
   const [tab, setTab] = useState<PricingTab>('pricelist');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => highlightCode);
+  const [previousHighlightCode, setPreviousHighlightCode] = useState(highlightCode);
   const [region, setRegion] = useState('');
   const [category, setCategory] = useState('');
   const [duration, setDuration] = useState('');
@@ -76,9 +77,10 @@ export default function Pricing() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [exportError, setExportError] = useState('');
 
-  useEffect(() => {
-    if (highlightCode) setSearch(highlightCode);
-  }, [highlightCode]);
+  if (highlightCode !== previousHighlightCode) {
+    setPreviousHighlightCode(highlightCode);
+    setSearch(highlightCode);
+  }
 
   useEffect(() => {
     if (highlightCode && highlightRef.current) {

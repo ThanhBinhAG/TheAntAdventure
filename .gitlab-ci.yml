@@ -1,4 +1,4 @@
-# GitLab CI — lint check only, no deploy
+# GitLab CI — verify only (lint + build), no deploy
 
 stages:
   - verify
@@ -24,3 +24,14 @@ lint:
     - npm --version
     - npm ci
     - npm run lint
+
+build:
+  stage: verify
+  image: node:20-alpine
+  tags:
+    - vm06-deploy-ant-admin
+  script:
+    - node --version
+    - npm --version
+    - npm ci
+    - npm run build

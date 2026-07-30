@@ -90,6 +90,11 @@ Domain logic lives under `lib/<domain>/`. Import explicitly, e.g. `@/lib/sales/s
 | `npm run build` | Production build |
 | `npm run typecheck` | TypeScript (`tsc --noEmit`) |
 | `npm run test` | Unit tests (`tests/`) |
+| `npm run db:migration:new -- name` | Create Supabase migration file |
+| `npm run db:push` | Apply migrations (needs `SUPABASE_DB_URL` in `.env.local`) |
+| `npm run db:bootstrap` | Mark baseline migrations on existing DB |
+
+Supabase CLI setup: [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md) §9.
 
 Private notes, legacy HTML, and one-off migration tools live in **`Personal/`** (gitignored — local only).
 

@@ -333,3 +333,87 @@ Legacy owner-grouped paths (`gallery/tours/…`, `gallery/attractions/…`, `gal
 - **5 GB** egress/month — use thumbnails in grids; `next/image` lazy-loads where enabled.
 - Owner-grouped paths make Supabase Storage easier to audit at scale (`tours`/`attractions`/`loose`).
 - Legacy `picsum.photos` URLs in `photos.url` are not migrated — re-upload via Gallery UI.
+
+## 9. Supabase CLI migrations
+
+Schema changes after v5 should use the **Supabase CLI** (`supabase/migrations/`), not ad-hoc SQL Editor pastes.
+
+### 9a. One-time setup
+
+```bash
+npm install                    # installs supabase CLI (devDependency)
+```
+
+**Self-hosted** (e.g. `sb.mitelai.com`) — set in `.env.local`:
+
+```env
+SUPABASE_DB_URL=postgresql://postgres:YOUR_PASSWORD@HOST:5432/postgres
+```
+
+**Supabase Cloud** — either set `SUPABASE_DB_URL` as above, or:
+
+```bash
+npm run db:login               # opens browser → access token
+npm run db:link -- --project-ref YOUR_PROJECT_REF
+```
+
+`config.toml` lives at [`supabase/config.toml`](../supabase/config.toml) (created by `supabase init`).
+
+### 9b. Bootstrap existing database
+
+If the DB already has `schema.sql` applied (no `supabase_migrations.schema_migrations` history):
+
+```bash
+# Add SUPABASE_DB_URL to .env.local first
+npm run db:bootstrap           # marks baseline + 20260711 + 20260713 as applied
+npm run db:status              # local vs remote history
+```
+
+Manual repair for a single version:
+
+```bash
+bash scripts/supabase-db.sh repair-applied 20260101000000
+```
+
+### 9c. New migration workflow
+
+```bash
+npm run db:migration:new -- add_my_column
+# Edit supabase/migrations/<timestamp>_add_my_column.sql
+npm run db:push                # DEV — applies pending migrations
+```
+
+Checklist per migration:
+
+1. SQL in `supabase/migrations/` (prefer `IF NOT EXISTS` / idempotent DDL)
+2. Update [`supabase/schema.sql`](../supabase/schema.sql) for fresh installs
+3. Update app types/mappers in `lib/` if columns changed
+4. `npm run typecheck`
+5. PROD: backup → `npm run db:push` on production `SUPABASE_DB_URL`
+
+### 9d. npm scripts
+
+| Script | Purpose |
+|--------|---------|
+| `npm run db:login` | Supabase Cloud access token |
+| `npm run db:link` | Link CLI to cloud project ref |
+| `npm run db:migration:new -- name` | Create timestamped migration file |
+| `npm run db:push` | Apply pending migrations (`SUPABASE_DB_URL`) |
+| `npm run db:pull` | Pull remote schema into new migration |
+| `npm run db:status` | List migration history |
+| `npm run db:bootstrap` | Repair baseline on existing DB |
+
+Helper: [`scripts/supabase-db.sh`](../scripts/supabase-db.sh)
+
+### 9e. Legacy `migrate-*.sql`
+
+Pre-CLI patches are documented in [`supabase/LEGACY-MIGRATIONS.md`](../supabase/LEGACY-MIGRATIONS.md). Do not add new files there — use `migrations/` instead.
+
+### 9f. Common errors
+
+| Error | Fix |
+|-------|-----|
+| `relation "X" already exists` | Run `npm run db:bootstrap` on existing DB before first push |
+| `SUPABASE_DB_URL is not set` | Add Postgres URL to `.env.local` |
+| `Cannot find project ref` | Use `db:push` with `SUPABASE_DB_URL`, or `db:link` for Cloud |
+| RLS blocks after new table | Update `rls-authenticated.sql` and re-run on remote |

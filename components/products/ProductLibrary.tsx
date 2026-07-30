@@ -1,10 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import PaginationBar from '@/components/PaginationBar';
 import ProductCard from '@/components/products/ProductCard';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import { deriveCategoriesFromProducts } from '@/lib/products/product-form';
 import {
   matchesPricingStatusFilter,
+  pricingStatus as getPricingStatus,
+  type PricingStatus,
   type PricingStatusFilter,
 } from '@/lib/products/product-pricing-helpers';
 import type { Product, ProductPricing } from '@/lib/types';
@@ -77,6 +83,7 @@ export default function ProductLibrary({
 }: ProductLibraryProps) {
   const [facetOpen, setFacetOpen] = useState(false);
   const categories = useMemo(() => deriveCategoriesFromProducts(products), [products]);
+  const { pageSize, setPageSize } = usePageSize();
 
   const pricingByCode = useMemo(
     () => new Map(productPricing.map((row) => [row.productCode, row])),
@@ -102,6 +109,16 @@ export default function ProductLibrary({
       return true;
     });
   }, [products, search, region, duration, category, destFilter, pricingStatus, pricingByCode]);
+
+  const pagination = usePagination(filtered, pageSize, [
+    search,
+    region,
+    duration,
+    category,
+    destFilter,
+    pricingStatus,
+    pageSize,
+  ]);
 
   useEffect(() => {
     onShownCountChange?.(filtered.length);
@@ -137,6 +154,29 @@ export default function ProductLibrary({
 
   const destTotal = useMemo(() => Object.values(destCounts).reduce((n, c) => n + c, 0), [destCounts]);
 
+  /** Pricing health for products matching filters except pricing status (so pulse stays actionable). */
+  const pricingPulse = useMemo(() => {
+    const tallies: Record<PricingStatus, number> = { complete: 0, incomplete: 0, missing: 0 };
+    products.forEach((p) => {
+      const q = search.toLowerCase();
+      if (region && p.region !== region) return;
+      if (duration && p.dur !== duration) return;
+      if (category && !p.cat.toLowerCase().includes(category.toLowerCase())) return;
+      if (destFilter && p.dest !== destFilter) return;
+      if (
+        q &&
+        !p.name.toLowerCase().includes(q) &&
+        !p.desc.toLowerCase().includes(q) &&
+        !p.code.toLowerCase().includes(q) &&
+        !p.dest.toLowerCase().includes(q)
+      )
+        return;
+      tallies[getPricingStatus(pricingByCode.get(p.code))] += 1;
+    });
+    const total = tallies.complete + tallies.incomplete + tallies.missing;
+    return { ...tallies, total };
+  }, [products, search, region, duration, category, destFilter, pricingByCode]);
+
   const hasFilters = !!(search || region || duration || category || destFilter || pricingStatus);
 
   const clearFilters = () => {
@@ -166,27 +206,13 @@ export default function ProductLibrary({
     <aside className="tp-facet">
       <div className="tp-facet-block">
         <div className="tp-facet-label">Destinations</div>
-        <button
-          type="button"
-          className={`tp-facet-item${destFilter === '' ? ' on' : ''}`}
-          onClick={() => onDestFilterChange('')}
-        >
-          <span>All destinations</span>
-          <span className="tp-facet-count">{destTotal}</span>
-        </button>
-        <div className="tp-facet-list">
-          {destList.map((dest) => (
-            <button
-              key={dest}
-              type="button"
-              className={`tp-facet-item${destFilter === dest ? ' on' : ''}`}
-              onClick={() => onDestFilterChange(destFilter === dest ? '' : dest)}
-            >
-              <span className="tp-facet-item-label">{dest}</span>
-              <span className="tp-facet-count">{destCounts[dest]}</span>
-            </button>
-          ))}
-        </div>
+        <DestFilterCombobox
+          destFilter={destFilter}
+          destList={destList}
+          destCounts={destCounts}
+          destTotal={destTotal}
+          onDestFilterChange={onDestFilterChange}
+        />
       </div>
 
       <div className="tp-facet-block">
@@ -273,6 +299,77 @@ export default function ProductLibrary({
           ))}
         </div>
       </div>
+
+      <div className="tp-facet-pulse">
+        <div className="tp-facet-pulse-hd">
+          <span className="tp-facet-label" style={{ marginBottom: 0 }}>
+            Pricing health
+          </span>
+          <Link href="/pricing-essentials" className="tp-facet-pulse-link">
+            Open Pricing
+          </Link>
+        </div>
+        <div className="tp-facet-pulse-bars" aria-hidden={pricingPulse.total === 0}>
+          {pricingPulse.complete > 0 && (
+            <span
+              className="tp-facet-pulse-seg tp-facet-pulse-seg--ok"
+              style={{ flexGrow: pricingPulse.complete }}
+              title={`Full pricing: ${pricingPulse.complete}`}
+            />
+          )}
+          {pricingPulse.incomplete > 0 && (
+            <span
+              className="tp-facet-pulse-seg tp-facet-pulse-seg--partial"
+              style={{ flexGrow: pricingPulse.incomplete }}
+              title={`Partial: ${pricingPulse.incomplete}`}
+            />
+          )}
+          {pricingPulse.missing > 0 && (
+            <span
+              className="tp-facet-pulse-seg tp-facet-pulse-seg--miss"
+              style={{ flexGrow: pricingPulse.missing }}
+              title={`No pricing: ${pricingPulse.missing}`}
+            />
+          )}
+        </div>
+        <div className="tp-facet-pulse-stats">
+          {(
+            [
+              ['complete', 'Full', pricingPulse.complete],
+              ['incomplete', 'Partial', pricingPulse.incomplete],
+              ['missing', 'No $', pricingPulse.missing],
+            ] as const
+          ).map(([key, label, count]) => (
+            <button
+              key={key}
+              type="button"
+              className={`tp-facet-pulse-stat${pricingStatus === key ? ' on' : ''}`}
+              onClick={() => onPricingStatusChange(pricingStatus === key ? '' : key)}
+              title={`Show ${label.toLowerCase()} pricing`}
+            >
+              <strong>{count}</strong>
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="tp-facet-pulse-links">
+          <Link href="/attractions">Museum hours</Link>
+          <Link href="/gallery">Photo library</Link>
+        </div>
+      </div>
+
+      <div className="tp-facet-foot">
+        <span className="tp-facet-foot-stat">
+          {filtered.length} match{filtered.length === 1 ? '' : 'es'}
+        </span>
+        {hasFilters ? (
+          <button type="button" className="tp-facet-foot-clear" onClick={clearFilters}>
+            Clear filters
+          </button>
+        ) : (
+          <span className="tp-facet-foot-hint">Tap a status to filter</span>
+        )}
+      </div>
     </aside>
   );
 
@@ -306,20 +403,161 @@ export default function ProductLibrary({
           {filtered.length === 0 ? (
             <div className="tp-empty-state">No products match. Adjust filters or clear them.</div>
           ) : (
-            <div className="tp-grid">
-              {filtered.map((p) => (
-                <ProductCard
-                  key={p.code}
-                  product={p}
-                  pickMode={pickMode}
-                  onOpenDetail={onOpenDetail}
-                  onPick={onPickProduct}
-                />
-              ))}
-            </div>
+            <>
+              <div className="tp-grid">
+                {pagination.paginatedItems.map((p) => (
+                  <ProductCard
+                    key={p.code}
+                    product={p}
+                    pickMode={pickMode}
+                    onOpenDetail={onOpenDetail}
+                    onPick={onPickProduct}
+                  />
+                ))}
+              </div>
+              <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
+            </>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function DestFilterCombobox({
+  destFilter,
+  destList,
+  destCounts,
+  destTotal,
+  onDestFilterChange,
+}: {
+  destFilter: string;
+  destList: string[];
+  destCounts: Record<string, number>;
+  destTotal: number;
+  onDestFilterChange: (v: string) => void;
+}) {
+  const listId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  useEffect(() => {
+    if (!open) setQuery(destFilter);
+  }, [destFilter, open]);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  const suggestions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return destList;
+    return destList.filter((d) => d.toLowerCase().includes(q));
+  }, [destList, query]);
+
+  const pick = (value: string) => {
+    onDestFilterChange(value);
+    setQuery(value);
+    setOpen(false);
+    setActiveIndex(-1);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      setOpen(true);
+      return;
+    }
+    if (!open) return;
+
+    const options = ['', ...suggestions];
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % options.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => (i <= 0 ? options.length - 1 : i - 1));
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      pick(options[activeIndex]);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      setActiveIndex(-1);
+    }
+  };
+
+  return (
+    <div className="tp-dest-combo" ref={rootRef}>
+      <input
+        type="search"
+        className="tp-dest-combo-input"
+        value={open ? query : destFilter}
+        placeholder="Search destinations…"
+        aria-autocomplete="list"
+        aria-controls={listId}
+        aria-expanded={open}
+        role="combobox"
+        onFocus={() => {
+          setOpen(true);
+          setQuery(destFilter);
+        }}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          setActiveIndex(-1);
+          if (!e.target.value.trim()) onDestFilterChange('');
+        }}
+        onKeyDown={onKeyDown}
+      />
+      {destFilter && (
+        <button
+          type="button"
+          className="tp-dest-combo-clear"
+          aria-label="Clear destination"
+          onClick={() => {
+            onDestFilterChange('');
+            setQuery('');
+          }}
+        >
+          ×
+        </button>
+      )}
+      {open && (
+        <ul id={listId} className="tp-dest-combo-list" role="listbox">
+          <li role="option" aria-selected={destFilter === ''}>
+            <button
+              type="button"
+              className={`tp-facet-item${destFilter === '' ? ' on' : ''}${activeIndex === 0 ? ' tp-dest-combo-active' : ''}`}
+              onMouseEnter={() => setActiveIndex(0)}
+              onClick={() => pick('')}
+            >
+              <span>All destinations</span>
+              <span className="tp-facet-count">{destTotal}</span>
+            </button>
+          </li>
+          {suggestions.map((dest, i) => (
+            <li key={dest} role="option" aria-selected={destFilter === dest}>
+              <button
+                type="button"
+                className={`tp-facet-item${destFilter === dest ? ' on' : ''}${activeIndex === i + 1 ? ' tp-dest-combo-active' : ''}`}
+                onMouseEnter={() => setActiveIndex(i + 1)}
+                onClick={() => pick(dest)}
+              >
+                <span className="tp-facet-item-label">{dest}</span>
+                <span className="tp-facet-count">{destCounts[dest]}</span>
+              </button>
+            </li>
+          ))}
+          {suggestions.length === 0 && (
+            <li className="tp-dest-combo-empty">No destinations match</li>
+          )}
+        </ul>
+      )}
     </div>
   );
 }

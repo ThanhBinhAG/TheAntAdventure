@@ -1,15 +1,19 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
+import PaginationBar from '@/components/PaginationBar';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import { isSelectableProduct } from '@/lib/products/product-display';
 import { REG_COLORS_HEX, REG_LABELS } from '@/lib/core/page-helpers';
 import {
   DUR_LABELS,
   MODULE_DUR_KEYS,
   MODULE_REGIONS,
-  countModulesProducts,
-  getModulePriceRange,
+  flattenModulesProducts,
+  groupModulesProductPage,
   groupProductsForModules,
+  getModulePriceRange,
   type ModulesGrouped,
 } from '@/lib/products/product-modules';
 import type { Product } from '@/lib/types';
@@ -31,33 +35,42 @@ export default function ModulesView({
   onOpenDetail,
   onShownCountChange,
 }: ModulesViewProps) {
+  const { pageSize, setPageSize } = usePageSize();
   const activeProducts = useMemo(() => products.filter(isSelectableProduct), [products]);
-  const grouped = groupProductsForModules(activeProducts, search);
-  const total = countModulesProducts(grouped);
+  const groupedAll = useMemo(() => groupProductsForModules(activeProducts, search), [activeProducts, search]);
+  const flatList = useMemo(() => flattenModulesProducts(groupedAll), [groupedAll]);
+  const pagination = usePagination(flatList, pageSize, [search, pageSize]);
+  const pageGrouped = useMemo(
+    () => groupModulesProductPage(pagination.paginatedItems),
+    [pagination.paginatedItems]
+  );
 
   useEffect(() => {
-    onShownCountChange?.(total);
-  }, [total, onShownCountChange]);
+    onShownCountChange?.(flatList.length);
+  }, [flatList.length, onShownCountChange]);
 
   return (
     <div className={`tp-modules${pickMode ? ' prod-pick-mode' : ''}`}>
       {pickMode && <div className="prod-pick-scrim" aria-hidden />}
       <div className="tp-modules-inner">
-        {total === 0 ? (
+        {flatList.length === 0 ? (
           <div className="tp-empty-state">No products match your search.</div>
         ) : (
-          <div className="tp-mod-regions">
-            {MODULE_REGIONS.map((reg) => (
-              <RegionBlock
-                key={reg}
-                region={reg}
-                grouped={grouped}
-                pickMode={pickMode}
-                onPickProduct={onPickProduct}
-                onOpenDetail={onOpenDetail}
-              />
-            ))}
-          </div>
+          <>
+            <div className="tp-mod-regions">
+              {MODULE_REGIONS.map((reg) => (
+                <RegionBlock
+                  key={reg}
+                  region={reg}
+                  grouped={pageGrouped}
+                  pickMode={pickMode}
+                  onPickProduct={onPickProduct}
+                  onOpenDetail={onOpenDetail}
+                />
+              ))}
+            </div>
+            <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
+          </>
         )}
       </div>
     </div>

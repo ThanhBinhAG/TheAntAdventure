@@ -1,7 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import PaginationBar from '@/components/PaginationBar';
 import QuickListFormModal, { type QuickListKind } from '@/components/suppliers/QuickListFormModal';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
 import { filterByRegion, supplierMatchesSearch, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/lib/types';
@@ -110,6 +113,10 @@ export default function QuickListTab({ kind, filters }: Props) {
     });
   }, [rows, filters, cfg]);
 
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(filtered, pageSize, [filters.region, filters.search, kind, pageSize]);
+  const { paginatedItems } = pagination;
+
   const editRow = editId ? rows.find((r) => r.id === editId) : null;
 
   const openAdd = () => {
@@ -165,7 +172,7 @@ export default function QuickListTab({ kind, filters }: Props) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
+              {paginatedItems.map((row) => (
                 <tr key={row.id}>
                   {cfg.columns.map((col) => (
                     <td key={col.key} style={col.style}>
@@ -188,7 +195,7 @@ export default function QuickListTab({ kind, filters }: Props) {
                   </td>
                 </tr>
               ))}
-              {!filtered.length && (
+              {!paginatedItems.length && (
                 <tr>
                   <td colSpan={cfg.columns.length + 1} style={{ textAlign: 'center', color: 'var(--m)', padding: 24 }}>
                     No {cfg.title.toLowerCase()} partners found.
@@ -197,6 +204,7 @@ export default function QuickListTab({ kind, filters }: Props) {
               )}
             </tbody>
           </table>
+          <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
         </div>
       </div>
 

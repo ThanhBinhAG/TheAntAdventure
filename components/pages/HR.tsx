@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 
 type HRTab = 'staff' | 'onboarding' | 'performance' | 'leave';
@@ -83,12 +84,13 @@ export default function HR() {
 
   const fullTime = staff.filter((s) => s.contract === 'Full-time');
 
-  const staffPagination = usePagination(filtered, undefined, [search, deptF, tab]);
+  const { pageSize, setPageSize } = usePageSize();
+  const staffPagination = usePagination(filtered, pageSize, [search, deptF, tab, pageSize]);
   const { paginatedItems: staffPage } = staffPagination;
 
   const fullTimeIndexed = useMemo(() => fullTime.map((s, index) => ({ staff: s, index })), [fullTime]);
-  const perfPagination = usePagination(fullTimeIndexed, undefined, [tab]);
-  const leavePagination = usePagination(fullTimeIndexed, undefined, [tab]);
+  const perfPagination = usePagination(fullTimeIndexed, pageSize, [tab, pageSize]);
+  const leavePagination = usePagination(fullTimeIndexed, pageSize, [tab, pageSize]);
   const { paginatedItems: perfPage } = perfPagination;
   const { paginatedItems: leavePage } = leavePagination;
 
@@ -176,7 +178,7 @@ export default function HR() {
                   ))}
                 </tbody>
               </table>
-              <PaginationBar {...staffPagination} />
+              <PaginationBar {...staffPagination} onPageSizeChange={setPageSize} />
             </div>
           </div>
         </>
@@ -281,7 +283,7 @@ export default function HR() {
                 })}
               </tbody>
             </table>
-            <PaginationBar {...perfPagination} />
+            <PaginationBar {...perfPagination} onPageSizeChange={setPageSize} />
           </div>
         </div>
       )}
@@ -324,7 +326,7 @@ export default function HR() {
                   })}
                 </tbody>
               </table>
-              <PaginationBar {...leavePagination} />
+              <PaginationBar {...leavePagination} onPageSizeChange={setPageSize} />
             </div>
           </div>
           <div className="card">

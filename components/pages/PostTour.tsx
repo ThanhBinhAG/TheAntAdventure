@@ -1,6 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import PaginationBar from '@/components/PaginationBar';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
 
 type PtTab = 'log' | 'ops' | 'guide' | 'client' | 'agent';
@@ -46,6 +49,10 @@ export default function PostTour() {
       return true;
     });
   }, [feedback, typeF, npsF]);
+
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(filtered, pageSize, [typeF, npsF, pageSize]);
+  const { paginatedItems } = pagination;
 
   const avgNps = feedback.length ? feedback.reduce((s, f) => s + (f.nps || 0), 0) / feedback.length : 0;
   const promoters = feedback.filter((f) => (f.nps || 0) >= 9).length;
@@ -136,7 +143,7 @@ export default function PostTour() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((f, i) => (
+                  {paginatedItems.map((f, i) => (
                     <tr key={f.id || i}>
                       <td>
                         <code>{f.bkid}</code>
@@ -158,6 +165,7 @@ export default function PostTour() {
                   ))}
                 </tbody>
               </table>
+              <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
             </div>
           </div>
         </>

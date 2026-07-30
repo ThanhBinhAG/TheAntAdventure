@@ -1,8 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import PaginationBar from '@/components/PaginationBar';
 import ExtSupplierCard from '@/components/suppliers/ExtSupplierCard';
 import ExtendedSupplierFormModal from '@/components/suppliers/ExtendedSupplierFormModal';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
 import { filterExtendedSuppliers, preselectCategoryForTab, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { ExtendedSupplier } from '@/lib/types';
@@ -23,6 +26,11 @@ function ExtGrid({
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
+  const { pageSize, setPageSize } = usePageSize();
+  const itemKey = useMemo(() => items.map((i) => i.id).join('|'), [items]);
+  const pagination = usePagination(items, pageSize, [itemKey, pageSize]);
+  const { paginatedItems } = pagination;
+
   if (!items.length) {
     return (
       <div className="sup-empty-grid">
@@ -31,11 +39,14 @@ function ExtGrid({
     );
   }
   return (
-    <div className="sup-ext-grid">
-      {items.map((s) => (
-        <ExtSupplierCard key={s.id} supplier={s} onEdit={onEdit} onDelete={onDelete} />
-      ))}
-    </div>
+    <>
+      <div className="sup-ext-grid">
+        {paginatedItems.map((s) => (
+          <ExtSupplierCard key={s.id} supplier={s} onEdit={onEdit} onDelete={onDelete} />
+        ))}
+      </div>
+      <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
+    </>
   );
 }
 

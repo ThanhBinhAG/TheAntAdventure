@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 
 type FinTab = 'overview' | 'cashflow' | 'pl' | 'ar' | 'ap';
@@ -77,9 +78,10 @@ export default function Finance() {
   const arFiltered = ar.filter((r) => !arFilter || r.status === arFilter);
   const apFiltered = ap.filter((p) => !apFilter || p.status === apFilter);
 
-  const financePagination = usePagination(finance, undefined, [tab]);
-  const arPagination = usePagination(arFiltered, undefined, [arFilter, tab]);
-  const apPagination = usePagination(apFiltered, undefined, [apFilter, tab]);
+  const { pageSize, setPageSize } = usePageSize();
+  const financePagination = usePagination(finance, pageSize, [tab, pageSize]);
+  const arPagination = usePagination(arFiltered, pageSize, [arFilter, tab, pageSize]);
+  const apPagination = usePagination(apFiltered, pageSize, [apFilter, tab, pageSize]);
 
   const { paginatedItems: financePage } = financePagination;
   const { paginatedItems: arPage } = arPagination;
@@ -167,7 +169,7 @@ export default function Finance() {
                 ))}
               </tbody>
             </table>
-            <PaginationBar {...financePagination} />
+            <PaginationBar {...financePagination} onPageSizeChange={setPageSize} />
           </div>
         </div>
       )}
@@ -298,7 +300,7 @@ export default function Finance() {
                   ))}
                 </tbody>
               </table>
-              <PaginationBar {...arPagination} />
+              <PaginationBar {...arPagination} onPageSizeChange={setPageSize} />
             </div>
           </div>
         </>
@@ -353,7 +355,7 @@ export default function Finance() {
                   ))}
                 </tbody>
               </table>
-              <PaginationBar {...apPagination} />
+              <PaginationBar {...apPagination} onPageSizeChange={setPageSize} />
             </div>
           </div>
         </>

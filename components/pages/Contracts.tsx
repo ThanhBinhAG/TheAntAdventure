@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { buildContractHTML, downloadContractWord, printContract } from '@/lib/contracts/contract-html';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 
 type Contract = {
@@ -105,7 +106,8 @@ export default function Contracts() {
     });
   }, [contracts, search, filter]);
 
-  const pagination = usePagination(filtered, undefined, [search, filter]);
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(filtered, pageSize, [search, filter, pageSize]);
   const { paginatedItems } = pagination;
 
   const kpis = useMemo(() => {
@@ -251,7 +253,7 @@ export default function Contracts() {
             )}
           </tbody>
         </table>
-        <PaginationBar {...pagination} />
+        <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
       </div>
 
       {showNew && (

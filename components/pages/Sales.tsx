@@ -27,6 +27,7 @@ import {
 import { localTodayIso } from '@/lib/core/date-utils';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 import { useLanguage } from '@/hooks/useLanguage';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
@@ -434,13 +435,15 @@ export default function Sales() {
 
   const listLeads = useMemo(() => sortLeads(filteredLeads, listSort, customers), [filteredLeads, listSort, customers]);
 
-  const listPagination = usePagination(listLeads, undefined, [
+  const { pageSize, setPageSize } = usePageSize();
+  const listPagination = usePagination(listLeads, pageSize, [
     search,
     timeFilter,
     stageFilter,
     custIdFilter,
     listSort,
     groupByMonth,
+    pageSize,
   ]);
   const { paginatedItems: pageLeads } = listPagination;
 
@@ -778,7 +781,7 @@ export default function Sales() {
                 </tbody>
               </table>
             )}
-            <PaginationBar {...listPagination} />
+            <PaginationBar {...listPagination} onPageSizeChange={setPageSize} />
           </div>
         </div>
       )}

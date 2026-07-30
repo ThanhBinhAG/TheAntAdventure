@@ -4,6 +4,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import GuideCalendar from '@/components/guides/GuideCalendar';
+import PaginationBar from '@/components/PaginationBar';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
 import { createClient } from '@/lib/supabase/client';
 import { uploadGuideAvatar } from '@/lib/storage/upload-guide-avatar';
@@ -74,6 +77,10 @@ export default function Guides() {
       }),
     [guides, search, regionF, langF]
   );
+
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(filtered, pageSize, [search, regionF, langF, tab, pageSize]);
+  const { paginatedItems } = pagination;
 
   const available = guides.filter((g) => g.status === 'Available').length;
   const onTour = guides.filter((g) => g.status === 'On Tour').length;
@@ -210,7 +217,7 @@ export default function Guides() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((g) => (
+                  {paginatedItems.map((g) => (
                     <tr key={g.id}>
                       <td>
                         <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{g.id}</code>
@@ -247,39 +254,43 @@ export default function Guides() {
                 </tbody>
               </table>
             </div>
+            <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
           </div>
         </>
       )}
 
       {tab === 'bios' && (
-        <div className="guide-bio-grid">
-          {filtered.map((g) => (
-            <div key={g.id} className="guide-bio-card" onClick={() => setBioGuide(g)} role="button" tabIndex={0}>
-              {g.photo ? (
-                <div className="guide-bio-avatar guide-bio-avatar-img" style={{ position: 'relative', overflow: 'hidden' }}>
-                  <Image src={g.photo} alt={g.fullname} fill style={{ objectFit: 'cover' }} sizes="80px" />
+        <>
+          <div className="guide-bio-grid">
+            {paginatedItems.map((g) => (
+              <div key={g.id} className="guide-bio-card" onClick={() => setBioGuide(g)} role="button" tabIndex={0}>
+                {g.photo ? (
+                  <div className="guide-bio-avatar guide-bio-avatar-img" style={{ position: 'relative', overflow: 'hidden' }}>
+                    <Image src={g.photo} alt={g.fullname} fill style={{ objectFit: 'cover' }} sizes="80px" />
+                  </div>
+                ) : (
+                  <div className="guide-bio-avatar" style={{ background: g.region === 'North' ? 'var(--g)' : g.region === 'Central' ? 'var(--amb)' : 'var(--blue)' }}>
+                    {g.ename.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div className="guide-bio-name">{g.fullname}</div>
+                <div className="guide-bio-sub">
+                  {g.ename} · {g.region}
                 </div>
-              ) : (
-                <div className="guide-bio-avatar" style={{ background: g.region === 'North' ? 'var(--g)' : g.region === 'Central' ? 'var(--amb)' : 'var(--blue)' }}>
-                  {g.ename.slice(0, 2).toUpperCase()}
+                <div className="guide-bio-specialty">{g.specialty}</div>
+                <div className="guide-bio-meta">
+                  <span className={`bdg ${STATUS_C[g.status] || 'bdg-w'}`}>{g.status}</span>
+                  <span className="guide-bio-rating">{g.rating}</span>
+                  {g.rate > 0 && <span className="guide-bio-rate">${g.rate}/day</span>}
                 </div>
-              )}
-              <div className="guide-bio-name">{g.fullname}</div>
-              <div className="guide-bio-sub">
-                {g.ename} · {g.region}
+                {g.bio && g.bio.length > 0 && (
+                  <div className="guide-bio-snippet">{g.bio.length > 120 ? `${g.bio.slice(0, 120)}…` : g.bio}</div>
+                )}
               </div>
-              <div className="guide-bio-specialty">{g.specialty}</div>
-              <div className="guide-bio-meta">
-                <span className={`bdg ${STATUS_C[g.status] || 'bdg-w'}`}>{g.status}</span>
-                <span className="guide-bio-rating">{g.rating}</span>
-                {g.rate > 0 && <span className="guide-bio-rate">${g.rate}/day</span>}
-              </div>
-              {g.bio && g.bio.length > 0 && (
-                <div className="guide-bio-snippet">{g.bio.length > 120 ? `${g.bio.slice(0, 120)}…` : g.bio}</div>
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
+        </>
       )}
 
       {tab === 'calendar' && <GuideCalendar />}

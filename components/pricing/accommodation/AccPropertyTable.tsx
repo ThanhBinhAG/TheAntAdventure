@@ -1,8 +1,11 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
+import PaginationBar from '@/components/PaginationBar';
 import EditableSection from '@/components/pricing/EditableSection';
 import InlineEdit from '@/components/pricing/InlineEdit';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import type { AccCruiseRate, AccProperty, AccRoomRate } from '@/lib/pricing/catalog-types';
 
 type Props = {
@@ -75,6 +78,10 @@ export default function AccPropertyTable({ properties, roomRates, cruiseRates, o
     });
   }, [properties, search, region, type, stars, approved]);
 
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(filtered, pageSize, [search, region, type, stars, approved, pageSize]);
+  const { paginatedItems } = pagination;
+
   return (
     <div>
       <div className="search-row">
@@ -138,7 +145,7 @@ export default function AccPropertyTable({ properties, roomRates, cruiseRates, o
               </tr>
             </thead>
             <tbody>
-              {filtered.map((property) => {
+              {paginatedItems.map((property) => {
                 const open = expanded === property.id;
                 const key = property.name.trim().toLowerCase();
                 const rates = ratesByProperty.get(key) ?? [];
@@ -196,6 +203,7 @@ export default function AccPropertyTable({ properties, roomRates, cruiseRates, o
               )}
             </tbody>
           </table>
+          <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
         </div>
       </div>
     </div>

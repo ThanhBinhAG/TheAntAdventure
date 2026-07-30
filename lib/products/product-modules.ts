@@ -94,3 +94,31 @@ export function countModulesProducts(grouped: ModulesGrouped): number {
   }
   return n;
 }
+
+/** Flat product list in region → duration display order (for pagination). */
+export function flattenModulesProducts(grouped: ModulesGrouped): Product[] {
+  const items: Product[] = [];
+  for (const r of MODULE_REGIONS) {
+    const durs = grouped[r];
+    if (!durs) continue;
+    for (const dk of MODULE_DUR_KEYS) {
+      const prods = durs[dk];
+      if (prods?.length) items.push(...prods);
+    }
+  }
+  return items;
+}
+
+/** Re-group an already-filtered product page (no search re-filter). */
+export function groupModulesProductPage(products: Product[]): ModulesGrouped {
+  const grouped = {} as ModulesGrouped;
+  for (const r of MODULE_REGIONS) grouped[r] = {};
+  products.forEach((p) => {
+    const r = p.region as ModuleRegion;
+    const dk = durToModuleKey(p.dur);
+    if (!dk || !grouped[r]) return;
+    if (!grouped[r][dk]) grouped[r][dk] = [];
+    grouped[r][dk]!.push(p);
+  });
+  return grouped;
+}

@@ -2,8 +2,8 @@ import type { PageSlug } from './types';
 
 export const FX = { USD: 1, EUR: 0.92, VND: 25000 } as const;
 
-/** Default page size for CRM table pagination. */
-export const PAGE_SIZE = 20;
+/** Default page size for CRM list/grid pagination. */
+export const PAGE_SIZE = 24;
 export const FX_SYM = { USD: '$', EUR: '€', VND: '₫' } as const;
 
 /** Annual revenue target (USD) for Dashboard YTD progress bar. */

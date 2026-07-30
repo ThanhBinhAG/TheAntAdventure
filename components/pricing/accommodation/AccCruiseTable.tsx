@@ -1,8 +1,11 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
+import PaginationBar from '@/components/PaginationBar';
 import EditableSection from '@/components/pricing/EditableSection';
 import InlineEdit from '@/components/pricing/InlineEdit';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import type { AccCruiseRate } from '@/lib/pricing/catalog-types';
 
 type Props = {
@@ -50,6 +53,10 @@ export default function AccCruiseTable({ cruises, sheets, onPatch }: Props) {
     return [...map.values()];
   }, [cruises, sheetFilter]);
 
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(blocks, pageSize, [sheetFilter, pageSize]);
+  const { paginatedItems } = pagination;
+
   const emptySheets = sheets.filter((sheet) => !cruises.some((c) => c.sheet === sheet));
 
   return (
@@ -91,7 +98,7 @@ export default function AccCruiseTable({ cruises, sheets, onPatch }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {blocks.map((block) => {
+                {paginatedItems.map((block) => {
                   const open = expanded === block.key;
                   const sell26 = block.cabins.map((c) => c.sell2026).filter((v): v is number => v != null);
                   const sell27 = block.cabins.map((c) => c.sell2027).filter((v): v is number => v != null);
@@ -128,6 +135,7 @@ export default function AccCruiseTable({ cruises, sheets, onPatch }: Props) {
                 })}
               </tbody>
             </table>
+            <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
           </div>
         </div>
       )}

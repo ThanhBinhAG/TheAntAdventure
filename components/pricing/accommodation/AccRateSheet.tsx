@@ -1,8 +1,11 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
+import PaginationBar from '@/components/PaginationBar';
 import EditableSection from '@/components/pricing/EditableSection';
 import InlineEdit from '@/components/pricing/InlineEdit';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import type { AccRoomRate } from '@/lib/pricing/catalog-types';
 
 type Props = {
@@ -58,6 +61,10 @@ export default function AccRateSheet({ sheet, rates, onPatch }: Props) {
     return [...map.values()];
   }, [rates, search, location]);
 
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(blocks, pageSize, [search, location, sheet, pageSize]);
+  const { paginatedItems } = pagination;
+
   if (!rates.length) {
     return <p className="pcx-empty">No rows imported from “{sheet}”.</p>;
   }
@@ -99,7 +106,7 @@ export default function AccRateSheet({ sheet, rates, onPatch }: Props) {
               </tr>
             </thead>
             <tbody>
-              {blocks.map((block) => {
+              {paginatedItems.map((block) => {
                 const open = expanded === block.key;
                 const sells = block.rates.map((r) => r.sellPrice).filter((v): v is number => v != null);
                 const seasons = Array.from(new Set(block.rates.map((r) => r.season).filter(Boolean)));
@@ -147,6 +154,7 @@ export default function AccRateSheet({ sheet, rates, onPatch }: Props) {
               })}
             </tbody>
           </table>
+          <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
         </div>
       </div>
     </div>

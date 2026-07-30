@@ -10,6 +10,7 @@ import {
 import { TIER_BG, TIER_COLORS } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 import type { Agent } from '@/lib/types';
 import AgentFormModal from '@/components/agents/AgentFormModal';
@@ -46,8 +47,9 @@ export default function Agents() {
     [agents, leads]
   );
 
-  const agentsPagination = usePagination(filtered, undefined, [search, view]);
-  const summaryPagination = usePagination(summaryRows.rows, undefined, [search, view]);
+  const { pageSize, setPageSize } = usePageSize();
+  const agentsPagination = usePagination(filtered, pageSize, [search, view, pageSize]);
+  const summaryPagination = usePagination(summaryRows.rows, pageSize, [search, view, pageSize]);
   const { paginatedItems: agentsPage } = agentsPagination;
   const { paginatedItems: summaryPage } = summaryPagination;
 
@@ -335,7 +337,7 @@ export default function Agents() {
       {view === 'grid' ? (
         <>
           <div className="agents-grid">{agentsPage.length ? agentsPage.map(renderAgentCard) : <div style={{ color: 'var(--m)', padding: 20 }}>No agents found.</div>}</div>
-          <PaginationBar {...agentsPagination} />
+          <PaginationBar {...agentsPagination} onPageSizeChange={setPageSize} />
         </>
       ) : (
         <div className="card" style={{ marginBottom: 20, padding: 0, overflow: 'hidden' }}>
@@ -413,7 +415,7 @@ export default function Agents() {
               </tbody>
             </table>
           </div>
-          <PaginationBar {...agentsPagination} />
+          <PaginationBar {...agentsPagination} onPageSizeChange={setPageSize} />
         </div>
       )}
 
@@ -467,7 +469,7 @@ export default function Agents() {
             </tbody>
           </table>
         </div>
-        <PaginationBar {...summaryPagination} />
+        <PaginationBar {...summaryPagination} onPageSizeChange={setPageSize} />
       </div>
 
       {profile && (

@@ -7,6 +7,7 @@ import { getCustomerName } from '@/lib/core/crm-utils';
 import { parseMoneyInput } from '@/lib/core/money';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 import type { Booking } from '@/lib/types';
 
@@ -100,7 +101,8 @@ export default function Bookings() {
     [bookings, customers, search, statusF, monthF]
   );
 
-  const pagination = usePagination(filtered, undefined, [search, statusF, monthF]);
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(filtered, pageSize, [search, statusF, monthF, pageSize]);
   const { paginatedItems } = pagination;
 
   const saveNewBooking = () => {
@@ -278,7 +280,7 @@ export default function Bookings() {
               })}
             </tbody>
           </table>
-          <PaginationBar {...pagination} />
+          <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
         </div>
       </div>
 

@@ -1,6 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import PaginationBar from '@/components/PaginationBar';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
 import { nextAttractionId, photosForAttraction } from '@/lib/attractions/attractions-helpers';
 import type { Attraction } from '@/lib/types';
@@ -46,6 +49,10 @@ export default function Attractions() {
       return true;
     });
   }, [attractions, region, typeF, search]);
+
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(filtered, pageSize, [region, typeF, search, pageSize]);
+  const { paginatedItems } = pagination;
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const closedToday = filtered.filter((a) => a.closed.toUpperCase().includes(today.toUpperCase().slice(0, 3)));
@@ -180,7 +187,7 @@ export default function Attractions() {
         }
       >
         {regions.map((r) => {
-          const regionAttractions = filtered.filter((a) => a.region === r);
+          const regionAttractions = paginatedItems.filter((a) => a.region === r);
           const hasActiveFilters = Boolean(region || typeF || search);
           const shared = {
             region: r,
@@ -205,6 +212,8 @@ export default function Attractions() {
           );
         })}
       </div>
+
+      <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
 
       <AttractionEditModal
         open={formMode !== null}

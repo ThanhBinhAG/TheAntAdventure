@@ -1,8 +1,11 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
+import PaginationBar from '@/components/PaginationBar';
 import EditableSection from '@/components/pricing/EditableSection';
 import InlineEdit from '@/components/pricing/InlineEdit';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import { ESS_PAX_COLUMNS, type EssCostLine, type EssProduct } from '@/lib/pricing/catalog-types';
 
 const PAX_COLS = Array.from({ length: ESS_PAX_COLUMNS }, (_, i) => i + 1);
@@ -71,6 +74,10 @@ export default function EssentialsProducts({
     });
   }, [products, search, category]);
 
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(filtered, pageSize, [search, category, pageSize]);
+  const { paginatedItems } = pagination;
+
   const sellingFor = (code: string, kind: EssCostLine['kind'], paxIndex: number): number | null => {
     const lines = linesByProduct.get(code) ?? [];
     const line = [...lines].reverse().find((l) => l.kind === kind);
@@ -118,7 +125,7 @@ export default function EssentialsProducts({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((product) => {
+              {paginatedItems.map((product) => {
                 const open = expanded === product.code;
                 const lines = linesByProduct.get(product.code) ?? [];
                 const solo = sellingFor(product.code, 'selling_pax', 0);
@@ -174,6 +181,7 @@ export default function EssentialsProducts({
               )}
             </tbody>
           </table>
+          <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
         </div>
       </div>
     </div>

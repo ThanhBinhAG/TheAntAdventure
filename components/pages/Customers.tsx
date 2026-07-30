@@ -7,6 +7,7 @@ import { customerMatchesSearch, getClientPipeline } from '@/lib/core/crm-utils';
 import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import CustomerProfileModal from '@/components/customers/CustomerProfileModal';
@@ -66,7 +67,8 @@ export default function Customers() {
     return list;
   }, [customers, leads, search, sourceF, countryF, salesF, typeF, stageF]);
 
-  const pagination = usePagination(filtered, undefined, [search, sourceF, countryF, salesF, typeF, stageF]);
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(filtered, pageSize, [search, sourceF, countryF, salesF, typeF, stageF, pageSize]);
   const { paginatedItems } = pagination;
 
   const profileCustomer = profileId ? customers.find((c) => c.id === profileId) : null;
@@ -285,7 +287,7 @@ export default function Customers() {
               })}
             </tbody>
           </table>
-          <PaginationBar {...pagination} />
+          <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
         </div>
       </div>
 

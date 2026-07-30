@@ -21,6 +21,9 @@ import GalleryPhotoModal, {
   type GalleryPhotoRecord,
   type GalleryPhotoSavePayload,
 } from '@/components/gallery/GalleryPhotoModal';
+import PaginationBar from '@/components/PaginationBar';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 
 const REGION_COLORS: Record<string, string> = {
   north: '#2E7D52',
@@ -68,6 +71,10 @@ export default function Gallery() {
       return photoMatchesSearchQuery(p, q);
     });
   }, [photos, region, q, attractionFilter, attractions]);
+
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(filtered, pageSize, [region, q, attractionFilter, pageSize]);
+  const { paginatedItems } = pagination;
 
   function openAdd() {
     setModalMode('add');
@@ -335,7 +342,7 @@ export default function Gallery() {
       )}
 
       <div className="phlib-grid">
-        {filtered.map((p) => {
+        {paginatedItems.map((p) => {
           const thumb = photoThumbUrl(p) || p.url;
           const isSel = selected.has(p.id);
           return (
@@ -394,6 +401,8 @@ export default function Gallery() {
           </button>
         </div>
       )}
+
+      {filtered.length > 0 && <PaginationBar {...pagination} onPageSizeChange={setPageSize} />}
 
       <GalleryPhotoModal
         open={modalOpen}

@@ -276,18 +276,22 @@ export default function ProductEditPanel({
   const photoStatus = productPhotoSlotStatus(form);
 
   const draftLabel =
-    busy && saveKind === 'draft' ? 'Saving…' : cleanSaved && saveKind === 'draft' ? 'Saved' : 'Save as Draft';
+    busy && saveKind === 'draft'
+      ? 'Saving…'
+      : cleanSaved && saveKind === 'draft'
+        ? '✓ Saved'
+        : 'Save as Draft';
   const activateLabel =
-    busy && saveKind === 'activate' ? 'Saving…' : cleanSaved ? 'Saved' : '✓ Save & Activate';
-
+    busy && saveKind === 'activate' ? 'Saving…' : cleanSaved ? '✓ Saved' : '✓ Save & Activate';
 
   return (
     <aside
-      className={`tp-edit-aside${open ? ' open' : ''}`}
+      className={`tp-edit-aside${open ? ' open' : ''}${busy ? ' tp-edit-aside--saving' : ''}${cleanSaved ? ' tp-edit-aside--saved' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="tp-edit-aside-title"
       aria-hidden={!open}
+      aria-busy={busy}
     >
       <header className="tp-edit-aside-hd">
         <div>
@@ -310,9 +314,16 @@ export default function ProductEditPanel({
         >
           ✕
         </button>
+        {busy && (
+          <div className="tp-save-progress" role="progressbar" aria-label="Saving product">
+            <span className="tp-save-progress-bar" />
+          </div>
+        )}
       </header>
 
-      <div className="tp-edit-aside-scroll">
+      <div className={`tp-edit-aside-scroll${busy ? ' is-busy' : ''}`}>
+        {busy && <div className="tp-save-overlay" aria-hidden="true" />}
+        <fieldset className="tp-edit-aside-fields" disabled={busy}>
         <FormSection
           title="Card tags & classification"
           hint="Product code: AA-{region}-{dest}-{activity}-{duration}-{seq}."
@@ -524,6 +535,7 @@ export default function ProductEditPanel({
         </FormSection>
 
         {displayError && <p className="prod-form-save-error">{displayError}</p>}
+        </fieldset>
       </div>
 
       <footer className="tp-edit-aside-ft">
@@ -545,7 +557,7 @@ export default function ProductEditPanel({
             Cancel
           </button>
           <button
-            className={`btn btn-s tp-save-btn${cleanSaved && saveKind === 'draft' ? ' is-saved' : ''}`}
+            className={`btn btn-s tp-save-btn${busy && saveKind === 'draft' ? ' is-saving' : ''}${cleanSaved && saveKind === 'draft' ? ' is-saved' : ''}`}
             type="button"
             onClick={() => void handleSave(true)}
             disabled={saveDisabled}
@@ -555,7 +567,7 @@ export default function ProductEditPanel({
             {draftLabel}
           </button>
           <button
-            className={`btn btn-p tp-save-btn${cleanSaved ? ' is-saved' : ''}`}
+            className={`btn btn-p tp-save-btn${busy && saveKind === 'activate' ? ' is-saving' : ''}${cleanSaved ? ' is-saved' : ''}`}
             type="button"
             onClick={() => void handleSave(false)}
             disabled={saveDisabled}

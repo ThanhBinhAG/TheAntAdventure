@@ -2,7 +2,10 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import PaginationBar from '@/components/PaginationBar';
 import HotelFormModal from '@/components/suppliers/HotelFormModal';
+import { usePagination } from '@/hooks/usePagination';
+import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
 import { filterByRegion, REG_BADGE, supplierMatchesSearch, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { Hotel } from '@/lib/types';
@@ -26,6 +29,10 @@ export default function HotelTab({ filters }: Props) {
       (h) => supplierMatchesSearch(filters.search, [h.name, h.dest, h.cat, h.id])
     );
   }, [hotels, filters]);
+
+  const { pageSize, setPageSize } = usePageSize();
+  const pagination = usePagination(filtered, pageSize, [filters.region, filters.search, pageSize]);
+  const { paginatedItems } = pagination;
 
   const editHotel = editId ? hotels.find((h) => h.id === editId) : null;
 
@@ -85,7 +92,7 @@ export default function HotelTab({ filters }: Props) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((h) =>
+              {paginatedItems.map((h) =>
                 h.rooms.map((r, ri) => (
                   <tr key={`${h.id}-${ri}`}>
                     {ri === 0 && (
@@ -144,7 +151,7 @@ export default function HotelTab({ filters }: Props) {
                   </tr>
                 ))
               )}
-              {!filtered.length && (
+              {!paginatedItems.length && (
                 <tr>
                   <td colSpan={14} style={{ textAlign: 'center', color: 'var(--m)', padding: 24 }}>
                     No hotels found.
@@ -153,6 +160,7 @@ export default function HotelTab({ filters }: Props) {
               )}
             </tbody>
           </table>
+          <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
         </div>
       </div>
 

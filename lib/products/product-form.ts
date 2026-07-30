@@ -3,12 +3,6 @@ import {
   suggestTypeSegment,
   type TypeSegment,
 } from '@/lib/products/product-code';
-import {
-  DUR_KEY_TO_PRODUCT_DUR,
-  durToModuleKey,
-  moduleKeyToDur,
-  type ModuleDurKey,
-} from '@/lib/products/product-modules';
 import type { Product } from '@/lib/types';
 
 export const PRODUCT_CATEGORIES = [
@@ -180,13 +174,3 @@ export function deriveCategoriesFromProducts(products: Product[]): string[] {
   });
   return [...set].sort((a, b) => a.localeCompare(b));
 }
-
-export function moduleDurSelectValue(dur: string): ModuleDurKey | '' {
-  return durToModuleKey(dur) ?? '';
-}
-
-export function setFormDurFromModuleKey(form: ProductFormState, key: ModuleDurKey): ProductFormState {
-  return { ...form, dur: moduleKeyToDur(key) };
-}
-
-export { DUR_KEY_TO_PRODUCT_DUR };

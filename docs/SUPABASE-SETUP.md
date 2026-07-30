@@ -4,15 +4,20 @@ Step-by-step guide to initialize the CRM database on Supabase and connect the Ne
 
 Schema reference: [`DATABASE.md`](./DATABASE.md)
 
-## SQL files
+## SQL files (colleague run order)
 
-| File | Purpose |
-|------|---------|
-| `supabase/reset-v5.sql` | Drop all CRM tables — use before a clean reinstall |
-| `supabase/schema.sql` | Create 35+ relational tables, indexes, dev RLS |
-| `supabase/import-v5-data.sql` | Seed / production data (run after schema) |
-| `supabase/verify-counts-v5.sql` | Verify row counts after import |
-| `supabase/migrate-photo-storage.sql` | Photo Storage bucket + `photos.thumb_url` / `storage_path` (existing projects) |
+Remember: **schema → import → (verify) → Auth → RLS**. Do not run any deleted `legacy/migrate-*.sql` patches.
+
+| Step | File | Purpose |
+|------|------|---------|
+| 0 (optional DEV) | `supabase/reset-v5.sql` | Drop all CRM tables — clean reinstall only |
+| 1 | `supabase/schema.sql` | Full DDL (tables, indexes, Storage, `dev_allow_all` RLS). Same content as CLI baseline `migrations/20260101000000_baseline_v5_schema.sql` |
+| 2 | `supabase/import-v5-data.sql` | Seed / production data |
+| 3 (optional) | `supabase/verify-counts-v5.sql` | Verify row counts after import |
+| 4 | App + Auth | `.env.local`, create user, confirm `/login` works |
+| 5 | `supabase/rls-authenticated.sql` | Production RLS (`authenticated_access`) |
+| only if needed | `supabase/fix-product-photos-rls.sql` | If `product_photos` RLS blocks inserts |
+| ops | `supabase/wipe-photo-library.sql` | Manual photo wipe (destructive) |
 
 ## 1. Supabase SQL Editor (in order)
 
@@ -41,6 +46,12 @@ If a previous import failed or you need a fresh start:
 2. Every row: `rows` column must equal `expected`
 
 Expected highlights: `customers: 27`, `products: 196`, `booking_itinerary: 33`, `booking_activities: 70`.
+
+### 1e. Auth then RLS
+
+1. Configure Auth and app env (see §2 and Auth sections below)
+2. Confirm login works
+3. Run `supabase/rls-authenticated.sql`
 
 ## 2. App configuration
 
@@ -287,11 +298,9 @@ chat_channels, chat_messages, chat_reactions, dev_notes
 
 ## 8. Photo Storage (Library + Guides)
 
-### One-time migrations (existing projects)
+Photo Storage bucket DDL and `product_photos` are included in `schema.sql` / the CLI baseline. Fresh installs do **not** need separate photo migration files.
 
-1. Run `supabase/migrate-photo-storage.sql` if the Storage bucket is not set up yet.
-2. Run `supabase/migrate-photo-library.sql` to create `product_photos`, backfill from `photos.product_code`/`slot`, drop those columns, and flatten Storage RLS for `gallery/{photoId}/…`.
-3. If Tour Product photos vanish on refresh with `new row violates row-level security policy for table "product_photos"`, run `supabase/fix-product-photos-rls.sql` (or re-run `rls-authenticated.sql`). An older copy of the photo-library migration enabled RLS without creating `authenticated_access`.
+If Tour Product photos vanish on refresh with `new row violates row-level security policy for table "product_photos"`, run `supabase/fix-product-photos-rls.sql` (or re-run `rls-authenticated.sql`).
 
 ### Upload paths (required convention)
 
@@ -313,14 +322,6 @@ Guides → edit form → **Avatar photo** still uploads client-side to `guides/{
 
 Legacy owner-grouped paths (`gallery/tours/…`, `gallery/attractions/…`, `gallery/loose/…`) remain readable via stored `url` / `storage_path`; new uploads use the flat layout.
 
-### Rollout gates (recommended)
-
-1. Run dry-run migration and inspect skipped/failed counts.
-2. Apply migration and confirm `photos.storage_path` now points to owner-grouped paths.
-3. Verify Gallery upload in all 3 modes: tour, attraction quick add, loose.
-4. Delete a migrated image and confirm both object variants are removed.
-5. Only then run `--delete-legacy` cleanup.
-
 ### Manual upload via Supabase Dashboard
 
 1. Storage → bucket `photos` → upload files at paths above.
@@ -336,7 +337,7 @@ Legacy owner-grouped paths (`gallery/tours/…`, `gallery/attractions/…`, `gal
 
 ## 9. Supabase CLI migrations
 
-Schema changes after v5 should use the **Supabase CLI** (`supabase/migrations/`), not ad-hoc SQL Editor pastes.
+Schema changes use the **Supabase CLI** (`supabase/migrations/`). Fresh empty DB: `npm run db:push` applies the single baseline (`20260101000000`). SQL Editor path still uses `schema.sql` (keep in sync with that baseline).
 
 ### 9a. One-time setup
 
@@ -361,11 +362,11 @@ npm run db:link -- --project-ref YOUR_PROJECT_REF
 
 ### 9b. Bootstrap existing database
 
-If the DB already has `schema.sql` applied (no `supabase_migrations.schema_migrations` history):
+If the DB already has `schema.sql` applied (no `supabase_migrations.schema_migrations` history) — **do not** `db push` the baseline (tables already exist):
 
 ```bash
 # Add SUPABASE_DB_URL to .env.local first
-npm run db:bootstrap           # marks baseline + 20260711 + 20260713 as applied
+npm run db:bootstrap           # marks 20260101000000 as applied
 npm run db:status              # local vs remote history
 ```
 
@@ -386,7 +387,7 @@ npm run db:push                # DEV — applies pending migrations
 Checklist per migration:
 
 1. SQL in `supabase/migrations/` (prefer `IF NOT EXISTS` / idempotent DDL)
-2. Update [`supabase/schema.sql`](../supabase/schema.sql) for fresh installs
+2. Mirror DDL into [`supabase/schema.sql`](../supabase/schema.sql) for SQL Editor fresh installs
 3. Update app types/mappers in `lib/` if columns changed
 4. `npm run typecheck`
 5. PROD: backup → `npm run db:push` on production `SUPABASE_DB_URL`
@@ -401,13 +402,13 @@ Checklist per migration:
 | `npm run db:push` | Apply pending migrations (`SUPABASE_DB_URL`) |
 | `npm run db:pull` | Pull remote schema into new migration |
 | `npm run db:status` | List migration history |
-| `npm run db:bootstrap` | Repair baseline on existing DB |
+| `npm run db:bootstrap` | Mark baseline `20260101000000` applied on existing DB |
 
 Helper: [`scripts/supabase-db.sh`](../scripts/supabase-db.sh)
 
-### 9e. Legacy `migrate-*.sql`
+### 9e. Squashed legacy patches
 
-Pre-CLI patches are documented in [`supabase/LEGACY-MIGRATIONS.md`](../supabase/LEGACY-MIGRATIONS.md). Do not add new files there — use `migrations/` instead.
+Pre-CLI `migrate-*.sql` files were removed; history note: [`supabase/legacy/LEGACY-MIGRATIONS.md`](../supabase/legacy/LEGACY-MIGRATIONS.md). New changes go only in `migrations/`.
 
 ### 9f. Common errors
 

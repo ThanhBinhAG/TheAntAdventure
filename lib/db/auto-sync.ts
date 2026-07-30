@@ -1,5 +1,4 @@
 import { isAutoSyncEnabled, isRemoteDataEnabled, isSupabaseReadOnly } from '../env';
-import type { BackupData } from '../types';
 import { TABLE_TO_STORE_KEY, SYNC_ARRAY_TABLES, type SyncArrayTable } from './sync-config';
 import { isSyncAllowed, subscribeHydration } from './sync-lifecycle';
 import { pushSnapshotToSupabase, pushTablesToSupabase } from './sync-push';
@@ -52,15 +51,6 @@ export function subscribeAutoSync(listener: (state: AutoSyncState) => void) {
 }
 
 /** Skip auto-sync while hydrating / importing from remote */
-export function withoutAutoSync<T>(fn: () => T): T {
-  suppressCount++;
-  try {
-    return fn();
-  } finally {
-    suppressCount--;
-  }
-}
-
 export async function withoutAutoSyncAsync<T>(fn: () => Promise<T>): Promise<T> {
   suppressCount++;
   try {
@@ -169,17 +159,6 @@ async function flushAutoSync() {
   }
 }
 
-/** Force immediate push (manual button) */
-export async function flushAutoSyncNow() {
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
-  }
-  pendingTables = new Set();
-  pendingMessages = true;
-  await flushAutoSync();
-}
-
 /** Compare Zustand snapshots — return changed table names */
 export function detectChangedTables(
   state: Record<string, unknown>,
@@ -194,5 +173,3 @@ export function detectChangedTables(
 
   return { tables, messages: state.messages !== prev.messages };
 }
-
-export const SYNC_STORE_KEYS = Object.values(TABLE_TO_STORE_KEY) as (keyof BackupData)[];

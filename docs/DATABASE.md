@@ -313,7 +313,10 @@ Migration v4.3 JSONB → v5 relational **đã hoàn tất**. Quy trình chuẩn 
 3. Run supabase/import-v5-data.sql
 4. Run supabase/verify-counts-v5.sql — cột rows phải khớp expected
 5. .env.local: NEXT_PUBLIC_USE_SUPABASE=true + URL + anon key
+6. Auth login OK → Run supabase/rls-authenticated.sql
 ```
+
+CLI alternate for step 2 on empty DB: `npm run db:push` (baseline `20260101000000`). Existing DB: `npm run db:bootstrap` then only push new migrations.
 
 Chi tiết từng bước: [`docs/SUPABASE-SETUP.md`](./SUPABASE-SETUP.md)
 

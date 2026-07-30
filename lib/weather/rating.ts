@@ -1,4 +1,3 @@
-import { WR } from '@/lib/seeds/weather';
 import type { TravelRating } from './types';
 
 /** Map Open-Meteo daily data to tourism E/G/F/P rating (matches seed legend). */
@@ -16,8 +15,4 @@ export function toTravelRating(
   if (weatherCode <= 3 && precipMm <= 2) return 'E';
   if (precipMm > 2 || weatherCode >= 51) return 'F';
   return 'G';
-}
-
-export function ratingDisplay(rating: TravelRating) {
-  return WR[rating];
 }

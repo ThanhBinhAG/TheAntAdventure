@@ -38,7 +38,6 @@ export { isRemoteDataEnabled } from '../env';
 export {
   getHydrationState,
   subscribeHydration,
-  type HydrationPhase,
   type HydrationState,
 } from './sync-lifecycle';
 

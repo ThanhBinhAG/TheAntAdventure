@@ -76,12 +76,10 @@ case "$cmd" in
     run_cli migration new "$name"
     ;;
   bootstrap-existing)
-    # Mark baseline + pre-CLI incremental migrations as already applied on remote.
+    # Mark squashed baseline as already applied on remote (do not re-run DDL).
     require_db_url
-    for v in 20260101000000 20260711 20260713; do
-      echo "Marking migration $v as applied..."
-      run_cli migration repair --status applied "$v" --db-url "$SUPABASE_DB_URL" || true
-    done
+    echo "Marking migration 20260101000000 as applied..."
+    run_cli migration repair --status applied 20260101000000 --db-url "$SUPABASE_DB_URL" || true
     run_cli migration list --db-url "$SUPABASE_DB_URL"
     ;;
   *)
@@ -93,7 +91,7 @@ Commands:
   pull [name]          Pull remote schema into a new migration file
   status               List local vs remote migration history
   repair-applied TS    Mark migration TIMESTAMP as applied on remote
-  bootstrap-existing   Repair baseline + 20260711 + 20260713 on existing DB
+  bootstrap-existing   Repair baseline 20260101000000 on existing DB
   link [flags]         supabase link (Supabase Cloud or self-hosted project ref)
   login                supabase login (Supabase Cloud access token)
   new NAME             Create supabase/migrations/<timestamp>_NAME.sql

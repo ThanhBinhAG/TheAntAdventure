@@ -98,17 +98,6 @@ export function photosLinkedToAttraction(
     .filter((p): p is GalleryPhoto => Boolean(p && (p.url || p.thumbUrl)));
 }
 
-export function linkPhotoToAttraction(attractionId: string, photoId: string) {
-  const attractions = useStore.getState().attractions;
-  const next = attractions.map((a) => {
-    if (a.id !== attractionId) return a;
-    const linked = a.linkedPhotoIds?.length ? a.linkedPhotoIds : (a.photoIds ?? []);
-    if (linked.includes(photoId)) return a;
-    return { ...a, linkedPhotoIds: [...linked, photoId] };
-  });
-  useStore.setState({ attractions: next });
-}
-
 /** Link photo to pool and auto-feature if fewer than 4 featured slots used. */
 export function linkPhotoToAttractionWithFeatured(attractionId: string, photoId: string) {
   const attractions = useStore.getState().attractions;
@@ -120,30 +109,6 @@ export function linkPhotoToAttractionWithFeatured(attractionId: string, photoId:
     const nextFeatured =
       featured.length < 4 && !featured.includes(photoId) ? [...featured, photoId] : featured;
     return { ...a, linkedPhotoIds: nextLinked, photoIds: nextFeatured };
-  });
-  useStore.setState({ attractions: next });
-}
-
-export function unlinkPhotoFromAttraction(attractionId: string, photoId: string) {
-  const attractions = useStore.getState().attractions;
-  const next = attractions.map((a) => {
-    if (a.id !== attractionId) return a;
-    return {
-      ...a,
-      linkedPhotoIds: (a.linkedPhotoIds ?? []).filter((id) => id !== photoId),
-      photoIds: (a.photoIds ?? []).filter((id) => id !== photoId),
-    };
-  });
-  useStore.setState({ attractions: next });
-}
-
-export function setFeaturedPhotos(attractionId: string, photoIds: string[]) {
-  const attractions = useStore.getState().attractions;
-  const next = attractions.map((a) => {
-    if (a.id !== attractionId) return a;
-    const linked = a.linkedPhotoIds?.length ? a.linkedPhotoIds : (a.photoIds ?? []);
-    const featured = photoIds.filter((id) => linked.includes(id)).slice(0, 4);
-    return { ...a, photoIds: featured };
   });
   useStore.setState({ attractions: next });
 }

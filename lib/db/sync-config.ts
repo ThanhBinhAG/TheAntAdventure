@@ -111,14 +111,6 @@ export const HEALTH_COUNT_TABLES = [
   MESSAGES_TABLE,
 ] as const;
 
-export function getRowId(row: Record<string, unknown>, table: SyncArrayTable, index: number): string {
-  if (row.id != null && String(row.id).length > 0) return String(row.id);
-  if (table === 'products' && row.code != null) return String(row.code);
-  if (table === 'product_pricing' && row.product_code != null) return String(row.product_code);
-  if (table === 'product_pricing' && row.productCode != null) return String(row.productCode);
-  return `${table}-${index}`;
-}
-
 export function countBackupRows(backup: BackupData): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const table of SYNC_ARRAY_TABLES) {

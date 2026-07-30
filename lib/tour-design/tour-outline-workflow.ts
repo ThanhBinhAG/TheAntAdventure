@@ -22,14 +22,6 @@ export function applyOutlineWorkflowPatch(
   return merged;
 }
 
-export {
-  patchOutlineSent,
-  patchOutlineResent,
-  patchOutlineApproved,
-  patchOutlineRevise,
-  buildOutlineComm,
-  outlineStatusLabel,
-  formatOutlineTimestamp,
-} from './tour-design-lead';
+export { patchOutlineSent, patchOutlineApproved } from './tour-design-lead';
 
 export type { OutlineWorkflowPatch } from './tour-design-lead';

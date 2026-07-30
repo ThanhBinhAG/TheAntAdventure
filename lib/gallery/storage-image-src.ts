@@ -25,25 +25,3 @@ export function isNextImageOptimizable(src: string): boolean {
     return false;
   }
 }
-
-export function supabaseImageRemotePattern(): {
-  protocol: string;
-  hostname: string;
-  port?: string;
-  pathname: string;
-} | null {
-  const base = supabaseUrlHost();
-  if (!base) return null;
-  const pattern: {
-    protocol: string;
-    hostname: string;
-    port?: string;
-    pathname: string;
-  } = {
-    protocol: base.protocol.replace(':', ''),
-    hostname: base.hostname,
-    pathname: '/storage/v1/object/public/**',
-  };
-  if (base.port) pattern.port = base.port;
-  return pattern;
-}

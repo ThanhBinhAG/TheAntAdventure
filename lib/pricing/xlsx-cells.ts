@@ -80,16 +80,6 @@ export function isBlankRow(grid: Grid, row: number): boolean {
   return cells.every((c) => c == null || String(c).trim() === '');
 }
 
-/** Index of the last column holding content, or -1 for an empty row. */
-export function lastFilledCol(grid: Grid, row: number): number {
-  const cells = grid[row] ?? [];
-  for (let i = cells.length - 1; i >= 0; i--) {
-    const value = cells[i];
-    if (value != null && String(value).trim() !== '') return i;
-  }
-  return -1;
-}
-
 /** Number of columns holding content within [from, to). */
 export function filledCount(grid: Grid, row: number, from = 0, to = 64): number {
   const cells = grid[row] ?? [];
@@ -117,19 +107,6 @@ export function periodText(value: unknown): string {
     }
   }
   return richText(value);
-}
-
-/** Finds the first row where the predicate matches, scanning from `start`. */
-export function findRow(grid: Grid, predicate: (row: string[], index: number) => boolean, start = 0): number {
-  for (let i = start; i < grid.length; i++) {
-    const row = (grid[i] ?? []).map((c) => text(c));
-    if (predicate(row, i)) return i;
-  }
-  return -1;
-}
-
-export function rowText(grid: Grid, row: number): string {
-  return (grid[row] ?? []).map((c) => text(c)).join(' | ').toLowerCase();
 }
 
 /** Stable slug used to build deterministic row ids for imported records. */

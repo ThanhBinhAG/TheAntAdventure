@@ -1,18 +1,20 @@
 -- ============================================================
 --  THE ANT ADVENTURES CRM — PostgreSQL Schema v5.0
 --  Supabase-ready · Fully relational · No JSONB
---  Generated: 2026-06-15
 --
---  Documentation: docs/DATABASE.md
+--  Documentation: docs/DATABASE.md · docs/SUPABASE-SETUP.md
 --
---  Run order (new Supabase project):
---    1. Paste this file → Supabase SQL Editor → Run
---    2. Seed data via SQL scripts or app (after app layer v5 refactor)
+--  Keep in sync with:
+--    supabase/migrations/20260101000000_baseline_v5_schema.sql
+--  Prefer editing the migration, then copy here for SQL Editor paste.
 --
---  Migrating from v4.3 JSONB tables:
---    1. Backup data first
---    2. Run supabase/migrate-drop-v43.sql
---    3. Run this file
+--  Run order (new Supabase project — SQL Editor):
+--    1. (optional DEV) reset-v5.sql
+--    2. This file (schema) — one run, do not split
+--    3. import-v5-data.sql
+--    4. verify-counts-v5.sql (optional)
+--    5. Auth + app config
+--    6. rls-authenticated.sql
 -- ============================================================
 
 create extension if not exists "pgcrypto";

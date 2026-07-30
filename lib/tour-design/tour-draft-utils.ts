@@ -81,10 +81,6 @@ export function tourDraftIdForLead(leadId: string): string {
   return `TD-${leadId}`;
 }
 
-export function outlineDaysToRows(days: TourOutlineDay[]) {
-  return [...days].sort((a, b) => a.dayNumber - b.dayNumber);
-}
-
 export function isIsoDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
 }

@@ -38,8 +38,6 @@ export const PRODUCT_DESTINATIONS: readonly ProductDestination[] = [
 /** Display-only destination tags for services (no AA dest code). */
 export const SERVICE_DESTINATION_TAGS = ['All Vietnam', 'SGN / HAN / DAD'] as const;
 
-export type ServiceDestinationTag = (typeof SERVICE_DESTINATION_TAGS)[number];
-
 /** Short airport / city aliases for search (query → catalog labels). */
 const DEST_SEARCH_ALIASES: Record<string, string[]> = {
   sgn: ['Ho Chi Minh City'],

@@ -32,20 +32,3 @@ export async function deleteProductPricingFromRemote(productCode: string): Promi
     });
   }
 }
-
-/** Delete gallery photos linked to a product code (by photo id). */
-export async function deletePhotosFromRemote(photoIds: string[]): Promise<void> {
-  if (!isRemoteDataEnabled() || isSupabaseReadOnly() || !photoIds.length) return;
-
-  for (const id of photoIds) {
-    try {
-      await db.photos.deleteRemote(id);
-    } catch (e) {
-      appLog('remote-delete', 'Failed to delete photo from Supabase', {
-        level: 'warn',
-        error: e,
-        meta: { id },
-      });
-    }
-  }
-}

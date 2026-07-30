@@ -1,4 +1,4 @@
-import type { Lead, OutlineStatus, TourDraft } from '../types';
+import type { Lead, TourDraft } from '../types';
 
 export function getTourDraftForLead(leadId: string, tourDrafts: TourDraft[]): TourDraft | undefined {
   return tourDrafts.find((d) => d.leadId === leadId);
@@ -40,12 +40,4 @@ export function countOutlineAwaitingApproval(leads: Lead[], tourDrafts: TourDraf
 /** Sidebar badge: new pipeline handoffs + outlines waiting on client. */
 export function countTourDesignAttention(leads: Lead[], tourDrafts: TourDraft[]): number {
   return countPendingTourDesignLeads(leads) + countOutlineAwaitingApproval(leads, tourDrafts);
-}
-
-export function getOutlineStatusForLead(
-  leadId: string,
-  tourDrafts: TourDraft[]
-): OutlineStatus | null {
-  const draft = getTourDraftForLead(leadId, tourDrafts);
-  return draft?.outlineStatus ?? null;
 }

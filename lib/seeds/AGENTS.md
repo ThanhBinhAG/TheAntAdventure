@@ -1,10 +1,13 @@
 # lib/seeds/ — Agent overview
 
 ## Role
-Static seed datasets for local/offline CRM bootstrap.
+Static seed datasets still used by hydrate/ensure helpers, Tour Design, Weather, proposals, or tests.
 
 ## Contents
-- `index.ts` barrel + domain seed modules (`customers`, `leads`, `products`, …)
+- `products.ts`, `hotels.ts`, `suppliers.ts`, `extendedSuppliers.ts`, `attractions.ts` — ensure/merge on hydrate
+- `weather.ts`, `tourPackages.ts`, `staff.ts`, `taa-tours.ts` — direct app/test imports
+- Offline CRM seeds (customers, bookings, …) live in `Personal/legacy-seeds/` (gitignored)
 
 ## Boundaries
-- Some seeds are imported directly (not all re-exported). Prefer explicit imports when unsure.
+- Prefer explicit `@/lib/seeds/<file>` imports. Do not reintroduce a catch-all barrel unless needed.
+- Do not import from `Personal/legacy-seeds` in app code.

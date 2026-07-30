@@ -30,17 +30,6 @@ export function photoThumbUrl(p: GalleryPhoto): string | undefined {
   return undefined;
 }
 
-export function photosForProductIds(
-  allPhotos: GalleryPhoto[],
-  product: Pick<Product, 'photoIds' | 'linkedPhotoIds'>
-): GalleryPhoto[] {
-  const ids =
-    product.linkedPhotoIds?.length
-      ? product.linkedPhotoIds
-      : (product.photoIds ?? []);
-  return photosForAttractionByIds(allPhotos, ids);
-}
-
 export type ProductPhotoSlots = {
   slot1: GalleryPhoto | null;
   slot2: GalleryPhoto | null;
@@ -75,21 +64,6 @@ export function photosForProductSlots(
   }
 
   return { slot1, slot2, pool };
-}
-
-export function galleryUrlForAttraction(attractionId: string, _name?: string, photoId?: string): string {
-  const params = new URLSearchParams({ attraction: attractionId });
-  if (photoId) params.set('photo', photoId);
-  return `/gallery?${params.toString()}`;
-}
-
-export function photosForAttractionByIds<T extends { id: string }>(
-  allPhotos: T[],
-  photoIds: string[]
-): T[] {
-  if (!photoIds.length) return [];
-  const byId = new Map(allPhotos.map((p) => [p.id, p]));
-  return photoIds.map((id) => byId.get(id)).filter((p): p is T => Boolean(p));
 }
 
 export const TOUR_PREVIEW_PHOTO_SLOTS = 2;

@@ -18,8 +18,9 @@ union all select 'staff', count(*), 5 from staff
 union all select 'tasks', count(*), 8 from tasks
 union all select 'feedback', count(*), 5 from feedback
 union all select 'contracts', count(*), 1 from contracts
-union all select 'photos', count(*), 12 from photos
-union all select 'photo_tags', count(*), 48 from photo_tags
+union all select 'photos', count(*), 20 from photos
+union all select 'photo_tags', count(*), 57 from photo_tags
+union all select 'product_photos', count(*), 17 from product_photos
 union all select 'attractions', count(*), 38 from attractions
 union all select 'attraction_photos', count(*), 0 from attraction_photos
 union all select 'suppliers', count(*), 12 from suppliers

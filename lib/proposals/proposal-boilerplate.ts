@@ -2,9 +2,6 @@
 
 export const PROPOSAL_TAGLINE_B2C = 'Where authentic adventure begins';
 
-export const PROPOSAL_FOOTER =
-  'THE ANT ADVENTURES | Boutique Inbound Travel — Vietnam | sales@theantadventures.com | www.theantadventures.com';
-
 export const PROPOSAL_DEFAULT_INCLUSIONS = [
   'Accommodation based on twin or double room with daily breakfast throughout',
   'Private airport transfers and private air-conditioned transportation throughout',

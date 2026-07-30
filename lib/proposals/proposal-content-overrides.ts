@@ -201,20 +201,6 @@ export function snapshotFromDoc(doc: ProposalDoc): ProposalContentOverrides {
   };
 }
 
-export function defaultPricingText(doc: ProposalDoc): ProposalPricingText {
-  const packageLabel = doc.pricing.kind === 'b2c' ? doc.pricing.packageLabel : undefined;
-  return {
-    packageLabel,
-    b2bGroundDesc:
-      'Ground arrangements — private tour (transfers, guide, vehicle, activities & entrance fees as per program)',
-    b2bFlightsDesc: 'Domestic flights as per program · Economy class',
-    footnote:
-      doc.variant === 'b2b'
-        ? 'This quotation is prepared exclusively for B2B partners. All rates are net and do not include agent commission. Valid for travel dates specified only.'
-        : 'All prices are quoted in USD and include applicable taxes. Rates are valid for the travel dates specified and subject to availability at time of booking confirmation.',
-  };
-}
-
 function formatLegalKv(rows: Array<{ label?: string; detail?: string; notice?: string; charge?: string; title?: string; body?: string }>): string {
   return rows
     .map((r) => {

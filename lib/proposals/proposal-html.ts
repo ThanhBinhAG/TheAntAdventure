@@ -1,12 +1,11 @@
 import { fmt } from '../constants';
-import { openPrintWindow } from '../core/print-window';
 import {
   defaultBookingFields,
   defaultLegalText,
   defaultOverviewRows,
 } from './proposal-content-overrides';
 import { proposalRichHtml } from './proposal-rich-text';
-import type { ProposalDoc, ProposalVariant } from './proposal-types';
+import type { ProposalDoc } from './proposal-types';
 import {
   PROPOSAL_AMENDMENT_POLICY,
   PROPOSAL_B2B_FOOTER_NOTE,
@@ -601,10 +600,6 @@ ${pageWrap}
   }
 }
 
-export function printProposal(doc: ProposalDoc, origin = ''): void {
-  openPrintWindow(buildProposalHTML(doc, origin), '');
-}
-
 export function downloadProposalWord(doc: ProposalDoc, origin = ''): void {
   const html = buildProposalHTML(doc, origin);
   const wordDoc = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -616,8 +611,4 @@ export function downloadProposalWord(doc: ProposalDoc, origin = ''): void {
   a.download = `${doc.quoteRef}-${doc.customerName.replace(/\s+/g, '_')}.doc`;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-export function proposalVariantFromClientType(clientType: 'b2c' | 'b2b'): ProposalVariant {
-  return clientType === 'b2b' ? 'b2b' : 'b2c';
 }

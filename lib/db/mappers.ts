@@ -545,10 +545,6 @@ export function staffToRow(s: StaffMember): Row {
   };
 }
 
-export function rowToLoose(r: Row): Row {
-  return { ...r, id: String(r.id) };
-}
-
 export function financeToRow(r: Row): Row {
   return {
     id: r.id,

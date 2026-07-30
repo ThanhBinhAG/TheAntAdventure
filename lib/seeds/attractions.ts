@@ -166,5 +166,3 @@ export const ATTRACTION_DATA = [
    best_time:'Morning',crowd:'Very light (Con Dao is remote)',book_req:false,
    seasonal:'Accessible year-round by plane; sea rough Jun–Sep',notes:'Harrowing colonial-era prison complex. Very moving. Revolutionary cemetery also worth visiting. Context essential.',alert:'OPEN DAILY · EMOTIONALLY INTENSE'}
 ];
-
-export type AttractionSeed = (typeof ATTRACTION_DATA)[number];

@@ -46,8 +46,6 @@ export const STAGE_ORDER = [
   'Inquiry',
 ] as const;
 
-export const ACTIVE_STAGE_FILTERS = [...KANBAN_STAGES] as const;
-
 export const STAGE_PROB_V22: Record<string, number> = {
   Inquiry: 10,
   Designing: 25,
@@ -80,8 +78,6 @@ export const SRC_COLORS: Record<string, string> = {
   Virtuoso: 'bdg-a',
   Abercrombie: 'bdg-a',
 };
-
-export const SALES_STAGES = [...KANBAN_STAGES, 'Lost'] as const;
 
 export const PAGE_TITLES: Record<PageSlug, string> = {
   dashboard: 'Dashboard',
@@ -252,8 +248,4 @@ export const VALID_PAGES = Array.from(
 
 export function fmt(n: number): string {
   return n.toLocaleString("en-US");
-}
-
-export function bdg(text: string, cls: string): string {
-  return `<span class="bdg ${cls}">${text}</span>`;
 }

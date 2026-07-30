@@ -932,12 +932,3 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
     detailedProgramLayout: detailedProgramLayout === 'inline' ? 'inline' : 'sidebar',
   };
 }
-
-export function mergeHotelRates(
-  detected: ProposalHotelRate[],
-  edited: ProposalHotelRate[]
-): ProposalHotelRate[] {
-  if (!edited.length) return detected;
-  const byId = new Map(edited.map((h) => [h.id, h]));
-  return detected.map((d) => ({ ...d, ...byId.get(d.id) }));
-}

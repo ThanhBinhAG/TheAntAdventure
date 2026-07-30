@@ -548,83 +548,102 @@ INSERT INTO restaurants (id, name, city, cuisine, set_menu, capacity, rating, no
 INSERT INTO restaurants (id, name, city, cuisine, set_menu, capacity, rating, notes) VALUES ('SUP-R-003', 'Morning Glory Hoi An', 'Hoi An', 'Central Vietnamese', '$22/pax', 60, '★★★★', NULL) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, city = EXCLUDED.city, cuisine = EXCLUDED.cuisine, set_menu = EXCLUDED.set_menu, capacity = EXCLUDED.capacity, rating = EXCLUDED.rating, notes = EXCLUDED.notes;
 
 -- MODULE 13–14: photos + tags, cal_events
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-001', 'Halong Bay at Dawn', 'north', 'AA-NV-HAL-SEA-HD-01', 'https://picsum.photos/seed/ant-halong1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-001', 'Halong Bay at Dawn', 'north', 'https://picsum.photos/seed/ant-halong1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-001', 'halong') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-001', 'cruise') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-001', 'sunrise') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-001', 'luxury') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-001b', 'Halong Bay Limestone Karst', 'north', 'AA-NV-HAL-SEA-HD-01', 'https://picsum.photos/seed/ant-halong2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-001b', 'Halong Bay Limestone Karst', 'north', 'https://picsum.photos/seed/ant-halong2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-001b', 'halong') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-001b', 'karst') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-002', 'Hoi An Lanterns at Night', 'central', 'AA-CV-HOI-HD-01', 'https://picsum.photos/seed/ant-hoian1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-002', 'Hoi An Lanterns at Night', 'central', 'https://picsum.photos/seed/ant-hoian1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-002', 'hoian') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-002', 'lanterns') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-002', 'night') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-002', 'culture') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-002b', 'Hoi An Ancient Town', 'central', 'AA-CV-HOI-HD-01', 'https://picsum.photos/seed/ant-hoian2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-002b', 'Hoi An Ancient Town', 'central', 'https://picsum.photos/seed/ant-hoian2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-002b', 'hoian') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-003', 'Mekong Delta Floating Market', 'south', 'AA-SV-MKG-HD-01', 'https://picsum.photos/seed/ant-mekong1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-003', 'Mekong Delta Floating Market', 'south', 'https://picsum.photos/seed/ant-mekong1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-003', 'mekong') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-003', 'market') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-003', 'river') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-003', 'morning') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-003b', 'Mekong River Life', 'south', 'AA-SV-MKG-HD-01', 'https://picsum.photos/seed/ant-mekong2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-003b', 'Mekong River Life', 'south', 'https://picsum.photos/seed/ant-mekong2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-003b', 'mekong') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-004', 'Sapa Rice Terraces', 'north', 'AA-NV-SPA-HD-01', 'https://picsum.photos/seed/ant-sapa1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-004', 'Sapa Rice Terraces', 'north', 'https://picsum.photos/seed/ant-sapa1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-004', 'sapa') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-004', 'terraces') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-004', 'trekking') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-004', 'hmong') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-004b', 'Sapa Mountain Valley', 'north', 'AA-NV-SPA-HD-01', 'https://picsum.photos/seed/ant-sapa2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-004b', 'Sapa Mountain Valley', 'north', 'https://picsum.photos/seed/ant-sapa2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-004b', 'sapa') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-005', 'Hue Imperial Citadel', 'central', 'AA-CV-HUE-HD-01', 'https://picsum.photos/seed/ant-hue1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-005', 'Hue Imperial Citadel', 'central', 'https://picsum.photos/seed/ant-hue1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-005', 'hue') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-005', 'citadel') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-005', 'history') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-005', 'royal') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-005b', 'Hue Royal Architecture', 'central', 'AA-CV-HUE-HD-01', 'https://picsum.photos/seed/ant-hue2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-005b', 'Hue Royal Architecture', 'central', 'https://picsum.photos/seed/ant-hue2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-005b', 'hue') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-006', 'Ha Giang Mountain Pass', 'north', NULL, 'https://picsum.photos/seed/ant-north1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-006', 'Ha Giang Mountain Pass', 'north', 'https://picsum.photos/seed/ant-north1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-006', 'hagiang') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-006', 'mountains') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-006', 'adventure') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-006', 'motorbike') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-007', 'Con Dao Sea Turtle', 'south', NULL, 'https://picsum.photos/seed/ant-south1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-007', 'Con Dao Sea Turtle', 'south', 'https://picsum.photos/seed/ant-south1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-007', 'condao') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-007', 'turtle') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-007', 'ocean') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-007', 'wildlife') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-008', 'Phong Nha Cave Interior', 'central', 'AA-CV-PHN-DAY-FD-01', 'https://picsum.photos/seed/ant-central1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-008', 'Phong Nha Cave Interior', 'central', 'https://picsum.photos/seed/ant-central1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-008', 'phongnha') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-008', 'cave') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-008', 'nature') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-008', 'expedition') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-009', 'Old Quarter Hanoi Morning', 'north', 'AA-NV-HAN-HD-02', 'https://picsum.photos/seed/ant-hanoi1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-009', 'Old Quarter Hanoi Morning', 'north', 'https://picsum.photos/seed/ant-hanoi1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-009', 'hanoi') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-009', 'oldquarter') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-009', 'street') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-009', 'breakfast') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-009b', 'Hanoi Street Food Market', 'north', 'AA-NV-HAN-HD-02', 'https://picsum.photos/seed/ant-hanoi2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-009b', 'Hanoi Street Food Market', 'north', 'https://picsum.photos/seed/ant-hanoi2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-009b', 'hanoi') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-010', 'Phu Quoc Sunset Beach', 'south', NULL, 'https://picsum.photos/seed/ant-south2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-010', 'Phu Quoc Sunset Beach', 'south', 'https://picsum.photos/seed/ant-south2/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-010', 'phuquoc') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-010', 'beach') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-010', 'sunset') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-010', 'luxury') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-011', 'Ethnic Minority Village', 'north', 'AA-NV-HAN-HD-09', 'https://picsum.photos/seed/ant-maichau1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-011', 'Ethnic Minority Village', 'north', 'https://picsum.photos/seed/ant-maichau1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-011', 'culture') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-011', 'minority') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-011', 'village') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-011', 'authentic') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-012', 'Vietnamese Family Kitchen', 'people', 'AA-NV-HAN-HD-29', 'https://picsum.photos/seed/ant-hanoi3/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-012', 'Vietnamese Family Kitchen', 'people', 'https://picsum.photos/seed/ant-hanoi3/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-012', 'food') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-012', 'family') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-012', 'cooking') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-012', 'culture') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-013', 'Sofitel Metropole Hanoi', 'north', 'AA-NV-HAN-HD-01', 'https://picsum.photos/seed/ant-hanoi1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-013', 'Sofitel Metropole Hanoi', 'north', 'https://picsum.photos/seed/ant-hanoi1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-013', 'hanoi') ON CONFLICT DO NOTHING;
-INSERT INTO photos (id, caption, region, product_code, url) VALUES ('PH-014', 'HCMC Skyline at Dusk', 'south', 'AA-SV-SGN-CT-FD-01', 'https://picsum.photos/seed/ant-hcmc1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, product_code = EXCLUDED.product_code, url = EXCLUDED.url;
+INSERT INTO photos (id, caption, region, url) VALUES ('PH-014', 'HCMC Skyline at Dusk', 'south', 'https://picsum.photos/seed/ant-hcmc1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-014', 'saigon') ON CONFLICT DO NOTHING;
+-- product_photos junction (photos no longer own product_code)
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-NV-HAL-SEA-HD-01', 'PH-001', 0, true) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-NV-HAL-SEA-HD-01', 'PH-001b', 1, false) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-CV-HOI-HD-01', 'PH-002', 0, true) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-CV-HOI-HD-01', 'PH-002b', 1, false) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-SV-MKG-HD-01', 'PH-003', 0, true) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-SV-MKG-HD-01', 'PH-003b', 1, false) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-NV-SPA-HD-01', 'PH-004', 0, true) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-NV-SPA-HD-01', 'PH-004b', 1, false) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-CV-HUE-HD-01', 'PH-005', 0, true) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-CV-HUE-HD-01', 'PH-005b', 1, false) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-CV-PHN-DAY-FD-01', 'PH-008', 0, true) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-NV-HAN-HD-02', 'PH-009', 0, true) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-NV-HAN-HD-02', 'PH-009b', 1, false) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-NV-HAN-HD-09', 'PH-011', 0, true) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-NV-HAN-HD-29', 'PH-012', 0, true) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-NV-HAN-HD-01', 'PH-013', 0, true) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+INSERT INTO product_photos (product_code, photo_id, sort_order, is_featured) VALUES ('AA-SV-SGN-CT-FD-01', 'PH-014', 0, true) ON CONFLICT (product_code, photo_id) DO UPDATE SET sort_order = EXCLUDED.sort_order, is_featured = EXCLUDED.is_featured;
+
 INSERT INTO cal_events (id, guide_id, booking_id, tour, clients, start_date, end_date, status, notes) VALUES ('CE-001', 'G-N01', 'BK-2026-001', 'Vietnam Full 12D', 'James & Sarah Miller, 2 pax', '2026-10-12', '2026-10-23', 'ontour', '') ON CONFLICT (id) DO UPDATE SET guide_id = EXCLUDED.guide_id, booking_id = EXCLUDED.booking_id, tour = EXCLUDED.tour, clients = EXCLUDED.clients, start_date = EXCLUDED.start_date, end_date = EXCLUDED.end_date, status = EXCLUDED.status, notes = EXCLUDED.notes;
 INSERT INTO cal_events (id, guide_id, booking_id, tour, clients, start_date, end_date, status, notes) VALUES ('CE-002', 'G-C01', 'BK-2026-002', 'Central Heritage 7D', 'Charlotte Dubois, 1 pax', '2026-06-03', '2026-06-09', 'booked', 'Departs soon') ON CONFLICT (id) DO UPDATE SET guide_id = EXCLUDED.guide_id, booking_id = EXCLUDED.booking_id, tour = EXCLUDED.tour, clients = EXCLUDED.clients, start_date = EXCLUDED.start_date, end_date = EXCLUDED.end_date, status = EXCLUDED.status, notes = EXCLUDED.notes;
 INSERT INTO cal_events (id, guide_id, booking_id, tour, clients, start_date, end_date, status, notes) VALUES ('CE-003', 'G-C02', 'BK-2026-003', 'Hoi An Cultural 4D', 'Oliver & Emma Watson, 2 pax', '2026-09-15', '2026-09-18', 'ontour', '') ON CONFLICT (id) DO UPDATE SET guide_id = EXCLUDED.guide_id, booking_id = EXCLUDED.booking_id, tour = EXCLUDED.tour, clients = EXCLUDED.clients, start_date = EXCLUDED.start_date, end_date = EXCLUDED.end_date, status = EXCLUDED.status, notes = EXCLUDED.notes;
@@ -676,8 +695,9 @@ COMMIT;
 --   finance: 11
 --   guides: 24
 --   leads: 30
---   photo_tags: 48
---   photos: 12
+--   photo_tags: 57
+--   photos: 20
+--   product_photos: 17
 --   products: 196
 --   restaurants: 3
 --   staff: 5

@@ -156,5 +156,3 @@ export function formToCustomer(
     donts: form.donts.trim() || undefined,
   };
 }
-
-export { nextCustomerId } from './customer-onboarding';

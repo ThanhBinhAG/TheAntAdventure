@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import { PAGE_SIZE } from '@/lib/constants';
 
 export const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const;
@@ -24,25 +24,40 @@ function readStoredPageSize(): number {
   }
 }
 
+const pageSizeListeners = new Set<() => void>();
+
+function emitPageSizeChange() {
+  pageSizeListeners.forEach((listener) => listener());
+}
+
+function subscribePageSize(onStoreChange: () => void) {
+  pageSizeListeners.add(onStoreChange);
+  window.addEventListener('storage', onStoreChange);
+  return () => {
+    pageSizeListeners.delete(onStoreChange);
+    window.removeEventListener('storage', onStoreChange);
+  };
+}
+
 /** Global CRM list/grid page size, persisted in localStorage. */
 export function usePageSize(): {
   pageSize: number;
   setPageSize: (size: number) => void;
 } {
-  const [pageSize, setPageSizeState] = useState(PAGE_SIZE);
-
-  useEffect(() => {
-    setPageSizeState(readStoredPageSize());
-  }, []);
+  const pageSize = useSyncExternalStore(
+    subscribePageSize,
+    readStoredPageSize,
+    () => PAGE_SIZE
+  );
 
   const setPageSize = useCallback((size: number) => {
     if (!isPageSizeOption(size)) return;
-    setPageSizeState(size);
     try {
       window.localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(size));
     } catch {
       /* ignore quota / private mode */
     }
+    emitPageSizeChange();
   }, []);
 
   return { pageSize, setPageSize };

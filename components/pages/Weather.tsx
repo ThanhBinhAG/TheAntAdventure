@@ -2,18 +2,18 @@
 
 import { useMemo, useState } from 'react';
 import WeatherWeeklyGrid from '@/components/weather/WeatherWeeklyGrid';
+import WeatherLegend from '@/components/weather/WeatherLegend';
+import WeatherRegionChips from '@/components/weather/WeatherRegionChips';
 import { BEST_BY, DEFAULT_WEATHER, DESTINATIONS, MONTHS, TEMP_RANGES, WR } from '@/lib/seeds/weather';
 import { REG_COLORS_HEX } from '@/lib/core/page-helpers';
+import { matchesFoldedQuery } from '@/lib/gallery/fold-search';
+import { wrStyle } from '@/components/weather/weatherUiHelpers';
 
 type WeatherData = Record<string, string[]>;
 type WeatherCode = keyof typeof WR;
 type WeatherTab = 'week' | 'grid' | 'region' | 'month';
 
 const STORAGE_KEY = 'ant_weather_v3';
-
-function getWR(code: string) {
-  return WR[code as WeatherCode] || WR.G;
-}
 
 function getStoredWeatherData(): WeatherData {
   if (typeof window === 'undefined') return { ...DEFAULT_WEATHER } as WeatherData;
@@ -25,22 +25,39 @@ function getStoredWeatherData(): WeatherData {
   }
 }
 
+const TABS: { id: WeatherTab; label: string }[] = [
+  { id: 'week', label: 'This Week' },
+  { id: 'grid', label: 'Seasonal' },
+  { id: 'region', label: 'By Region' },
+  { id: 'month', label: 'Best Time' },
+];
+
 export default function Weather() {
   const [tab, setTab] = useState<WeatherTab>('week');
   const [regionF, setRegionF] = useState('all');
+  const [query, setQuery] = useState('');
   const [weatherData, setWeatherData] = useState<WeatherData>(getStoredWeatherData);
   const [editCell, setEditCell] = useState<{ destId: string; monthIdx: number } | null>(null);
   const [pendingCode, setPendingCode] = useState<string>('G');
   const [savedFlash, setSavedFlash] = useState(false);
 
   const dests = useMemo(
-    () => DESTINATIONS.filter((d) => regionF === 'all' || d.region === regionF),
-    [regionF]
+    () =>
+      DESTINATIONS.filter((d) => {
+        if (regionF !== 'all' && d.region !== regionF) return false;
+        if (!query.trim()) return true;
+        return matchesFoldedQuery(`${d.name} ${d.id} ${d.region}`, query);
+      }),
+    [regionF, query]
   );
 
   function setCell(destId: string, monthIdx: number, code: string) {
     setWeatherData((prev) => {
-      const row = [...(prev[destId] || DEFAULT_WEATHER[destId as keyof typeof DEFAULT_WEATHER] || Array(12).fill('G'))];
+      const row = [
+        ...(prev[destId] ||
+          DEFAULT_WEATHER[destId as keyof typeof DEFAULT_WEATHER] ||
+          Array(12).fill('G')),
+      ];
       row[monthIdx] = code;
       return { ...prev, [destId]: row };
     });
@@ -58,142 +75,170 @@ export default function Weather() {
   }
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-        <div className="tabs" style={{ marginBottom: 0 }}>
-          {(
-            [
-              ['week', 'This Week'],
-              ['grid', 'Seasonal Grid'],
-              ['region', 'By Region'],
-              ['month', 'Best Time to Visit'],
-            ] as const
-          ).map(([id, label]) => (
-            <div key={id} className={`tab${tab === id ? ' on' : ''}`} onClick={() => setTab(id)} role="button" tabIndex={0}>
-              {label}
-            </div>
+    <div className="wg-page">
+      <div className="wg-chrome">
+        <div className="wg-tabs" role="tablist">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              className={`wg-tab${tab === t.id ? ' on' : ''}`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+            </button>
           ))}
         </div>
-        <div style={{ flex: 1 }} />
+
+        <label className="wg-search">
+          <span className="wg-search-icon" aria-hidden>
+            ⌕
+          </span>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search…"
+            aria-label="Search destination"
+            autoComplete="off"
+          />
+          {query && (
+            <button
+              type="button"
+              className="wg-search-clear"
+              onClick={() => setQuery('')}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </label>
+
         {(tab === 'week' || tab === 'grid') && (
-          <select
-            value={regionF}
-            onChange={(e) => setRegionF(e.target.value)}
-            style={{ width: 180, fontSize: 12, padding: '5px 9px', border: '1px solid var(--b)', borderRadius: 7 }}
-          >
-            <option value="all">All Destinations</option>
-            <option value="north">Northern Vietnam</option>
-            <option value="central">Central Vietnam</option>
-            <option value="south">Southern Vietnam</option>
-          </select>
+          <WeatherRegionChips value={regionF} onChange={setRegionF} />
         )}
+
         {tab !== 'week' && (
           <button className="btn btn-p btn-sm" type="button" onClick={saveAll}>
-            💾 {savedFlash ? 'Saved!' : 'Save Changes'}
+            {savedFlash ? 'Saved' : 'Save'}
           </button>
         )}
       </div>
 
-      <div className="weather-legend">
-        <span style={{ fontSize: 11.5, color: 'var(--m)', marginRight: 4, fontWeight: 500 }}>Legend:</span>
-        {Object.entries(WR).map(([code, wr]) => (
-          <span key={code} className="weather-legend-pill" style={{ background: wr.bg, color: wr.fg }}>
-            {wr.icon} {wr.label}
-          </span>
-        ))}
-        <span className="weather-best-pill">⭐ Best By Month</span>
-        <span style={{ fontSize: 11, color: 'var(--m)', marginLeft: 4 }}>
-          {tab === 'week'
-            ? 'Live 7-day forecast (cached). Seasonal tabs: click cells to edit locally.'
-            : 'Click any cell to edit. Changes are saved locally.'}
-        </span>
+      <div className="wg-meta-row">
+        <WeatherLegend showBestBy={tab === 'grid' || tab === 'month'} compact />
       </div>
 
-      {tab === 'week' && <WeatherWeeklyGrid region={regionF} />}
+      {tab === 'week' && <WeatherWeeklyGrid region={regionF} query={query} />}
 
       {tab === 'grid' && (
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="weather-grid-tbl">
-              <thead>
-                <tr>
-                  <th className="weather-sticky-col">Destination</th>
-                  {MONTHS.map((m) => (
-                    <th key={m}>{m}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {dests.map((d) => {
-                  const row = weatherData[d.id] || DEFAULT_WEATHER[d.id as keyof typeof DEFAULT_WEATHER] || Array(12).fill('G');
-                  const temps = TEMP_RANGES[d.id as keyof typeof TEMP_RANGES] || [];
-                  const [rbg, rfg] = REG_COLORS_HEX[d.region as keyof typeof REG_COLORS_HEX] || ['#f0f0ee', '#666'];
-                  const bb = BEST_BY[d.id as keyof typeof BEST_BY];
+        <div className="wg-seasonal-list">
+          {!dests.length && (
+            <div className="wg-empty-state">
+              <p className="wg-muted">No destinations match “{query.trim()}”.</p>
+            </div>
+          )}
+          {dests.map((d) => {
+            const row =
+              weatherData[d.id] ||
+              DEFAULT_WEATHER[d.id as keyof typeof DEFAULT_WEATHER] ||
+              Array(12).fill('G');
+            const temps = TEMP_RANGES[d.id as keyof typeof TEMP_RANGES] || [];
+            const [rbg, rfg] = REG_COLORS_HEX[d.region as keyof typeof REG_COLORS_HEX] || [
+              '#E8F5EE',
+              '#1a5c38',
+            ];
+            const bb = BEST_BY[d.id as keyof typeof BEST_BY];
 
-                  return (
-                    <tr key={d.id}>
-                      <td className="weather-sticky-col">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                          <span>{d.emoji}</span>
-                          <div>
-                            <div style={{ fontSize: 12.5 }}>{d.name}</div>
-                            <span style={{ background: rbg, color: rfg, padding: '1px 6px', borderRadius: 4, fontSize: 9.5, fontWeight: 600 }}>
-                              {d.region.toUpperCase()}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      {row.map((code, mi) => {
-                        const wr = getWR(code);
-                        const t = temps[mi] || [];
-                        const tempStr = t.length ? `${t[0]}–${t[1]}°C` : '';
-                        const isBest = bb && (bb as { months: number[] }).months.includes(mi);
-                        const bbTooltip = isBest && (bb as { tooltips?: Record<number, string> }).tooltips?.[mi];
-
-                        return (
-                          <td key={mi} style={{ padding: '5px 4px', textAlign: 'center', cursor: 'pointer' }} onClick={() => { setEditCell({ destId: d.id, monthIdx: mi }); setPendingCode(code); }} title={isBest ? `⭐ Best By Month: ${bbTooltip || (bb as { activity?: string }).activity}` : `Click to edit: ${d.name} ${MONTHS[mi]}`}>
-                            <div className={`weather-cell${isBest ? ' weather-cell-best' : ''}`} style={{ background: wr.bg, color: wr.fg }}>
-                              <div style={{ fontSize: 16 }}>{wr.icon}</div>
-                              <div style={{ fontSize: 10, fontWeight: 600, marginTop: 2 }}>{wr.label}</div>
-                              {tempStr && <div style={{ fontSize: 9.5, opacity: 0.75, marginTop: 1 }}>{tempStr}</div>}
-                              {isBest && <div style={{ fontSize: 9, color: '#92711d', fontWeight: 700, marginTop: 3 }}>⭐ Best By</div>}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+            return (
+              <article key={d.id} className="wg-dest-card wg-dest-card--seasonal">
+                <div className="wg-dest-card-accent" style={{ background: rbg }} />
+                <div className="wg-dest-card-hd">
+                  <div>
+                    <h3 className="wg-dest-card-name">{d.name}</h3>
+                    <span className="wg-dest-region" style={{ background: rbg, color: rfg }}>
+                      {d.region}
+                    </span>
+                  </div>
+                </div>
+                <div className="wg-month-strip">
+                  {row.map((code, mi) => {
+                    const wr = wrStyle(code);
+                    const t = temps[mi] || [];
+                    const isBest = bb && (bb as { months: number[] }).months.includes(mi);
+                    const bbTooltip =
+                      isBest && (bb as { tooltips?: Record<number, string> }).tooltips?.[mi];
+                    return (
+                      <button
+                        key={mi}
+                        type="button"
+                        className={`wg-month-cell${isBest ? ' wg-month-cell--best' : ''}`}
+                        style={{ background: wr.bg, color: wr.fg }}
+                        onClick={() => {
+                          setEditCell({ destId: d.id, monthIdx: mi });
+                          setPendingCode(code);
+                        }}
+                        title={
+                          isBest
+                            ? `Peak: ${bbTooltip || (bb as { activity?: string }).activity}`
+                            : `Edit ${d.name} ${MONTHS[mi]}`
+                        }
+                      >
+                        <span className="wg-month-abbr">{MONTHS[mi]}</span>
+                        <span className="wg-month-code">{code}</span>
+                        {t.length > 0 && (
+                          <span className="wg-month-temp">
+                            {t[0]}–{t[1]}°
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
 
       {tab === 'region' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
+        <div className="wg-region-grid">
+          {!dests.length && query.trim() && (
+            <div className="wg-empty-state" style={{ gridColumn: '1 / -1' }}>
+              <p className="wg-muted">No destinations match “{query.trim()}”.</p>
+            </div>
+          )}
           {(['north', 'central', 'south'] as const).map((reg) => {
             const [rbg, rfg] = REG_COLORS_HEX[reg];
-            const regDests = DESTINATIONS.filter((d) => d.region === reg);
+            const regDests = dests.filter((d) => d.region === reg);
+            if (!regDests.length) return null;
             return (
-              <div key={reg} className="card">
-                <div className="card-hd" style={{ background: rbg }}>
-                  <span className="card-title" style={{ color: rfg, textTransform: 'capitalize' }}>
-                    {reg} Vietnam
-                  </span>
+              <div key={reg} className="wg-region-card">
+                <div className="wg-region-hd" style={{ background: rbg, color: rfg }}>
+                  {reg} Vietnam
                 </div>
-                <div className="card-body" style={{ padding: 12 }}>
+                <div className="wg-region-body">
                   {regDests.map((d) => {
-                    const row = weatherData[d.id] || DEFAULT_WEATHER[d.id as keyof typeof DEFAULT_WEATHER];
+                    const row =
+                      weatherData[d.id] || DEFAULT_WEATHER[d.id as keyof typeof DEFAULT_WEATHER];
                     const excellent = row.filter((c) => c === 'E').length;
                     const good = row.filter((c) => c === 'G').length;
                     return (
-                      <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--b)', fontSize: 12.5 }}>
-                        <span>
-                          {d.emoji} {d.name}
-                        </span>
-                        <span style={{ color: 'var(--m)' }}>
-                          {excellent}E · {good}G months
+                      <div key={d.id} className="wg-region-row">
+                        <span className="wg-region-name">{d.name}</span>
+                        <div className="wg-region-bars" aria-hidden>
+                          {row.map((c, i) => (
+                            <span
+                              key={i}
+                              className="wg-region-dot"
+                              style={{ background: wrStyle(c).fg, opacity: 0.85 }}
+                            />
+                          ))}
+                        </div>
+                        <span className="wg-muted">
+                          {excellent}E · {good}G
                         </span>
                       </div>
                     );
@@ -206,31 +251,43 @@ export default function Weather() {
       )}
 
       {tab === 'month' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
+        <div className="wg-month-grid">
+          {query.trim() &&
+            !DESTINATIONS.some((d) => {
+              const bb = BEST_BY[d.id as keyof typeof BEST_BY];
+              return (
+                bb &&
+                matchesFoldedQuery(`${d.name} ${d.id} ${d.region}`, query) &&
+                (bb as { months: number[] }).months.length > 0
+              );
+            }) && (
+              <div className="wg-empty-state" style={{ gridColumn: '1 / -1' }}>
+                <p className="wg-muted">No destinations match “{query.trim()}”.</p>
+              </div>
+            )}
           {MONTHS.map((m, mi) => {
             const bestDests = DESTINATIONS.filter((d) => {
               const bb = BEST_BY[d.id as keyof typeof BEST_BY];
-              return bb && (bb as { months: number[] }).months.includes(mi);
+              if (!bb || !(bb as { months: number[] }).months.includes(mi)) return false;
+              if (!query.trim()) return true;
+              return matchesFoldedQuery(`${d.name} ${d.id} ${d.region}`, query);
             });
+            if (query.trim() && !bestDests.length) return null;
             return (
-              <div key={m} className="card">
-                <div className="card-hd">
-                  <span className="card-title">{m} 2026</span>
-                </div>
-                <div className="card-body" style={{ padding: 12, fontSize: 12 }}>
+              <div key={m} className="wg-month-card">
+                <div className="wg-month-hd">{m}</div>
+                <div className="wg-month-body">
                   {bestDests.length ? (
                     bestDests.map((d) => (
-                      <div key={d.id} style={{ marginBottom: 8 }}>
-                        <b>
-                          {d.emoji} {d.name}
-                        </b>
-                        <div style={{ color: 'var(--m)', fontSize: 11.5, marginTop: 2 }}>
+                      <div key={d.id} className="wg-month-item">
+                        <b>{d.name}</b>
+                        <div className="wg-muted">
                           {(BEST_BY[d.id as keyof typeof BEST_BY] as { activity?: string }).activity}
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div style={{ color: 'var(--m)' }}>Shoulder season — check grid for details.</div>
+                    <div className="wg-muted">Shoulder season — check Seasonal.</div>
                   )}
                 </div>
               </div>
@@ -241,46 +298,43 @@ export default function Weather() {
 
       {editCell && (
         <div className="modal-overlay open" onClick={() => setEditCell(null)}>
-          <div className="modal" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal wg-edit-modal" onClick={(e) => e.stopPropagation()}>
             {(() => {
               const d = DESTINATIONS.find((x) => x.id === editCell.destId);
               return (
                 <>
-                  <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
-                    {d?.emoji} {d?.name} — {MONTHS[editCell.monthIdx]}
+                  <div className="wg-edit-title">
+                    {d?.name} — {MONTHS[editCell.monthIdx]}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--m)', marginBottom: 16 }}>Select weather rating for this month</div>
-                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 20 }}>
+                  <div className="wg-muted" style={{ marginBottom: 16 }}>
+                    Select travel rating for this month
+                  </div>
+                  <div className="wg-edit-codes">
                     {(['E', 'G', 'F', 'P'] as WeatherCode[]).map((code) => {
-                      const wr = getWR(code);
+                      const wr = wrStyle(code);
                       return (
-                        <div
+                        <button
                           key={code}
-                          role="button"
-                          tabIndex={0}
+                          type="button"
+                          className={`wg-edit-code${pendingCode === code ? ' on' : ''}`}
+                          style={{ background: wr.bg, color: wr.fg }}
                           onClick={() => setPendingCode(code)}
-                          style={{
-                            border: pendingCode === code ? '2px solid var(--g)' : '2px solid transparent',
-                            background: wr.bg,
-                            color: wr.fg,
-                            borderRadius: 8,
-                            padding: '10px 14px',
-                            cursor: 'pointer',
-                            textAlign: 'center',
-                            minWidth: 90,
-                          }}
                         >
-                          <div style={{ fontSize: 22 }}>{wr.icon}</div>
-                          <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{wr.label}</div>
-                        </div>
+                          <div className="wg-cell-code">{code}</div>
+                          <div className="wg-cell-label">{wr.label}</div>
+                        </button>
                       );
                     })}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <div className="wg-edit-actions">
                     <button className="btn btn-s" type="button" onClick={() => setEditCell(null)}>
                       Cancel
                     </button>
-                    <button className="btn btn-p" type="button" onClick={() => setCell(editCell.destId, editCell.monthIdx, pendingCode)}>
+                    <button
+                      className="btn btn-p"
+                      type="button"
+                      onClick={() => setCell(editCell.destId, editCell.monthIdx, pendingCode)}
+                    >
                       Save
                     </button>
                   </div>

@@ -38,6 +38,9 @@ export type WeeklyWeatherResponse = {
   expiresAt: string | null;
   stale: boolean;
   destinations: WeeklyDestinationForecast[];
+  /** Set by GET /weekly when cache is stale — client soft-refreshes in background. */
+  needsBackgroundRefresh?: boolean;
+  refreshError?: string | null;
 };
 
 export type RefreshResult = {

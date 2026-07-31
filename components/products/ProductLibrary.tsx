@@ -440,12 +440,8 @@ function DestFilterCombobox({
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(destFilter);
   const [activeIndex, setActiveIndex] = useState(-1);
-
-  useEffect(() => {
-    if (!open) setQuery(destFilter);
-  }, [destFilter, open]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -471,6 +467,7 @@ function DestFilterCombobox({
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
       setOpen(true);
+      setQuery(destFilter);
       return;
     }
     if (!open) return;

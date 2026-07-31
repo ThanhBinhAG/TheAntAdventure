@@ -7,10 +7,11 @@ import {
   isCacheStale,
   logWeatherFetch,
   prunePastForecastDates,
+  readWeeklyCache,
   upsertWeeklyCache,
 } from './cache';
 import { fetchWeeklyForecastFromApi } from './open-meteo';
-import type { RefreshResult } from './types';
+import type { RefreshResult, WeeklyWeatherResponse } from './types';
 
 const RATE_LIMIT_MINUTES = 5;
 
@@ -91,18 +92,38 @@ export async function refreshWeeklyForecast(options?: {
   }
 }
 
-export async function getWeeklyForecastWithRefresh(region?: string | null) {
-  const { readWeeklyCache } = await import('./cache');
-  let payload = await readWeeklyCache(region);
+export type WeeklyForecastResult = {
+  payload: WeeklyWeatherResponse;
+  refreshError?: string;
+  /** True when cache had rows but is past TTL — client should soft-refresh in background. */
+  needsBackgroundRefresh?: boolean;
+};
 
-  if (!payload.destinations.length || payload.stale) {
-    const result = await refreshWeeklyForecast({ force: false });
-    if (result.ok && !result.skipped) {
-      payload = await readWeeklyCache(region);
-    } else if (!payload.destinations.length && result.ok === false) {
-      return { payload, refreshError: result.error };
-    }
+/**
+ * Cache-first weekly read. Never blocks on Open-Meteo when any rows exist
+ * (fresh or stale). Cold empty cache is the only path that awaits a refresh.
+ */
+export async function getWeeklyForecastWithRefresh(
+  region?: string | null
+): Promise<WeeklyForecastResult> {
+  const payload = await readWeeklyCache(region);
+
+  if (payload.destinations.length) {
+    return {
+      payload,
+      needsBackgroundRefresh: payload.stale,
+    };
   }
 
-  return { payload, refreshError: undefined as string | undefined };
+  const result = await refreshWeeklyForecast({ force: false });
+  if (result.ok && !result.skipped) {
+    const refreshed = await readWeeklyCache(region);
+    return { payload: refreshed };
+  }
+
+  if (result.ok === false) {
+    return { payload, refreshError: result.error };
+  }
+
+  return { payload };
 }

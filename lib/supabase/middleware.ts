@@ -45,9 +45,15 @@ export async function updateSession(request: NextRequest) {
     });
     return new NextResponse(null, { status: 404 });
   }
-
+  // Các route auth này tự kiểm tra session và phải trả JSON,
+  // không redirect API request sang trang /login.
   // Allow unauthenticated access to auth API routes (login/logout).
-  if (pathname.startsWith('/api/auth/login') || pathname.startsWith('/api/auth/logout')) {
+  if (
+    pathname.startsWith('/api/auth/login') ||
+    pathname.startsWith('/api/auth/logout') ||
+    pathname === '/api/auth/permissions'
+
+  ) {
     return NextResponse.next({ request });
   }
 

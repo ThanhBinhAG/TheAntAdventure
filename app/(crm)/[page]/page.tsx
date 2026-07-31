@@ -4,6 +4,7 @@ import { VALID_PAGES } from '@/lib/constants';
 import { PAGE_COMPONENTS } from '@/components/pages';
 import PageRouteLoading from '@/components/PageRouteLoading';
 import type { PageSlug } from '@/lib/types';
+import { PermissionGate } from '@/components/PermissionGate';
 
 interface PageProps {
   params: { page: string };
@@ -20,7 +21,9 @@ export default function CRMPage({ params }: PageProps) {
   const PageComponent = PAGE_COMPONENTS[slug];
   return (
     <Suspense fallback={<PageRouteLoading />}>
-      <PageComponent />
+      <PermissionGate page={slug}>
+        <PageComponent />
+      </PermissionGate>
     </Suspense>
   );
 }

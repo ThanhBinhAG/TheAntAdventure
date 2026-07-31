@@ -10,14 +10,14 @@
 |---|---|---|
 | Điều hướng/trang CRM | `lib/constants.ts` (`NAV_SECTIONS`, `VALID_PAGES`) | `app/(crm)/[page]/page.tsx` → `components/pages/index.ts` → page component |
 | Dữ liệu CRM | `lib/store.ts`, `lib/types.ts` | `components/StoreProvider.tsx` → `lib/db/hydrate.ts` / `lib/db/sync-push.ts` → `lib/db/supabase.ts` |
-| Supabase/schema | `supabase/schema.sql`, `docs/DATABASE.md` | table → mapper trong `lib/db/mappers.ts` → `lib/db/supabase.ts` |
+| Supabase/schema & RLS | `supabase/schema.sql`, `supabase/migrations/20260730042242_02_migrations.sql`, `docs/DATABASE.md` | table → mapper trong `lib/db/mappers.ts` → `lib/db/supabase.ts`; RLS chuyển tiếp ở `supabase/rls-authenticated.sql` |
 | Đăng nhập/session | `app/api/auth/login/route.ts` | `lib/auth/*`, `lib/env.ts`, `middleware.ts` |
 | Sales đến booking | `components/pages/Sales.tsx` | `lib/customers/*`, `lib/sales/*`, `components/pages/Bookings.tsx` |
 | Thiết kế tour/proposal | `components/pages/TourDesign.tsx` | `components/tour-design/*` → `lib/tour-design/*` / `lib/proposals/*` |
 | Bảng giá/XLSX | `components/pages/Pricing*.tsx` | `components/pricing/*` → `lib/pricing/*` → bảng `pricing_*` |
 | Ảnh | `components/pages/Gallery.tsx` | `components/gallery/*` → `lib/gallery/*` / `lib/storage/*` → Storage `photos` |
 | API server | `app/api/**/route.ts` | `lib/auth`, `lib/weather`, `lib/storage`, `lib/system`, `lib/proposals` |
-| Kiểm thử | `tests/*.test.ts` | module `lib/` cùng tên; test runner là `npm test` |
+| Kiểm thử | `tests/*.test.ts` | module `lib/` cùng tên; test runner là `npm test` (hai test XLSX cần workbook gitignored trong `Personal/Material/pricing/`) |
 
 ## 2. System graph
 
@@ -32,7 +32,9 @@ flowchart LR
   P --> Z
   C --> S[StoreProvider + AutoSyncListener]
   S --> H[Hydrate: lib/db/hydrate.ts]
+  H --> HL[Hydration lifecycle + baseline counts]
   S --> A[Auto-sync: lib/db/auto-sync.ts]
+  HL --> A
   H --> D[lib/db/supabase.ts]
   A --> D
   D --> SB[(Supabase PostgreSQL + Storage)]
@@ -214,7 +216,7 @@ sequenceDiagram
   B->>CRM: navigate to protected CRM route
 ```
 
-Current coupling: `middleware.ts` imports `lib/supabase/middleware`, and `lib/supabase/index.ts` imports `lib/supabase/client`; neither source file exists in this snapshot. The intended route/session bridge is therefore a critical broken node, not a completed authorization boundary.
+Implemented session bridge: `middleware.ts` calls `updateSession` from `lib/supabase/middleware.ts`; `lib/supabase/index.ts` caches the browser client created by `lib/supabase/client.ts`. Middleware keeps `/api/health`, login/logout and configured debug paths public, refreshes Supabase cookies, and redirects unauthenticated CRM traffic to `/login`. Break-glass sessions can also attach a shadow Supabase session for authenticated RLS access.
 
 ### Hydrate and synchronization
 
@@ -225,24 +227,27 @@ sequenceDiagram
   participant DB as lib/db/supabase
   participant SB as Supabase
   participant Z as Zustand store
+  participant HL as sync-lifecycle
   participant AS as AutoSyncListener
   SP->>HY: app start
-  HY->>DB: getAll for 31 sync tables + messages
+  HY->>DB: getAll for 28 sync tables + messages
   DB->>SB: browser Supabase queries
   SB-->>HY: rows
-  HY->>Z: importBackup + seed merges
-  Z-->>AS: state mutation
+  HY->>Z: importBackup + seed merges (auto-sync suppressed)
+  HY->>HL: mark ready + baseline row counts
+  Z-->>AS: subsequent state mutation
   AS->>AS: debounce 2.5 seconds
   AS->>DB: upsert changed table(s)
-  DB->>SB: upsert + possible orphan deletion
+  DB->>SB: upsert + guarded mirror deletion
 ```
 
 Important implementation nodes:
 
-- `lib/db/sync-config.ts` maps 31 table names to `BackupData`/Zustand keys and declares FK-safe write waves.
+- `lib/db/sync-config.ts` maps 28 table names to `BackupData`/Zustand keys and declares FK-safe write waves.
 - `lib/db/mappers.ts` transforms domain models ↔ SQL rows.
-- `lib/db/sync-policy.ts` makes `products` and `product_pricing` upsert-only; other synchronized tables are guarded mirrors.
-- `lib/db/supabase.ts` still reads and writes many full tables (`select('*')`) and deletes remote IDs absent from the local snapshot.
+- `lib/db/sync-lifecycle.ts` blocks automatic writes until a successful hydrate records baseline counts; a failed hydrate permits only an explicitly confirmed manual push.
+- `lib/db/sync-policy.ts` makes `products` and `product_pricing` upsert-only. Other synchronized tables skip orphan deletion when the local row count is below 90% of the hydrated baseline; `force` can bypass that guard for mirror tables.
+- `lib/db/supabase.ts` still reads and writes many full tables (`select('*')`) and can delete remote IDs absent from a local snapshot when the guard permits it. Nested booking, hotel, product and attraction associations are replaced per parent during sync.
 
 ### Sales to proposal to booking
 
@@ -303,10 +308,11 @@ flowchart TB
   CAT[Shared catalogue: products, attractions, public-ready photos] --> CRM
   INTERNAL[Internal: dev_notes, chat, audit trail] --> CRM
   CRM --> RLS[Supabase RLS policy]
-  RLS --> ROLE[User role + ownership/assignment]
+  RLS --> AUTH[Current transition: shared authenticated access]
+  RLS --> ROLE[Target: role + ownership/assignment]
 ```
 
-Current schema relationship source: `docs/DATABASE.md` and `supabase/schema.sql`. Its production RLS claim references `supabase/rls-authenticated.sql`, but that file is absent from this checkout; `schema.sql` currently creates `dev_allow_all` for every table.
+Schema relationships live in `docs/DATABASE.md` and `supabase/schema.sql`; the CLI baseline is `supabase/migrations/20260730042242_02_migrations.sql`. Fresh schema/migration sources still create `dev_allow_all` policies. The tracked `supabase/rls-authenticated.sql` is a manual transition run after Auth login works: it replaces those policies with shared `authenticated_access` policies. It blocks anonymous direct access but does **not** implement the role/ownership model below; whether it has been applied to a remote project must be checked separately.
 
 ## 8. RBAC target graph and implementation blueprint
 
@@ -357,33 +363,33 @@ Suggested resources/actions: `customers.{read,create,update,delete}`, `leads.*`,
 
 ### Ordered delivery plan
 
-1. **Stabilize the baseline.** Restore or implement the missing Supabase browser client and middleware source files; add the missing DnD dependencies; run a clean `npm ci`, then make typecheck, test and build pass. Do not introduce RBAC over a non-buildable auth boundary.
+1. **Verify and ship the current baseline.** Browser/session helpers, DnD dependencies and Sentry are tracked, and local typecheck, lint and production build pass. Make the XLSX parser tests portable (fixture or explicit optional test input), then verify that the remote database has run the tracked authenticated-only RLS transition before adding RBAC.
 2. **Define the authorization contract.** Confirm the above role matrix with business owners; write a permission list, sensitive-data classification, team/manager model and export policy. Decide whether agents own records directly or via a team table.
 3. **Model authorization in a versioned SQL migration.** Add `profiles`, `roles`, `permissions`, `user_roles`, and (where needed) assignment/team tables. Link profile `id` to `auth.users(id)`; seed only explicit initial roles. Store migrations in version control, not only in a dashboard.
-4. **Replace development RLS.** Remove `dev_allow_all`; introduce small SQL helper functions such as `has_permission(resource, action)` and assignment predicates. Write policies table-by-table, beginning with PII/finance. Test each policy with at least two non-admin users and a service-role-only migration path.
-5. **Change write architecture before enabling multi-user sync.** Replace whole-table mirror/delete synchronization with record-level commands or server-side transactional mutations. Add `owner_user_id`, `created_by`, `updated_by`, `updated_at`, and optimistic versioning to mutable business records. This prevents a stale snapshot from deleting a colleague’s record and lets RLS evaluate a row’s owner.
-6. **Enforce on every server path.** Add a single server authorization helper (`requirePermission`) and apply it to every non-public route; distinguish read from export, write, delete, refresh and user administration. Service-role clients must run only after this check and must not accept unvalidated storage paths.
+4. **Replace transition RLS with RBAC RLS.** Supersede `dev_allow_all`/shared `authenticated_access` with small SQL helper functions such as `has_permission(resource, action)` and assignment predicates. Write policies table-by-table, beginning with PII/finance. Test each policy with at least two non-admin users and a service-role-only migration path.
+5. **Change write architecture before enabling multi-user sync.** The 90% regression guard reduces accidental destructive pushes but does not solve concurrent editing. Replace whole-table mirror/delete synchronization with record-level commands or server-side transactional mutations. Add `owner_user_id`, `created_by`, `updated_by`, `updated_at`, and optimistic versioning to mutable business records.
+6. **Enforce on every server path.** The current routes consistently establish authentication where required, but only the recovery API is role-specific. Add a single server authorization helper (`requirePermission`) to distinguish read from export, write, delete, refresh and user administration. Service-role clients must run only after this check and must not accept unvalidated storage paths.
 7. **Use permissions in UI as affordances only.** Populate session/profile permissions; filter `NAV_SECTIONS`, hide write/delete controls and protect actions. The UI never substitutes for RLS/API enforcement.
-8. **Add audit and tests.** Log role changes, exports, deletes, rejected access and break-glass use. Add unit tests for the permission matrix plus integration tests that execute RLS as each role. CI should run `typecheck`, tests, lint and production build.
+8. **Add audit and tests.** Log role changes, exports, deletes, rejected access and break-glass use. Add unit tests for the permission matrix plus integration tests that execute RLS as each role. CI already runs lint and production build; add typecheck and a self-contained test suite.
 9. **Roll out safely.** Start in read-only mode for a small pilot, compare count/access logs, then enable writes by role. Keep a tested rollback migration and emergency `super_admin` procedure.
 
 ## 9. Known integrity and delivery constraints at this snapshot
 
 | Priority | Evidence node | Why it matters to the graph/RBAC plan |
 |---|---|---|
-| Blocker | `middleware.ts:2` and `lib/supabase/index.ts:3` import missing local files | Session refresh/protected-route client cannot compile from this checkout. |
-| Blocker | `components/gallery/PhotoLibraryPicker.tsx`, `components/tour-design/SelectedExperiencesPanel.tsx` import `@dnd-kit/*`, absent from `package.json` and lockfile | A clean install will still fail module resolution. |
-| Critical | `supabase/schema.sql:1068-1095` creates `dev_allow_all` with `using (true)` / `with check (true)` | The anonymous browser data path has no row authorization; do not deploy this policy. |
-| High | `lib/db/supabase.ts:159-173`, `lib/db/sync-policy.ts:26-39` | Snapshot mirror sync can remove remote rows absent locally; it conflicts with concurrent multi-user editing and row-scoped RLS. |
-| High | `app/api/photos/delete/route.ts:34-40` → `lib/storage/upload-gallery-photo-server.ts:22-34,96-102` | Any authenticated user reaches a service-role-capable delete path and supplies `storagePath`; authorization must be resource-specific. |
-| High | `docs/DATABASE.md:302,359` reference `supabase/rls-authenticated.sql`, but the file is absent and `.gitignore` ignores new `supabase/` files | The documented production policy cannot be reviewed, reproduced or migrated from this repository. |
-| Medium | `.gitlab-ci.yml:17-26` only runs lint | Typecheck, tests and build are not enforced in CI. |
+| Critical | `supabase/schema.sql:1068-1095` and `supabase/migrations/20260730042242_02_migrations.sql` | Both fresh-install sources grant anonymous `dev_allow_all` access. `rls-authenticated.sql` is tracked but is a manual, shared-access transition, so its remote application must be verified. |
+| High | `lib/db/supabase.ts`, `lib/db/sync-policy.ts`, `lib/db/sync-lifecycle.ts` | Snapshot mirror sync still deletes remote rows when the 90% baseline guard permits it or an operator forces a push; this conflicts with concurrent editing and future row-scoped RLS. |
+| High | `app/api/photos/delete/route.ts` → `lib/storage/upload-gallery-photo-server.ts` → `lib/storage/photo-paths.ts` | Any authenticated user can invoke a service-role-capable delete and provide an additional `storagePath`; folder policy and validation are not a per-record authorization check. |
+| High | `scripts/supabase-db.sh`, `supabase/LEGACY-MIGRATIONS.md` | Bootstrap guidance still names three migration files deleted in the current revision, while the only tracked CLI migration is `20260730042242_02_migrations.sql`; reconcile migration history before relying on CLI status/push. |
+| Medium | `.gitlab-ci.yml` | CI runs lint and production build, but not typecheck or tests. |
+| Medium | `tests/pricing-catalog-xlsx.test.ts:8-9` | Two tests depend on XLSX files below gitignored `Personal/Material/pricing/`, so a checkout without local material reports two `ENOENT` failures. |
 | Medium | `components/pages/Sales.tsx` (882 lines), `TourDesign.tsx` (778), `Bookings.tsx` (694), `Dashboard.tsx` (690), `lib/db/supabase.ts` (821), `lib/proposals/proposal-assembler.ts` (943) | High coupling makes permission checks and future ownership enforcement expensive; extract command/data boundaries before broad RBAC UI work. |
 
 ## 10. Verification status
 
 - Static source review: complete for App Router, page registry, core state/sync, auth/session, API handlers, storage, weather, database schema, tests and project configuration.
-- `npm run typecheck`: failed in current workspace due missing installed dependencies plus the missing internal Supabase source modules; DnD imports are not declared in the manifest/lockfile.
-- `npm run lint`: could not validate in this workspace because its installed ESLint is v6 while the tracked flat config requires the declared v9 setup; run from a clean `npm ci` after fixing source/dependency gaps.
-- `npm test`: 177 assertions passed; 12 test files failed to load because `@sentry/nextjs` is absent from the current `node_modules`.
+- `npm run typecheck`: passed.
+- `npm run lint`: passed with `--max-warnings=0`.
+- `npm run build`: passed. Sentry reports a deprecation warning that `sentry.client.config.ts` should move to `instrumentation-client.ts` for future Turbopack support.
+- `npm test`: 264 of 266 tests passed. The two failures are `ENOENT` reads for the ignored Essentials and Accommodation XLSX workbooks; no test assertion failed.
 - No source code, configuration or schema was changed to produce this memory document.

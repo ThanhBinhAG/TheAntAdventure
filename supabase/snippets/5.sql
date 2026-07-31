@@ -1,0 +1,48 @@
+-- =============================================================================
+-- The Ant Adventures CRM — Production RLS (authenticated users only)
+-- =============================================================================
+--
+-- PREREQUISITES (run in this order):
+--   1. Supabase Auth users created (Dashboard → Authentication → Users)
+--   2. App login + middleware deployed and verified
+--   3. Then run this script in SQL Editor
+--
+-- Effect:
+--   - Drops dev_allow_all (open anon access)
+--   - Grants full CRM access to role `authenticated` only
+--   - Role `anon` has no policies → all direct API access denied
+--
+-- Shared CRM model: all logged-in users see the same data (no per-user rows).
+-- =============================================================================
+
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'agents','customers','products','product_pricing','guides','guide_reviews','leads',
+    'tour_drafts','tour_outline_days',
+    'bookings','booking_changes','booking_itinerary','booking_activities',
+    'comms','finance','accounts_receivable','accounts_payable','tax_reports',
+    'staff','salary_records','tasks','contracts','feedback',
+    'suppliers','supplier_tags','cruises','transport','restaurants',
+    'hotels','hotel_rooms',
+    'photos','photo_tags','product_photos','attractions','attraction_photos','cal_events',
+    'chat_channels','chat_messages','chat_reactions','dev_notes',
+    'pricing_settings','pricing_ess_products','pricing_ess_cost_lines','pricing_ess_services',
+    'pricing_ess_car_rates','pricing_ess_hotel_rates','pricing_ess_notes',
+    'pricing_acc_properties','pricing_acc_room_rates','pricing_acc_cruise_rates',
+    'pricing_catalog_imports',
+    -- Weather tables: cron/API use service role (bypasses RLS). Policies here only
+    -- block anon-key direct access after dropping leftover dev_allow_all.
+    'weather_forecast_cache','weather_fetch_log'
+  ] loop
+    execute format('alter table %I enable row level security', t);
+    execute format('drop policy if exists dev_allow_all on %I', t);
+    execute format('drop policy if exists authenticated_access on %I', t);
+    execute format(
+      'create policy authenticated_access on %I for all to authenticated using (true) with check (true)',
+      t
+    );
+  end loop;
+end $$;

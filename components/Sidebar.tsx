@@ -10,6 +10,8 @@ import { useStore } from '@/hooks/useStore';
 import { countActiveTasks } from '@/lib/planner/planner-task-utils';
 import { countTourDesignAttention } from '@/lib/tour-design/tour-design-leads';
 import type { Lead, PageSlug, Task, TourDraft } from '@/lib/types';
+import { PAGE_READ_PERMISSION } from '@/lib/auth/permissions';
+import { usePermissions } from '@/components/PermissionsProvider';
 
 interface SidebarProps {
   open: boolean;
@@ -19,6 +21,7 @@ interface SidebarProps {
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { language, t } = useLanguage();
+  const { can, loading, error } = usePermissions();
   const current = (pathname.split('/').pop() || 'dashboard') as PageSlug;
   const tasks = useStore((s) => s.tasks) as Task[];
   const leads = useStore((s) => s.leads) as Lead[];
@@ -31,10 +34,40 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     [leads, tourDrafts]
   );
 
+  // Chỉ giữ các menu mà user có quyền xem.
+  const visibleSections = useMemo(
+    () =>
+      NAV_SECTIONS
+        .map((section) => ({
+          ...section,
+          items: section.items
+            .map((item) => {
+              // Menu nhóm: chỉ giữ các menu con được phép.
+              if (item.children?.length) {
+                const children = item.children.filter((child) =>
+                  can(PAGE_READ_PERMISSION[child.page]),
+                );
+
+                return children.length > 0
+                  ? { ...item, children }
+                  : null;
+              }
+
+              // Menu đơn: giữ khi có quyền xem trang tương ứng.
+              return can(PAGE_READ_PERMISSION[item.page])
+                ? item
+                : null;
+            })
+            .filter((item): item is NavItem => item !== null),
+        }))
+        .filter((section) => section.items.length > 0),
+    [can],
+  );
+
   const groupPages = useMemo(
     () =>
       new Set(
-        NAV_SECTIONS.flatMap((s) => s.items)
+        visibleSections.flatMap((s) => s.items)
           .filter((i) => i.children?.length)
           .flatMap((i) => i.children!.map((c) => c.page))
       ),
@@ -47,7 +80,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   if (current !== previousPage) {
     setPreviousPage(current);
     if (groupPages.has(current)) {
-      const owner = NAV_SECTIONS.flatMap((s) => s.items).find((i) =>
+      const owner = visibleSections.flatMap((s) => s.items).find((i) =>
         i.children?.some((c) => c.page === current)
       );
       setOpenGroup(owner?.page ?? null);
@@ -100,47 +133,53 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </div>
         </div>
 
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.en}>
-            <div className="sb-sec">{language === 'vi' ? section.vi : section.en}</div>
-            {section.items.map((item) =>
-              item.children?.length ? (
-                <NavGroup
-                  key={item.page}
-                  item={item}
-                  current={current}
-                  open={openGroup === item.page}
-                  label={t(item.en, item.vi)}
-                  onToggle={() => setOpenGroup((prev) => (prev === item.page ? null : item.page))}
-                  onNavigate={onClose}
-                  translate={t}
-                />
-              ) : (
-              <Link
-                key={item.page}
-                href={`/${item.page}`}
-                className={`sbi${current === item.page ? ' on' : ''}`}
-                title={t(item.en, item.vi)}
-                onClick={onClose}
-              >
-                <span className="sb-icon">{item.icon}</span>
-                <span className="sb-label">{t(item.en, item.vi)}</span>
-                {item.badge && item.badgeType === 'ceo' && <span className="sb-badge">{item.badge}</span>}
-                {item.badge && item.badgeType === 'new' && <span className="sb-new">{item.badge}</span>}
-                {item.page === 'planner' && activeTaskCount > 0 && (
-                  <span className="sb-overdue-badge">{activeTaskCount}</span>
-                )}
-                {item.page === 'tourdesign' && pendingTourDesign > 0 && (
-                  <span className="sb-overdue-badge">{pendingTourDesign}</span>
-                )}
-                {item.page === 'teamchat' && chatUnread > 0 && (
-                  <span className="sb-chat-badge">{chatUnread}</span>
-                )}
-              </Link>
-              )
-            )}
-          </div>
-        ))}
+
+        {loading ? (
+          <div className="sb-sec">Đang tải quyền…</div>
+        ) : error ? (
+          <div className="sb-sec">Không thể tải quyền</div>
+        ) : (
+          visibleSections.map((section) => (
+            <div key={section.en}>
+              <div className="sb-sec">{language === 'vi' ? section.vi : section.en}</div>
+              {section.items.map((item) =>
+                item.children?.length ? (
+                  <NavGroup
+                    key={item.page}
+                    item={item}
+                    current={current}
+                    open={openGroup === item.page}
+                    label={t(item.en, item.vi)}
+                    onToggle={() => setOpenGroup((prev) => (prev === item.page ? null : item.page))}
+                    onNavigate={onClose}
+                    translate={t}
+                  />
+                ) : (
+                  <Link
+                    key={item.page}
+                    href={`/${item.page}`}
+                    className={`sbi${current === item.page ? ' on' : ''}`}
+                    title={t(item.en, item.vi)}
+                    onClick={onClose}
+                  >
+                    <span className="sb-icon">{item.icon}</span>
+                    <span className="sb-label">{t(item.en, item.vi)}</span>
+                    {item.badge && item.badgeType === 'ceo' && <span className="sb-badge">{item.badge}</span>}
+                    {item.badge && item.badgeType === 'new' && <span className="sb-new">{item.badge}</span>}
+                    {item.page === 'planner' && activeTaskCount > 0 && (
+                      <span className="sb-overdue-badge">{activeTaskCount}</span>
+                    )}
+                    {item.page === 'tourdesign' && pendingTourDesign > 0 && (
+                      <span className="sb-overdue-badge">{pendingTourDesign}</span>
+                    )}
+                    {item.page === 'teamchat' && chatUnread > 0 && (
+                      <span className="sb-chat-badge">{chatUnread}</span>
+                    )}
+                  </Link>
+                )
+              )}
+            </div>
+          )))}
       </div>
     </>
   );

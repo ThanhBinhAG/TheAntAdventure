@@ -5,6 +5,7 @@ Tracked product documentation: database schema reference and Supabase setup. Sou
 
 ## Contents
 - `DATABASE.md` — ER / table design
+- `GRAPHRAG-MEMORY.md` — verified codebase retrieval and flow map
 - `SUPABASE-SETUP.md` — install & connect steps
 
 ## Boundaries

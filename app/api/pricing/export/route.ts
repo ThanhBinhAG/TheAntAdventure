@@ -1,5 +1,14 @@
+/**
+ * API xuất bảng giá thành file PDF.
+ *
+ * Chức năng:
+ * - Nhận dữ liệu bảng giá từ giao diện.
+ * - Kiểm tra quyền `pricing.export` ở server.
+ * - Chỉ admin hiện tại mới có quyền xuất PDF.
+ */
+
 import { NextResponse } from 'next/server';
-import { isProposalExportAuthorized } from '@/lib/proposals/proposal-auth';
+import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import { pricingExportFilename } from '@/lib/pricing/pricing-export';
 import { renderPricingPdf, type PricingPdfInput } from '@/lib/pricing/pricing-pdf';
 import type { PricingTableRow } from '@/lib/products/product-pricing-helpers';
@@ -7,9 +16,16 @@ import type { PlCurrency } from '@/lib/pricing/pricing-utils';
 import { captureAppError } from '@/lib/system/app-logger';
 
 export async function POST(request: Request) {
-  const allowed = await isProposalExportAuthorized();
-  if (!allowed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Bảo vệ thao tác xuất bảng giá bằng permission riêng.
+  const permission = await checkPermissionForRequest('pricing.export');
+
+  if (!permission.allowed) {
+    return NextResponse.json(
+      {
+        error: permission.status === 401 ? 'Unauthorized' : 'Forbidden',
+      },
+      { status: permission.status },
+    );
   }
 
   let body: {

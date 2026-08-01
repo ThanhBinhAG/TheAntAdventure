@@ -20,6 +20,7 @@ import type { ExperienceOverride, Hotel, Product, TourOutlineDay } from '@/lib/t
 import type { ProposalDoc, ProposalDetailedProgramLayout, ProposalHotelRate } from '@/lib/proposals/proposal-types';
 import ProposalHotelRatesPanel from '@/components/tour-design/ProposalHotelRatesPanel';
 import ProposalEditorModal from '@/components/tour-design/ProposalEditorModal';
+import { toast } from '@/lib/toast';
 
 const API_KEY_STORAGE = 'ant_api_key';
 
@@ -175,7 +176,7 @@ export default function ProposalExportStep({
 
   async function aiExport(type: 'proposal' | 'email') {
     if (!hasContent) {
-      alert('Please add experiences, select a package, or build an outline first.');
+      toast.warning('Please add experiences, select a package, or build an outline first.');
       return;
     }
 
@@ -259,7 +260,7 @@ Include subject line, body, sign-off from ${proposalDoc.consultant.name}.`;
 
   const downloadPdf = useCallback(async () => {
     if (!hasContent) {
-      alert('Please add tour content before exporting.');
+      toast.warning('Please add tour content before exporting.');
       return;
     }
     setPdfLoading(true);
@@ -291,7 +292,7 @@ Include subject line, body, sign-off from ${proposalDoc.consultant.name}.`;
   /** Open Puppeteer PDF in a new tab for print — avoids browser date/URL/title chrome. */
   const printViaPdf = useCallback(async () => {
     if (!hasContent) {
-      alert('Please add tour content before printing.');
+      toast.warning('Please add tour content before printing.');
       return;
     }
     setPdfLoading(true);

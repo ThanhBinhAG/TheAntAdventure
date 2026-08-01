@@ -11,6 +11,7 @@ import { useStore } from '@/hooks/useStore';
 import { createClient } from '@/lib/supabase/client';
 import { uploadGuideAvatar } from '@/lib/storage/upload-guide-avatar';
 import type { Guide } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 const REG_COLORS: Record<string, string> = { North: 'bdg-g', Central: 'bdg-a', South: 'bdg-b' };
 const STATUS_C: Record<string, string> = {
@@ -99,7 +100,7 @@ export default function Guides() {
 
   const saveGuide = async () => {
     if (!form.fullname || !form.id) {
-      alert('Guide ID and Full Name are required.');
+      toast.warning('Guide ID and Full Name are required.');
       return;
     }
     setSaving(true);
@@ -115,7 +116,7 @@ export default function Guides() {
       setShowAdd(false);
       setAvatarFile(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Avatar upload failed');
+      toast.error(err instanceof Error ? err.message : 'Avatar upload failed');
     } finally {
       setSaving(false);
     }

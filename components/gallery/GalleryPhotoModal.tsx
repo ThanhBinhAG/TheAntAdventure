@@ -155,99 +155,107 @@ export default function GalleryPhotoModal({
         </div>
 
         <form className="phlib-modal-bd" onSubmit={handleSubmit}>
-          <ModalSection title="Image" hint={mode === 'add' ? 'JPEG, PNG, or WebP · max 10 MB each' : undefined}>
-            {mode === 'edit' && (
-              <label className="phlib-check-row">
-                <input
-                  type="checkbox"
-                  checked={replaceImage}
-                  onChange={(e) => {
-                    setReplaceImage(e.target.checked);
-                    if (!e.target.checked) setFile(null);
-                  }}
-                />
-                Replace image file
-              </label>
-            )}
-            {(mode === 'add' || replaceImage) && (
-              <GalleryUploadZone
-                label={mode === 'add' ? 'Drop photo here' : 'New image'}
-                sublabel="or click to browse"
-                previewUrl={previewUrl || undefined}
-                file={file}
-                disabled={saving}
-                onChange={setFile}
-              />
-            )}
-            {mode === 'edit' && !replaceImage && previewUrl && (
-              <div className="phlib-edit-preview" style={{ backgroundImage: `url(${previewUrl})` }} />
-            )}
-            {mode === 'add' && (
-              <div className="phlib-multi-row">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-o"
-                  disabled={saving}
-                  onClick={() => multiRef.current?.click()}
-                >
-                  Add more files
-                </button>
-                <input
-                  ref={multiRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  multiple
-                  hidden
-                  onChange={(e) => {
-                    const list = [...(e.target.files ?? [])].filter((f) =>
-                      /^image\/(jpeg|png|webp)$/.test(f.type)
-                    );
-                    setExtraFiles((prev) => [...prev, ...list]);
-                    e.target.value = '';
-                  }}
-                />
-                {extraFiles.length > 0 && (
-                  <span className="phlib-multi-count">+{extraFiles.length} more</span>
+          <div className="phlib-modal-layout">
+            <div className="phlib-modal-col-media">
+              <ModalSection title="Image" hint={mode === 'add' ? 'JPEG, PNG, or WebP · max 10 MB each' : undefined}>
+                {mode === 'edit' && (
+                  <label className="phlib-check-row">
+                    <input
+                      type="checkbox"
+                      checked={replaceImage}
+                      onChange={(e) => {
+                        setReplaceImage(e.target.checked);
+                        if (!e.target.checked) setFile(null);
+                      }}
+                    />
+                    Replace image file
+                  </label>
                 )}
-              </div>
-            )}
-            {mode === 'edit' && initial?.displayBytes != null && (
-              <p className="phlib-size-hint">Stored size: {photoSizeLabel(initial)} ({formatBytes(initial.displayBytes)})</p>
-            )}
-          </ModalSection>
-
-          <ModalSection title="Details">
-            <div className="fg">
-              <label className="lbl">Caption</label>
-              <input
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                placeholder="Short description"
-                disabled={saving}
-                required={mode === 'edit' || Boolean(file)}
-              />
+                {(mode === 'add' || replaceImage) && (
+                  <GalleryUploadZone
+                    label={mode === 'add' ? 'Drop photo here' : 'New image'}
+                    sublabel="or click to browse"
+                    previewUrl={previewUrl || undefined}
+                    file={file}
+                    disabled={saving}
+                    onChange={setFile}
+                  />
+                )}
+                {mode === 'edit' && !replaceImage && previewUrl && (
+                  <div className="phlib-edit-preview" style={{ backgroundImage: `url(${previewUrl})` }} />
+                )}
+                {mode === 'add' && (
+                  <div className="phlib-multi-row">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-o"
+                      disabled={saving}
+                      onClick={() => multiRef.current?.click()}
+                    >
+                      Add more files
+                    </button>
+                    <input
+                      ref={multiRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      hidden
+                      onChange={(e) => {
+                        const list = [...(e.target.files ?? [])].filter((f) =>
+                          /^image\/(jpeg|png|webp)$/.test(f.type)
+                        );
+                        setExtraFiles((prev) => [...prev, ...list]);
+                        e.target.value = '';
+                      }}
+                    />
+                    {extraFiles.length > 0 && (
+                      <span className="phlib-multi-count">+{extraFiles.length} more</span>
+                    )}
+                  </div>
+                )}
+                {mode === 'edit' && initial?.displayBytes != null && (
+                  <p className="phlib-size-hint">
+                    Stored size: {photoSizeLabel(initial)} ({formatBytes(initial.displayBytes)})
+                  </p>
+                )}
+              </ModalSection>
             </div>
-            <div className="fg">
-              <label className="lbl">Region</label>
-              <select value={region} onChange={(e) => setRegion(e.target.value)} disabled={saving}>
-                {REGION_OPTIONS.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </ModalSection>
 
-          <ModalSection title="Tags">
-            <GalleryTagSelector
-              selected={tags}
-              onChange={setTags}
-              customTag={customTag}
-              onCustomTagChange={setCustomTag}
-              onAddCustomTag={addCustomTag}
-            />
-          </ModalSection>
+            <div className="phlib-modal-col-meta">
+              <ModalSection title="Details">
+                <div className="fg">
+                  <label className="lbl">Caption</label>
+                  <input
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    placeholder="Short description"
+                    disabled={saving}
+                    required={mode === 'edit' || Boolean(file)}
+                  />
+                </div>
+                <div className="fg">
+                  <label className="lbl">Region</label>
+                  <select value={region} onChange={(e) => setRegion(e.target.value)} disabled={saving}>
+                    {REGION_OPTIONS.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </ModalSection>
+
+              <ModalSection title="Tags">
+                <GalleryTagSelector
+                  selected={tags}
+                  onChange={setTags}
+                  customTag={customTag}
+                  onCustomTagChange={setCustomTag}
+                  onAddCustomTag={addCustomTag}
+                />
+              </ModalSection>
+            </div>
+          </div>
 
           {saveStatus && <p className="phlib-save-status">{saveStatus}</p>}
 

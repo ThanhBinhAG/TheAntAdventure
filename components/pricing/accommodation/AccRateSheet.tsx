@@ -7,6 +7,7 @@ import InlineEdit from '@/components/pricing/InlineEdit';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import type { AccRoomRate } from '@/lib/pricing/catalog-types';
+import EmptyState from '@/components/EmptyState';
 
 type Props = {
   sheet: string;
@@ -66,7 +67,15 @@ export default function AccRateSheet({ sheet, rates, onPatch }: Props) {
   const { paginatedItems } = pagination;
 
   if (!rates.length) {
-    return <p className="pcx-empty">No rows imported from “{sheet}”.</p>;
+    return (
+      <EmptyState
+        className="crm-empty-state--flush"
+        size="compact"
+        variant="suppliers"
+        title={`No rows imported from “${sheet}”`}
+        description="Import an updated Accommodation workbook to populate this sheet."
+      />
+    );
   }
 
   return (

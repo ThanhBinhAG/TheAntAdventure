@@ -29,11 +29,13 @@ import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
 import { useLanguage } from '@/hooks/useLanguage';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
 import type { SalesKey } from '@/lib/i18n/pages/sales';
 import type { Lead, TourDraft } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 const LOST_REASONS = ['Price too high', 'Chose competitor', 'Dates unavailable', 'No response', 'Changed plans', 'Other'];
 
@@ -683,14 +685,24 @@ export default function Sales() {
           </div>
 
           {filteredLeads.length === 0 ? (
-            <div className="sales-empty-state">
-              <p>{tsf('noResults')}</p>
-              {filtersActive && (
-                <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
-                  {tsf('clearFilters')}
-                </button>
-              )}
-            </div>
+            <EmptyState
+              className="sales-empty-state"
+              variant="leads"
+              title={filtersActive ? tsf('noResults') : tsf('noLeadsYet')}
+              description={filtersActive ? tsf('noResultsHint') : tsf('noLeadsYetHint')}
+              action={
+                <>
+                  {filtersActive && (
+                    <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
+                      {tsf('clearFilters')}
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-p btn-sm" onClick={() => setFormOpen(true)}>
+                    {tc('newClientBtn')}
+                  </button>
+                </>
+              }
+            />
           ) : (
             <div className="pipeline">
               {KANBAN_STAGES.map((stage) => {
@@ -742,14 +754,24 @@ export default function Sales() {
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             {listLeads.length === 0 ? (
-              <div className="sales-empty-state">
-                <p>{tsf('noResults')}</p>
-                {filtersActive && (
-                  <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
-                    {tsf('clearFilters')}
-                  </button>
-                )}
-              </div>
+              <EmptyState
+                className="sales-empty-state crm-empty-state--table"
+                variant="leads"
+                title={filtersActive ? tsf('noResults') : tsf('noLeadsYet')}
+                description={filtersActive ? tsf('noResultsHint') : tsf('noLeadsYetHint')}
+                action={
+                  <>
+                    {filtersActive && (
+                      <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
+                        {tsf('clearFilters')}
+                      </button>
+                    )}
+                    <button type="button" className="btn btn-p btn-sm" onClick={() => setFormOpen(true)}>
+                      {tc('newClientBtn')}
+                    </button>
+                  </>
+                }
+              />
             ) : (
               <table className="tbl">
                 <thead>
@@ -843,7 +865,7 @@ export default function Sales() {
               message: result.message || `Customer ${result.customer.id} created.`,
             });
           } else if (result.message) {
-            alert(result.message);
+            toast.info(result.message);
           }
           return true;
         }}

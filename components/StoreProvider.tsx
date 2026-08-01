@@ -28,6 +28,9 @@ import { countBackupRows } from '@/lib/db/sync-config';
 import { isAutoSyncEnabled, isSupabaseReadOnly } from '@/lib/env';
 import { useStore } from '@/lib/store';
 import { SupabaseContext } from '@/lib/context/SupabaseContext';
+import { toast } from '@/lib/toast';
+
+import { confirmDialog } from '@/lib/confirm';
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [remote, setRemote] = useState(false);
@@ -114,12 +117,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         .filter(([, n]) => n > 0)
         .map(([k, n]) => `${k}: ${n}`)
         .join('\n');
-      const ok = window.confirm(
+      const ok = await confirmDialog(
         'Push toàn bộ snapshot lên Supabase?\n\n' +
           'Catalogue (products) chỉ upsert — không xóa orphan.\n' +
           'Các bảng khác có thể mirror nếu bạn chọn force.\n\n' +
           (summary || '(empty)') +
-          '\n\nTiếp tục?'
+          '\n\nTiếp tục?',
+        {
+          title: 'Push to Supabase',
+          confirmLabel: 'Push',
+          danger: true,
+        },
       );
       if (!ok) return;
     }
@@ -135,8 +143,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         updateBaselineCounts(countBackupRows(useStore.getState().exportBackup()));
       }
       const warn = result.warnings?.length ? `\n\nCảnh báo:\n${result.warnings.join('\n')}` : '';
-      alert(`Đã push lên Supabase.${warn}\n\n${formatCounts(result.counts)}`);
-    } else alert(result.error || 'Sync failed');
+      toast.success(`Đã push lên Supabase.${warn}\n\n${formatCounts(result.counts)}`, 5000);
+    } else toast.error(result.error || 'Sync failed');
   }
 
   async function handleVerify() {
@@ -154,13 +162,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function handleCompleteMigration() {
-    const ok = window.confirm(
+    const ok = await confirmDialog(
       'Bước này sẽ:\n' +
         '1. Push toàn bộ data local lên Supabase\n' +
         '2. So sánh số dòng local vs remote\n' +
         '3. Xóa cache localStorage (ant-crm-v43)\n' +
         '4. Load lại từ Supabase\n\n' +
-        'Tiếp tục?'
+        'Tiếp tục?',
+      {
+        title: 'Complete migration',
+        confirmLabel: 'Migrate',
+        danger: true,
+      },
     );
     if (!ok) return;
 
@@ -172,10 +185,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     if (result.ok) {
       setRemote(true);
-      alert('Migration hoàn tất! Trang sẽ reload để dùng Supabase làm nguồn chính.');
+      toast.success('Migration hoàn tất! Trang sẽ reload để dùng Supabase làm nguồn chính.');
       window.location.reload();
     } else {
-      alert(result.error || 'Migration failed');
+      toast.error(result.error || 'Migration failed');
     }
   }
 

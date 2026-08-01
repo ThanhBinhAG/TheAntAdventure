@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
+import EmptyState from '@/components/EmptyState';
 
 const CHANNEL_META: Record<string, { title: string; desc: string }> = {
   general: { title: '# general', desc: 'General team conversation' },
@@ -136,9 +137,13 @@ export default function TeamChat() {
 
         <div className="chat-messages">
           {channelMessages.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--m)', padding: 40, fontSize: 13 }}>
-              No messages yet. Start the conversation below.
-            </div>
+            <EmptyState
+              className="crm-empty-state--flush"
+              size="compact"
+              variant="chat"
+              title="No messages yet"
+              description="Start the conversation using the composer below."
+            />
           ) : (
             channelMessages.map((m) => (
               <div className="chat-msg" key={m.id}>

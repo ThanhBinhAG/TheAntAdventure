@@ -9,6 +9,7 @@ import {
 import { parsePortfolioFile } from '@/lib/products/portfolio-xlsx';
 import type { PortfolioDraftProduct } from '@/lib/products/portfolio-classify';
 import { replaceCatalogueFromDrafts } from '@/lib/products/replace-catalogue';
+import { confirmDialog } from '@/lib/confirm';
 
 const REGIONS = [
   { value: 'south', label: 'South' },
@@ -104,10 +105,15 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
 
   const handleImport = async () => {
     if (!drafts.length) return;
-    const ok = window.confirm(
+    const ok = await confirmDialog(
       `This replaces ALL tour products (${drafts.length} rows from this file).\n\n` +
         'Pricing for old product codes will be removed. Gallery photos stay but will not match new codes until re-linked.\n\n' +
-        'Continue?'
+        'Continue?',
+      {
+        title: 'Replace catalogue',
+        confirmLabel: 'Replace all',
+        danger: true,
+      },
     );
     if (!ok) return;
 

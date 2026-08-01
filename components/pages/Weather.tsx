@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import WeatherWeeklyGrid from '@/components/weather/WeatherWeeklyGrid';
+import EmptyState from '@/components/EmptyState';
 import WeatherLegend from '@/components/weather/WeatherLegend';
 import WeatherRegionChips from '@/components/weather/WeatherRegionChips';
 import { BEST_BY, DEFAULT_WEATHER, DESTINATIONS, MONTHS, TEMP_RANGES, WR } from '@/lib/seeds/weather';
@@ -136,9 +137,18 @@ export default function Weather() {
       {tab === 'grid' && (
         <div className="wg-seasonal-list">
           {!dests.length && (
-            <div className="wg-empty-state">
-              <p className="wg-muted">No destinations match “{query.trim()}”.</p>
-            </div>
+<EmptyState
+              className="crm-empty-state--flush"
+              size="compact"
+              variant="weather"
+              title={`No destinations match “${query.trim()}”`}
+              description="Clear the search or try another region to see destinations."
+              action={
+                <button type="button" className="btn btn-s btn-sm" onClick={() => setQuery('')}>
+                  Clear search
+                </button>
+              }
+            />
           )}
           {dests.map((d) => {
             const row =
@@ -206,9 +216,18 @@ export default function Weather() {
       {tab === 'region' && (
         <div className="wg-region-grid">
           {!dests.length && query.trim() && (
-            <div className="wg-empty-state" style={{ gridColumn: '1 / -1' }}>
-              <p className="wg-muted">No destinations match “{query.trim()}”.</p>
-            </div>
+<EmptyState
+              className="crm-empty-state--flush crm-empty-state--inline"
+              size="compact"
+              variant="weather"
+              title={`No destinations match “${query.trim()}”`}
+              description="Clear the search or try another region to see destinations."
+              action={
+                <button type="button" className="btn btn-s btn-sm" onClick={() => setQuery('')}>
+                  Clear search
+                </button>
+              }
+            />
           )}
           {(['north', 'central', 'south'] as const).map((reg) => {
             const [rbg, rfg] = REG_COLORS_HEX[reg];
@@ -261,9 +280,18 @@ export default function Weather() {
                 (bb as { months: number[] }).months.length > 0
               );
             }) && (
-              <div className="wg-empty-state" style={{ gridColumn: '1 / -1' }}>
-                <p className="wg-muted">No destinations match “{query.trim()}”.</p>
-              </div>
+              <EmptyState
+                className="crm-empty-state--flush crm-empty-state--inline"
+                size="compact"
+                variant="weather"
+                title={`No destinations match “${query.trim()}”`}
+                description="Clear the search or try another region to see destinations."
+                action={
+                  <button type="button" className="btn btn-s btn-sm" onClick={() => setQuery('')}>
+                    Clear search
+                  </button>
+                }
+              />
             )}
           {MONTHS.map((m, mi) => {
             const bestDests = DESTINATIONS.filter((d) => {

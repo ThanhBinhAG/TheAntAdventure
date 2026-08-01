@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { isSelectableProduct } from '@/lib/products/product-display';
@@ -54,7 +55,13 @@ export default function ModulesView({
       {pickMode && <div className="prod-pick-scrim" aria-hidden />}
       <div className="tp-modules-inner">
         {flatList.length === 0 ? (
-          <div className="tp-empty-state">No products match your search.</div>
+          <EmptyState
+            className="crm-empty-state--flush"
+            size="compact"
+            variant="products"
+            title="No products match your search"
+            description="Try a different keyword, or clear the search to browse by region."
+          />
         ) : (
           <>
             <div className="tp-mod-regions">

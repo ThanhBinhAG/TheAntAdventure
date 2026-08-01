@@ -5,7 +5,7 @@ Invisible route group that wraps authenticated CRM pages with Sidebar, Topbar, s
 
 ## Contents
 - `[page]/` — Catch-all CRM UI mapped from slug → page component
-- `layout.tsx` — CRM chrome
+- `layout.tsx` — wraps pages in `CRMShell` (Sidebar, Topbar, store, toast/confirm)
 
 ## Boundaries
 - URL paths do not include `(crm)`. Login and system/debug stay outside this group.

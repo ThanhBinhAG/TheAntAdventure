@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Agent } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 export type AgentFormData = {
   id: string;
@@ -83,7 +84,7 @@ export default function AgentFormModal({ open, mode, agent, agents, onClose, onS
 
   function handleSave() {
     if (!form.name.trim()) {
-      alert('Agent name is required.');
+      toast.warning('Agent name is required.');
       return;
     }
     const saved: Agent = {

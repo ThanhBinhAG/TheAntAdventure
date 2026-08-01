@@ -6,6 +6,8 @@ import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
+import { toast } from '@/lib/toast';
 
 type Contract = {
   id: string;
@@ -135,7 +137,7 @@ export default function Contracts() {
 
   const saveContract = () => {
     if (!form.clientName || !form.tourName) {
-      alert('Please fill in Client Name and Tour Name.');
+      toast.warning('Please fill in Client Name and Tour Name.');
       return;
     }
     const id = `CTR-${new Date().getFullYear()}-${String(contracts.length + 1).padStart(3, '0')}`;
@@ -220,8 +222,19 @@ export default function Contracts() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: 30, color: 'var(--m)', fontStyle: 'italic' }}>
-                  No contracts found.
+                <td colSpan={9} style={{ padding: 0, border: 'none' }}>
+                  <EmptyState
+                    className="crm-empty-state--table"
+                    size="compact"
+                    variant="docs"
+                    title="No contracts found"
+                    description="Create a contract from a confirmed booking, or adjust filters if you expected results."
+                    action={
+                      <button type="button" className="btn btn-p btn-sm" onClick={() => setShowNew(true)}>
+                        ＋ New Contract
+                      </button>
+                    }
+                  />
                 </td>
               </tr>
             ) : (

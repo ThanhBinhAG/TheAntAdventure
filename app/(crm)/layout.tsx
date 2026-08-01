@@ -1,28 +1,5 @@
-'use client';
-
-import { useState } from 'react';
-import Sidebar from '@/components/Sidebar';
-import Topbar, { QuickNav } from '@/components/Topbar';
-import AiCopilot from '@/components/AiCopilot';
-import { AiCopilotProvider } from '@/components/AiCopilotContext';
-import { StoreProvider } from '@/components/StoreProvider';
+import CRMShell from '@/components/CRMShell';
 
 export default function CRMLayout({ children }: { children: React.ReactNode }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  return (
-    <StoreProvider>
-      <AiCopilotProvider>
-        <div className="crm-app">
-          <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
-          <div id="main">
-            <Topbar onMenuToggle={() => setMenuOpen((v) => !v)} />
-            <QuickNav />
-            <div id="content">{children}</div>
-          </div>
-          <AiCopilot />
-        </div>
-      </AiCopilotProvider>
-    </StoreProvider>
-  );
+  return <CRMShell>{children}</CRMShell>;
 }

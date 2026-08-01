@@ -3,12 +3,16 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
 import HotelFormModal from '@/components/suppliers/HotelFormModal';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
 import { filterByRegion, REG_BADGE, supplierMatchesSearch, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { Hotel } from '@/lib/types';
+import { toast } from '@/lib/toast';
+
+import { confirmDialog } from '@/lib/confirm';
 
 type Props = {
   filters: SupplierFilters;
@@ -48,8 +52,11 @@ export default function HotelTab({ filters }: Props) {
     setFormOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Remove this hotel?')) removeHotel(id);
+  const handleDelete = async (id: string) => {
+    const ok = await confirmDialog('Remove this hotel?', { title: 'Remove hotel' });
+    if (!ok) return;
+    removeHotel(id);
+    toast.success('Hotel removed.');
   };
 
   const handleSave = (hotel: Hotel) => {
@@ -153,8 +160,19 @@ export default function HotelTab({ filters }: Props) {
               )}
               {!paginatedItems.length && (
                 <tr>
-                  <td colSpan={14} style={{ textAlign: 'center', color: 'var(--m)', padding: 24 }}>
-                    No hotels found.
+                  <td colSpan={14} style={{ padding: 0, border: 'none' }}>
+                    <EmptyState
+                      className="crm-empty-state--table"
+                      size="compact"
+                      variant="suppliers"
+                      title="No hotels found"
+                      description="Add a hotel partner, or adjust search/region filters."
+                      action={
+                        <button type="button" className="btn btn-p btn-sm" onClick={openAdd}>
+                          ＋ Add Hotel
+                        </button>
+                      }
+                    />
                   </td>
                 </tr>
               )}

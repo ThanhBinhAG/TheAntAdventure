@@ -7,6 +7,7 @@ import InlineEdit from '@/components/pricing/InlineEdit';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import type { AccCruiseRate, AccProperty, AccRoomRate } from '@/lib/pricing/catalog-types';
+import EmptyState from '@/components/EmptyState';
 
 type Props = {
   properties: AccProperty[];
@@ -196,8 +197,14 @@ export default function AccPropertyTable({ properties, roomRates, cruiseRates, o
               })}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={9} className="pcx-empty">
-                    No properties match these filters.
+                  <td colSpan={9} style={{ padding: 0, border: 'none' }}>
+                    <EmptyState
+                      className="crm-empty-state--table"
+                      size="compact"
+                      variant="suppliers"
+                      title="No properties match these filters"
+                      description="Try another region or search term."
+                    />
                   </td>
                 </tr>
               )}

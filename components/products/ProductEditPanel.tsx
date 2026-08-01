@@ -26,6 +26,9 @@ import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import Link from 'next/link';
 import { useStore } from '@/hooks/useStore';
 import type { Product } from '@/lib/types';
+import { toast } from '@/lib/toast';
+
+import { confirmDialog } from '@/lib/confirm';
 
 type SourceTab = 'library' | 'modules';
 
@@ -546,7 +549,15 @@ export default function ProductEditPanel({
             disabled={busy}
             onClick={() => {
               if (busy) return;
-              if (confirm(`Delete "${form.name}"? This cannot be undone.`)) onDelete(form.code);
+              void (async () => {
+                const ok = await confirmDialog(
+                  `Delete "${form.name}"? This cannot be undone.`,
+                  { title: 'Delete product' },
+                );
+                if (!ok) return;
+                onDelete(form.code);
+                toast.success('Product deleted.');
+              })();
             }}
           >
             Delete

@@ -22,8 +22,12 @@ import GalleryPhotoModal, {
   type GalleryPhotoSavePayload,
 } from '@/components/gallery/GalleryPhotoModal';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
+import { toast } from '@/lib/toast';
+
+import { confirmDialog } from '@/lib/confirm';
 
 const REGION_COLORS: Record<string, string> = {
   north: '#2E7D52',
@@ -199,7 +203,11 @@ export default function Gallery() {
 
   async function handleBulkDelete() {
     if (!selected.size) return;
-    if (!confirm(`Delete ${selected.size} photo(s) from the library?`)) return;
+    const ok = await confirmDialog(
+      `Delete ${selected.size} photo(s) from the library?`,
+      { title: 'Delete photos' },
+    );
+    if (!ok) return;
     setSaving(true);
     setError(null);
     try {
@@ -224,8 +232,10 @@ export default function Gallery() {
       });
       await pushTablesToSupabase(['attractions', 'products'], false);
       setSelected(new Set());
+      toast.success('Photos deleted.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Bulk delete failed');
+      toast.error(e instanceof Error ? e.message : 'Bulk delete failed');
     } finally {
       setSaving(false);
     }
@@ -394,12 +404,35 @@ export default function Gallery() {
       </div>
 
       {!filtered.length && (
-        <div className="phlib-empty-state">
-          <p>No photos yet.</p>
-          <button type="button" className="btn btn-g" onClick={openAdd}>
-            Upload your first photo
-          </button>
-        </div>
+        <EmptyState
+          className="crm-empty-state--flush"
+          variant="photos"
+          title={region !== 'all' || q.trim() || attractionFilter ? 'No photos match your filters' : 'No photos yet'}
+          description={
+            region !== 'all' || q.trim() || attractionFilter
+              ? 'Try another region or search, or clear filters to see the full library.'
+              : 'Upload photos to build your library for attractions and proposals.'
+          }
+          action={
+            <>
+              {(region !== 'all' || q.trim()) && (
+                <button
+                  type="button"
+                  className="btn btn-s btn-sm"
+                  onClick={() => {
+                    setRegion('all');
+                    setQ('');
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
+              <button type="button" className="btn btn-g btn-sm" onClick={openAdd}>
+                Upload your first photo
+              </button>
+            </>
+          }
+        />
       )}
 
       {filtered.length > 0 && <PaginationBar {...pagination} onPageSizeChange={setPageSize} />}

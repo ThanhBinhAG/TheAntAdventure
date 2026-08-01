@@ -13,6 +13,7 @@ import { validateProductCodeInput } from '@/lib/products/product-code';
 import type { PricingStatusFilter } from '@/lib/products/product-pricing-helpers';
 import { useStore } from '@/hooks/useStore';
 import type { Product } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 type ViewTab = 'library' | 'modules';
 type ShellMode = 'catalog' | 'modules' | 'manage';
@@ -365,9 +366,10 @@ export default function Products() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={(count) => {
-          alert(
+          toast.success(
             `Imported ${count} products to Supabase.\n` +
-              'Empty pricing rows were created for each product (linked by code). Open Pricing to enter tiers later.'
+              'Empty pricing rows were created for each product (linked by code). Open Pricing to enter tiers later.',
+            5000
           );
         }}
       />

@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState } from 'react';
 import EditableSection from '@/components/pricing/EditableSection';
 import InlineEdit from '@/components/pricing/InlineEdit';
 import type { EssHotelRate, EssNote } from '@/lib/pricing/catalog-types';
+import EmptyState from '@/components/EmptyState';
 
 type Props = {
   hotels: EssHotelRate[];
@@ -52,7 +53,15 @@ export default function EssentialsHotels({ hotels, notes, onPatch }: Props) {
   }, [notes]);
 
   if (!hotels.length) {
-    return <p className="pcx-empty">No Essentials hotel rates imported yet.</p>;
+    return (
+      <EmptyState
+        className="crm-empty-state--flush"
+        size="compact"
+        variant="suppliers"
+        title="No Essentials hotel rates yet"
+        description="Import the Essentials workbook to populate hotel rates for this tab."
+      />
+    );
   }
 
   return (

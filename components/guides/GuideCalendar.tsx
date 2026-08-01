@@ -3,6 +3,9 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
 import type { CalEvent } from '@/lib/types';
+import { toast } from '@/lib/toast';
+
+import { confirmDialog } from '@/lib/confirm';
 
 const CAL_STATUS: Record<string, { cls: string; emoji: string; label: string }> = {
   booked: { cls: 'booked', emoji: '🩵', label: 'Booked' },
@@ -66,11 +69,11 @@ export default function GuideCalendar() {
 
   const saveEvent = () => {
     if (!form.guideId || !form.clients || !form.start || !form.end) {
-      alert('Please fill in Guide, Guests, Start and End dates.');
+      toast.warning('Please fill in Guide, Guests, Start and End dates.');
       return;
     }
     if (form.end < form.start) {
-      alert('End date must be after start date.');
+      toast.warning('End date must be after start date.');
       return;
     }
     addCalEvent({ id: `CE-${Date.now()}`, ...form });
@@ -79,10 +82,17 @@ export default function GuideCalendar() {
   };
 
   const editEvent = (ev: CalEvent) => {
-    const g = guides.find((x) => x.id === ev.guideId);
-    const st = CAL_STATUS[ev.status] || CAL_STATUS.ontour;
-    const info = `Guide: ${g?.fullname || ev.guideId} | Tour: ${ev.tour} | ${ev.start} to ${ev.end} | ${st.label}`;
-    if (confirm(`${info}\n\nDelete this event?`)) removeCalEvent(ev.id);
+    void (async () => {
+      const g = guides.find((x) => x.id === ev.guideId);
+      const st = CAL_STATUS[ev.status] || CAL_STATUS.ontour;
+      const info = `Guide: ${g?.fullname || ev.guideId} | Tour: ${ev.tour} | ${ev.start} to ${ev.end} | ${st.label}`;
+      const ok = await confirmDialog(`${info}\n\nDelete this event?`, {
+        title: 'Delete event',
+      });
+      if (!ok) return;
+      removeCalEvent(ev.id);
+      toast.success('Event deleted.');
+    })();
   };
 
   return (

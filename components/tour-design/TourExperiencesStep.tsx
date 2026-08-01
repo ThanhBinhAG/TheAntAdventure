@@ -9,6 +9,7 @@ import { getDurationPillLabel, getDurationPillVariant, isSelectableProduct } fro
 import { TOUR_PACKAGES, type TourPackage } from '@/lib/seeds/tourPackages';
 import type { TourBrief, GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import type { ExperienceOverride, Product, TourOutlineDay } from '@/lib/types';
+import EmptyState from '@/components/EmptyState';
 import GuestProfileCard from '@/components/tour-design/GuestProfileCard';
 import PackagePreviewPanel from '@/components/tour-design/PackagePreviewPanel';
 import SelectedExperiencesPanel, {
@@ -233,7 +234,13 @@ export default function TourExperiencesStep({
               </div>
               <div className="td-lib-list">
                 {libFiltered.length === 0 ? (
-                  <div style={{ color: 'var(--m)', textAlign: 'center', padding: 24, fontSize: 12.5 }}>No experiences found. Try adjusting the filters.</div>
+                  <EmptyState
+                    className="crm-empty-state--flush"
+                    size="compact"
+                    variant="products"
+                    title="No experiences found"
+                    description="Try adjusting region, duration, or category filters."
+                  />
                 ) : (
                   libFiltered.slice(0, 80).map((p) => (
                     <ExpRow key={p.code} product={p} selected={selectedCodes.includes(p.code)} pax={brief.pax} onToggle={() => onToggleProduct(p.code)} />

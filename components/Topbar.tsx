@@ -9,6 +9,7 @@ import { useStore } from '@/hooks/useStore';
 import { useSupabasePanel } from '@/lib/context/SupabaseContext';
 import { AiCopilotTrigger } from '@/components/AiCopilot';
 import type { PageSlug } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 interface TopbarProps {
   onMenuToggle: () => void;
@@ -53,7 +54,7 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
         const data = JSON.parse(reader.result as string);
         importBackup(data);
       } catch {
-        alert('Invalid backup file');
+        toast.error('Invalid backup file');
       }
     };
     reader.readAsText(file);

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { EditableCard } from '@/components/pricing/EditableSection';
 import InlineEdit from '@/components/pricing/InlineEdit';
 import type { EssCarRate } from '@/lib/pricing/catalog-types';
+import EmptyState from '@/components/EmptyState';
 
 type Props = {
   cars: EssCarRate[];
@@ -39,7 +40,15 @@ export default function EssentialsTransport({ cars, onPatch }: Props) {
   }, [cars, search]);
 
   if (!cars.length) {
-    return <p className="pcx-empty">No vehicle rates imported yet.</p>;
+    return (
+      <EmptyState
+        className="crm-empty-state--flush"
+        size="compact"
+        variant="suppliers"
+        title="No vehicle rates yet"
+        description="Import the Essentials workbook to populate car and truck rates."
+      />
+    );
   }
 
   return (

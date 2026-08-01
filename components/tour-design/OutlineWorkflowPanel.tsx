@@ -36,7 +36,7 @@ export default function OutlineWorkflowPanel({
   const canSend = outlineStatus === 'draft' && outlineRevision === 0;
   const canResend = outlineStatus === 'draft' && outlineRevision >= 1;
   const canApprove = outlineStatus === 'sent';
-  const canRevise = outlineStatus === 'sent' || outlineStatus === 'approved';
+  const canRevise = outlineStatus === 'sent';
 
   return (
     <div className="outline-workflow-panel">

@@ -8,7 +8,7 @@ import {
   nextSupplierId,
 } from '@/lib/suppliers/supplier-utils';
 import type { ExtendedSupplier } from '@/lib/types';
-
+import { toast } from '@/lib/toast';
 interface Props {
   open: boolean;
   mode: 'add' | 'edit';
@@ -92,7 +92,7 @@ export default function ExtendedSupplierFormModal({
 
   function handleSave() {
     if (!form.name.trim() || !form.phone?.trim() || !form.desc?.trim()) {
-      alert('Name, phone, and description are required.');
+      toast.warning('Name, phone, and description are required.');
       return;
     }
     onSave({

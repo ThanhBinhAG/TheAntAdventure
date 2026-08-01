@@ -2,6 +2,7 @@
 
 import type { Attraction } from '@/lib/types';
 import AttractionCard from './AttractionCard';
+import EmptyState from '@/components/EmptyState';
 
 const REG_GROUPS: Record<string, string> = {
   north: '🏔 Northern Vietnam',
@@ -73,12 +74,18 @@ export default function AttractionRegionColumn({
           ))}
         </div>
       ) : (
-        <div className="att-region-empty">
-          <p>{emptyHint}</p>
-          <button type="button" className="btn btn-s btn-sm" onClick={onAdd}>
-            + Add Attraction
-          </button>
-        </div>
+        <EmptyState
+          className="crm-empty-state--flush"
+          size="compact"
+          variant="attractions"
+          title={emptyHint.replace(/\.$/, '')}
+          description="Add an attraction to this region, or clear filters if you expected matches."
+          action={
+            <button type="button" className="btn btn-s btn-sm" onClick={onAdd}>
+              + Add Attraction
+            </button>
+          }
+        />
       )}
     </section>
   );

@@ -7,6 +7,7 @@ import InlineEdit from '@/components/pricing/InlineEdit';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { ESS_PAX_COLUMNS, type EssCostLine, type EssProduct } from '@/lib/pricing/catalog-types';
+import EmptyState from '@/components/EmptyState';
 
 const PAX_COLS = Array.from({ length: ESS_PAX_COLUMNS }, (_, i) => i + 1);
 const KEY_PAX_COLS = [1, 2, 7, 10, 14, 20];
@@ -174,8 +175,14 @@ export default function EssentialsProducts({
               })}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={11} className="pcx-empty">
-                    No experiences match this filter.
+                  <td colSpan={11} style={{ padding: 0, border: 'none' }}>
+                    <EmptyState
+                      className="crm-empty-state--table"
+                      size="compact"
+                      variant="products"
+                      title="No experiences match this filter"
+                      description="Try another region or search term."
+                    />
                   </td>
                 </tr>
               )}

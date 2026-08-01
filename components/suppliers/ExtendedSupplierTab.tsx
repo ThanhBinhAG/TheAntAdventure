@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
 import ExtSupplierCard from '@/components/suppliers/ExtSupplierCard';
 import ExtendedSupplierFormModal from '@/components/suppliers/ExtendedSupplierFormModal';
 import { usePagination } from '@/hooks/usePagination';
@@ -9,6 +10,9 @@ import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
 import { filterExtendedSuppliers, preselectCategoryForTab, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { ExtendedSupplier } from '@/lib/types';
+import { toast } from '@/lib/toast';
+
+import { confirmDialog } from '@/lib/confirm';
 
 export type ExtendedSection = 'logistics' | 'water' | 'adventure' | 'experience' | 'personnel';
 
@@ -21,10 +25,12 @@ function ExtGrid({
   items,
   onEdit,
   onDelete,
+  onAdd,
 }: {
   items: ExtendedSupplier[];
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onAdd: () => void;
 }) {
   const { pageSize, setPageSize } = usePageSize();
   const itemKey = useMemo(() => items.map((i) => i.id).join('|'), [items]);
@@ -33,9 +39,18 @@ function ExtGrid({
 
   if (!items.length) {
     return (
-      <div className="sup-empty-grid">
-        <p>No suppliers found. Add one using the button above.</p>
-      </div>
+      <EmptyState
+        className="crm-empty-state--flush"
+        size="compact"
+        variant="suppliers"
+        title="No suppliers found"
+        description="Add a supplier for this category to start building your partner list."
+        action={
+          <button type="button" className="btn btn-p btn-sm" onClick={onAdd}>
+            + Add Supplier
+          </button>
+        }
+      />
     );
   }
   return (
@@ -102,8 +117,11 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
     }
   };
 
-  const deleteExt = (id: string) => {
-    if (confirm('Remove this supplier?')) removeSpecialSupplier(id);
+  const deleteExt = async (id: string) => {
+    const ok = await confirmDialog('Remove this supplier?', { title: 'Remove supplier' });
+    if (!ok) return;
+    removeSpecialSupplier(id);
+    toast.success('Supplier removed.');
   };
 
   const addLabel = useMemo(() => {
@@ -143,7 +161,7 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
           {logSub === 'visa' && (
             <>
               <div className="info-bar">Visa partners handle E-visa applications, urgent processing (24–48hr), and business multi-entry visas for all nationalities.</div>
-              <ExtGrid items={getExt(['visa'])} onEdit={openEdit} onDelete={deleteExt} />
+              <ExtGrid onAdd={() => openAdd()} items={getExt(['visa'])} onEdit={openEdit} onDelete={deleteExt} />
             </>
           )}
           {logSub === 'fasttrack' && (
@@ -151,13 +169,13 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
               <div className="info-bar">
                 Airport fast track covers VIP arrival/departure lanes, immigration assistance, and lounge access — sorted by region: <b>North (HAN/HPH)</b> · <b>Central (HUI/DAD)</b> · <b>South (SGN/CXR/PQC)</b>.
               </div>
-              <ExtGrid items={getExt(['fasttrack'])} onEdit={openEdit} onDelete={deleteExt} />
+              <ExtGrid onAdd={() => openAdd()} items={getExt(['fasttrack'])} onEdit={openEdit} onDelete={deleteExt} />
             </>
           )}
           {logSub === 'aviation' && (
             <>
               <div className="info-bar">Covers domestic scheduled airlines and private charter operators for helicopter, seaplane, and small fixed-wing aircraft.</div>
-              <ExtGrid items={getExt(['aviation'])} onEdit={openEdit} onDelete={deleteExt} />
+              <ExtGrid onAdd={() => openAdd()} items={getExt(['aviation'])} onEdit={openEdit} onDelete={deleteExt} />
             </>
           )}
         </>
@@ -173,7 +191,7 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
               {addLabel}
             </button>
           </div>
-          <ExtGrid items={getExt(['river', 'coastal', 'park'])} onEdit={openEdit} onDelete={deleteExt} />
+          <ExtGrid onAdd={() => openAdd()} items={getExt(['river', 'coastal', 'park'])} onEdit={openEdit} onDelete={deleteExt} />
         </>
       )}
 
@@ -203,7 +221,7 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
             {advSub === 'trekking' && 'Trekking & camping gear rental: tents, sleeping bags, GPS trackers, portable radios, first-aid kits.'}
             {advSub === 'wildlife' && 'Wildlife & nature experts: ornithologists, marine biologists, karst geologists, wildlife trackers.'}
           </div>
-          <ExtGrid items={getExt([advSub])} onEdit={openEdit} onDelete={deleteExt} />
+          <ExtGrid onAdd={() => openAdd()} items={getExt([advSub])} onEdit={openEdit} onDelete={deleteExt} />
         </>
       )}
 
@@ -233,7 +251,7 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
             {expSub === 'wellness' && 'Luxury wellness partners: traditional medicine doctors, spa directors, meditation guides.'}
             {expSub === 'events' && 'Exclusive event & decor specialists: private beach dinners, floral designers, lantern lighting.'}
           </div>
-          <ExtGrid items={getExt([expSub])} onEdit={openEdit} onDelete={deleteExt} />
+          <ExtGrid onAdd={() => openAdd()} items={getExt([expSub])} onEdit={openEdit} onDelete={deleteExt} />
         </>
       )}
 
@@ -269,7 +287,7 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
             </div>
           )}
           <div className="info-bar">Specialist guides, media production, and security & health partners — all VNAT-licensed where applicable.</div>
-          <ExtGrid items={getExt([perSub])} onEdit={openEdit} onDelete={deleteExt} />
+          <ExtGrid onAdd={() => openAdd()} items={getExt([perSub])} onEdit={openEdit} onDelete={deleteExt} />
         </>
       )}
 

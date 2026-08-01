@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import CatalogImportModal from '@/components/pricing/CatalogImportModal';
 import PricingSubnav from '@/components/pricing/PricingSubnav';
+import EmptyState from '@/components/EmptyState';
 import EssentialsHotels from '@/components/pricing/essentials/EssentialsHotels';
 import EssentialsNotes from '@/components/pricing/essentials/EssentialsNotes';
 import EssentialsProducts from '@/components/pricing/essentials/EssentialsProducts';
@@ -186,13 +187,17 @@ export default function PricingEssentials() {
       {loading ? (
         <p className="pcx-empty">Loading the Essentials catalog…</p>
       ) : isEmpty ? (
-        <div className="pcx-blank">
-          <h3>No Essentials pricing yet</h3>
-          <p>Import the Essentials workbook to populate experiences, provider rates, hotels and guidelines.</p>
-          <button className="btn btn-p" type="button" onClick={() => setImportOpen(true)}>
-            ⭱ Import Excel
-          </button>
-        </div>
+        <EmptyState
+          className="crm-empty-state--flush"
+          variant="products"
+          title="No Essentials pricing yet"
+          description="Import the Essentials workbook to populate experiences, provider rates, hotels and guidelines."
+          action={
+            <button className="btn btn-p btn-sm" type="button" onClick={() => setImportOpen(true)}>
+              Import Excel
+            </button>
+          }
+        />
       ) : (
         <>
           {tab === 'products' && (

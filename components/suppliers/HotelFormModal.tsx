@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
 import type { Hotel, HotelRoom } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 const EMPTY_ROOM = (): HotelRoom => ({
   type: '',
@@ -75,7 +76,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
 
   function handleSave() {
     if (!form.name.trim() || !form.dest.trim()) {
-      alert('Hotel name and destination are required.');
+      toast.warning('Hotel name and destination are required.');
       return;
     }
     const rooms = form.rooms
@@ -86,7 +87,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
         type: room.type.trim(),
       }));
     if (!rooms.length) {
-      alert('Add at least one room type.');
+      toast.warning('Add at least one room type.');
       return;
     }
     onSave({ ...form, name: form.name.trim(), dest: form.dest.trim(), rooms });

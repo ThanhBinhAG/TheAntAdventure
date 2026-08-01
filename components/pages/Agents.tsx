@@ -12,8 +12,12 @@ import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
 import type { Agent } from '@/lib/types';
 import AgentFormModal from '@/components/agents/AgentFormModal';
+import { toast } from '@/lib/toast';
+
+import { confirmDialog } from '@/lib/confirm';
 
 export default function Agents() {
   const agents = useStore((s) => s.agents);
@@ -58,12 +62,13 @@ export default function Agents() {
   const profile = profileId ? agents.find((a) => a.id === profileId) : null;
   const editAgent = editId ? agents.find((a) => a.id === editId) : null;
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     if (id === 'AGT-001') return;
-    if (confirm('Delete this agent?')) {
-      deleteAgent(id);
-      setProfileId(null);
-    }
+    const ok = await confirmDialog('Delete this agent?', { title: 'Delete agent' });
+    if (!ok) return;
+    deleteAgent(id);
+    setProfileId(null);
+    toast.success('Agent deleted.');
   }
 
   function handleSave(agent: Agent) {
@@ -334,9 +339,32 @@ export default function Agents() {
         </div>
       </div>
 
-      {view === 'grid' ? (
+      {!agentsPage.length ? (
+        <EmptyState
+          className="crm-empty-state--flush"
+          variant="agents"
+          title={search.trim() ? 'No agents match your search' : 'No agents yet'}
+          description={
+            search.trim()
+              ? 'Try a different name or country, or clear the search to see all agents.'
+              : 'Add a B2B agent partner to track commissions and linked leads.'
+          }
+          action={
+            <>
+              {search.trim() && (
+                <button type="button" className="btn btn-s btn-sm" onClick={() => setSearch('')}>
+                  Clear search
+                </button>
+              )}
+              <button type="button" className="btn btn-p btn-sm" onClick={() => setFormMode('add')}>
+                + Add Agent
+              </button>
+            </>
+          }
+        />
+      ) : view === 'grid' ? (
         <>
-          <div className="agents-grid">{agentsPage.length ? agentsPage.map(renderAgentCard) : <div style={{ color: 'var(--m)', padding: 20 }}>No agents found.</div>}</div>
+          <div className="agents-grid">{agentsPage.map(renderAgentCard)}</div>
           <PaginationBar {...agentsPagination} onPageSizeChange={setPageSize} />
         </>
       ) : (

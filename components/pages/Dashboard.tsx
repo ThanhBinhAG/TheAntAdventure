@@ -18,6 +18,7 @@ import { TIER_BG, TIER_COLORS } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
 import { getCustomerName } from '@/lib/core/crm-utils';
 import type { Customer, Lead } from '@/lib/types';
+import EmptyState from '@/components/EmptyState';
 
 function ForecastBreakdown({ leads, customers }: { leads: Lead[]; customers: Customer[] }) {
   const { deals, allActive } = useMemo(() => {
@@ -478,9 +479,13 @@ export default function Dashboard() {
                   />
                 </div>
               ) : (
-                <div style={{ padding: 24, textAlign: 'center', color: 'var(--m)', fontSize: 13 }}>
-                  No scheduled tours yet — confirm leads with travel months to see tours per month.
-                </div>
+                <EmptyState
+                  className="crm-empty-state--flush"
+                  size="compact"
+                  variant="leads"
+                  title="No scheduled tours yet"
+                  description="Confirm leads with travel months to see tours per month."
+                />
               )}
             </div>
           </div>

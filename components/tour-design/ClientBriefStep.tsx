@@ -2,9 +2,20 @@
 
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import { AGENT_DATALIST, SALES_PEOPLE } from '@/lib/customers/customer-form';
+import {
+  isTravelDateNotPast,
+  todayIsoLocal,
+} from '@/lib/customers/customer-validation';
+import {
+  NATIONALITIES,
+  isKnownNationality,
+  normalizeNationality,
+} from '@/lib/customers/nationalities';
 import { buildBriefSummaryHtml } from '@/lib/tour-design/tour-brief-summary';
+import { DURATION_PRESETS } from '@/lib/tour-design/tour-durations';
 import type { TourBrief } from '@/lib/tour-design/tour-design-types';
 import type { Customer } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 const CHILD_TAGS = ['Infant 0-2', 'Toddler 3-5', 'Child 6-9', 'Pre-teen 10-12', 'Teen 13-17'];
 const PAX_PRESETS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
@@ -15,21 +26,6 @@ const REGIONS = [
   { id: 'central', label: 'Central Vietnam' },
   { id: 'south', label: 'Southern Vietnam' },
   { id: 'multi', label: 'Multi-Region' },
-];
-
-const DURATIONS = [
-  '3 Days 2 Nights',
-  '4 Days 3 Nights',
-  '5 Days 4 Nights',
-  '6 Days 5 Nights',
-  '7 Days 6 Nights',
-  '8 Days 7 Nights',
-  '10 Days 9 Nights',
-  '12 Days 11 Nights',
-  '14 Days 13 Nights',
-  '16 Days 15 Nights',
-  '18 Days 17 Nights',
-  '21 Days 20 Nights',
 ];
 
 interface Props {
@@ -67,6 +63,8 @@ export default function ClientBriefStep({
   const isCustomPax = brief.pax > 10;
   const paxMode = isCustomPax ? 'custom' : 'preset';
   const [customPaxInput, setCustomPaxInput] = useState(String(isCustomPax ? brief.pax : 12));
+  const todayIso = todayIsoLocal();
+  const firstTimeValue = brief.firstTime === 'unknown' ? '' : brief.firstTime;
 
   function setPax(n: number) {
     setBrief((b) => ({ ...b, pax: n, adults: n }));
@@ -94,6 +92,33 @@ export default function ClientBriefStep({
       ...b,
       childAges: b.childAges ? `${b.childAges}, ${tag}` : tag,
     }));
+  }
+
+  function handleStartDateChange(value: string) {
+    if (value && !isTravelDateNotPast(value)) {
+      toast.warning('Travel start date must be today or later.');
+      setBrief({ ...brief, startDate: '' });
+      return;
+    }
+    setBrief({ ...brief, startDate: value });
+  }
+
+  function handleNext() {
+    if (brief.startDate && !isTravelDateNotPast(brief.startDate)) {
+      toast.warning('Travel start date must be today or later.');
+      return;
+    }
+    if (brief.nationality.trim() && !isKnownNationality(brief.nationality)) {
+      toast.warning('Please choose a Nationality from the suggestion list.');
+      return;
+    }
+    if (brief.nationality.trim()) {
+      const canonical = normalizeNationality(brief.nationality);
+      if (canonical !== brief.nationality) {
+        setBrief({ ...brief, nationality: canonical });
+      }
+    }
+    onNext();
   }
 
   return (
@@ -272,19 +297,34 @@ export default function ClientBriefStep({
           <div className="td-form-grid td-form-grid-3">
             <div className="fg">
               <label className="lbl">Travel Start Date</label>
-              <input type="date" value={brief.startDate} onChange={(e) => setBrief({ ...brief, startDate: e.target.value })} />
+              <input
+                type="date"
+                min={todayIso}
+                value={brief.startDate}
+                onChange={(e) => handleStartDateChange(e.target.value)}
+              />
             </div>
             <div className="fg">
               <label className="lbl">Nationality / Country</label>
-              <input value={brief.nationality} onChange={(e) => setBrief({ ...brief, nationality: e.target.value })} placeholder="e.g. Australian, French..." />
+              <input
+                list="td-nationality-list"
+                value={brief.nationality}
+                onChange={(e) => setBrief({ ...brief, nationality: e.target.value })}
+                placeholder="Type to search…"
+                autoComplete="off"
+              />
+              <datalist id="td-nationality-list">
+                {NATIONALITIES.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
             </div>
             <div className="fg">
               <label className="lbl">First Time in Vietnam?</label>
-              <select value={brief.firstTime} onChange={(e) => setBrief({ ...brief, firstTime: e.target.value })}>
+              <select value={firstTimeValue} onChange={(e) => setBrief({ ...brief, firstTime: e.target.value })}>
                 <option value="">— Not specified —</option>
                 <option value="yes">Yes — first visit</option>
                 <option value="no">No — returning</option>
-                <option value="unknown">Not sure</option>
               </select>
             </div>
           </div>
@@ -358,11 +398,21 @@ export default function ClientBriefStep({
 
         <div className="fg" style={{ marginTop: 8 }}>
           <label className="lbl">Duration</label>
-          <select value={brief.duration} onChange={(e) => setBrief({ ...brief, duration: e.target.value })}>
-            {DURATIONS.map((d) => (
-              <option key={d}>{d}</option>
+          <input
+            list="td-duration-list"
+            value={brief.duration}
+            onChange={(e) => setBrief({ ...brief, duration: e.target.value })}
+            placeholder="e.g. 7 Days 6 Nights — or type custom"
+            autoComplete="off"
+          />
+          <datalist id="td-duration-list">
+            {DURATION_PRESETS.map((d) => (
+              <option key={d} value={d} />
             ))}
-          </select>
+          </datalist>
+          <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>
+            Pick a suggestion (2–30 days) or type a custom duration
+          </div>
         </div>
 
         <div className="fg">
@@ -396,7 +446,7 @@ export default function ClientBriefStep({
           <button className="btn btn-pu btn-sm" type="button" onClick={onAiSuggest}>
             ✦ AI Suggest Style
           </button>
-          <button className="btn btn-p" type="button" onClick={onNext}>
+          <button className="btn btn-p" type="button" onClick={handleNext}>
             Next: Outline →
           </button>
         </div>

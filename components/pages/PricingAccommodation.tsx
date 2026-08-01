@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import CatalogImportModal from '@/components/pricing/CatalogImportModal';
+import EmptyState from '@/components/EmptyState';
 import PricingSubnav from '@/components/pricing/PricingSubnav';
 import AccCruiseTable from '@/components/pricing/accommodation/AccCruiseTable';
 import AccOverview from '@/components/pricing/accommodation/AccOverview';
@@ -165,13 +166,17 @@ export default function PricingAccommodation() {
       {loading ? (
         <p className="pcx-empty">Loading the accommodation catalog…</p>
       ) : isEmpty ? (
-        <div className="pcx-blank">
-          <h3>No accommodation pricing yet</h3>
-          <p>Import the Accommodation &amp; Cruises workbook to populate properties, room rates and cabins.</p>
-          <button className="btn btn-p" type="button" onClick={() => setImportOpen(true)}>
-            ⭱ Import Excel
-          </button>
-        </div>
+        <EmptyState
+          className="crm-empty-state--flush"
+          variant="suppliers"
+          title="No accommodation pricing yet"
+          description="Import the Accommodation & Cruises workbook to populate properties, room rates and cabins."
+          action={
+            <button className="btn btn-p btn-sm" type="button" onClick={() => setImportOpen(true)}>
+              Import Excel
+            </button>
+          }
+        />
       ) : (
         <>
           {tab === 'properties' && (

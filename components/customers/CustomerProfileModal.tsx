@@ -8,6 +8,7 @@ import { getClientLeads, getClientPipeline, getCustomerBookings } from '@/lib/co
 import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
 import type { Comm, Customer, Lead } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 const TABS = ['overview', 'pipeline', 'communications', 'bookings', 'notes', 'feedback'] as const;
 type Tab = (typeof TABS)[number];
@@ -111,7 +112,7 @@ export default function CustomerProfileModal({
 
   function logComm() {
     if (!commForm.subj.trim()) {
-      alert('Please add a subject.');
+      toast.warning('Please add a subject.');
       return;
     }
     const comm: Comm = {
@@ -130,7 +131,7 @@ export default function CustomerProfileModal({
 
   function saveNotes() {
     updateCustomer(customer.id, { notes: notesDraft });
-    alert('Notes saved.');
+    toast.success('Notes saved.');
   }
 
   function aiDraftEmail() {

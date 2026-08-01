@@ -17,6 +17,7 @@ import {
   wrStyle,
 } from '@/components/weather/weatherUiHelpers';
 import { matchesFoldedQuery } from '@/lib/gallery/fold-search';
+import EmptyState from '@/components/EmptyState';
 
 type Props = {
   region: string;
@@ -261,15 +262,17 @@ export default function WeatherWeeklyGrid({ region, query = '' }: Props) {
 
   if (error && !data?.destinations?.length) {
     return (
-      <div className="wg-empty-state">
-        <p className="wg-error">{error}</p>
-        <p className="wg-muted" style={{ marginBottom: 14 }}>
-          Ensure Supabase weather tables exist and <code>SUPABASE_SERVICE_ROLE_KEY</code> is set.
-        </p>
-        <button className="btn btn-p btn-sm" type="button" onClick={handleRefresh} disabled={refreshing}>
-          {refreshing ? 'Refreshing…' : 'Refresh forecast'}
-        </button>
-      </div>
+      <EmptyState
+        className="crm-empty-state--flush"
+        variant="weather"
+        title={error}
+        description="Ensure Supabase weather tables exist and SUPABASE_SERVICE_ROLE_KEY is set."
+        action={
+          <button className="btn btn-p btn-sm" type="button" onClick={handleRefresh} disabled={refreshing}>
+            {refreshing ? 'Refreshing…' : 'Refresh forecast'}
+          </button>
+        }
+      />
     );
   }
 
@@ -303,13 +306,21 @@ export default function WeatherWeeklyGrid({ region, query = '' }: Props) {
           <DestCard key={dest.id} dest={dest} index={i} />
         ))}
         {!destinations.length && (
-          <div className="wg-empty-state">
-            <p className="wg-muted">
-              {query.trim()
-                ? `No destinations match “${query.trim()}”.`
-                : 'No destinations in this region.'}
-            </p>
-          </div>
+          <EmptyState
+            className="crm-empty-state--flush"
+            size="compact"
+            variant="weather"
+            title={
+              query.trim()
+                ? `No destinations match “${query.trim()}”`
+                : 'No destinations in this region'
+            }
+            description={
+              query.trim()
+                ? 'Clear the search or pick another region.'
+                : 'Try another region chip to browse weekly forecasts.'
+            }
+          />
         )}
       </div>
 

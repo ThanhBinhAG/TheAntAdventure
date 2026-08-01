@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { EditableCard } from '@/components/pricing/EditableSection';
 import InlineEdit from '@/components/pricing/InlineEdit';
 import type { EssServiceRate } from '@/lib/pricing/catalog-types';
+import EmptyState from '@/components/EmptyState';
 
 type Props = {
   services: EssServiceRate[];
@@ -25,7 +26,15 @@ export default function EssentialsServices({ services, onPatch }: Props) {
   }, [services]);
 
   if (!services.length) {
-    return <p className="pcx-empty">No service rates imported yet.</p>;
+    return (
+      <EmptyState
+        className="crm-empty-state--flush"
+        size="compact"
+        variant="docs"
+        title="No service rates yet"
+        description="Import the Essentials workbook to populate service rates."
+      />
+    );
   }
 
   return (

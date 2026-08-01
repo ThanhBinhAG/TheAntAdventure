@@ -9,9 +9,13 @@ import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import CustomerProfileModal from '@/components/customers/CustomerProfileModal';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
+import { toast } from '@/lib/toast';
+
+import { confirmDialog } from '@/lib/confirm';
 
 const TYPE_FILTERS: { value: string; label: string; style?: React.CSSProperties }[] = [
   { value: '', label: 'All (B2B + B2C)' },
@@ -71,6 +75,17 @@ export default function Customers() {
   const pagination = usePagination(filtered, pageSize, [search, sourceF, countryF, salesF, typeF, stageF, pageSize]);
   const { paginatedItems } = pagination;
 
+  const filtersActive = !!(search || sourceF || countryF || salesF || typeF || stageF);
+
+  function clearFilters() {
+    setSearch('');
+    setSourceF('');
+    setCountryF('');
+    setSalesF('');
+    setTypeF('');
+    setStageF('');
+  }
+
   const profileCustomer = profileId ? customers.find((c) => c.id === profileId) : null;
   const editCustomer = editId ? customers.find((c) => c.id === editId) : null;
 
@@ -87,7 +102,7 @@ export default function Customers() {
   function handleSave(payload: Parameters<typeof saveFromForm>[0]): boolean {
     const result = saveFromForm(payload);
     if (!result.ok) return false;
-    if (result.message) alert(result.message);
+    if (result.message) toast.success(result.message);
     setFormMode(null);
     setEditId(null);
     return true;
@@ -169,125 +184,159 @@ export default function Customers() {
 
       <div className="card">
         <div className="card-body" style={{ padding: 0 }}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name / Tên</th>
-                <th>Email</th>
-                <th>Country</th>
-                <th>Type</th>
-                <th>Source</th>
-                <th>Pipeline Status</th>
-                <th>Active Value</th>
-                <th>Leads</th>
-                <th>NPS</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedItems.map((c) => {
-                const p = getClientPipeline(c.id, leads);
-                const isB2B = c.clientType === 'b2b';
-                const cfb = feedback.filter((f) => f.custId === c.id);
-                const avgNps = cfb.length ? cfb.reduce((s, f) => s + (f.nps || 0), 0) / cfb.length : null;
-
-                return (
-                  <tr key={c.id}>
-                    <td>
-                      <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{c.id}</code>
-                    </td>
-                    <td>
-                      <b>{c.name}</b>
-                    </td>
-                    <td style={{ color: 'var(--m)' }}>{c.email || '—'}</td>
-                    <td>{c.country || '—'}</td>
-                    <td>
-                      <span className={`bdg ${isB2B ? '' : 'bdg-b'}`} style={isB2B ? { background: '#F3E5F5', color: '#6B21A8', fontSize: 10 } : { fontSize: 10 }}>
-                        {isB2B ? 'B2B' : 'B2C'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`bdg ${SRC_COLORS[c.source] || 'bdg-w'}`}>{c.source}</span>
-                    </td>
-                    <td>
-                      {p.stage ? (
-                        <button
-                          type="button"
-                          className={`bdg ${STAGE_COLORS[p.stage] || 'bdg-w'}`}
-                          style={{ fontSize: 10, border: 'none', cursor: 'pointer' }}
-                          onClick={() => openProfile(c.id, 'pipeline')}
-                        >
-                          {p.stage}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="bdg bdg-w"
-                          style={{ fontSize: 10, border: 'none', cursor: 'pointer' }}
-                          onClick={() => openProfile(c.id, 'pipeline')}
-                        >
-                          No Activity
-                        </button>
-                      )}
-                    </td>
-                    <td style={{ fontWeight: 600, color: 'var(--g)' }}>
-                      {p.value > 0 ? `$${fmt(p.value)}` : <span style={{ color: 'var(--m)' }}>—</span>}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      {p.count ? (
-                        <button
-                          type="button"
-                          className="btn btn-s btn-sm"
-                          style={{ minWidth: 28, padding: '2px 8px' }}
-                          onClick={() => openProfile(c.id, 'pipeline')}
-                        >
-                          {p.count}
-                        </button>
-                      ) : (
-                        <span style={{ color: 'var(--m)' }}>0</span>
-                      )}
-                    </td>
-                    <td>
-                      {avgNps !== null ? (
-                        <span className={`bdg ${npsBadgeClass(avgNps)}`}>
-                          {npsIcon(avgNps)} {avgNps.toFixed(1)}
-                        </span>
-                      ) : (
-                        <span className="bdg bdg-w">—</span>
-                      )}
-                    </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <button className="btn btn-s btn-sm" type="button" style={{ marginRight: 4 }} onClick={() => openProfile(c.id)}>
-                        View
-                      </button>
-                      <button
-                        className="btn btn-s btn-sm"
-                        type="button"
-                        style={{ marginRight: 4 }}
-                        onClick={() => {
-                          setEditId(c.id);
-                          setFormMode('edit');
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        type="button"
-                        onClick={() => {
-                          if (confirm(`Delete ${c.name}?`)) deleteCustomer(c.id);
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </td>
+          {filtered.length === 0 ? (
+            <EmptyState
+              className="crm-empty-state--table"
+              variant="clients"
+              title={filtersActive ? 'No clients match your filters' : 'No clients yet'}
+              description={
+                filtersActive
+                  ? 'Try adjusting search or filters, or clear them to see the full client list.'
+                  : 'Add your first customer to start tracking inquiries and pipeline activity.'
+              }
+              action={
+                <>
+                  {filtersActive && (
+                    <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
+                      Clear filters
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-p btn-sm" onClick={() => setFormMode('add')}>
+                    + Add Customer
+                  </button>
+                </>
+              }
+            />
+          ) : (
+            <>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name / Tên</th>
+                    <th>Email</th>
+                    <th>Country</th>
+                    <th>Type</th>
+                    <th>Source</th>
+                    <th>Pipeline Status</th>
+                    <th>Active Value</th>
+                    <th>Leads</th>
+                    <th>NPS</th>
+                    <th>Actions</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
+                </thead>
+                <tbody>
+                  {paginatedItems.map((c) => {
+                    const p = getClientPipeline(c.id, leads);
+                    const isB2B = c.clientType === 'b2b';
+                    const cfb = feedback.filter((f) => f.custId === c.id);
+                    const avgNps = cfb.length ? cfb.reduce((s, f) => s + (f.nps || 0), 0) / cfb.length : null;
+
+                    return (
+                      <tr key={c.id}>
+                        <td>
+                          <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{c.id}</code>
+                        </td>
+                        <td>
+                          <b>{c.name}</b>
+                        </td>
+                        <td style={{ color: 'var(--m)' }}>{c.email || '—'}</td>
+                        <td>{c.country || '—'}</td>
+                        <td>
+                          <span className={`bdg ${isB2B ? '' : 'bdg-b'}`} style={isB2B ? { background: '#F3E5F5', color: '#6B21A8', fontSize: 10 } : { fontSize: 10 }}>
+                            {isB2B ? 'B2B' : 'B2C'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`bdg ${SRC_COLORS[c.source] || 'bdg-w'}`}>{c.source}</span>
+                        </td>
+                        <td>
+                          {p.stage ? (
+                            <button
+                              type="button"
+                              className={`bdg ${STAGE_COLORS[p.stage] || 'bdg-w'}`}
+                              style={{ fontSize: 10, border: 'none', cursor: 'pointer' }}
+                              onClick={() => openProfile(c.id, 'pipeline')}
+                            >
+                              {p.stage}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="bdg bdg-w"
+                              style={{ fontSize: 10, border: 'none', cursor: 'pointer' }}
+                              onClick={() => openProfile(c.id, 'pipeline')}
+                            >
+                              No Activity
+                            </button>
+                          )}
+                        </td>
+                        <td style={{ fontWeight: 600, color: 'var(--g)' }}>
+                          {p.value > 0 ? `$${fmt(p.value)}` : <span style={{ color: 'var(--m)' }}>—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {p.count ? (
+                            <button
+                              type="button"
+                              className="btn btn-s btn-sm"
+                              style={{ minWidth: 28, padding: '2px 8px' }}
+                              onClick={() => openProfile(c.id, 'pipeline')}
+                            >
+                              {p.count}
+                            </button>
+                          ) : (
+                            <span style={{ color: 'var(--m)' }}>0</span>
+                          )}
+                        </td>
+                        <td>
+                          {avgNps !== null ? (
+                            <span className={`bdg ${npsBadgeClass(avgNps)}`}>
+                              {npsIcon(avgNps)} {avgNps.toFixed(1)}
+                            </span>
+                          ) : (
+                            <span className="bdg bdg-w">—</span>
+                          )}
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <button className="btn btn-s btn-sm" type="button" style={{ marginRight: 4 }} onClick={() => openProfile(c.id)}>
+                            View
+                          </button>
+                          <button
+                            className="btn btn-s btn-sm"
+                            type="button"
+                            style={{ marginRight: 4 }}
+                            onClick={() => {
+                              setEditId(c.id);
+                              setFormMode('edit');
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-danger btn-sm"
+                            type="button"
+                            onClick={() => {
+                              void (async () => {
+                                const ok = await confirmDialog(`Delete ${c.name}?`, {
+                                  title: 'Delete customer',
+                                });
+                                if (!ok) return;
+                                deleteCustomer(c.id);
+                                toast.success('Customer deleted.');
+                              })();
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
+            </>
+          )}
         </div>
       </div>
 
@@ -314,10 +363,15 @@ export default function Customers() {
             setFormMode('edit');
           }}
           onDelete={() => {
-            if (confirm(`Delete ${profileCustomer.name}?`)) {
+            void (async () => {
+              const ok = await confirmDialog(`Delete ${profileCustomer.name}?`, {
+                title: 'Delete customer',
+              });
+              if (!ok) return;
               deleteCustomer(profileCustomer.id);
               closeProfile();
-            }
+              toast.success('Customer deleted.');
+            })();
           }}
         />
       )}

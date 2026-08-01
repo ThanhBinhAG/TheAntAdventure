@@ -2,12 +2,16 @@
 
 import { useMemo, useState } from 'react';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
 import QuickListFormModal, { type QuickListKind } from '@/components/suppliers/QuickListFormModal';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
 import { filterByRegion, supplierMatchesSearch, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/lib/types';
+import { toast } from '@/lib/toast';
+
+import { confirmDialog } from '@/lib/confirm';
 
 type QuickRow = TransportSupplier | RestaurantSupplier | CruiseSupplier;
 
@@ -131,11 +135,13 @@ export default function QuickListTab({ kind, filters }: Props) {
     setFormOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (!confirm('Remove this entry?')) return;
+  const handleDelete = async (id: string) => {
+    const ok = await confirmDialog('Remove this entry?', { title: 'Remove entry' });
+    if (!ok) return;
     if (kind === 'transport') removeTransport(id);
     else if (kind === 'restaurant') removeRestaurant(id);
     else removeCruise(id);
+    toast.success('Entry removed.');
   };
 
   const handleSave = (row: QuickRow) => {
@@ -197,8 +203,19 @@ export default function QuickListTab({ kind, filters }: Props) {
               ))}
               {!paginatedItems.length && (
                 <tr>
-                  <td colSpan={cfg.columns.length + 1} style={{ textAlign: 'center', color: 'var(--m)', padding: 24 }}>
-                    No {cfg.title.toLowerCase()} partners found.
+                  <td colSpan={cfg.columns.length + 1} style={{ padding: 0, border: 'none' }}>
+                    <EmptyState
+                      className="crm-empty-state--table"
+                      size="compact"
+                      variant="suppliers"
+                      title={`No ${cfg.title.toLowerCase()} partners found`}
+                      description="Add a partner, or adjust search/region filters."
+                      action={
+                        <button type="button" className="btn btn-p btn-sm" onClick={openAdd}>
+                          ＋ Add {cfg.title}
+                        </button>
+                      }
+                    />
                   </td>
                 </tr>
               )}

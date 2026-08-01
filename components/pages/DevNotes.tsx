@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
+import EmptyState from '@/components/EmptyState';
 
 type DevNote = {
   id?: string;
@@ -165,7 +166,13 @@ export default function DevNotes() {
         </div>
 
         {filtered.length === 0 ? (
-          <div className="dn-empty">No notes found. Add your first requirement above.</div>
+          <EmptyState
+            className="crm-empty-state--flush"
+            size="compact"
+            variant="notes"
+            title="No notes found"
+            description="Add your first requirement using the form above."
+          />
         ) : (
           filtered.map((n, i) => {
             const pri = PRIORITY_META[n.priority || 'medium'] || PRIORITY_META.medium;

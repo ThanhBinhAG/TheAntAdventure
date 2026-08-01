@@ -14,6 +14,8 @@ import { saveNewLoosePhoto, saveNewLoosePhotosBatch } from '@/lib/gallery/galler
 import { pushTablesToSupabase } from '@/lib/db/hydrate';
 import { deletePhotoViaApi } from '@/lib/gallery/photo-api';
 import GalleryPhotoModal, { type GalleryPhotoSavePayload } from '@/components/gallery/GalleryPhotoModal';
+import { toast } from '@/lib/toast';
+import { confirmDialog } from '@/lib/confirm';
 
 export type AttractionFormData = {
   id: string;
@@ -275,20 +277,20 @@ export default function AttractionEditModal({
 
   function handleSave() {
     if (!form.name.trim()) {
-      alert('Attraction name is required.');
+      toast.warning('Attraction name is required.');
       return;
     }
     if (!form.dest.trim()) {
-      alert('Destination is required.');
+      toast.warning('Destination is required.');
       return;
     }
     if (!form.id.trim()) {
-      alert('ID is missing — pick a region and try again.');
+      toast.warning('ID is missing — pick a region and try again.');
       return;
     }
     const duplicate = attractions.some((a) => a.id === form.id && a.id !== attraction?.id);
     if (duplicate) {
-      alert(`ID ${form.id} already exists. Change region to get a new ID.`);
+      toast.warning(`ID ${form.id} already exists. Change region to get a new ID.`);
       return;
     }
     const linked = form.linkedPhotoIds ?? [];
@@ -296,11 +298,16 @@ export default function AttractionEditModal({
     onSave({ ...form, photoIds: featured });
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!attraction || !onDelete) return;
-    if (!confirm(`Delete "${attraction.name}"? This cannot be undone.`)) return;
+    const ok = await confirmDialog(
+      `Delete "${attraction.name}"? This cannot be undone.`,
+      { title: 'Delete attraction' },
+    );
+    if (!ok) return;
     onDelete(attraction.id);
     onClose();
+    toast.success('Attraction deleted.');
   }
 
   return (

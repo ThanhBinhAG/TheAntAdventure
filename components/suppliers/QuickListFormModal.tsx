@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
 import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 export type QuickListKind = 'transport' | 'restaurant' | 'cruise';
 
@@ -91,7 +92,7 @@ export default function QuickListFormModal({ open, kind, mode, row, existing, on
 
   function handleSave() {
     if (!form.name?.trim()) {
-      alert('Name is required.');
+      toast.warning('Name is required.');
       return;
     }
     const saved: Record<string, unknown> = { id: form.id };

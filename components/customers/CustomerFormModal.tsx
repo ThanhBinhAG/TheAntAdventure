@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { COUNTRIES, isKnownCountry, normalizeCountry } from '@/lib/customers/countries';
 import {
   AGENT_DATALIST,
   EMPTY_CUSTOMER_FORM,
@@ -8,8 +9,19 @@ import {
   customerToForm,
   type CustomerFormData,
 } from '@/lib/customers/customer-form';
+import {
+  isValidEmail,
+  isValidPhone,
+  sanitizePhoneInput,
+} from '@/lib/customers/customer-validation';
 import { findDuplicateCustomerByEmail, formatDuplicateEmailMessage } from '@/lib/customers/customer-onboarding';
+import {
+  NATIONALITIES,
+  isKnownNationality,
+  normalizeNationality,
+} from '@/lib/customers/nationalities';
 import type { Customer } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 const CHILD_TAGS = ['Infant 0–2', 'Toddler 3–5', 'Child 6–9', 'Pre-teen 10–12', 'Teen 13–17'];
 const EMAIL_CHECK_DEBOUNCE_MS = 400;
@@ -102,11 +114,31 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
 
   function handleSave() {
     if (!form.name.trim()) {
-      alert('Please enter client name.');
+      toast.warning('Please enter client name.');
       return;
     }
     if (!form.email.trim()) {
-      alert('Please enter email.');
+      toast.warning('Please enter email.');
+      return;
+    }
+    if (!isValidEmail(form.email)) {
+      toast.warning('Please enter a valid email address.');
+      return;
+    }
+    if (form.phone.trim() && !isValidPhone(form.phone)) {
+      toast.warning('Phone must contain numbers only (optional +, spaces, dashes).');
+      return;
+    }
+    if (form.whatsapp.trim() && !isValidPhone(form.whatsapp)) {
+      toast.warning('WhatsApp must contain numbers only (optional +, spaces, dashes).');
+      return;
+    }
+    if (!isKnownCountry(form.country)) {
+      toast.warning('Please choose a Country from the suggestion list.');
+      return;
+    }
+    if (form.nat.trim() && !isKnownNationality(form.nat)) {
+      toast.warning('Please choose a Nationality from the suggestion list.');
       return;
     }
 
@@ -118,8 +150,14 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
       return;
     }
 
+    const normalized: CustomerFormData = {
+      ...form,
+      country: normalizeCountry(form.country),
+      nat: form.nat.trim() ? normalizeNationality(form.nat) : '',
+    };
+
     const saved = onSave({
-      form,
+      form: normalized,
       mode,
       logInquiry: mode === 'add' ? logInquiry : false,
       existingCustomer: mode === 'edit' && customer ? customer : undefined,
@@ -197,11 +235,18 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             </div>
             <div className="fg">
               <label className="lbl">Country</label>
-              <select value={form.country} onChange={(e) => set('country', e.target.value)}>
-                {['USA', 'Australia', 'France', 'UK', 'Germany', 'Japan', 'Canada', 'Singapore', 'Switzerland', 'Netherlands', 'Italy', 'Other'].map((c) => (
-                  <option key={c}>{c}</option>
+              <input
+                list="nc-country-list"
+                value={form.country}
+                onChange={(e) => set('country', e.target.value)}
+                placeholder="Type to search…"
+                autoComplete="off"
+              />
+              <datalist id="nc-country-list">
+                {COUNTRIES.map((c) => (
+                  <option key={c} value={c} />
                 ))}
-              </select>
+              </datalist>
             </div>
             <div className="fg">
               <label className="lbl">
@@ -229,15 +274,38 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             </div>
             <div className="fg">
               <label className="lbl">Phone</label>
-              <input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+1 415 555 ..." />
+              <input
+                type="tel"
+                inputMode="tel"
+                value={form.phone}
+                onChange={(e) => set('phone', sanitizePhoneInput(e.target.value))}
+                placeholder="+1 415 555 ..."
+              />
             </div>
             <div className="fg">
               <label className="lbl">WhatsApp</label>
-              <input value={form.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="If different from phone" />
+              <input
+                type="tel"
+                inputMode="tel"
+                value={form.whatsapp}
+                onChange={(e) => set('whatsapp', sanitizePhoneInput(e.target.value))}
+                placeholder="If different from phone"
+              />
             </div>
             <div className="fg">
               <label className="lbl">Nationality</label>
-              <input value={form.nat} onChange={(e) => set('nat', e.target.value)} placeholder="American, French..." />
+              <input
+                list="nc-nationality-list"
+                value={form.nat}
+                onChange={(e) => set('nat', e.target.value)}
+                placeholder="Type to search…"
+                autoComplete="off"
+              />
+              <datalist id="nc-nationality-list">
+                {NATIONALITIES.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
             </div>
             <div className="fg">
               <label className="lbl">Source</label>
@@ -306,10 +374,10 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             </div>
             <div className="fg">
               <label className="lbl">First Time in Vietnam?</label>
-              <select value={form.firstTime} onChange={(e) => set('firstTime', e.target.value)}>
+              <select value={form.firstTime === 'unknown' ? '' : form.firstTime} onChange={(e) => set('firstTime', e.target.value)}>
+                <option value="">— Not specified —</option>
                 <option value="yes">Yes — first visit</option>
                 <option value="no">No — returning</option>
-                <option value="unknown">Not sure</option>
               </select>
             </div>
           </div>

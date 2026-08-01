@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
 import ProductCard from '@/components/products/ProductCard';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
@@ -401,7 +402,20 @@ export default function ProductLibrary({
           )}
 
           {filtered.length === 0 ? (
-            <div className="tp-empty-state">No products match. Adjust filters or clear them.</div>
+            <EmptyState
+              className="crm-empty-state--flush"
+              size="compact"
+              variant="products"
+              title="No products match"
+              description="Adjust filters or clear them to see the full catalogue."
+              action={
+                hasFilters ? (
+                  <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
+                    Clear filters
+                  </button>
+                ) : undefined
+              }
+            />
           ) : (
             <>
               <div className="tp-grid">

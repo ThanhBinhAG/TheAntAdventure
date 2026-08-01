@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from '@/lib/toast';
+import { confirmDialog } from '@/lib/confirm';
 
 const LS_KEY = 'ant-ai-requirements';
 
@@ -83,10 +85,15 @@ export default function AI() {
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const clearAll = () => {
-    if (!confirm('Clear all AI requirements?')) return;
+  const clearAll = async () => {
+    const ok = await confirmDialog('Clear all AI requirements?', {
+      title: 'Clear requirements',
+      confirmLabel: 'Clear',
+    });
+    if (!ok) return;
     setForm(EMPTY);
     localStorage.removeItem(LS_KEY);
+    toast.success('AI requirements cleared.');
   };
 
   const loadTemplate = (id: string) => {

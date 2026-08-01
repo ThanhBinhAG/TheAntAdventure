@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import EditableSection, { EditableCard } from '@/components/pricing/EditableSection';
 import InlineEdit from '@/components/pricing/InlineEdit';
 import type { EssNote, PricingSetting } from '@/lib/pricing/catalog-types';
+import EmptyState from '@/components/EmptyState';
 
 type Props = {
   notes: EssNote[];
@@ -101,7 +102,15 @@ export default function EssentialsNotes({ notes, settings, onPatchNote, onPatchS
         </section>
       ))}
 
-      {!sheets.length && !settings.length && <p className="pcx-empty">No guidelines or notes imported yet.</p>}
+      {!sheets.length && !settings.length && (
+        <EmptyState
+          className="crm-empty-state--flush"
+          size="compact"
+          variant="notes"
+          title="No guidelines or notes yet"
+          description="Import the Essentials workbook to populate guidelines and inputs."
+        />
+      )}
     </div>
   );
 }

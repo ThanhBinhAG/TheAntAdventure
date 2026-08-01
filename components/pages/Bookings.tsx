@@ -10,6 +10,7 @@ import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 import type { Booking } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 const STATUS_COLORS: Record<string, string> = {
   'Deposit Paid': 'bdg-a',
@@ -107,7 +108,7 @@ export default function Bookings() {
 
   const saveNewBooking = () => {
     if (!newBk.custId || !newBk.tour) {
-      alert('Please select a customer and enter tour name.');
+      toast.warning('Please select a customer and enter tour name.');
       return;
     }
     const total = parseMoneyInput(totalInput, { absolute: true });
@@ -583,7 +584,7 @@ function OnTourForm({ tab, onSave }: { tab: OtTab; onSave: (type: OtTab, payload
             type="button"
             onClick={() => {
               if (!addName.trim()) {
-                alert('Please enter the activity name.');
+                toast.warning('Please enter the activity name.');
                 return;
               }
               const addCost = parseMoneyInput(addCostInput, { absolute: true });
@@ -639,7 +640,7 @@ function OnTourForm({ tab, onSave }: { tab: OtTab; onSave: (type: OtTab, payload
             style={{ background: '#C0392B', color: '#fff', border: 'none' }}
             onClick={() => {
               if (!fullConfirm) {
-                alert('Please tick the confirmation checkbox.');
+                toast.warning('Please tick the confirmation checkbox.');
                 return;
               }
               onSave('full', { description: 'BOOKING CANCELLED', guideAlert: true });
@@ -682,7 +683,7 @@ function OnTourForm({ tab, onSave }: { tab: OtTab; onSave: (type: OtTab, payload
             if (start) parts.push(`Start → ${start}`);
             if (hotel) parts.push(`Hotel → ${hotel}`);
             if (!parts.length) {
-              alert('Enter at least one change.');
+              toast.warning('Enter at least one change.');
               return;
             }
             onSave('modify', { description: `Modified: ${parts.join(' · ')}`, pax, start, hotel, guideAlert: true });

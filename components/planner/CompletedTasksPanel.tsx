@@ -13,6 +13,7 @@ import {
   type TaskStatusValue,
 } from '@/lib/planner/planner-task-utils';
 import type { Task } from '@/lib/types';
+import EmptyState from '@/components/EmptyState';
 import { localTodayIso } from '@/lib/core/date-utils';
 
 function TaskStatusSelect({
@@ -210,15 +211,25 @@ export default function CompletedTasksPanel({ tasks, onStatusChange }: Completed
           )}
 
           {filteredTasks.length === 0 ? (
-            <div className="planner-completed-empty">
-              {completedTasks.length === 0
-                ? 'Chưa có công việc hoàn thành.'
-                : timeFilter !== 'all' && !search.trim()
-                  ? timeFilter === 'custom' && (!customFrom || !customTo)
-                    ? 'Chọn khoảng ngày để xem công việc.'
-                    : 'Không có công việc hoàn thành trong khoảng thời gian này.'
-                  : 'Không tìm thấy công việc phù hợp.'}
-            </div>
+            <EmptyState
+              className="crm-empty-state--flush"
+              size="compact"
+              variant="tasks"
+              title={
+                completedTasks.length === 0
+                  ? 'Chưa có công việc hoàn thành'
+                  : timeFilter !== 'all' && !search.trim()
+                    ? timeFilter === 'custom' && (!customFrom || !customTo)
+                      ? 'Chọn khoảng ngày để xem công việc'
+                      : 'Không có công việc trong khoảng này'
+                    : 'Không tìm thấy công việc phù hợp'
+              }
+              description={
+                completedTasks.length === 0
+                  ? 'Hoàn thành task trên Daily Planner để chúng xuất hiện tại đây.'
+                  : 'Thử đổi bộ lọc thời gian hoặc từ khóa tìm kiếm.'
+              }
+            />
           ) : (
             groupedByDate.map(([date, dateTasks]) => (
               <div key={date} className="planner-completed-group">

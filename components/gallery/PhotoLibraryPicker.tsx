@@ -18,6 +18,7 @@ import { photoThumbUrl } from '@/lib/gallery/gallery-helpers';
 import { photoMatchesSearchQuery } from '@/lib/gallery/fold-search';
 import { nextFeaturedAfterLink, nextSelectionAfterLinkToggle } from '@/lib/gallery/photo-link-selection';
 import StorageImage from '@/components/gallery/StorageImage';
+import EmptyState from '@/components/EmptyState';
 
 type PhotoApply = { linkedPhotoIds: string[]; photoIds: string[] };
 
@@ -351,7 +352,15 @@ export default function PhotoLibraryPicker({
             featuredFull={featured.length >= maxFeatured}
           />
         ))}
-        {!filtered.length && <p className="phlib-empty">No photos match this filter.</p>}
+        {!filtered.length && (
+          <EmptyState
+            className="crm-empty-state--flush crm-empty-state--inline"
+            size="compact"
+            variant="photos"
+            title="No photos match this filter"
+            description="Try another region or clear the search."
+          />
+        )}
       </div>
 
       <DragOverlay>

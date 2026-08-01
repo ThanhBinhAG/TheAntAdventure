@@ -35,6 +35,7 @@ import { resolveProductPhotos } from '@/lib/gallery/tour-photos';
 import { paxToExactN, sumSellForProducts } from '@/lib/tour-design/tour-pricing';
 import type { TourBrief, GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import type { ExperienceOverride, Product } from '@/lib/types';
+import EmptyState from '@/components/EmptyState';
 import PhotoStack from '@/components/tour-design/PhotoStack';
 
 const DESC_CLAMP_CHARS = 500;
@@ -139,12 +140,13 @@ export default function SelectedExperiencesPanel({
             ✦ AI Recommend
           </button>
         </div>
-        <div className="td-sel-empty">
-          <div style={{ fontSize: 22, marginBottom: 8 }}>🗺</div>
-          Click experiences on the left to build your tailor-made tour.
-          <br />
-          <span style={{ fontSize: 11 }}>A day-by-day draft itinerary will appear here automatically.</span>
-        </div>
+        <EmptyState
+          className="crm-empty-state--flush"
+          size="compact"
+          variant="products"
+          title="No experiences selected"
+          description="Click experiences on the left to build your tailor-made tour. A day-by-day draft will appear here."
+        />
       </div>
     );
   }

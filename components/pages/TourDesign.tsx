@@ -44,6 +44,7 @@ import { outlineDocFromRows, printOutline } from '@/lib/outline/outline-html';
 import { getCustomerName } from '@/lib/core/crm-utils';
 import type { ExperienceOverride, OutlineStatus, Product, TourOutlineDay } from '@/lib/types';
 import { paxToTierN, sumSellForProducts } from '@/lib/tour-design/tour-pricing';
+import { toast } from '@/lib/toast';
 
 const STEPS = ['Client Brief', 'Outline', 'Tour Experiences', 'Pricing', 'AI Export'] as const;
 
@@ -351,7 +352,7 @@ export default function TourDesign() {
   function goToStep(next: number) {
     if (next === 1) {
       if (!custId) {
-        alert('Please select a customer before building the outline.');
+        toast.warning('Please select a customer before building the outline.');
         return;
       }
       const lid = ensureLeadSession();
@@ -426,7 +427,7 @@ export default function TourDesign() {
   function saveAsLead() {
     const cust = custId || customers.find((c) => c.name === brief.clientName)?.id || '';
     if (!cust) {
-      alert('Please select a customer before saving to the Sales Pipeline.');
+      toast.warning('Please select a customer before saving to the Sales Pipeline.');
       return;
     }
 
@@ -464,7 +465,7 @@ export default function TourDesign() {
     }
 
     persistDraft({ step });
-    alert(`✓ Saved to Sales Pipeline!\n\nClient: ${brief.clientName || custName || 'New'}\nEst. Value: $${fmt(sellTotal)}`);
+    toast.success(`✓ Saved to Sales Pipeline!\n\nClient: ${brief.clientName || custName || 'New'}\nEst. Value: $${fmt(sellTotal)}`);
   }
 
   function resetDesign() {
@@ -769,7 +770,7 @@ export default function TourDesign() {
           if (!result.ok) return false;
           setClientFormOpen(false);
           autoFillFromCustomer(result.customer.id);
-          if (result.message) alert(result.message);
+          if (result.message) toast.success(result.message);
           return true;
         }}
       />

@@ -34,6 +34,7 @@ import {
   getSpUSD,
   mkPct,
 } from '@/lib/pricing/pricing-utils';
+import { toast } from '@/lib/toast';
 
 type PricingTab = 'pricelist' | 'costbuilder' | 'markup';
 
@@ -140,7 +141,7 @@ export default function Pricing() {
 
   const handleDownloadExcel = useCallback(() => {
     if (filtered.length === 0) {
-      alert('No products to export — adjust filters or add pricing rows.');
+      toast.warning('No products to export — adjust filters or add pricing rows.');
       return;
     }
     setExportError('');
@@ -149,7 +150,7 @@ export default function Pricing() {
 
   const handlePrintPdf = useCallback(() => {
     if (filtered.length === 0) {
-      alert('No products to export — adjust filters or add pricing rows.');
+      toast.warning('No products to export — adjust filters or add pricing rows.');
       return;
     }
     setExportError('');
@@ -158,7 +159,7 @@ export default function Pricing() {
 
   const handleDownloadPdf = useCallback(async () => {
     if (filtered.length === 0) {
-      alert('No products to export — adjust filters or add pricing rows.');
+      toast.warning('No products to export — adjust filters or add pricing rows.');
       return;
     }
     setPdfLoading(true);

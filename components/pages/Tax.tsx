@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
 import { useStore } from '@/hooks/useStore';
+import { toast } from '@/lib/toast';
 
 type TaxRow = {
   id: string;
@@ -57,7 +58,7 @@ export default function Tax() {
   const calculateQuarter = () => {
     const q = period === 'all' ? tax : filtered;
     if (!q.length) {
-      alert('No tax data for selected period.');
+      toast.warning('No tax data for selected period.');
       return;
     }
     const sum = q.reduce(
@@ -68,12 +69,13 @@ export default function Tax() {
       }),
       { rev: 0, vat_pay: 0, corp_tax: 0 }
     );
-    alert(
+    toast.info(
       `Tax Summary — ${period === 'all' ? 'All Periods' : period}\n\n` +
         `Revenue: $${fmt(sum.rev)}\n` +
         `VAT Payable: $${fmt(sum.vat_pay)}\n` +
         `Corp Tax Est.: $${fmt(sum.corp_tax)}\n\n` +
-        `Total Tax Liability: $${fmt(sum.vat_pay + sum.corp_tax)}`
+        `Total Tax Liability: $${fmt(sum.vat_pay + sum.corp_tax)}`,
+      6000
     );
   };
 

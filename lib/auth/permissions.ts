@@ -67,8 +67,5 @@ export function hasPermission(
   permissionCodes: ReadonlySet<string>,
   requiredPermission: PermissionCode,
 ): boolean {
-  return (
-    permissionCodes.has('*') ||
-    permissionCodes.has(requiredPermission)
-  );
+  return permissionCodes.has('*') || permissionCodes.has(requiredPermission);
 }

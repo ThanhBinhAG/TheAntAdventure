@@ -30,7 +30,7 @@ type PermissionsContextValue = {
     loading: boolean;
     error: string | null;
     can: (permission: PermissionCode) => boolean;
-    refreshPermissions: () => Promise<void>;
+    loadPermissions: () => Promise<void>;
 };
 
 const PermissionsContext = createContext<PermissionsContextValue | null>(null);
@@ -51,51 +51,32 @@ export function PermissionsProvider({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    /** Tải lại quyền, dùng sau khi admin vừa đổi role của user. */
-    const refreshPermissions = useCallback(async () => {
+    // Lấy toàn bộ quyền của user hiện đang đăng nhập.
+    const loadPermissions = useCallback(async () => {
         setLoading(true);
         setError(null);
 
         try {
-            const codes = await fetchCurrentPermissionCodes();
-            setPermissionCodes(new Set(codes));
-        } catch (cause) {
-            // Không tải được quyền thì chặn giao diện thay vì cấp quyền mặc định.
+            const permissionCodes = await fetchCurrentPermissionCodes();
+
+            // Dùng Set để kiểm tra quyền bằng .has() dễ dàng.
+            setPermissionCodes(new Set(permissionCodes));
+        } catch (error) {
             setPermissionCodes(new Set());
             setError(
-                cause instanceof Error ? cause.message : 'Không thể tải quyền người dùng',
+                error instanceof Error
+                    ? error.message
+                    : 'Không thể tải quyền người dùng.',
             );
         } finally {
             setLoading(false);
         }
     }, []);
 
+    // Component vừa xuất hiện thì tải quyền lần đầu.
     useEffect(() => {
-        let cancelled = false;
-
-        async function loadInitialPermissions() {
-            try {
-                const codes = await fetchCurrentPermissionCodes();
-                if (!cancelled) setPermissionCodes(new Set(codes));
-            } catch (cause) {
-                if (!cancelled) {
-                    setPermissionCodes(new Set());
-                    setError(
-                        cause instanceof Error
-                            ? cause.message
-                            : 'Không thể tải quyền người dùng',
-                    );
-                }
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        }
-
-        void loadInitialPermissions();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+        void loadPermissions();
+    }, [loadPermissions]);
 
     const value = useMemo<PermissionsContextValue>(
         () => ({
@@ -103,9 +84,9 @@ export function PermissionsProvider({
             loading,
             error,
             can: (permission) => hasPermission(permissionCodes, permission),
-            refreshPermissions,
+            loadPermissions,
         }),
-        [error, loading, permissionCodes, refreshPermissions],
+        [error, loading, permissionCodes, loadPermissions],
     );
 
     return (

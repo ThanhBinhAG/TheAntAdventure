@@ -64,15 +64,15 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     [can],
   );
 
-  const groupPages = useMemo(
-    () =>
-      new Set(
-        visibleSections.flatMap((s) => s.items)
-          .filter((i) => i.children?.length)
-          .flatMap((i) => i.children!.map((c) => c.page))
-      ),
-    []
-  );
+  const groupPages = useMemo(() => {
+    return new Set(
+      visibleSections
+        .flatMap((section) => section.items)
+        .filter((item) => item.children?.length)
+        .flatMap((item) => item.children!.map((child) => child.page)),
+    );
+  }, [visibleSections]);//Mỗi khi danh sách menu được phép hiển thị thay đổi, 
+  //Next/React tính lại các trang thuộc menu nhóm.
   const [openGroup, setOpenGroup] = useState<PageSlug | null>(null);
   const [previousPage, setPreviousPage] = useState(current);
 

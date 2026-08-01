@@ -32,7 +32,7 @@ export function PermissionGate({
         loading,
         error,
         can,
-        refreshPermissions,
+        loadPermissions,
     } = usePermissions();
 
     //Tra quyền bên PAGE_READ_PERMISSION
@@ -65,7 +65,7 @@ export function PermissionGate({
                     <button
                         type="button"
                         className="btn btn-p"
-                        onClick={() => void refreshPermissions()}
+                        onClick={() => void loadPermissions()}
                     >
                         Thử lại
                     </button>

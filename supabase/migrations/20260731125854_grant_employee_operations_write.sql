@@ -1,0 +1,3 @@
+-- Intentionally empty no-op.
+-- Real grant lives in 20260731130326_grant_employee_operations_write.sql.
+-- Kept so migration history version 20260731125854 stays valid if already applied.

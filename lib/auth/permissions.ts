@@ -22,7 +22,8 @@ export type PermissionCode = string;
 export const PAGE_READ_PERMISSION = {
   dashboard: 'dashboard.read',
 
-  planner: 'operations.read',
+  // Planner nằm trong Sales & Product; không dùng operations.read kẻo mở cả nhóm Operations.
+  planner: 'sales.read',
   customers: 'customers.read',
   agents: 'agents.read',
   sales: 'sales.read',

@@ -74,8 +74,15 @@ export function PermissionsProvider({
     }, []);
 
     // Component vừa xuất hiện thì tải quyền lần đầu.
+    // queueMicrotask: tránh setState đồng bộ trong body của effect (react-hooks/set-state-in-effect).
     useEffect(() => {
-        void loadPermissions();
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (!cancelled) void loadPermissions();
+        });
+        return () => {
+            cancelled = true;
+        };
     }, [loadPermissions]);
 
     const value = useMemo<PermissionsContextValue>(

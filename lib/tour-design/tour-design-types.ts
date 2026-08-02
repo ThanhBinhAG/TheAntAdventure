@@ -84,4 +84,6 @@ export type GalleryPhoto = {
   storagePath?: string;
   displayBytes?: number;
   createdAt?: string;
+  /** Photo folder id (defaults to Unsorted). */
+  folderId?: string;
 };

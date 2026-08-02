@@ -4,6 +4,7 @@ import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import { linkPhotoToAttractionWithFeatured } from '@/lib/attractions/attractions-helpers';
 import { nextPhotoId } from '@/lib/gallery/gallery-helpers';
 import { uploadPhotoViaApi } from '@/lib/gallery/photo-api';
+import { UNSORTED_FOLDER_ID } from '@/lib/gallery/photo-folders';
 
 export function nextGalleryPhotoId(photos: GalleryPhoto[]): string {
   return nextPhotoId(photos);
@@ -27,7 +28,7 @@ export type SaveLoosePhotosBatchResult = {
 /** Upload multiple library photos via Sharp API; optionally link to an attraction. */
 export async function saveNewLoosePhotosBatch(
   items: LoosePhotoBatchItem[],
-  data: { region: string; tags: string[] },
+  data: { region: string; tags: string[]; folderId?: string },
   opts?: {
     attractionId?: string;
     defaultRegion?: string;
@@ -39,6 +40,7 @@ export async function saveNewLoosePhotosBatch(
 
   const region = data.region || opts?.defaultRegion || 'north';
   const tags = data.tags ?? [];
+  const folderId = data.folderId || UNSORTED_FOLDER_ID;
   let photos = useStore.getState().photos as GalleryPhoto[];
   const records: GalleryPhoto[] = [];
 
@@ -51,6 +53,7 @@ export async function saveNewLoosePhotosBatch(
       caption: item.caption.trim(),
       region,
       tags,
+      folderId,
     });
     photos = [...photos, record];
     useStore.setState({ photos });
@@ -79,6 +82,7 @@ export async function saveNewLoosePhoto(
     tags: string[];
     file?: File | null;
     looseBatch?: LoosePhotoBatchItem[];
+    folderId?: string;
   },
   opts?: {
     attractionId?: string;
@@ -105,6 +109,7 @@ export async function saveNewLoosePhoto(
     caption: data.caption.trim(),
     region: data.region || opts?.defaultRegion || 'north',
     tags: data.tags ?? [],
+    folderId: data.folderId || UNSORTED_FOLDER_ID,
   });
 
   useStore.setState({ photos: [...photos, record] });

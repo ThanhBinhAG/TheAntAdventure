@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PAGE_TITLES, QUICK_NAV_PAGES } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
@@ -28,9 +28,35 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
   const leads = useStore((s) => s.leads);
   const bookings = useStore((s) => s.bookings);
   const fileRef = useRef<HTMLInputElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const supabase = useSupabasePanel();
 
   const title = pageTitle(PAGE_TITLES[page] || page);
+
+  useEffect(() => {
+    if (!toolsOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (toolsRef.current && !toolsRef.current.contains(e.target as Node)) {
+        setToolsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [toolsOpen]);
+
+  const connDotClass = `crm-conn-dot${
+    supabase?.conn?.ok ? ' ok' : supabase?.conn ? ' fail' : supabase?.remoteEnabled ? '' : ' fail'
+  }`;
+
+  const syncStatusLine =
+    (supabase?.remoteEnabled && supabase.autoSync?.status === 'synced' && supabase.autoSync.lastSyncedAt
+      ? `Supabase saved: ${supabase.autoSync.lastSyncedAt} · `
+      : supabase?.remoteEnabled && supabase.autoSync?.status === 'error'
+        ? `Supabase save failed${supabase.autoSync.lastError ? `: ${supabase.autoSync.lastError}` : ''} · `
+        : supabase?.remoteEnabled
+          ? 'Auto-sync on · '
+          : '') + `Last backup: ${lastBackup || 'never'}`;
 
   const handleExport = () => {
     const data = exportBackup();
@@ -109,50 +135,74 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
           }}
         />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, marginLeft: 8 }}>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <AiCopilotTrigger />
+      <div className="tb-tools" ref={toolsRef}>
+        <AiCopilotTrigger />
+        <div
+          id="tb-tools-rail"
+          className={`tb-tools-rail${toolsOpen ? ' is-open' : ''}`}
+          aria-hidden={!toolsOpen}
+        >
           <button
             className="btn btn-s btn-sm crm-supabase-topbtn"
             type="button"
-            title={supabase?.remoteEnabled ? 'Supabase — click to open panel' : 'Supabase chưa bật — kiểm tra .env.local'}
+            title={
+              supabase?.remoteEnabled
+                ? `Supabase — click to open panel · ${syncStatusLine}`
+                : 'Supabase chưa bật — kiểm tra .env.local'
+            }
             onClick={() => supabase?.setPanelOpen(!supabase?.panelOpen)}
             style={supabase?.remoteEnabled ? undefined : { opacity: 0.55 }}
+            tabIndex={toolsOpen ? undefined : -1}
           >
-            <span
-              className={`crm-conn-dot${
-                supabase?.conn?.ok ? ' ok' : supabase?.conn ? ' fail' : supabase?.remoteEnabled ? '' : ' fail'
-              }`}
-            />
+            <span className={connDotClass} />
             ☁ Supabase
             {supabase?.autoSync?.status === 'syncing' ? ' ↻' : ''}
             {supabase?.autoSync?.status === 'pending' ? ' …' : ''}
           </button>
-          <button className="btn btn-s btn-sm" onClick={handleExport} type="button" title="Download JSON backup">
+          <button
+            className="btn btn-s btn-sm"
+            onClick={handleExport}
+            type="button"
+            title={`Download JSON backup · Last backup: ${lastBackup || 'never'}`}
+            tabIndex={toolsOpen ? undefined : -1}
+          >
             ⬇ Backup
           </button>
-          <button className="btn btn-s btn-sm" onClick={() => fileRef.current?.click()} type="button" title="Restore from backup">
+          <button
+            className="btn btn-s btn-sm"
+            onClick={() => fileRef.current?.click()}
+            type="button"
+            title="Restore from backup"
+            tabIndex={toolsOpen ? undefined : -1}
+          >
             ⬆ Restore
           </button>
-          <button className="btn btn-s btn-sm" onClick={handleLogout} type="button" title="Đăng xuất">
+          <button
+            className="btn btn-s btn-sm"
+            onClick={handleLogout}
+            type="button"
+            title="Đăng xuất"
+            tabIndex={toolsOpen ? undefined : -1}
+          >
             ⎋ Logout
           </button>
           <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
         </div>
-        <div
-          id="last-backup-label"
-          style={{ fontSize: 10, color: 'var(--m)', whiteSpace: 'nowrap' }}
-          title={supabase?.autoSync?.status === 'error' ? supabase.autoSync.lastError ?? undefined : undefined}
+        <button
+          className="btn btn-s btn-sm tb-tools-toggle"
+          type="button"
+          title={
+            toolsOpen
+              ? 'Thu gọn công cụ hệ thống'
+              : `Mở công cụ hệ thống · ${syncStatusLine}`
+          }
+          aria-expanded={toolsOpen}
+          aria-controls="tb-tools-rail"
+          onClick={() => setToolsOpen((v) => !v)}
         >
-          {supabase?.remoteEnabled && supabase.autoSync?.status === 'synced' && supabase.autoSync.lastSyncedAt
-            ? `Supabase saved: ${supabase.autoSync.lastSyncedAt} · `
-            : supabase?.remoteEnabled && supabase.autoSync?.status === 'error'
-              ? `Supabase save failed${supabase.autoSync.lastError ? `: ${supabase.autoSync.lastError}` : ''} · `
-              : supabase?.remoteEnabled
-                ? 'Auto-sync on · '
-                : ''}
-          Last backup: {lastBackup || 'never'}
-        </div>
+          {!toolsOpen && <span className={connDotClass} aria-hidden />}
+          ⚙
+        </button>
       </div>
       <div
         style={{

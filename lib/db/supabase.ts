@@ -25,6 +25,7 @@ import {
   messagesFromRows,
   messagesToRows,
   photoToRow,
+  photoFolderToRow,
   productPhotoRows,
   productToRow,
   productPricingToRow,
@@ -45,6 +46,7 @@ import {
   rowToGuide,
   rowToLead,
   rowToPhoto,
+  rowToPhotoFolder,
   rowToProduct,
   rowToProductPricing,
   rowToRestaurant,
@@ -124,6 +126,12 @@ const HANDLERS: Record<SyncArrayTable, TableHandler> = {
   tasks: { table: 'tasks', pk: 'id', toRow: taskToRow, fromRow: rowToTask },
   feedback: { table: 'feedback', pk: 'id', toRow: feedbackToRow, fromRow: rowToFeedback },
   contracts: { table: 'contracts', pk: 'id', toRow: contractToRow, fromRow: rowToContract },
+  photo_folders: {
+    table: 'photo_folders',
+    pk: 'id',
+    toRow: photoFolderToRow,
+    fromRow: (r) => rowToPhotoFolder(r),
+  },
   photos: {
     table: 'photos',
     pk: 'id',

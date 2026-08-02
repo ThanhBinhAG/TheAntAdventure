@@ -547,8 +547,9 @@ INSERT INTO restaurants (id, name, city, cuisine, set_menu, capacity, rating, no
 INSERT INTO restaurants (id, name, city, cuisine, set_menu, capacity, rating, notes) VALUES ('SUP-R-002', 'The Deck Saigon', 'Ho Chi Minh City', 'International / Vietnamese', '$35/pax', 80, '★★★★★', NULL) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, city = EXCLUDED.city, cuisine = EXCLUDED.cuisine, set_menu = EXCLUDED.set_menu, capacity = EXCLUDED.capacity, rating = EXCLUDED.rating, notes = EXCLUDED.notes;
 INSERT INTO restaurants (id, name, city, cuisine, set_menu, capacity, rating, notes) VALUES ('SUP-R-003', 'Morning Glory Hoi An', 'Hoi An', 'Central Vietnamese', '$22/pax', 60, '★★★★', NULL) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, city = EXCLUDED.city, cuisine = EXCLUDED.cuisine, set_menu = EXCLUDED.set_menu, capacity = EXCLUDED.capacity, rating = EXCLUDED.rating, notes = EXCLUDED.notes;
 
--- MODULE 13–14: photos + tags, cal_events
-INSERT INTO photos (id, caption, region, url) VALUES ('PH-001', 'Halong Bay at Dawn', 'north', 'https://picsum.photos/seed/ant-halong1/480/320') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url;
+-- MODULE 13–14: photo folders, photos + tags, cal_events
+INSERT INTO photo_folders (id, name, parent_id, sort_order, is_system) VALUES ('PF-unsorted', 'Unsorted', NULL, 0, true) ON CONFLICT (id) DO NOTHING;
+INSERT INTO photos (id, caption, region, url, folder_id) VALUES ('PH-001', 'Halong Bay at Dawn', 'north', 'https://picsum.photos/seed/ant-halong1/480/320', 'PF-unsorted') ON CONFLICT (id) DO UPDATE SET caption = EXCLUDED.caption, region = EXCLUDED.region, url = EXCLUDED.url, folder_id = EXCLUDED.folder_id;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-001', 'halong') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-001', 'cruise') ON CONFLICT DO NOTHING;
 INSERT INTO photo_tags (photo_id, tag) VALUES ('PH-001', 'sunrise') ON CONFLICT DO NOTHING;

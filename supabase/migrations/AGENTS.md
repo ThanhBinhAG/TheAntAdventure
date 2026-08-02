@@ -11,6 +11,7 @@ CLI migrations (`db:push`). Incremental SQL dated; do not paste bootstrap copies
 - `20260731123321_grant_employee_function_permissions.sql` — export / catalogue.write
 - `20260731125854_…operations_write.sql` — no-op (giữ version history)
 - `20260731130326_…operations_write.sql` — `employee` + `operations.write`
+- `20260802160347_add_photo_folders.sql` — `photo_folders` + `photos.folder_id` (Unsorted)
 
 ## Boundaries
 - Role helpers / gán user: `supabase/snippets/`.

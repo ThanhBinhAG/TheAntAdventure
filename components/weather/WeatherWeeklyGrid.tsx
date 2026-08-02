@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { REG_COLORS_HEX } from '@/lib/core/page-helpers';
+import { FEATURED_WEEKLY_IDS } from '@/lib/weather/coordinates';
 import type { WeeklyDestinationForecast, WeeklyWeatherResponse } from '@/lib/weather/types';
 import {
   readWeeklySessionCache,
@@ -23,6 +24,8 @@ type Props = {
   region: string;
   query?: string;
 };
+
+const FEATURED_SET = new Set<string>(FEATURED_WEEKLY_IDS);
 
 function DayTile({
   date,
@@ -72,46 +75,139 @@ function DayTile({
   );
 }
 
-function DestCard({ dest, index }: { dest: WeeklyDestinationForecast; index: number }) {
+function DestHeader({ dest }: { dest: WeeklyDestinationForecast }) {
   const [rbg, rfg] = REG_COLORS_HEX[dest.region] ?? ['#E8F5EE', '#1a5c38'];
   const comfort = weekComfort(dest.days);
 
   return (
+    <div className="wg-dest-card-hd">
+      <div>
+        <h3 className="wg-dest-card-name">{dest.name}</h3>
+        <span className="wg-dest-region" style={{ background: rbg, color: rfg }}>
+          {dest.region}
+        </span>
+      </div>
+      <div className="wg-comfort">
+        <div className="wg-comfort-score">{comfort.avg.toFixed(1)}</div>
+        <div className="wg-comfort-meta">
+          <span className="wg-comfort-label">{comfort.label}</span>
+          <span className="wg-comfort-sub">
+            {comfort.excellentDays}/{dest.days.length} good days
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DayStrip({ dest }: { dest: WeeklyDestinationForecast }) {
+  return (
+    <div className="wg-day-strip">
+      {dest.days.map((day) => (
+        <DayTile
+          key={day.date}
+          date={day.date}
+          rating={day.rating}
+          tempMin={day.tempMin}
+          tempMax={day.tempMax}
+          precipMm={day.precipMm}
+          weatherCode={day.weatherCode}
+        />
+      ))}
+    </div>
+  );
+}
+
+function FeaturedDestPanel({ dest, index }: { dest: WeeklyDestinationForecast; index: number }) {
+  const [rbg] = REG_COLORS_HEX[dest.region] ?? ['#E8F5EE', '#1a5c38'];
+
+  return (
     <article
-      className="wg-dest-card"
+      className="wg-dest-card wg-dest-card--featured"
       style={{ animationDelay: `${Math.min(index, 10) * 40}ms` }}
     >
       <div className="wg-dest-card-accent" style={{ background: rbg }} />
-      <div className="wg-dest-card-hd">
-        <div>
-          <h3 className="wg-dest-card-name">{dest.name}</h3>
+      <DestHeader dest={dest} />
+      <DayStrip dest={dest} />
+    </article>
+  );
+}
+
+function CompactDestCard({
+  dest,
+  index,
+  selected,
+  onSelect,
+}: {
+  dest: WeeklyDestinationForecast;
+  index: number;
+  selected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const [rbg, rfg] = REG_COLORS_HEX[dest.region] ?? ['#E8F5EE', '#1a5c38'];
+  const comfort = weekComfort(dest.days);
+  const today = dest.days.find((d) => formatDayParts(d.date).isToday) ?? dest.days[0];
+  const wr = today ? wrStyle(today.rating) : wrStyle('G');
+  const glyph = today ? weatherGlyph(today.weatherCode) : 'cloud';
+
+  return (
+    <button
+      type="button"
+      className={`wg-compact-card${selected ? ' wg-compact-card--selected' : ''}`}
+      style={{ animationDelay: `${Math.min(index, 10) * 40}ms` }}
+      aria-pressed={selected}
+      onClick={() => onSelect(dest.id)}
+    >
+      <div className="wg-compact-card-accent" style={{ background: rbg }} />
+      <div className="wg-compact-card-main">
+        <div className="wg-compact-card-hd">
+          <h3 className="wg-compact-card-name">{dest.name}</h3>
           <span className="wg-dest-region" style={{ background: rbg, color: rfg }}>
             {dest.region}
           </span>
         </div>
-        <div className="wg-comfort">
-          <div className="wg-comfort-score">{comfort.avg.toFixed(1)}</div>
-          <div className="wg-comfort-meta">
-            <span className="wg-comfort-label">{comfort.label}</span>
-            <span className="wg-comfort-sub">
-              {comfort.excellentDays}/{dest.days.length} good days
+        <div className="wg-compact-comfort">
+          <span className="wg-compact-score">{comfort.avg.toFixed(1)}</span>
+          <span className="wg-compact-label">{comfort.label}</span>
+        </div>
+      </div>
+      {today ? (
+        <div
+          className="wg-compact-today"
+          style={{ ['--day-fg' as string]: wr.fg, ['--day-bg' as string]: wr.bg }}
+        >
+          <div className={`wg-glyph wg-glyph--${glyph}`} aria-hidden />
+          <div className="wg-compact-today-meta">
+            <span className="wg-compact-today-rating">{wr.label}</span>
+            <span className="wg-compact-today-temps">
+              {Math.round(today.tempMax)}° / {Math.round(today.tempMin)}°
             </span>
           </div>
         </div>
+      ) : null}
+    </button>
+  );
+}
+
+function SelectedDestPanel({
+  dest,
+  onClose,
+}: {
+  dest: WeeklyDestinationForecast;
+  onClose: () => void;
+}) {
+  const [rbg] = REG_COLORS_HEX[dest.region] ?? ['#E8F5EE', '#1a5c38'];
+
+  return (
+    <article className="wg-dest-card wg-dest-card--selected-detail">
+      <div className="wg-dest-card-accent" style={{ background: rbg }} />
+      <div className="wg-selected-detail-hd">
+        <DestHeader dest={dest} />
+        <button type="button" className="btn btn-s btn-sm" onClick={onClose}>
+          Close
+        </button>
       </div>
-      <div className="wg-day-strip">
-        {dest.days.map((day) => (
-          <DayTile
-            key={day.date}
-            date={day.date}
-            rating={day.rating}
-            tempMin={day.tempMin}
-            tempMax={day.tempMax}
-            precipMm={day.precipMm}
-            weatherCode={day.weatherCode}
-          />
-        ))}
-      </div>
+      <DayStrip dest={dest} />
     </article>
   );
 }
@@ -123,6 +219,7 @@ export default function WeatherWeeklyGrid({ region, query = '' }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const softRefreshStarted = useRef(false);
   const hasDataRef = useRef(false);
 
@@ -138,21 +235,6 @@ export default function WeatherWeeklyGrid({ region, query = '' }: Props) {
       if (cached?.destinations?.length && !hasDataRef.current) {
         applyPayload(cached);
         setLoading(false);
-        // #region agent log
-        fetch('http://127.0.0.1:7795/ingest/2b1fefad-0968-4921-af80-38a8434fa394', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '731769' },
-          body: JSON.stringify({
-            sessionId: '731769',
-            runId: 'hydration-fix',
-            hypothesisId: 'H1',
-            location: 'WeatherWeeklyGrid.tsx:load-cache',
-            message: 'applied session cache after mount (post-hydration)',
-            data: { destCount: cached.destinations.length },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
       } else if (opts?.showSkeleton && !hasDataRef.current) {
         setLoading(true);
       }
@@ -196,21 +278,6 @@ export default function WeatherWeeklyGrid({ region, query = '' }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    // #region agent log
-    fetch('http://127.0.0.1:7795/ingest/2b1fefad-0968-4921-af80-38a8434fa394', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '731769' },
-      body: JSON.stringify({
-        sessionId: '731769',
-        runId: 'hydration-fix',
-        hypothesisId: 'H1',
-        location: 'WeatherWeeklyGrid.tsx:mount',
-        message: 'mount: queueMicrotask load (empty SSR/client start)',
-        data: { hasDataRef: hasDataRef.current },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     queueMicrotask(() => {
       if (!cancelled) void load({ showSkeleton: true });
     });
@@ -246,15 +313,38 @@ export default function WeatherWeeklyGrid({ region, query = '' }: Props) {
 
   const destinations = useMemo(() => {
     const all = data?.destinations ?? [];
-    const filtered = all.filter((d) => {
+    return all.filter((d) => {
       if (region !== 'all' && d.region !== region) return false;
       if (!query.trim()) return true;
       return matchesFoldedQuery(`${d.name} ${d.id} ${d.region}`, query);
     });
-    return sortByComfort(filtered);
   }, [data, region, query]);
 
-  const highlights = useMemo(() => destinations.slice(0, 3), [destinations]);
+  const featured = useMemo(() => {
+    const byId = new Map(destinations.map((d) => [d.id, d]));
+    return FEATURED_WEEKLY_IDS.map((id) => byId.get(id)).filter(
+      (d): d is WeeklyDestinationForecast => Boolean(d)
+    );
+  }, [destinations]);
+
+  const others = useMemo(
+    () => sortByComfort(destinations.filter((d) => !FEATURED_SET.has(d.id))),
+    [destinations]
+  );
+
+  const selectedDest = useMemo(() => {
+    if (!selectedId) return null;
+    return others.find((d) => d.id === selectedId) ?? null;
+  }, [others, selectedId]);
+
+  // Drop stale selection when filters remove the destination (adjust while rendering).
+  if (selectedId && !selectedDest) {
+    setSelectedId(null);
+  }
+
+  function handleSelectCompact(id: string) {
+    setSelectedId((prev) => (prev === id ? null : id));
+  }
 
   if (loading && !data?.destinations?.length) {
     return <WeatherWeeklySkeleton />;
@@ -286,45 +376,57 @@ export default function WeatherWeeklyGrid({ region, query = '' }: Props) {
           {data?.stale && <span className="wg-stale">Updating…</span>}
           {flash && <span className="wg-flash">{flash}</span>}
           {error && data?.destinations?.length ? <span className="wg-error-inline">{error}</span> : null}
-          {highlights.length > 0 && (
-            <div className="wg-highlights-inline">
-              {highlights.map((d, i) => (
-                <span key={d.id} className="wg-highlight-chip">
-                  <b>#{i + 1}</b> {d.name}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
         <button className="btn btn-s btn-sm" type="button" onClick={handleRefresh} disabled={refreshing}>
           {refreshing ? 'Updating…' : 'Refresh'}
         </button>
       </div>
 
-      <div className="wg-dest-list">
-        {destinations.map((dest, i) => (
-          <DestCard key={dest.id} dest={dest} index={i} />
-        ))}
-        {!destinations.length && (
-          <EmptyState
-            className="crm-empty-state--flush"
-            size="compact"
-            variant="weather"
-            title={
-              query.trim()
-                ? `No destinations match “${query.trim()}”`
-                : 'No destinations in this region'
-            }
-            description={
-              query.trim()
-                ? 'Clear the search or pick another region.'
-                : 'Try another region chip to browse weekly forecasts.'
-            }
-          />
-        )}
-      </div>
+      {featured.length > 0 && (
+        <div className="wg-featured-row">
+          {featured.map((dest, i) => (
+            <FeaturedDestPanel key={dest.id} dest={dest} index={i} />
+          ))}
+        </div>
+      )}
 
-      <p className="wg-foot">Sorted by comfort · Open-Meteo · cron 06:00 ICT</p>
+      {selectedDest && (
+        <SelectedDestPanel dest={selectedDest} onClose={() => setSelectedId(null)} />
+      )}
+
+      {others.length > 0 && (
+        <div className="wg-compact-grid">
+          {others.map((dest, i) => (
+            <CompactDestCard
+              key={dest.id}
+              dest={dest}
+              index={i}
+              selected={selectedId === dest.id}
+              onSelect={handleSelectCompact}
+            />
+          ))}
+        </div>
+      )}
+
+      {!destinations.length && (
+        <EmptyState
+          className="crm-empty-state--flush"
+          size="compact"
+          variant="weather"
+          title={
+            query.trim()
+              ? `No destinations match “${query.trim()}”`
+              : 'No destinations in this region'
+          }
+          description={
+            query.trim()
+              ? 'Clear the search or pick another region.'
+              : 'Try another region chip to browse weekly forecasts.'
+          }
+        />
+      )}
+
+      <p className="wg-foot">Hanoi &amp; Saigon featured · click a card for 7-day detail · Open-Meteo · cron 06:00 ICT</p>
     </div>
   );
 }

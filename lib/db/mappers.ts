@@ -635,6 +635,7 @@ export function photoToRow(r: Row): Row {
     thumb_url: r.thumbUrl ?? r.thumb_url ?? null,
     storage_path: r.storagePath ?? r.storage_path ?? null,
     display_bytes: r.displayBytes ?? r.display_bytes ?? null,
+    folder_id: r.folderId ?? r.folder_id ?? 'PF-unsorted',
   };
 }
 
@@ -755,7 +756,29 @@ export function rowToPhoto(r: Row, tags: string[] = []): Row {
     storagePath: r.storage_path,
     displayBytes: r.display_bytes != null ? Number(r.display_bytes) : undefined,
     createdAt: r.created_at != null ? String(r.created_at) : undefined,
+    folderId: r.folder_id != null ? String(r.folder_id) : 'PF-unsorted',
     tags,
+  };
+}
+
+export function photoFolderToRow(r: Row): Row {
+  return {
+    id: r.id,
+    name: r.name ?? null,
+    parent_id: r.parentId ?? r.parent_id ?? null,
+    sort_order: r.sortOrder ?? r.sort_order ?? 0,
+    is_system: Boolean(r.isSystem ?? r.is_system ?? false),
+  };
+}
+
+export function rowToPhotoFolder(r: Row): Row {
+  return {
+    id: r.id,
+    name: r.name,
+    parentId: r.parent_id != null ? String(r.parent_id) : null,
+    sortOrder: Number(r.sort_order ?? 0),
+    isSystem: Boolean(r.is_system),
+    createdAt: r.created_at != null ? String(r.created_at) : undefined,
   };
 }
 

@@ -578,6 +578,21 @@ create table if not exists hotel_rooms (
 --  MODULE 13 · GALLERY
 -- ============================================================
 
+create table if not exists photo_folders (
+  id              text primary key,                -- PF-unsorted, PF-001
+  name            text not null,
+  parent_id       text references photo_folders(id) on delete restrict,
+  sort_order      smallint not null default 0,
+  is_system       boolean not null default false,
+  created_at      timestamptz not null default now()
+);
+
+create index if not exists idx_photo_folders_parent on photo_folders(parent_id);
+
+insert into photo_folders (id, name, parent_id, sort_order, is_system)
+values ('PF-unsorted', 'Unsorted', null, 0, true)
+on conflict (id) do nothing;
+
 create table if not exists photos (
   id              text primary key,                -- PH-001
   caption         text,
@@ -586,8 +601,11 @@ create table if not exists photos (
   thumb_url       text,                            -- thumbnail variant public URL
   storage_path    text,                            -- gallery/PH-001/display.webp
   display_bytes   integer,                         -- compressed display.webp size in bytes
+  folder_id       text not null default 'PF-unsorted' references photo_folders(id) on delete restrict,
   created_at      timestamptz default now()
 );
+
+create index if not exists idx_photos_folder on photos(folder_id);
 
 create table if not exists photo_tags (
   photo_id        text not null references photos(id) on delete cascade,
@@ -1081,7 +1099,7 @@ begin
     'comms','finance','accounts_receivable','accounts_payable','tax_reports',
     'staff','salary_records','tasks','contracts','feedback',
     'suppliers','supplier_tags','cruises','transport','restaurants',
-    'photos','photo_tags','product_photos','attractions','attraction_photos','cal_events',
+    'photo_folders','photos','photo_tags','product_photos','attractions','attraction_photos','cal_events',
     'chat_channels','chat_messages','chat_reactions','dev_notes',
     'weather_destinations','weather_forecast_cache','weather_fetch_log',
     'pricing_settings','pricing_ess_products','pricing_ess_cost_lines','pricing_ess_services',

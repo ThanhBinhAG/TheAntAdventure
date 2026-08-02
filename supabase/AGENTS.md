@@ -8,7 +8,7 @@ PostgreSQL v5 schema, seed/import SQL, RLS, and CLI migrations (`migrations/`).
 - `migrations/` — CLI dated SQL (RBAC + incremental)
 - `snippets/` — SQL Editor helpers (gán role user, query kiểm tra) — xem [`snippets/AGENTS.md`](snippets/AGENTS.md)
 - `reset-v5.sql`, `import-v5-data.sql`, `verify-counts-v5.sql`
-- `rls-authenticated.sql`, `fix-product-photos-rls.sql`, `wipe-photo-library.sql`
+- `wipe-photo-library.sql`, `rls-authenticated.sql`, `fix-product-photos-rls.sql`
 - `config.toml` — Supabase CLI config
 - `legacy/` — archive note only (pre-CLI patches removed)
 

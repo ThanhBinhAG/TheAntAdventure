@@ -23,6 +23,7 @@ import {
 import { pricingStatus, pricingUrlForProduct } from '@/lib/products/product-pricing-helpers';
 import { productPhotoSlotStatus } from '@/lib/gallery/gallery-helpers';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
+import type { PhotoFolder } from '@/lib/gallery/photo-folders';
 import Link from 'next/link';
 import { useStore } from '@/hooks/useStore';
 import type { Product } from '@/lib/types';
@@ -111,6 +112,7 @@ export default function ProductEditPanel({
 }: ProductEditPanelProps) {
   const allProducts = useStore((s) => s.products);
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
+  const photoFolders = useStore((s) => s.photoFolders) as PhotoFolder[];
   const existingCodes = useMemo(() => allProducts.map((p) => p.code), [allProducts]);
   const [form, setForm] = useState<ProductFormState>(() => emptyProductForm('north', existingCodes));
   const pricingRow = useStore((s) =>
@@ -528,6 +530,7 @@ export default function ProductEditPanel({
             variant="inline"
             title="Photo library"
             photos={photos}
+            folders={photoFolders}
             linkedPhotoIds={form.linkedPhotoIds}
             featuredPhotoIds={form.photoIds}
             maxFeatured={2}

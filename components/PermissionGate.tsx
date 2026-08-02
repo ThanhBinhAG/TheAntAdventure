@@ -47,7 +47,7 @@ export function PermissionGate({
                 aria-live="polite"
             >
                 <div className="card-body">
-                    Đang kiểm tra quyền truy cập…
+                    Checking access permissions…
                 </div>
             </section>
         );

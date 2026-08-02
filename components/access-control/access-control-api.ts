@@ -1,0 +1,362 @@
+'use client';
+
+/**
+ * File này gọi API phân quyền từ phía trình duyệt.
+ *
+ * Chức năng:
+ * - Lấy role, permission, danh sách user và lịch sử thay đổi từ API.
+ * - Gửi yêu cầu tạo, sửa, đổi role và đổi trạng thái user.
+ *
+ * Lưu ý:
+ * - File này không gọi Supabase trực tiếp.
+ * - API server mới là nơi kiểm tra users.manage và gọi database RPC.
+ */
+
+/** Ba role nghiệp vụ hiện có trong CRM. */
+export type ManagedRoleCode =
+    | 'super_admin'
+    | 'admin'
+    | 'employee';
+
+/** Role có thể chỉnh permission trực tiếp trên UI. */
+export type EditableRoleCode = 'admin' | 'employee';
+
+/** Dữ liệu user dùng để hiển thị trong bảng. */
+export type AccessControlUser = {
+    user_id: string;
+    email: string | null;
+    display_name: string | null;
+    is_active: boolean;
+    role_code: ManagedRoleCode | null;
+};
+
+/** Dữ liệu role trả về từ API. */
+export type AccessControlRole = {
+    role_code: ManagedRoleCode;
+    role_label: string;
+    role_description: string | null;
+    permission_codes: string[];
+};
+
+/** Dữ liệu permission trả về từ API. */
+export type AccessControlPermission = {
+    permission_code: string;
+    permission_description: string;
+};
+
+export type AccessControlData = {
+    roles: AccessControlRole[];
+    permissions: AccessControlPermission[];
+};
+
+/** Role dùng để lọc danh sách user. */
+export type UserListRoleFilter =
+    | 'all'
+    | ManagedRoleCode
+    | 'unassigned';
+
+/** Trạng thái dùng để lọc danh sách user. */
+export type UserListStatusFilter =
+    | 'all'
+    | 'active'
+    | 'inactive';
+
+/** Thống kê user cho các thẻ ở đầu trang. */
+export type AccessControlUserSummary = {
+    totalUsers: number;
+    activeUsers: number;
+    superAdminCount: number;
+    adminCount: number;
+    employeeCount: number;
+    unassignedCount: number;
+};
+
+/** Kết quả API danh sách user phân trang. */
+export type AccessControlUsersPage = {
+    items: AccessControlUser[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    summary: AccessControlUserSummary;
+};
+
+/** Dữ liệu Super Admin nhập khi tạo một tài khoản mới. */
+export type CreateAccessControlUserInput = {
+    email: string;
+    password: string;
+    displayName: string;
+    roleCode: ManagedRoleCode;
+};
+
+/** Một lần thay đổi role hoặc permission. */
+export type AccessControlAuditLog = {
+    id: number;
+    action: string;
+    actorEmail: string | null;
+    actorDisplayName: string | null;
+    targetEmail: string | null;
+    targetDisplayName: string | null;
+    beforeValue: Record<string, unknown>;
+    afterValue: Record<string, unknown>;
+    createdAt: string;
+};
+
+/** Kết quả lịch sử có phân trang. */
+export type AccessControlAuditLogsPage = {
+    items: AccessControlAuditLog[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+};
+
+
+type ApiResponse<T> =
+    | ({ ok: true } & T)
+    | { ok: false; error?: string };
+
+/** Đọc response API và ném lỗi dễ hiểu nếu request thất bại. */
+async function readApiResponse<T>(
+    response: Response,
+): Promise<T> {
+    const body = (await response.json().catch(() => ({}))) as ApiResponse<T>;
+
+    if (!response.ok || !body.ok) {
+        throw new Error(
+            'error' in body && body.error
+                ? body.error
+                : 'Không thể xử lý yêu cầu phân quyền.',
+        );
+    }
+
+    return body as T;
+}
+
+/** Lấy dữ liệu cho toàn bộ trang Access Control. */
+export async function fetchAccessControlData(): Promise<AccessControlData> {
+    const response = await fetch('/api/access-control', {
+        method: 'GET',
+        cache: 'no-store',
+    });
+
+    return readApiResponse<AccessControlData>(response);
+}
+
+/** Gửi yêu cầu đổi role cho một user. */
+export async function updateUserRole(
+    userId: string,
+    roleCode: ManagedRoleCode,
+): Promise<void> {
+    const response = await fetch('/api/access-control', {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            action: 'set_user_role',
+            userId,
+            roleCode,
+        }),
+    });
+
+    await readApiResponse<Record<string, never>>(response);
+}
+
+/**
+ * Gửi danh sách permission mới cho role admin hoặc employee.
+ */
+export async function updateRolePermissions(
+    roleCode: EditableRoleCode,
+    permissionCodes: string[],
+): Promise<void> {
+    const response = await fetch('/api/access-control', {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            action: 'replace_role_permissions',
+            roleCode,
+            permissionCodes,
+        }),
+    });
+
+    await readApiResponse<Record<string, never>>(response);
+}
+
+/**
+ * Lấy user theo trang từ API.
+ *
+ * Chỉ gửi các filter đang được chọn.
+ * API server mới là nơi thực hiện tìm kiếm/phân trang thật.
+ */
+export async function fetchAccessControlUsersPage(input: {
+    keyword: string;
+    role: UserListRoleFilter;
+    status: UserListStatusFilter;
+    page: number;
+    pageSize: number;
+}): Promise<AccessControlUsersPage> {
+    const query = new URLSearchParams({
+        page: String(input.page),
+        pageSize: String(input.pageSize),
+    });
+
+    if (input.keyword.trim()) {
+        query.set('q', input.keyword.trim());
+    }
+
+    if (input.role !== 'all') {
+        query.set('role', input.role);
+    }
+
+    if (input.status !== 'all') {
+        query.set('status', input.status);
+    }
+
+    const response = await fetch(
+        `/api/access-control/users?${query.toString()}`,
+        {
+            method: 'GET',
+            cache: 'no-store',
+        },
+    );
+
+    return readApiResponse<AccessControlUsersPage>(response);
+}
+
+/**
+ * Lấy lịch sử đổi role và permission theo trang.
+ *
+ * API kiểm tra users.manage trước khi gọi RPC database.
+ */
+export async function fetchAccessControlAuditLogs(input: {
+    page: number;
+    pageSize: number;
+}): Promise<AccessControlAuditLogsPage> {
+    const query = new URLSearchParams({
+        page: String(input.page),
+        pageSize: String(input.pageSize),
+    });
+
+    const response = await fetch(
+        `/api/access-control/audit-logs?${query.toString()}`,
+        {
+            method: 'GET',
+            cache: 'no-store',
+        },
+    );
+
+    return readApiResponse<AccessControlAuditLogsPage>(response);
+}
+
+/**
+ * Các dữ liệu PATCH hợp lệ cho API /api/access-control/users.
+ *
+ * Giữ type này ở client để component gọi API không phải nhớ
+ * action và tên field kỹ thuật.
+ */
+type UserUpdateRequest =
+    | {
+        action: 'update_profile';
+        userId: string;
+        displayName: string;
+    }
+    | {
+        action: 'set_active';
+        userId: string;
+        isActive: boolean;
+    }
+    | {
+        action: 'restore';
+        userId: string;
+    };
+
+/** Gửi một thao tác PATCH đến API quản lý user. */
+async function sendUserUpdate(
+    body: UserUpdateRequest,
+): Promise<void> {
+    const response = await fetch('/api/access-control/users', {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+    });
+
+    await readApiResponse<Record<string, never>>(response);
+}
+
+/** Sửa tên hiển thị của user. */
+export async function updateUserDisplayName(
+    userId: string,
+    displayName: string,
+): Promise<void> {
+    await sendUserUpdate({
+        action: 'update_profile',
+        userId,
+        displayName,
+    });
+}
+
+/** Kích hoạt hoặc vô hiệu hóa user. */
+export async function updateUserActiveStatus(
+    userId: string,
+    isActive: boolean,
+): Promise<void> {
+    await sendUserUpdate({
+        action: 'set_active',
+        userId,
+        isActive,
+    });
+}
+
+/** Xóa mềm user. User sẽ biến mất khỏi danh sách mặc định. */
+export async function softDeleteUser(
+    userId: string,
+): Promise<void> {
+    const response = await fetch('/api/access-control/users', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+    });
+
+    await readApiResponse<Record<string, never>>(response);
+}
+
+/** Khôi phục user đã bị xóa mềm. */
+export async function restoreUser(
+    userId: string,
+): Promise<void> {
+    await sendUserUpdate({
+        action: 'restore',
+        userId,
+    });
+}
+
+/**
+ * Tạo một tài khoản Auth mới, sau đó API sẽ tự tạo profile và gán role.
+ *
+ * Mật khẩu chỉ được gửi trong request này, không lưu trong state chung
+ * và API cũng không trả mật khẩu về trình duyệt.
+ */
+export async function createAccessControlUser(
+    input: CreateAccessControlUserInput,
+): Promise<string> {
+    const response = await fetch('/api/access-control/users', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(input),
+    });
+
+    const result = await readApiResponse<{
+        userId: string;
+    }>(response);
+
+    return result.userId;
+}

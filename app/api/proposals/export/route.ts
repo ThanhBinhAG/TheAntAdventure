@@ -2,27 +2,24 @@
  * API xuất Proposal PDF.
  *
  * Chức năng:
- * - Nhận dữ liệu proposal từ giao diện.
- * - Kiểm tra quyền `tour_design.export` ở server.
- * - Chỉ tạo và trả PDF khi người dùng được cấp quyền.
+ * - Chỉ yêu cầu người gọi đã đăng nhập.
+ * - Không kiểm tra role hoặc permission xuất PDF.
+ * - Nhận dữ liệu proposal và tạo file PDF.
  */
 
 import { NextResponse } from 'next/server';
-import { checkProposalExportPermission } from '@/lib/proposals/proposal-auth';
+import { getAuthContext } from '@/lib/auth/session';
 import { renderProposalPdf } from '@/lib/proposals/proposal-pdf';
 import type { ProposalDoc } from '@/lib/proposals/proposal-types';
 import { captureAppError } from '@/lib/system/app-logger';
 
 export async function POST(request: Request) {
-  // Kiểm tra quyền tại server, không tin quyền do trình duyệt gửi lên.
-  const permission = await checkProposalExportPermission();
+  const auth = await getAuthContext();
 
-  if (!permission.allowed) {
+  if (!auth.authenticated) {
     return NextResponse.json(
-      {
-        error: permission.status === 401 ? 'Unauthorized' : 'Forbidden',
-      },
-      { status: permission.status },
+      { error: 'Unauthorized' },
+      { status: 401 },
     );
   }
 

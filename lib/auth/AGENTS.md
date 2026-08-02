@@ -5,6 +5,7 @@ Server session, break-glass admin, and rate limiting.
 
 ## Contents
 - `session.ts`, `break-glass*.ts`, `rate-limit.ts`
+- `access-control-admin.ts` — Supabase Admin API server-only để tạo Auth user từ Access Control.
 
 ## Boundaries
-- API routes: `app/api/auth`. Captcha UI: `components/auth`.
+- API routes: `app/api/auth`; riêng `access-control-admin.ts` chỉ được Route Handler Access Control phía server gọi. Captcha UI: `components/auth`.

@@ -58,6 +58,9 @@ export const PAGE_READ_PERMISSION = {
   ai: 'devnotes.read',
   devnotes: 'devnotes.read',
   teamchat: 'teamchat.read',
+  // Trang quản lý user, role và permission.
+  // Chỉ super_admin có wildcard (*) nên mới qua được users.manage.
+  'access-control': 'users.manage',
 } satisfies Record<PageSlug, PermissionCode>;
 
 /**

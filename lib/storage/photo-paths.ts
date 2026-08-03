@@ -43,3 +43,8 @@ export function thumbPathFromDisplayPath(displayPath?: string | null): string | 
 export function guideAvatarPath(guideId: string): string {
   return `guides/${guideId}/avatar.webp`;
 }
+
+/** Fixed path for CRM company logo (sidebar avatar). */
+export function companyLogoPath(): string {
+  return 'branding/logo.webp';
+}

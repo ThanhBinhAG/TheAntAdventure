@@ -1,6 +1,9 @@
 # GitLab CI
-# - main: package Docker image on the runner host Docker (no DinD)
+# - main: build Docker image on the runner host + deploy (compose up)
 # - other branches: lint + Next build (verify only)
+#
+# Runner: shell executor on vm06 (host Docker, no DinD).
+# Secrets: $MNT_FDATA/sharing/.env.local
 
 stages:
   - verify
@@ -11,7 +14,8 @@ variables:
   NEXT_TELEMETRY_DISABLED: '1'
   IMAGE_TAG: 'the-ant-adventures-crm:$CI_COMMIT_SHORT_SHA'
   IMAGE_LATEST: 'the-ant-adventures-crm:latest'
-  MNT_FDATA: '/mnt/fdata/the_ant_adventures_crm/'
+  MNT_FDATA: '/mnt/fdata/the_ant_adventures_crm'
+  COMPOSE_PROJECT_NAME: 'the-ant-adventures-crm'
 
 cache:
   key:
@@ -50,8 +54,7 @@ build:
     - npm ci
     - npm run build
 
-# Package on server Docker daemon — main only (shell / host docker, no DinD).
-# Secrets: $MNT_FDATA/sharing/.env.local
+# Build image + run container on server Docker daemon — main only.
 docker:
   stage: package
   tags:
@@ -63,7 +66,7 @@ docker:
     - docker info
     - export ENV_FILE="$(sh scripts/docker-with-env.sh print)"
     - echo "Building with ENV_FILE=$ENV_FILE"
-    - docker compose --env-file "$ENV_FILE" build
+    - sh scripts/docker-with-env.sh build
     - docker tag the-ant-adventures-crm:local "$IMAGE_TAG"
     - docker tag the-ant-adventures-crm:local "$IMAGE_LATEST"
     - |
@@ -74,3 +77,6 @@ docker:
       else
         echo "CI_REGISTRY not set — image kept on server Docker only."
       fi
+    - echo "Deploying container on server..."
+    - sh scripts/docker-with-env.sh deploy
+    - sh scripts/docker-with-env.sh status

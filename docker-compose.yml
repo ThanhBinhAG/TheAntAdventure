@@ -1,7 +1,11 @@
 # Local / VM packaging for The Ant Adventures CRM.
-# Build + run:
-#   docker compose --env-file .env.local up --build -d
-# App: http://localhost:3006
+# Env resolution (see scripts/docker-with-env.sh):
+#   1) ENV_FILE if set
+#   2) /mnt/fdata/sharing/.env.local  (or env.local)
+#   3) ./.env.local
+#
+#   npm run docker:up
+#   # or: ENV_FILE=/path/to/.env.local docker compose --env-file "$ENV_FILE" up --build -d
 
 services:
   app:
@@ -22,7 +26,7 @@ services:
     ports:
       - "${APP_PORT:-3006}:3006"
     env_file:
-      - .env.local
+      - ${ENV_FILE:-/mnt/fdata/sharing/.env.local}
     environment:
       NODE_ENV: production
       PORT: 3006

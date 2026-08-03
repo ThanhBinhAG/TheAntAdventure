@@ -1,6 +1,6 @@
 # GraphRAG Memory — The Ant Adventures CRM
 
-> Snapshot: 2026-07-30 · phạm vi: mã nguồn đang có trong repository, không bao gồm `node_modules` hay `.next`.
+> Snapshot: 2026-08-02 · phạm vi: mã nguồn đang có trong repository, không bao gồm `node_modules` hay `.next`. Bao gồm module Access Control đã commit ở `0345007`.
 >
 > Mục đích: đây là memory map để truy vết nhanh **chức năng → file → dữ liệu → luồng chạy**. Các sơ đồ là các cạnh có hướng; tên trong dấu backtick là node có thể tìm bằng `rg`.
 
@@ -12,6 +12,7 @@
 | Dữ liệu CRM | `lib/store.ts`, `lib/types.ts` | `components/StoreProvider.tsx` → `lib/db/hydrate.ts` / `lib/db/sync-push.ts` → `lib/db/supabase.ts` |
 | Supabase/schema & RLS | `supabase/schema.sql`, `supabase/migrations/20260730042242_02_migrations.sql`, `docs/DATABASE.md` | table → mapper trong `lib/db/mappers.ts` → `lib/db/supabase.ts`; RLS chuyển tiếp ở `supabase/rls-authenticated.sql` |
 | Đăng nhập/session | `app/api/auth/login/route.ts` | `lib/auth/*`, `lib/env.ts`, `middleware.ts` |
+| Quyền và Access Control | `lib/auth/permissions.ts` | `PermissionsProvider` → `/api/auth/permissions` → `current_permission_codes()`; `/access-control` → `components/access-control/*` → `/api/access-control/*` → RPC Supabase |
 | Sales đến booking | `components/pages/Sales.tsx` | `lib/customers/*`, `lib/sales/*`, `components/pages/Bookings.tsx` |
 | Thiết kế tour/proposal | `components/pages/TourDesign.tsx` | `components/tour-design/*` → `lib/tour-design/*` / `lib/proposals/*` |
 | Bảng giá/XLSX | `components/pages/Pricing*.tsx` | `components/pricing/*` → `lib/pricing/*` → bảng `pricing_*` |
@@ -41,6 +42,10 @@ flowchart LR
   N --> API[app/api/* route handlers]
   API --> SB
   API --> EXT[Open-Meteo / Puppeteer PDF / Sentry]
+  P --> AC[Access Control UI]
+  AC --> API
+  API --> ARBAC[Access Control RPC]
+  ARBAC --> SB
   U --> LOGIN[/login]
   LOGIN --> AUTH[/api/auth/login]
   AUTH --> SA[Supabase Auth + break-glass]
@@ -69,6 +74,8 @@ flowchart TB
   UI --> AR --> SR --> ST
   BG --> AR
   AU --> DB
+  UI -->|permission codes only| AR
+  AR -->|users.manage + RPC checks| DB
 ```
 
 ## 3. Route and UI graph
@@ -114,6 +121,9 @@ flowchart TB
   S4 --> ai
   S4 --> devnotes
   S4 --> teamchat
+
+  REG --> S5[System]
+  S5 --> accesscontrol[access-control]
 ```
 
 Page registry: `components/pages/index.ts` lazy-loads every page except `Dashboard`. `lib/constants.ts` is the authoritative navigation and slug registry; `lib/types.ts` supplies `PageSlug`.
@@ -218,6 +228,31 @@ sequenceDiagram
 
 Implemented session bridge: `middleware.ts` calls `updateSession` from `lib/supabase/middleware.ts`; `lib/supabase/index.ts` caches the browser client created by `lib/supabase/client.ts`. Middleware keeps `/api/health`, login/logout and configured debug paths public, refreshes Supabase cookies, and redirects unauthenticated CRM traffic to `/login`. Break-glass sessions can also attach a shadow Supabase session for authenticated RLS access.
 
+### Permission load and Access Control
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant PP as PermissionsProvider
+  participant PA as /api/auth/permissions
+  participant RPC as current_permission_codes()
+  participant AC as /access-control + API
+  participant DB as Access Control RPC
+
+  B->>PP: CRM mount after login
+  PP->>PA: GET permission codes once
+  PA->>RPC: use current session cookie
+  RPC-->>PP: permission codes, e.g. users.manage or *
+  PP->>AC: PermissionGate checks PAGE_READ_PERMISSION
+  alt Has users.manage or *
+    AC->>DB: manage users/roles/audit through protected API
+  else Missing permission
+    AC-->>B: do not mount page; link back to Dashboard
+  end
+```
+
+`PermissionsProvider` caches permission codes in React Context for the current CRM session; `hasPermission()` accepts either the requested code or the Super Admin wildcard `*`. This cache improves UI responsiveness only. Every Access Control API and its database RPC perform their own `users.manage` check.
+
 ### Hydrate and synchronization
 
 ```mermaid
@@ -293,10 +328,13 @@ flowchart LR
 | `GET,POST /api/auth/users` | recovery/admin use | `requireBreakGlass` | service-role Auth admin |
 | `GET /api/health` | external monitor | public by design | Supabase Auth health |
 | `POST /api/photos/upload`, `/delete` | gallery | authenticated only | Storage + `photos` tables |
-| `POST /api/pricing/export`, `/api/proposals/export` | pricing/tour-design | authenticated only via `proposal-auth` | Puppeteer/Chromium PDF |
+| `POST /api/pricing/export`, `/api/proposals/export` | pricing/tour-design | authenticated only; no role/permission export check | Puppeteer/Chromium PDF |
 | `GET,PUT /api/system/*` | debug panel | debug token except debug-log POST | diagnostics/log buffer |
 | `POST /api/weather/refresh` | weather page or cron | authenticated user or cron secret | service-role cache + Open-Meteo |
 | `GET /api/weather/weekly` | weather page | no explicit guard | service-role cache |
+| `GET,PATCH /api/access-control` | role and permission tab | `users.manage` at API and RPC | `lib/access-control/server.ts` + authorization RPC |
+| `GET,POST,PATCH,DELETE /api/access-control/users` | user directory | `users.manage` at API and RPC; create additionally uses server-only Admin API | Auth, `profiles`, `user_roles`, audit RPC |
+| `GET /api/access-control/audit-logs` | audit log tab | `users.manage` at API and RPC | paginated audit-log RPC |
 
 ## 7. Data graph and sensitivity groups
 
@@ -314,82 +352,104 @@ flowchart TB
 
 Schema relationships live in `docs/DATABASE.md` and `supabase/schema.sql`; the CLI baseline is `supabase/migrations/20260730042242_02_migrations.sql`. Fresh schema/migration sources still create `dev_allow_all` policies. The tracked `supabase/rls-authenticated.sql` is a manual transition run after Auth login works: it replaces those policies with shared `authenticated_access` policies. It blocks anonymous direct access but does **not** implement the role/ownership model below; whether it has been applied to a remote project must be checked separately.
 
-## 8. RBAC target graph and implementation blueprint
+## 8. RBAC implementation — delivered 2026-08-02
 
-### Recommended role set
+### Current role model
 
-Use roles as a coarse grant and permissions as the stable implementation primitive. Do not encode page names directly in Supabase Auth metadata as the only authority.
+RBAC now uses roles as a convenient business grouping and permission codes as the enforcement primitive. A role is not checked by page/API code directly, except where the management UI must constrain valid role names.
 
-| Role | Scope | Typical rights |
+| Role | Effective permission model | Access Control capability |
 |---|---|---|
-| `super_admin` | emergency/system administration | all permissions; break-glass only for recovery |
-| `admin` | business administration | user/role management, all business modules, no break-glass secret actions |
-| `sales_manager` | sales team | see team pipeline; assign leads; approve discounts/exports |
-| `sales_agent` | assigned customers/leads | CRUD own/assigned customer, lead, draft; no finance/HR |
-| `operations` | confirmed tours | booking, itinerary, suppliers, guides, tasks; limited customer read |
-| `finance` | finance | finance, AR/AP, tax, pricing cost; booking/customer read; no HR salary by default |
-| `hr` | people operations | staff, salary, selected company pages; no customer finance |
-| `content_editor` | catalogue/media | products, attractions, gallery; no customer/finance data |
-| `viewer` | read-only reporting | approved read-only data, no export of sensitive data |
+| `super_admin` | wildcard `*` | Can open `/access-control` and manage users, roles, permissions and audit logs. The wildcard is view-only in the role UI. |
+| `admin` | permissions assigned through `role_permissions` | Can use the CRM functions granted to the role; cannot receive `users.manage` through the UI/RPC. |
+| `employee` | permissions assigned through `role_permissions` | Can use the CRM functions granted to the role; cannot receive `users.manage` through the UI/RPC. |
 
-### Permission vocabulary
+`users.manage` is the sole permission required for Access Control. The migration removes it from `admin`/`employee`, hides it from the editable permission list, and rejects attempts to add `users.manage` or `*` to either role.
+
+### Permission data and enforcement graph
 
 ```mermaid
 flowchart LR
-  USER[auth.users user_id] --> PROFILE[profiles]
-  PROFILE --> UR[user_roles]
+  USER[auth.users id] --> PROFILE[profiles]
+  PROFILE --> UR[user_roles: one role per user]
   UR --> ROLE[roles]
   ROLE --> RP[role_permissions]
-  RP --> PERM[permissions: resource.action]
-  PROFILE --> ASSIGN[ownership / assignment]
-  PERM --> RLS[Postgres RLS]
-  PERM --> API[Next API guard]
-  PERM --> UI[Navigation + control visibility]
-  ASSIGN --> RLS
+  RP --> PERM[permissions]
+  PERM --> RPC[current_permission_codes]
+  RPC --> UI[PermissionsProvider + PermissionGate]
+  RPC --> API[checkPermissionForRequest]
+  API --> DBRPC[Access Control RPC]
+  DBRPC --> AUDIT[access_control_audit_logs]
 ```
 
-Suggested resources/actions: `customers.{read,create,update,delete}`, `leads.*`, `tour_drafts.*`, `bookings.*`, `products.*`, `pricing.{read,write,export}`, `finance.*`, `hr.*`, `photos.*`, `weather.{read,refresh}`, `users.manage`, `audit.read`. Add `own`, `team`, and `all` as scope levels only where row ownership is meaningful.
+The same permission is checked in three places:
 
-### Policy boundaries by data class
+1. **UI:** `PermissionsProvider` loads only permission codes and `PermissionGate` prevents the `/access-control` page from mounting for users without `users.manage`.
+2. **Next.js API:** every `/api/access-control/*` route calls `checkPermissionForRequest('users.manage')`; a direct browser request cannot bypass this.
+3. **Database RPC:** each sensitive RPC calls `public.has_permission('users.manage')`; this protects against an API mistake or a direct RPC request.
 
-| Data group | RLS rule shape | Role examples |
-|---|---|---|
-| Customer, lead, comms, tour draft | `owner_user_id = auth.uid()` or active assignment membership; managers see team | sales agent / sales manager |
-| Booking, itinerary, supplier, guide, task | booking assignment/team membership | operations / manager |
-| Finance, AR/AP, tax, salary | permission check only; no open ownership fallback | finance / HR / admin |
-| Products, attractions, pricing | shared read; write requires content/pricing permission | content editor / finance / admin |
-| Photos / Storage | owner folder and application permission; never arbitrary path parameter | content editor / admin |
-| Chat, dev notes | channel membership / author / explicit admin | internal roles |
+The first layer is for navigation and user experience. The API and database layers are the actual authorization boundaries.
 
-### Ordered delivery plan
+### Access Control UI and APIs
 
-1. **Verify and ship the current baseline.** Browser/session helpers, DnD dependencies and Sentry are tracked, and local typecheck, lint and production build pass. Make the XLSX parser tests portable (fixture or explicit optional test input), then verify that the remote database has run the tracked authenticated-only RLS transition before adding RBAC.
-2. **Define the authorization contract.** Confirm the above role matrix with business owners; write a permission list, sensitive-data classification, team/manager model and export policy. Decide whether agents own records directly or via a team table.
-3. **Model authorization in a versioned SQL migration.** Add `profiles`, `roles`, `permissions`, `user_roles`, and (where needed) assignment/team tables. Link profile `id` to `auth.users(id)`; seed only explicit initial roles. Store migrations in version control, not only in a dashboard.
-4. **Replace transition RLS with RBAC RLS.** Supersede `dev_allow_all`/shared `authenticated_access` with small SQL helper functions such as `has_permission(resource, action)` and assignment predicates. Write policies table-by-table, beginning with PII/finance. Test each policy with at least two non-admin users and a service-role-only migration path.
-5. **Change write architecture before enabling multi-user sync.** The 90% regression guard reduces accidental destructive pushes but does not solve concurrent editing. Replace whole-table mirror/delete synchronization with record-level commands or server-side transactional mutations. Add `owner_user_id`, `created_by`, `updated_by`, `updated_at`, and optimistic versioning to mutable business records.
-6. **Enforce on every server path.** The current routes consistently establish authentication where required, but only the recovery API is role-specific. Add a single server authorization helper (`requirePermission`) to distinguish read from export, write, delete, refresh and user administration. Service-role clients must run only after this check and must not accept unvalidated storage paths.
-7. **Use permissions in UI as affordances only.** Populate session/profile permissions; filter `NAV_SECTIONS`, hide write/delete controls and protect actions. The UI never substitutes for RLS/API enforcement.
-8. **Add audit and tests.** Log role changes, exports, deletes, rejected access and break-glass use. Add unit tests for the permission matrix plus integration tests that execute RLS as each role. CI already runs lint and production build; add typecheck and a self-contained test suite.
-9. **Roll out safely.** Start in read-only mode for a small pilot, compare count/access logs, then enable writes by role. Keep a tested rollback migration and emergency `super_admin` procedure.
+| Feature | Main UI node | Route | Server/database operation |
+|---|---|---|---|
+| View users, search, role/status filters and summary | `UserDirectory.tsx` | `GET /api/access-control/users` | `list_access_control_users_page`, `get_access_control_user_summary` |
+| Create user | `UserCreateDrawer.tsx` | `POST /api/access-control/users` | Create `auth.users` with service role; trigger creates profile; RPC sets profile and role; rollback Auth user on partial failure |
+| Change a user role | `UserAccessDrawer.tsx` | `PATCH /api/access-control` | `set_user_role` |
+| Edit display name | `UserEditDrawer.tsx` | `PATCH /api/access-control/users` | `update_access_control_user_profile` |
+| Activate/deactivate or soft-delete a user | `UserActionsMenu.tsx` | `PATCH`/`DELETE /api/access-control/users` | lifecycle RPCs; rejected for self-targeting and the last Super Admin |
+| Configure Admin/Employee permissions | `RolesPermissionsTab.tsx` | `PATCH /api/access-control` | `replace_role_permissions` |
+| Read change history | `AuditLogsTab.tsx` | `GET /api/access-control/audit-logs` | `list_access_control_audit_logs` |
 
-## 9. Known integrity and delivery constraints at this snapshot
+The browser accesses these routes through `components/access-control/access-control-api.ts`; it does not call Supabase directly for management operations. `lib/access-control/server.ts` makes RPC calls with the current user's cookies, so PostgreSQL sees the correct `auth.uid()`. The only service-role module is `lib/auth/access-control-admin.ts`, used solely to create/rollback an Auth user on the server.
+
+### Versioned migrations for the delivered module
+
+| Migration | Responsibility |
+|---|---|
+| `20260802010226_add_super_admin_role.sql` | Seeds `super_admin`, assigns wildcard `*`, removes `users.manage` from Admin. |
+| `20260802014552_add_access_control_rpcs.sql` | Adds audit table, role/permission/user management RPC baseline and one-role-per-user constraint. |
+| `20260802070833_protect_access_control_system_permissions.sql` | Protects `users.manage` and prevents wildcard/system permission assignment to Admin/Employee. |
+| `20260802123339_add_access_control_user_pagination.sql` | Adds server-side user listing, filters and role statistics. |
+| `20260802131905_add_access_control_audit_list.sql` | Adds protected, paginated audit-log read RPC. |
+| `20260802141248_add_access_control_user_lifecycle.sql` | Adds soft-delete state and excludes deleted users from permission codes, normal listings and statistics. |
+| `20260802142349_add_access_control_user_write_rpcs.sql` | Adds update profile, activate/deactivate, soft-delete/restore RPCs and lifecycle audit actions. |
+
+`supabase/snippets/gan_quyen_super_admin.sql` is a controlled manual bootstrap snippet to assign the first Super Admin after its Auth/profile records exist. It must not be used as an application runtime path.
+
+### Audit trail
+
+The `access_control_audit_logs` table records the actor, target, before/after values and time. The current UI maps these actions to Vietnamese labels: `user_role_changed`, `role_permissions_replaced`, `user_profile_updated`, `user_activated`, `user_deactivated`, `user_soft_deleted`, and `user_restored`. The table is read via the protected RPC rather than directly from the browser.
+
+### Deliberately not yet enforced by this module
+
+- General CRM business tables do **not** yet have role/row-scoped RLS based on these permissions. This work only protects Access Control itself and page-level navigation already wired to permission codes.
+- Photo upload/delete, weather refresh, and PDF exports retain their existing guards. PDF exports intentionally require only an authenticated session so both Admin and Employee can export; they are not restricted by a separate export permission.
+- The user directory hides soft-deleted users in its normal list. A restore RPC exists, but there is no dedicated deleted-user/restore screen yet.
+
+### Future extension direction
+
+When the business requires more roles, add a role and assign existing permission codes first. Add new permission codes only when a genuinely new action must be distinguished. For record-specific scope, introduce ownership/assignment fields and enforce them with RLS after replacing full-table mirror synchronization with record-level server commands. Candidate future roles include sales, operations, finance, HR, content editor and viewer; they are not currently seeded roles.
+
+## 9. Known integrity and delivery constraints
 
 | Priority | Evidence node | Why it matters to the graph/RBAC plan |
 |---|---|---|
-| Critical | `supabase/schema.sql:1068-1095` and `supabase/migrations/20260730042242_02_migrations.sql` | Both fresh-install sources grant anonymous `dev_allow_all` access. `rls-authenticated.sql` is tracked but is a manual, shared-access transition, so its remote application must be verified. |
+| Critical | `supabase/schema.sql:1068-1095` and `supabase/migrations/20260730042242_02_migrations.sql` | Both fresh-install sources grant anonymous `dev_allow_all` access. `rls-authenticated.sql` is tracked but is a manual, shared-access transition, so its remote application must be verified. This is separate from the protected Access Control RPCs. |
+| High | `supabase/rls-authenticated.sql`, Access Control migrations | Current RBAC protects permission loading and the Access Control module, not CRUD rows in general CRM business tables. Do not represent the current work as complete data-level RBAC. |
 | High | `lib/db/supabase.ts`, `lib/db/sync-policy.ts`, `lib/db/sync-lifecycle.ts` | Snapshot mirror sync still deletes remote rows when the 90% baseline guard permits it or an operator forces a push; this conflicts with concurrent editing and future row-scoped RLS. |
 | High | `app/api/photos/delete/route.ts` → `lib/storage/upload-gallery-photo-server.ts` → `lib/storage/photo-paths.ts` | Any authenticated user can invoke a service-role-capable delete and provide an additional `storagePath`; folder policy and validation are not a per-record authorization check. |
-| High | `scripts/supabase-db.sh`, `supabase/LEGACY-MIGRATIONS.md` | Bootstrap guidance still names three migration files deleted in the current revision, while the only tracked CLI migration is `20260730042242_02_migrations.sql`; reconcile migration history before relying on CLI status/push. |
+| Medium | `components/access-control/UserDirectory.tsx` + lifecycle RPCs | Soft-deleted users are excluded from the normal list; an administrator cannot restore one from the UI until a deleted-user view is added. |
 | Medium | `.gitlab-ci.yml` | CI runs lint and production build, but not typecheck or tests. |
 | Medium | `tests/pricing-catalog-xlsx.test.ts:8-9` | Two tests depend on XLSX files below gitignored `Personal/Material/pricing/`, so a checkout without local material reports two `ENOENT` failures. |
 | Medium | `components/pages/Sales.tsx` (882 lines), `TourDesign.tsx` (778), `Bookings.tsx` (694), `Dashboard.tsx` (690), `lib/db/supabase.ts` (821), `lib/proposals/proposal-assembler.ts` (943) | High coupling makes permission checks and future ownership enforcement expensive; extract command/data boundaries before broad RBAC UI work. |
 
 ## 10. Verification status
 
-- Static source review: complete for App Router, page registry, core state/sync, auth/session, API handlers, storage, weather, database schema, tests and project configuration.
-- `npm run typecheck`: passed.
-- `npm run lint`: passed with `--max-warnings=0`.
-- `npm run build`: passed. Sentry reports a deprecation warning that `sentry.client.config.ts` should move to `instrumentation-client.ts` for future Turbopack support.
-- `npm test`: 264 of 266 tests passed. The two failures are `ENOENT` reads for the ignored Essentials and Accommodation XLSX workbooks; no test assertion failed.
-- No source code, configuration or schema was changed to produce this memory document.
+- Static source review: refreshed for the Access Control routes, UI, server services, migrations and audit test added in commit `0345007`.
+- `npx supabase migration list --local`: local and remote histories must match through `20260802142349`; use this command after migration changes rather than `db:status`, which requires a linked hosted Supabase project.
+- `npm run typecheck`: passed when Access Control was completed.
+- `npm test`: 275 of 277 tests passed in the latest full run. The two failures are `ENOENT` reads for the ignored Essentials and Accommodation XLSX workbooks; no test assertion failed.
+- A production build is not claimed for this snapshot: running `next build` concurrently with `next dev` corrupted generated `.next` vendor chunks locally. The cache was moved aside and `next dev` restarted successfully; stop the dev server before the next production-build verification.
+- This documentation update changes `docs/GRAPHRAG-MEMORY.md`; no application logic, configuration or database schema was changed by the documentation refresh itself.

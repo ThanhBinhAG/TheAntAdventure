@@ -28,6 +28,7 @@ begin
     'suppliers','supplier_tags','cruises','transport','restaurants',
     'hotels','hotel_rooms',
     'photo_folders','photos','photo_tags','product_photos','attractions','attraction_photos','cal_events',
+    'company_branding',
     'chat_channels','chat_messages','chat_reactions','dev_notes',
     'pricing_settings','pricing_ess_products','pricing_ess_cost_lines','pricing_ess_services',
     'pricing_ess_car_rates','pricing_ess_hotel_rates','pricing_ess_notes',

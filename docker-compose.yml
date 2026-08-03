@@ -1,11 +1,14 @@
 # Local / VM packaging for The Ant Adventures CRM.
 # Env resolution (see scripts/docker-with-env.sh):
 #   1) ENV_FILE if set
-#   2) /mnt/fdata/sharing/.env.local  (or env.local)
+#   2) $MNT_FDATA/sharing/.env.local  (or env.local)
 #   3) ./.env.local
 #
-#   npm run docker:up
-#   # or: ENV_FILE=/path/to/.env.local docker compose --env-file "$ENV_FILE" up --build -d
+#   npm run docker:up       # build + run
+#   npm run docker:deploy   # recreate from existing image (CI)
+#   npm run docker:status
+#
+# COMPOSE_PROJECT_NAME defaults to the-ant-adventures-crm (set in script / CI).
 
 services:
   app:

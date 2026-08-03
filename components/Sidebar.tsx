@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NAV_SECTIONS, type NavItem } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
@@ -12,13 +12,19 @@ import { countTourDesignAttention } from '@/lib/tour-design/tour-design-leads';
 import type { Lead, PageSlug, Task, TourDraft } from '@/lib/types';
 import { PAGE_READ_PERMISSION } from '@/lib/auth/permissions';
 import { usePermissions } from '@/components/PermissionsProvider';
+import CompanyLogoEditor from '@/components/sidebar/CompanyLogoEditor';
+import StorageImage from '@/components/gallery/StorageImage';
+
+const DEFAULT_LOGO = '/Logo-3.svg';
 
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
+  pinned: boolean;
+  onPinnedChange: (pinned: boolean) => void;
 }
 
-export default function Sidebar({ open, onClose }: SidebarProps) {
+export default function Sidebar({ open, onClose, pinned, onPinnedChange }: SidebarProps) {
   const pathname = usePathname();
   const { language, t } = useLanguage();
   const { can, loading, error } = usePermissions();
@@ -27,6 +33,24 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const leads = useStore((s) => s.leads) as Lead[];
   const tourDrafts = useStore((s) => s.tourDrafts) as TourDraft[];
   const messages = useStore((s) => s.messages);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoEditorOpen, setLogoEditorOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/branding/logo');
+        const body = (await res.json()) as { ok?: boolean; logoUrl?: string | null };
+        if (!cancelled && body.ok) setLogoUrl(body.logoUrl ?? null);
+      } catch {
+        /* keep default */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const activeTaskCount = useMemo(() => countActiveTasks(tasks), [tasks]);
   const pendingTourDesign = useMemo(
@@ -71,8 +95,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         .filter((item) => item.children?.length)
         .flatMap((item) => item.children!.map((child) => child.page)),
     );
-  }, [visibleSections]);//Mỗi khi danh sách menu được phép hiển thị thay đổi, 
-  //Next/React tính lại các trang thuộc menu nhóm.
+  }, [visibleSections]);
   const [openGroup, setOpenGroup] = useState<PageSlug | null>(null);
   const [previousPage, setPreviousPage] = useState(current);
 
@@ -95,25 +118,68 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     return count > 0 ? Math.min(count, 99) : 0;
   }, [messages]);
 
+  const canEditLogo = can('company.read');
+  const displayLogo = logoUrl || DEFAULT_LOGO;
+  const isCustomLogo = Boolean(logoUrl);
+
   return (
     <>
       <div id="sb-overlay" className={open ? 'open' : ''} onClick={onClose} />
       <div id="sb" className={open ? 'open' : ''}>
         <div className="sb-logo" style={{ padding: '12px 14px 10px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <div
-            style={{
-              width: 112,
-              height: 112,
-              borderRadius: '50%',
-              background: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 8px',
-              overflow: 'hidden',
-            }}
-          >
-            <Image src="/Logo-3.svg" alt="The Ant Adventures" width={100} height={100} style={{ height: 'auto', display: 'block' }} priority />
+          <div className="sb-logo-head">
+            <button
+              type="button"
+              className={`sb-pin-btn${pinned ? ' is-pinned' : ''}`}
+              title={pinned ? 'Bỏ ghim cột (ẩn sidebar)' : 'Ghim cột (luôn hiện)'}
+              aria-pressed={pinned}
+              aria-label={pinned ? 'Bỏ ghim cột điều hướng' : 'Ghim cột điều hướng'}
+              onClick={() => onPinnedChange(!pinned)}
+            >
+              {pinned ? '📌' : '📍'}
+            </button>
+          </div>
+          <div className={`sb-logo-avatar${isCustomLogo ? ' sb-logo-avatar--custom' : ''}`}>
+            <div className="sb-logo-avatar-img">
+              {isCustomLogo ? (
+                <StorageImage
+                  src={displayLogo}
+                  alt="The Ant Adventures"
+                  width={112}
+                  height={112}
+                  className="sb-logo-custom"
+                  style={{ objectFit: 'cover', width: 112, height: 112 }}
+                />
+              ) : (
+                <Image
+                  src={DEFAULT_LOGO}
+                  alt="The Ant Adventures"
+                  width={100}
+                  height={100}
+                  style={{ height: 'auto', display: 'block' }}
+                  priority
+                />
+              )}
+            </div>
+            {canEditLogo && (
+              <button
+                type="button"
+                className="sb-logo-edit"
+                title="Change company logo"
+                aria-label="Change company logo"
+                onClick={() => setLogoEditorOpen(true)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path
+                    d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.1-1.6A1.5 1.5 0 0 1 10 3.5h4a1.5 1.5 0 0 1 1.2.9L16.3 6h1.2A2.5 2.5 0 0 1 20 8.5v9A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-9Z"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="12" cy="13" r="3.25" stroke="currentColor" strokeWidth="1.75" />
+                </svg>
+              </button>
+            )}
           </div>
           <div
             style={{
@@ -132,7 +198,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             CRM System · v4.3
           </div>
         </div>
-
 
         {loading ? (
           <div className="sb-sec">Đang tải quyền…</div>
@@ -181,6 +246,11 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             </div>
           )))}
       </div>
+      <CompanyLogoEditor
+        open={logoEditorOpen}
+        onClose={() => setLogoEditorOpen(false)}
+        onSaved={(url) => setLogoUrl(url)}
+      />
     </>
   );
 }

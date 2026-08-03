@@ -56,6 +56,34 @@ usage() {
   echo "Usage: $0 {print|build|up|deploy|down|status} [extra docker compose args...]" >&2
 }
 
+# Host port from ENV_FILE (APP_PORT=…) or default 3006 — matches docker-compose.yml
+resolve_app_port() {
+  port="${APP_PORT:-}"
+  if [ -z "$port" ] && [ -f "$ENV_FILE" ]; then
+    line=$(grep -E '^[[:space:]]*APP_PORT=' "$ENV_FILE" 2>/dev/null | tail -n 1 || true)
+    if [ -n "$line" ]; then
+      port=${line#*=}
+      port=$(printf '%s' "$port" | tr -d '[:space:]"'"'")
+    fi
+  fi
+  printf '%s\n' "${port:-3006}"
+}
+
+# Stop containers publishing host port (e.g. old compose project name still on :3006).
+free_host_port() {
+  port="$1"
+  ids=$(docker ps --filter "publish=${port}" -q 2>/dev/null || true)
+  if [ -n "$ids" ]; then
+    echo "Port ${port}/tcp already in use — stopping container(s):"
+    docker ps --filter "publish=${port}" --format 'table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Ports}}'
+    # shellcheck disable=SC2086
+    docker stop $ids >/dev/null
+    # shellcheck disable=SC2086
+    docker rm $ids >/dev/null 2>&1 || true
+    echo "Freed port ${port}."
+  fi
+}
+
 case "$cmd" in
   build)
     echo "Using ENV_FILE=$ENV_FILE"
@@ -63,11 +91,15 @@ case "$cmd" in
     ;;
   up)
     echo "Using ENV_FILE=$ENV_FILE"
+    APP_PORT_HOST=$(resolve_app_port)
+    free_host_port "$APP_PORT_HOST"
     exec docker compose --env-file "$ENV_FILE" up --build -d "$@"
     ;;
   deploy)
     # After CI (or local) build: recreate from image without rebuilding
     echo "Deploying with ENV_FILE=$ENV_FILE (COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME)"
+    APP_PORT_HOST=$(resolve_app_port)
+    free_host_port "$APP_PORT_HOST"
     exec docker compose --env-file "$ENV_FILE" up -d --no-build --force-recreate --remove-orphans "$@"
     ;;
   down)

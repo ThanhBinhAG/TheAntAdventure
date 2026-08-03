@@ -1,0 +1,39 @@
+# Dependencies & build output
+node_modules
+.next
+out
+build
+*.tsbuildinfo
+
+# Git / IDE / local-only
+.git
+.gitignore
+.cursor
+.vscode
+.idea
+Personal
+Material
+Material_test
+backups
+
+# Env & secrets (inject at runtime / build-arg)
+.env
+.env.local
+.env.*
+!.env.example
+
+# Tests & docs not needed in image
+tests
+docs
+coverage
+*.md
+!README.md
+
+# CI / misc
+.gitlab-ci.yml
+.npm
+npm-debug.log*
+yarn-error.log*
+Dockerfile*
+docker-compose*.yml
+.dockerignore

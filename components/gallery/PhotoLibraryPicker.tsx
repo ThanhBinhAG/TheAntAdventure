@@ -32,6 +32,8 @@ type PhotoApply = { linkedPhotoIds: string[]; photoIds: string[] };
 type Props = {
   /** Modal overlay (Apply/Cancel) or inline panel (live onChange). */
   variant?: 'modal' | 'inline';
+  /** Multi = product library slots; single = pick one photo (e.g. company logo). */
+  mode?: 'multi' | 'single';
   open?: boolean;
   title?: string;
   photos: GalleryPhoto[];
@@ -43,6 +45,8 @@ type Props = {
   onApply?: (next: PhotoApply) => void;
   /** Live updates for inline variant. */
   onChange?: (next: PhotoApply) => void;
+  /** Fired when user picks a photo in single mode (click). */
+  onPick?: (photo: GalleryPhoto) => void;
 };
 
 function SlotDrop({
@@ -168,6 +172,7 @@ function DraggablePhotoCard({
 
 export default function PhotoLibraryPicker({
   variant = 'modal',
+  mode = 'multi',
   open = true,
   title = 'Choose from Photo Library',
   photos,
@@ -178,8 +183,10 @@ export default function PhotoLibraryPicker({
   onClose,
   onApply,
   onChange,
+  onPick,
 }: Props) {
   const isInline = variant === 'inline';
+  const isSingle = mode === 'single';
   const folders = useMemo(
     () => ensureUnsortedFolder(foldersProp ?? []),
     [foldersProp]
@@ -317,24 +324,8 @@ export default function PhotoLibraryPicker({
   const activePhoto = activeId ? byId.get(activeId) : null;
   const activeThumb = activePhoto ? photoThumbUrl(activePhoto) || activePhoto.url : null;
 
-  const body = (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="phlib-picker-slots">
-        <SlotDrop
-          id="featured-0"
-          label="Featured 1"
-          photo={featuredSlots[0]}
-          onClear={() => clearFeaturedAt(0)}
-        />
-        <SlotDrop
-          id="featured-1"
-          label="Featured 2"
-          photo={featuredSlots[1]}
-          onClear={() => clearFeaturedAt(1)}
-        />
-      </div>
-      <LinkedDrop photos={linkedPhotos} onUnlink={unlink} />
-
+  const folderBar = (
+    <>
       <div className="phlib-picker-folder-bar">
         <nav className="phlib-breadcrumb" aria-label="Folder">
           <button type="button" className="phlib-breadcrumb-item" onClick={() => setFolderId(null)}>
@@ -387,7 +378,9 @@ export default function PhotoLibraryPicker({
           ))}
         </div>
         <div className="phlib-picker-count">
-          {linked.length} linked · {featured.length}/{maxFeatured} featured · {filtered.length} shown
+          {isSingle
+            ? `${filtered.length} shown · click a photo to select`
+            : `${linked.length} linked · ${featured.length}/${maxFeatured} featured · ${filtered.length} shown`}
         </div>
       </div>
 
@@ -406,17 +399,45 @@ export default function PhotoLibraryPicker({
         </div>
       ) : (
         <div className={`phlib-picker-grid${isInline ? ' phlib-picker-grid--inline' : ''}`}>
-          {filtered.map((p) => (
-            <DraggablePhotoCard
-              key={p.id}
-              photo={p}
-              isLinked={linked.includes(p.id)}
-              isFeatured={featured.includes(p.id)}
-              onToggleLink={() => toggleLink(p.id)}
-              onToggleFeatured={() => toggleFeatured(p.id)}
-              featuredFull={featured.length >= maxFeatured}
-            />
-          ))}
+          {filtered.map((p) =>
+            isSingle ? (
+              <button
+                key={p.id}
+                type="button"
+                className="phlib-picker-card phlib-picker-card--pick"
+                onClick={() => onPick?.(p)}
+              >
+                <span className="phlib-picker-thumb">
+                  {photoThumbUrl(p) || p.url ? (
+                    <StorageImage
+                      src={photoThumbUrl(p) || p.url}
+                      alt={p.caption}
+                      fill
+                      className="phlib-img"
+                      sizes="160px"
+                    />
+                  ) : (
+                    <span className="phlib-missing">No image</span>
+                  )}
+                </span>
+                <span className="phlib-picker-meta">
+                  <span className="phlib-picker-caption" title={p.caption}>
+                    {p.caption || p.id}
+                  </span>
+                </span>
+              </button>
+            ) : (
+              <DraggablePhotoCard
+                key={p.id}
+                photo={p}
+                isLinked={linked.includes(p.id)}
+                isFeatured={featured.includes(p.id)}
+                onToggleLink={() => toggleLink(p.id)}
+                onToggleFeatured={() => toggleFeatured(p.id)}
+                featuredFull={featured.length >= maxFeatured}
+              />
+            )
+          )}
           {!filtered.length && (
             <EmptyState
               className="crm-empty-state--flush crm-empty-state--inline"
@@ -428,7 +449,29 @@ export default function PhotoLibraryPicker({
           )}
         </div>
       )}
+    </>
+  );
 
+  const body = isSingle ? (
+    <div className="phlib-picker-single">{folderBar}</div>
+  ) : (
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="phlib-picker-slots">
+        <SlotDrop
+          id="featured-0"
+          label="Featured 1"
+          photo={featuredSlots[0]}
+          onClear={() => clearFeaturedAt(0)}
+        />
+        <SlotDrop
+          id="featured-1"
+          label="Featured 2"
+          photo={featuredSlots[1]}
+          onClear={() => clearFeaturedAt(1)}
+        />
+      </div>
+      <LinkedDrop photos={linkedPhotos} onUnlink={unlink} />
+      {folderBar}
       <DragOverlay>
         {activeThumb ? (
           <div className="phlib-drag-overlay">
@@ -455,7 +498,9 @@ export default function PhotoLibraryPicker({
           <div>
             <div className="phlib-modal-title">{title}</div>
             <div className="phlib-modal-sub">
-              {linked.length} linked · {featured.length}/{maxFeatured} featured · drag onto slots
+              {isSingle
+                ? 'Browse folders and click a photo'
+                : `${linked.length} linked · ${featured.length}/${maxFeatured} featured · drag onto slots`}
             </div>
           </div>
           <button type="button" className="modal-close-btn" onClick={onClose}>
@@ -463,26 +508,28 @@ export default function PhotoLibraryPicker({
           </button>
         </div>
         {body}
-        <div className="phlib-modal-ft">
-          <div />
-          <div className="phlib-modal-ft-right">
-            <button type="button" className="btn btn-o" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-g"
-              onClick={() =>
-                onApply?.({
-                  linkedPhotoIds: linked,
-                  photoIds: featured.filter((id) => linked.includes(id)).slice(0, maxFeatured),
-                })
-              }
-            >
-              Apply
-            </button>
+        {!isSingle && (
+          <div className="phlib-modal-ft">
+            <div />
+            <div className="phlib-modal-ft-right">
+              <button type="button" className="btn btn-o" onClick={onClose}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-g"
+                onClick={() =>
+                  onApply?.({
+                    linkedPhotoIds: linked,
+                    photoIds: featured.filter((id) => linked.includes(id)).slice(0, maxFeatured),
+                  })
+                }
+              >
+                Apply
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

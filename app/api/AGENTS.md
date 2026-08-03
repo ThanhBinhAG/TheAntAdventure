@@ -5,6 +5,7 @@ Next.js Route Handlers for server-side auth, media, exports, weather, and diagno
 
 ## Contents
 - `auth/` — login, logout, users
+- `branding/` — company logo
 - `photos/` — gallery upload/delete
 - `pricing/` — pricing PDF export
 - `proposals/` — proposal PDF export

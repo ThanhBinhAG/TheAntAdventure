@@ -13,9 +13,11 @@ import { toast } from '@/lib/toast';
 
 interface TopbarProps {
   onMenuToggle: () => void;
+  /** When true, show the sidebar hamburger on desktop (unpinned mode). Mobile always shows via CSS. */
+  showMenuToggle?: boolean;
 }
 
-export default function Topbar({ onMenuToggle }: TopbarProps) {
+export default function Topbar({ onMenuToggle, showMenuToggle = false }: TopbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const page = (pathname.split('/').pop() || 'dashboard') as PageSlug;
@@ -99,7 +101,14 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
 
   return (
     <div id="topbar">
-      <button id="menu-toggle" onClick={onMenuToggle} title="Menu" type="button">
+      <button
+        id="menu-toggle"
+        className={showMenuToggle ? 'menu-toggle-visible' : undefined}
+        onClick={onMenuToggle}
+        title="Menu"
+        type="button"
+        aria-label="Mở menu điều hướng"
+      >
         ☰
       </button>
       <span className="tb-title">{title}</span>
@@ -135,8 +144,29 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
           }}
         />
       </div>
+      <AiCopilotTrigger />
+      <div
+        className="tb-lang"
+        title="Switch language / Đổi ngôn ngữ"
+      >
+        <button
+          id="lang-en-btn"
+          onClick={() => setLanguage('en')}
+          type="button"
+          className={`tb-lang-btn${language === 'en' ? ' is-active' : ''}`}
+        >
+          EN
+        </button>
+        <button
+          id="lang-vi-btn"
+          onClick={() => setLanguage('vi')}
+          type="button"
+          className={`tb-lang-btn${language === 'vi' ? ' is-active' : ''}`}
+        >
+          VN
+        </button>
+      </div>
       <div className="tb-tools" ref={toolsRef}>
-        <AiCopilotTrigger />
         <div
           id="tb-tools-rail"
           className={`tb-tools-rail${toolsOpen ? ' is-open' : ''}`}
@@ -198,61 +228,13 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
           }
           aria-expanded={toolsOpen}
           aria-controls="tb-tools-rail"
+          aria-label={toolsOpen ? 'Thu gọn công cụ hệ thống' : 'Mở công cụ hệ thống'}
           onClick={() => setToolsOpen((v) => !v)}
         >
           {!toolsOpen && <span className={connDotClass} aria-hidden />}
-          ⚙
-        </button>
-      </div>
-      <div
-        style={{
-          display: 'flex',
-          background: 'var(--bg)',
-          border: '1px solid var(--b)',
-          borderRadius: 8,
-          padding: 3,
-          gap: 2,
-          marginLeft: 8,
-        }}
-        title="Switch language / Đổi ngôn ngữ"
-      >
-        <button
-          id="lang-en-btn"
-          onClick={() => setLanguage('en')}
-          type="button"
-          style={{
-            padding: '5px 14px',
-            borderRadius: 6,
-            border: 'none',
-            fontFamily: 'inherit',
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: 'pointer',
-            background: language === 'en' ? 'var(--g)' : 'transparent',
-            color: language === 'en' ? '#fff' : 'var(--m)',
-            letterSpacing: '0.5px',
-          }}
-        >
-          EN
-        </button>
-        <button
-          id="lang-vi-btn"
-          onClick={() => setLanguage('vi')}
-          type="button"
-          style={{
-            padding: '5px 14px',
-            borderRadius: 6,
-            border: 'none',
-            fontFamily: 'inherit',
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: 'pointer',
-            background: language === 'vi' ? 'var(--g)' : 'transparent',
-            color: language === 'vi' ? '#fff' : 'var(--m)',
-            letterSpacing: '0.5px',
-          }}
-        >
-          VN
+          <span className="tb-tools-toggle-icon" aria-hidden>
+            ☰
+          </span>
         </button>
       </div>
     </div>

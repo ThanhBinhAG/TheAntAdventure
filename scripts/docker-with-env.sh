@@ -8,7 +8,7 @@
 #   print   — print resolved ENV_FILE path (for CI)
 #   build   — docker compose build
 #   up      — build + run detached
-#   deploy  — recreate containers from already-built image (no rebuild)
+#   deploy  — down + free port + up from already-built image
 #   down    — stop and remove compose services
 #   status  — show compose ps + matching images
 set -eu
@@ -69,19 +69,104 @@ resolve_app_port() {
   printf '%s\n' "${port:-3006}"
 }
 
-# Stop containers publishing host port (e.g. old compose project name still on :3006).
+uniq_ids() {
+  printf '%s\n' "$@" | tr ' ' '\n' | awk 'NF && !seen[$0]++'
+}
+
+# Container IDs that publish host port (filter + Ports column; Docker 29 filter can miss).
+containers_on_port() {
+  port="$1"
+  ids=""
+  ids="$ids $(docker ps -q --filter "publish=${port}" 2>/dev/null || true)"
+  ids="$ids $(docker ps -q --filter "publish=${port}/tcp" 2>/dev/null || true)"
+  # e.g. 0.0.0.0:3006->3006/tcp or :::3006->3006/tcp
+  ids="$ids $(docker ps --format '{{.ID}} {{.Ports}}' 2>/dev/null \
+    | grep -E "(^|[^0-9]):${port}->" \
+    | awk '{print $1}' || true)"
+  uniq_ids $ids
+}
+
+# CRM containers from this image or legacy compose project names.
+crm_container_ids() {
+  ids=""
+  ids="$ids $(docker ps -aq --filter "ancestor=the-ant-adventures-crm:local" 2>/dev/null || true)"
+  ids="$ids $(docker ps -aq --filter "ancestor=the-ant-adventures-crm:latest" 2>/dev/null || true)"
+  ids="$ids $(docker ps -aq --filter "name=the-ant-adventures-crm" 2>/dev/null || true)"
+  ids="$ids $(docker ps -aq --filter "name=crm-the-ants" 2>/dev/null || true)"
+  uniq_ids $ids
+}
+
+diagnose_port() {
+  port="$1"
+  echo "--- diagnose host :${port} ---" >&2
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnp 2>/dev/null | grep -E ":${port}\\b" || echo "(ss: nothing matched)" >&2
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true
+  fi
+  echo "docker ps (port column):" >&2
+  docker ps --format 'table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Ports}}' >&2 || true
+  echo "--- end diagnose ---" >&2
+}
+
+port_is_free() {
+  port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ! ss -tlnH 2>/dev/null | grep -qE ":${port}\\b"
+    return $?
+  fi
+  # Fallback: no listener reported by docker publish parse
+  ids=$(containers_on_port "$port")
+  [ -z "$ids" ]
+}
+
+stop_ids() {
+  ids="$1"
+  if [ -z "$ids" ]; then
+    return 0
+  fi
+  echo "Stopping container(s):"
+  for id in $ids; do
+    docker ps -a --filter "id=${id}" --format '  {{.ID}}  {{.Names}}  {{.Image}}  {{.Ports}}' 2>/dev/null || true
+  done
+  # shellcheck disable=SC2086
+  docker stop $ids >/dev/null 2>&1 || true
+  # shellcheck disable=SC2086
+  docker rm -f $ids >/dev/null 2>&1 || true
+}
+
+# Free host port: compose down (caller), stop CRM + anything publishing the port.
 free_host_port() {
   port="$1"
-  ids=$(docker ps --filter "publish=${port}" -q 2>/dev/null || true)
-  if [ -n "$ids" ]; then
-    echo "Port ${port}/tcp already in use — stopping container(s):"
-    docker ps --filter "publish=${port}" --format 'table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Ports}}'
-    # shellcheck disable=SC2086
-    docker stop $ids >/dev/null
-    # shellcheck disable=SC2086
-    docker rm $ids >/dev/null 2>&1 || true
-    echo "Freed port ${port}."
+  echo "Freeing host port ${port}/tcp if needed..."
+
+  on_port=$(containers_on_port "$port")
+  crm=$(crm_container_ids)
+  all=$(uniq_ids $on_port $crm)
+
+  if [ -n "$all" ]; then
+    stop_ids "$all"
+    echo "Removed conflicting container(s)."
+  else
+    echo "No Docker containers matched port ${port} or CRM image/name."
   fi
+
+  # Brief wait for docker-proxy / kernel to release the bind
+  i=0
+  while [ "$i" -lt 10 ]; do
+    if port_is_free "$port"; then
+      echo "Host port ${port} is free."
+      return 0
+    fi
+    i=$((i + 1))
+    sleep 1
+  done
+
+  echo "ERROR: host port ${port} is still in use after stopping Docker containers." >&2
+  diagnose_port "$port"
+  echo "Stop the non-Docker process (or set APP_PORT in the server env file) and re-run." >&2
+  exit 1
 }
 
 case "$cmd" in
@@ -92,15 +177,18 @@ case "$cmd" in
   up)
     echo "Using ENV_FILE=$ENV_FILE"
     APP_PORT_HOST=$(resolve_app_port)
+    docker compose --env-file "$ENV_FILE" down --remove-orphans >/dev/null 2>&1 || true
     free_host_port "$APP_PORT_HOST"
     exec docker compose --env-file "$ENV_FILE" up --build -d "$@"
     ;;
   deploy)
-    # After CI (or local) build: recreate from image without rebuilding
+    # After CI (or local) build: clean down, free port, up from image (no rebuild)
     echo "Deploying with ENV_FILE=$ENV_FILE (COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME)"
     APP_PORT_HOST=$(resolve_app_port)
+    echo "Host APP_PORT=${APP_PORT_HOST}"
+    docker compose --env-file "$ENV_FILE" down --remove-orphans || true
     free_host_port "$APP_PORT_HOST"
-    exec docker compose --env-file "$ENV_FILE" up -d --no-build --force-recreate --remove-orphans "$@"
+    exec docker compose --env-file "$ENV_FILE" up -d --no-build --remove-orphans "$@"
     ;;
   down)
     exec docker compose --env-file "$ENV_FILE" down "$@"
@@ -110,6 +198,9 @@ case "$cmd" in
     docker compose --env-file "$ENV_FILE" ps "$@"
     docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}' \
       | awk 'NR==1 || /the-ant-adventures-crm/'
+    APP_PORT_HOST=$(resolve_app_port)
+    echo "Host port ${APP_PORT_HOST}:"
+    diagnose_port "$APP_PORT_HOST" 2>&1 || true
     ;;
   print)
     # For CI: path only on stdout

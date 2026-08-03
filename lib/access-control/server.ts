@@ -344,7 +344,13 @@ export async function getAccessControlUsersPage(input: {
 
     return {
         // Bỏ total_count của từng row vì frontend chỉ cần một totalCount.
-        items: rows.map(({ total_count: _totalCount, ...user }) => user),
+        items: rows.map((row) => ({
+            user_id: row.user_id,
+            email: row.email,
+            display_name: row.display_name,
+            is_active: row.is_active,
+            role_code: row.role_code,
+        })),
         totalCount,
         page: input.page,
         pageSize: input.pageSize,

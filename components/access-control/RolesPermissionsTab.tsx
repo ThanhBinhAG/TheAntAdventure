@@ -15,7 +15,6 @@
  */
 
 import {
-    useEffect,
     useMemo,
     useState,
 } from 'react';
@@ -57,6 +56,11 @@ type RolesPermissionsTabProps = {
         permissionCodes: string[],
     ) => Promise<void>;
 };
+
+/** Bản nháp checkbox chưa lưu, được tách riêng cho từng role có thể sửa. */
+type PermissionDraftByRole = Partial<
+    Record<EditableRoleCode, string[]>
+>;
 
 /** Nhãn hiển thị cho từng role. */
 const ROLE_LABELS: Record<ManagedRoleCode, string> = {
@@ -138,8 +142,8 @@ export default function RolesPermissionsTab({
 }: RolesPermissionsTabProps) {
     const [selectedRole, setSelectedRole] =
         useState<ManagedRoleCode>('employee');
-    const [selectedPermissionCodes, setSelectedPermissionCodes] =
-        useState<string[]>([]);
+    const [permissionDraftByRole, setPermissionDraftByRole] =
+        useState<PermissionDraftByRole>({});
     const [saving, setSaving] = useState(false);
 
     /** Role hiện đang được chọn trên giao diện. */
@@ -154,26 +158,49 @@ export default function RolesPermissionsTab({
         return groupPermissions(permissions);
     }, [permissions]);
 
-    // Khi đổi role hoặc tải lại dữ liệu, lấy quyền hiện tại từ database.
-    useEffect(() => {
-        if (selectedRole === 'super_admin') return;
+    /**
+     * Nếu chưa tick checkbox, đọc quyền thẳng từ dữ liệu API.
+     * Khi người dùng chỉnh sửa, chỉ lưu bản nháp cho đúng role đó.
+     * Cách này không cần useEffect để chép props vào state.
+     */
+    const selectedPermissionCodes =
+        selectedRole === 'super_admin'
+            ? []
+            : permissionDraftByRole[selectedRole] ??
+              activeRole?.permission_codes ??
+              [];
 
-        setSelectedPermissionCodes(
+    const hasChanges =
+        selectedRole !== 'super_admin' &&
+        !hasSamePermissions(
+            selectedPermissionCodes,
             activeRole?.permission_codes ?? [],
         );
-    }, [activeRole, selectedRole]);
 
-    const hasChanges = !hasSamePermissions(
-        selectedPermissionCodes,
-        activeRole?.permission_codes ?? [],
-    );
+    /** Cập nhật bản nháp của role đang chọn từ thao tác checkbox. */
+    function updatePermissionDraft(
+        update: (current: string[]) => string[],
+    ) {
+        if (selectedRole === 'super_admin') return;
+
+        const editableRoleCode: EditableRoleCode = selectedRole;
+
+        setPermissionDraftByRole((currentDrafts) => ({
+            ...currentDrafts,
+            [editableRoleCode]: update(
+                currentDrafts[editableRoleCode] ??
+                    activeRole?.permission_codes ??
+                    [],
+            ),
+        }));
+    }
 
     /** Bật hoặc tắt một permission đơn lẻ. */
     function togglePermission(
         permissionCode: string,
         checked: boolean,
     ) {
-        setSelectedPermissionCodes((current) => {
+        updatePermissionDraft((current) => {
             if (checked) {
                 return [...new Set([...current, permissionCode])];
             }
@@ -189,7 +216,7 @@ export default function RolesPermissionsTab({
         permissionCodes: string[],
         checked: boolean,
     ) {
-        setSelectedPermissionCodes((current) => {
+        updatePermissionDraft((current) => {
             if (checked) {
                 return [...new Set([...current, ...permissionCodes])];
             }
@@ -209,6 +236,8 @@ export default function RolesPermissionsTab({
             return;
         }
 
+        const editableRoleCode: EditableRoleCode = selectedRole;
+
         const confirmed = await confirmDialog(
             `Bạn sắp cập nhật ${selectedPermissionCodes.length} quyền cho role ${ROLE_LABELS[selectedRole]}.`,
             {
@@ -225,12 +254,21 @@ export default function RolesPermissionsTab({
 
         try {
             await onUpdatePermissions(
-                selectedRole,
+                editableRoleCode,
                 selectedPermissionCodes,
             );
 
             toast.success('Đã cập nhật permission của role.');
             await onRoleChanged();
+
+            // Dữ liệu mới đã được tải lại từ API, nên bỏ bản nháp cũ.
+            setPermissionDraftByRole((currentDrafts) => {
+                const nextDrafts = { ...currentDrafts };
+
+                delete nextDrafts[editableRoleCode];
+
+                return nextDrafts;
+            });
         } catch (error) {
             toast.error(
                 error instanceof Error

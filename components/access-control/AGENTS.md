@@ -9,7 +9,7 @@ Giao diện Quản lý người dùng và phân quyền dành cho Super Admin.
 - `RolesPermissionsTab.tsx` — cấu hình permission theo role.
 - `AuditLogsTab.tsx` — lịch sử đổi role và permission.
 - `access-control-api.ts` — client gọi API Access Control.
-- `UserActionsMenu.tsx` — menu thao tác nhanh: phân quyền, trạng thái và xóa mềm.
+- `UserActionsMenu.tsx` — menu thao tác nhanh: sửa thông tin, trạng thái và xóa mềm.
 - `UserEditDrawer.tsx` — sửa tên hiển thị của user.
 - `UserCreateDrawer.tsx` — tạo Auth user mới, tên hiển thị và role ban đầu.
 

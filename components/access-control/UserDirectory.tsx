@@ -331,7 +331,6 @@ export default function UserDirectory({
 
                     <UserActionsMenu
                         user={user}
-                        onManagePermissions={() => setSelectedUser(user)}
                         onEditInfo={() => setEditingUser(user)}
                         onChanged={loadUsers}
                     />
@@ -467,6 +466,7 @@ export default function UserDirectory({
             />
 
             <UserAccessDrawer
+                key={selectedUser?.user_id ?? 'no-user-selected'}
                 user={selectedUser}
                 roles={roles}
                 permissions={permissions}
@@ -475,6 +475,7 @@ export default function UserDirectory({
                 onSave={handleSaveRole}
             />
             <UserEditDrawer
+                key={editingUser?.user_id ?? 'no-user-selected'}
                 user={editingUser}
                 saving={savingEdit}
                 onClose={() => setEditingUser(null)}

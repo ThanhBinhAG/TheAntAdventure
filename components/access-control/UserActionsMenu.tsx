@@ -4,7 +4,6 @@
  * Menu thao tác nhanh của một user trong bảng Access Control.
  *
  * Chức năng:
- * - Mở Drawer phân quyền.
  * - Mở Drawer sửa tên hiển thị.
  * - Kích hoạt hoặc vô hiệu hóa user.
  * - Xóa mềm user sau khi xác nhận.
@@ -21,7 +20,6 @@ import {
     EditOutlined,
     LockOutlined,
     MoreOutlined,
-    SafetyCertificateOutlined,
     UnlockOutlined,
 } from '@ant-design/icons';
 import {
@@ -41,14 +39,12 @@ import {
 
 type UserActionsMenuProps = {
     user: AccessControlUser;
-    onManagePermissions: () => void;
     onChanged: () => Promise<void>;
     onEditInfo: () => void;
 };
 
 export default function UserActionsMenu({
     user,
-    onManagePermissions,
     onEditInfo,
     onChanged,
 }: UserActionsMenuProps) {
@@ -135,13 +131,6 @@ export default function UserActionsMenu({
     }
 
     const menuItems: MenuProps['items'] = [
-        // {
-        //     key: 'manage-permissions',
-        //     icon: <SafetyCertificateOutlined />,
-        //     label: 'Phân quyền',
-        //     disabled: saving,
-        //     onClick: onManagePermissions,
-        // },
         {
             key: 'edit-info',
             icon: <EditOutlined />,

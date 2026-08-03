@@ -22,7 +22,6 @@ import {
 } from '@ant-design/icons';
 import {
     Tabs,
-    Tag,
 } from 'antd';
 import AccessControlUiProvider from './AccessControlUiProvider';
 import UserDirectory from './UserDirectory';
@@ -62,9 +61,38 @@ export default function AccessControlPage() {
     }, []);
 
     // Khi Super Admin mở trang, tải dữ liệu lần đầu.
+    // State chỉ được cập nhật sau khi API trả về, tránh render lồng nhau.
     useEffect(() => {
-        void loadData();
-    }, [loadData]);
+        let isCurrent = true;
+
+        async function loadInitialData() {
+            try {
+                const nextData = await fetchAccessControlData();
+
+                if (!isCurrent) return;
+
+                setData(nextData);
+            } catch (error) {
+                if (!isCurrent) return;
+
+                setError(
+                    error instanceof Error
+                        ? error.message
+                        : 'Không thể tải dữ liệu phân quyền.',
+                );
+            } finally {
+                if (isCurrent) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        void loadInitialData();
+
+        return () => {
+            isCurrent = false;
+        };
+    }, []);
 
     return (
         <AccessControlUiProvider>

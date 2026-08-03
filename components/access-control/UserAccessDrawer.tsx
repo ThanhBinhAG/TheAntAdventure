@@ -15,7 +15,6 @@
  */
 
 import {
-    useEffect,
     useMemo,
     useState,
 } from 'react';
@@ -85,12 +84,12 @@ export default function UserAccessDrawer({
     onSave,
 }: UserAccessDrawerProps) {
     const [selectedRole, setSelectedRole] =
-        useState<ManagedRoleCode>('employee');
+        useState<ManagedRoleCode>(
+            () => user?.role_code ?? 'employee',
+        );
 
-    // Mỗi lần mở Drawer cho user khác, đưa Select về role hiện tại của user đó.
-    useEffect(() => {
-        setSelectedRole(user?.role_code ?? 'employee');
-    }, [user]);
+    // UserDirectory truyền key theo user_id, nên Drawer được tạo lại khi đổi user.
+    // Vì vậy state trên luôn bắt đầu từ role hiện tại, không cần useEffect.
 
     /** Lấy thông tin đầy đủ của role đang chọn. */
     const selectedRoleInfo = useMemo(() => {

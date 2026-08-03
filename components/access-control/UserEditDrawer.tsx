@@ -14,7 +14,6 @@
  */
 
 import {
-    useEffect,
     useState,
     type FormEvent,
 } from 'react';
@@ -42,15 +41,13 @@ export default function UserEditDrawer({
     onClose,
     onSave,
 }: UserEditDrawerProps) {
-    const [displayName, setDisplayName] = useState('');
+    const [displayName, setDisplayName] = useState(
+        () => user?.display_name ?? '',
+    );
     const [error, setError] =
         useState<string | null>(null);
 
-    // Mỗi lần mở Drawer cho user khác, đưa input về tên hiện tại.
-    useEffect(() => {
-        setDisplayName(user?.display_name ?? '');
-        setError(null);
-    }, [user]);
+    // UserDirectory truyền key theo user_id, nên form tự khởi tạo lại khi đổi user.
 
     async function handleSubmit(
         event: FormEvent<HTMLFormElement>,

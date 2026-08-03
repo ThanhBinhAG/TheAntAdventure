@@ -1,0 +1,524 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px;
+    background: var(--s);
+    border: 1px solid var(--b);
+    border-radius: 11px;
+}
+
+.eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--g);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.title {
+    margin: 7px 0 0;
+    color: var(--t);
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.description {
+    max-width: 680px;
+    margin: 6px 0 0;
+    color: var(--m);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.superAdminTag {
+    margin: 0;
+    padding: 4px 10px;
+    font-weight: 600;
+}
+
+.content {
+    padding: 18px;
+    background: var(--s);
+    border: 1px solid var(--b);
+    border-radius: 11px;
+}
+
+.tabLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+
+
+@media (max-width: 640px) {
+    .header {
+        flex-direction: column;
+    }
+
+    .title {
+        font-size: 20px;
+    }
+}
+
+.userEmail {
+    margin-top: 3px;
+    color: var(--m);
+    font-size: 12px;
+}
+
+.errorState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 32px 16px;
+    color: var(--red);
+    text-align: center;
+}
+
+.errorState p {
+    margin: 0;
+}
+
+.changeRoleButton:global(.ant-btn) {
+    height: 30px;
+    padding: 0 12px;
+    color: var(--gd);
+    background: var(--gl);
+    border: 1px solid #b8ddc6;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+.changeRoleButton:global(.ant-btn):hover {
+    color: #ffffff;
+    background: var(--g);
+    border-color: var(--g);
+}
+
+.changeRoleButton:global(.ant-btn):focus-visible {
+    outline: 2px solid rgba(46, 125, 82, 0.3);
+    outline-offset: 2px;
+}
+
+
+.sectionTitle {
+    margin: 0;
+    color: var(--t);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.sectionDescription {
+    margin: 4px 0 0;
+    color: var(--m);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+
+.permissionGroups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+
+.permissionCode {
+    display: inline-block;
+    margin-top: 3px;
+    color: var(--m);
+    font-size: 10.5px;
+}
+
+.userDirectory {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.summaryGrid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.summaryCard {
+    padding: 14px 16px;
+    background: var(--bg);
+    border: 1px solid var(--b);
+    border-radius: 10px;
+}
+
+.userToolbar {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) 180px 180px auto;
+    gap: 10px;
+}
+
+.createUserButton:global(.ant-btn) {
+    white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+    .summaryGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .userToolbar {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .userToolbar :global(.ant-input-search) {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 640px) {
+
+    .summaryGrid,
+    .userToolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .userToolbar :global(.ant-input-search) {
+        grid-column: auto;
+    }
+}
+
+.userAccessDrawer {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.drawerField {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.drawerField label,
+.effectivePermissions h3 {
+    color: var(--t);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.drawerField p,
+.effectivePermissions p {
+    margin: 0;
+    color: var(--m);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+.effectivePermissions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.effectivePermissionList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.effectivePermissionItem {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 9px 10px;
+    background: var(--bg);
+    border: 1px solid var(--b);
+    border-radius: 7px;
+}
+
+.effectivePermissionItem strong {
+    color: var(--t);
+    font-size: 12.5px;
+}
+
+.effectivePermissionItem code {
+    color: var(--m);
+    font-size: 11px;
+}
+
+.drawerActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 16px;
+    border-top: 1px solid var(--b);
+}
+
+.rolesWorkspace {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 18px;
+}
+
+.roleList,
+.permissionWorkspace {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.roleList {
+    padding-right: 18px;
+    border-right: 1px solid var(--b);
+}
+
+.roleChoice {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+    color: var(--t);
+    text-align: left;
+    cursor: pointer;
+    background: var(--s);
+    border: 1px solid var(--b);
+    border-radius: 9px;
+}
+
+.roleChoice:hover,
+.roleChoiceActive {
+    background: var(--gl);
+    border-color: var(--g);
+}
+
+.roleChoice>svg {
+    margin-top: 2px;
+    color: var(--g);
+    font-size: 17px;
+}
+
+.roleChoice span {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.roleChoice strong {
+    font-size: 13px;
+}
+
+.roleChoice small {
+    color: var(--m);
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
+.roleChoice em {
+    grid-column: 2;
+    color: var(--gd);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 600;
+}
+
+.permissionWorkspaceHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.permissionGroup {
+    border-color: var(--b);
+}
+
+.permissionGroupHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.permissionGroupHeader strong {
+    color: var(--t);
+    font-size: 13px;
+}
+
+.permissionGroupCount {
+    display: block;
+    margin: 5px 0 10px;
+    color: var(--m);
+    font-size: 11px;
+}
+
+.permissionRows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.permissionRow {
+    display: flex;
+    align-items: flex-start;
+    margin: 0;
+    padding: 8px;
+    border-radius: 7px;
+}
+
+.permissionRow:hover {
+    background: var(--bg);
+}
+
+.permissionText {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: var(--t);
+    font-size: 12.5px;
+}
+
+.permissionSaveBar {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    color: var(--m);
+    background: var(--s);
+    border-top: 1px solid var(--b);
+}
+
+@media (max-width: 900px) {
+    .rolesWorkspace {
+        grid-template-columns: 1fr;
+    }
+
+    .roleList {
+        padding: 0 0 14px;
+        border-right: 0;
+        border-bottom: 1px solid var(--b);
+    }
+
+    .permissionGroups {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+
+    .permissionWorkspaceHeader,
+    .permissionSaveBar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .permissionSaveBar :global(.ant-btn) {
+        width: 100%;
+    }
+}
+
+.auditTab {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.auditHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.auditDetails {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 720px;
+    padding: 4px 0;
+    color: var(--t);
+    font-size: 12.5px;
+}
+
+.auditCodeList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.auditCodeList code {
+    padding: 3px 6px;
+    color: var(--gd);
+    background: var(--gl);
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+@media (max-width: 640px) {
+    .auditHeader {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+.userActionCell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.userEditForm {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.userCreateForm {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.createUserHint {
+    margin: 0;
+    color: var(--m);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+.drawerReadOnlyField {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--b);
+    border-radius: 8px;
+}
+
+.drawerReadOnlyField span {
+    color: var(--m);
+    font-size: 12px;
+}
+
+.drawerReadOnlyField strong {
+    color: var(--t);
+    font-size: 13px;
+}

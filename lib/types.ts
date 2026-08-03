@@ -460,4 +460,6 @@ export type PageSlug =
   | 'hr'
   | 'ai'
   | 'devnotes'
-  | 'teamchat';
+  | 'teamchat'
+  | 'access-control';
+

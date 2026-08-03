@@ -10,8 +10,8 @@ variables:
   npm_config_cache: '$CI_PROJECT_DIR/.npm'
   NEXT_TELEMETRY_DISABLED: '1'
   DOCKER_TLS_CERTDIR: '/certs'
-  IMAGE_TAG: '$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA'
-  IMAGE_LATEST: '$CI_REGISTRY_IMAGE:latest'
+  IMAGE_TAG: 'the-ant-adventures-crm:$CI_COMMIT_SHORT_SHA'
+  IMAGE_LATEST: 'the-ant-adventures-crm:latest'
   MNT_FDATA: '/mnt/fdata/the_ant_adventures_crm/'
 
 cache:

@@ -5,6 +5,7 @@ export type PhotoUploadMeta = {
   caption?: string;
   region?: string;
   tags?: string[];
+  folderId?: string;
 };
 
 async function readApiJson(res: Response): Promise<{ ok?: boolean; error?: string; photo?: GalleryPhoto }> {
@@ -27,6 +28,7 @@ export async function uploadPhotoViaApi(file: File, meta: PhotoUploadMeta): Prom
   form.set('caption', meta.caption ?? '');
   form.set('region', meta.region ?? 'north');
   form.set('tags', JSON.stringify(meta.tags ?? []));
+  if (meta.folderId) form.set('folderId', meta.folderId);
 
   const res = await fetch('/api/photos/upload', { method: 'POST', body: form });
   const json = await readApiJson(res);

@@ -5,7 +5,8 @@ Static seed datasets still used by hydrate/ensure helpers, Tour Design, Weather,
 
 ## Contents
 - `products.ts`, `hotels.ts`, `suppliers.ts`, `extendedSuppliers.ts`, `attractions.ts` — ensure/merge on hydrate
-- `weather.ts`, `tourPackages.ts`, `staff.ts`, `taa-tours.ts` — direct app/test imports
+- `weather.ts` — seasonal maps (`DEFAULT_WEATHER`, `TEMP_RANGES`, `BEST_BY`); `DESTINATIONS` derived from `lib/weather/coordinates`
+- `tourPackages.ts`, `staff.ts`, `taa-tours.ts` — direct app/test imports
 - Offline CRM seeds (customers, bookings, …) live in `Personal/legacy-seeds/` (gitignored)
 
 ## Boundaries

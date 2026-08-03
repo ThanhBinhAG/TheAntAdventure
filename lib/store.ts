@@ -45,6 +45,7 @@ interface CRMState {
   tasks: unknown[];
   feedback: unknown[];
   contracts: unknown[];
+  photoFolders: unknown[];
   photos: unknown[];
   messages: ChatMessages;
   calEvents: unknown[];
@@ -153,6 +154,7 @@ const emptyState = () => ({
   tasks: [] as unknown[],
   feedback: [] as unknown[],
   contracts: [] as unknown[],
+  photoFolders: [] as unknown[],
   photos: [] as unknown[],
   messages: {} as ChatMessages,
   calEvents: [] as unknown[],
@@ -374,6 +376,7 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           tasks: s.tasks,
           feedback: s.feedback,
           contracts: s.contracts,
+          photoFolders: s.photoFolders,
           photos: s.photos,
           messages: s.messages,
           calEvents: s.calEvents,
@@ -409,6 +412,7 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           tasks: data.tasks ?? get().tasks,
           feedback: data.feedback ?? get().feedback,
           contracts: data.contracts ?? get().contracts,
+          photoFolders: data.photoFolders ?? get().photoFolders,
           photos: data.photos ?? get().photos,
           messages: data.messages ?? get().messages,
           calEvents: data.calEvents ?? get().calEvents,

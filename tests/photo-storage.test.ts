@@ -59,11 +59,13 @@ describe('photo mappers', () => {
       thumbUrl: 'https://proj.supabase.co/storage/v1/object/public/photos/gallery/PH-001/thumb.webp',
       storagePath: 'gallery/PH-001/display.webp',
       displayBytes: 142000,
+      folderId: 'PF-unsorted',
       tags: ['Cultural'],
     };
     const row = photoToRow(app);
     assert.equal(row.thumb_url, app.thumbUrl);
     assert.equal(row.storage_path, app.storagePath);
+    assert.equal(row.folder_id, 'PF-unsorted');
     assert.equal(row.product_code, undefined);
     assert.equal(row.slot, undefined);
     assert.equal(row.display_bytes, 142000);
@@ -71,6 +73,7 @@ describe('photo mappers', () => {
     assert.equal(back.thumbUrl, app.thumbUrl);
     assert.equal(back.storagePath, app.storagePath);
     assert.equal(back.displayBytes, 142000);
+    assert.equal(back.folderId, 'PF-unsorted');
     assert.equal(back.product, undefined);
   });
 

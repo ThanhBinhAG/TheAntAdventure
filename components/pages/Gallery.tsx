@@ -1,6 +1,16 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/hooks/useStore';
 import { pushTablesToSupabase } from '@/lib/db/hydrate';
@@ -13,20 +23,36 @@ import {
   photoSizeLabel,
   photoThumbUrl,
 } from '@/lib/gallery/gallery-helpers';
-import { photoMatchesSearchQuery } from '@/lib/gallery/fold-search';
+import { photoMatchesSearchQuery, matchesFoldedQuery } from '@/lib/gallery/fold-search';
 import { deletePhotoViaApi, uploadPhotoViaApi } from '@/lib/gallery/photo-api';
+import {
+  canDeleteFolder,
+  childFolders,
+  countPhotosInFolder,
+  createFolder,
+  ensureUnsortedFolder,
+  folderBreadcrumb,
+  folderById,
+  renameFolder,
+  UNSORTED_FOLDER_ID,
+  type PhotoFolder,
+} from '@/lib/gallery/photo-folders';
 import StorageImage from '@/components/gallery/StorageImage';
 import GalleryPhotoModal, {
   type GalleryModalMode,
   type GalleryPhotoRecord,
   type GalleryPhotoSavePayload,
 } from '@/components/gallery/GalleryPhotoModal';
+import GalleryFolderBreadcrumb from '@/components/gallery/GalleryFolderBreadcrumb';
+import GalleryFolderGrid from '@/components/gallery/GalleryFolderGrid';
+import GalleryMovePhotosModal from '@/components/gallery/GalleryMovePhotosModal';
+import GalleryFolderNameModal from '@/components/gallery/GalleryFolderNameModal';
+import GalleryFolderInfoModal from '@/components/gallery/GalleryFolderInfoModal';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { toast } from '@/lib/toast';
-
 import { confirmDialog } from '@/lib/confirm';
 
 const REGION_COLORS: Record<string, string> = {
@@ -37,14 +63,82 @@ const REGION_COLORS: Record<string, string> = {
   services: '#555',
 };
 
+function DraggablePhotoCard({
+  photo,
+  selected,
+  onToggleSelect,
+  onOpenLightbox,
+  onEdit,
+}: {
+  photo: GalleryPhoto;
+  selected: boolean;
+  onToggleSelect: () => void;
+  onOpenLightbox: () => void;
+  onEdit: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `gallery-photo-${photo.id}`,
+    data: { photoId: photo.id, type: 'gallery-photo' },
+  });
+  const thumb = photoThumbUrl(photo) || photo.url;
+
+  return (
+    <article
+      ref={setNodeRef}
+      className={`phlib-card${selected ? ' selected' : ''}${isDragging ? ' dragging' : ''}`}
+      {...listeners}
+      {...attributes}
+    >
+      <div className="phlib-card-media">
+        <button type="button" className="phlib-card-img-btn" onClick={onOpenLightbox}>
+          {thumb ? (
+            <StorageImage src={thumb} alt={photo.caption} fill className="phlib-img" sizes="280px" />
+          ) : (
+            <span className="phlib-missing">No image</span>
+          )}
+        </button>
+        <span
+          className="phlib-region-badge"
+          style={{ background: REGION_COLORS[photo.region] || '#555' }}
+        >
+          {photo.region}
+        </span>
+        <label className="phlib-select" onPointerDown={(e) => e.stopPropagation()}>
+          <input type="checkbox" checked={selected} onChange={onToggleSelect} />
+        </label>
+        <div className="phlib-card-actions" onPointerDown={(e) => e.stopPropagation()}>
+          <button type="button" onClick={onEdit}>
+            Edit
+          </button>
+        </div>
+      </div>
+      <div className="phlib-card-body">
+        <div className="phlib-card-caption">{photo.caption || photo.id}</div>
+        <div className="phlib-card-meta">
+          <span>{photoSizeLabel(photo)}</span>
+          {(photo.tags ?? []).slice(0, 3).map((t) => (
+            <span key={t} className="phlib-tag">
+              {t}
+            </span>
+          ))}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function Gallery() {
   const searchParams = useSearchParams();
   const photoFilter = searchParams.get('photo') || '';
   const attractionFilter = searchParams.get('attraction') || '';
 
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
+  const rawFolders = useStore((s) => s.photoFolders) as PhotoFolder[];
   const attractions = useStore((s) => s.attractions);
 
+  const folders = useMemo(() => ensureUnsortedFolder(rawFolders), [rawFolders]);
+
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [region, setRegion] = useState('all');
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -56,6 +150,20 @@ export default function Gallery() {
   const [lightbox, setLightbox] = useState<GalleryPhoto | null>(null);
   const [dismissedPhotoFilter, setDismissedPhotoFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [dragPhotoId, setDragPhotoId] = useState<string | null>(null);
+  const [folderNameModal, setFolderNameModal] = useState<
+    null | { mode: 'create' } | { mode: 'rename'; folder: PhotoFolder }
+  >(null);
+  const [infoFolder, setInfoFolder] = useState<PhotoFolder | null>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  useEffect(() => {
+    if (rawFolders.length === 0 && folders.some((f) => f.id === UNSORTED_FOLDER_ID)) {
+      useStore.setState({ photoFolders: folders });
+    }
+  }, [rawFolders.length, folders]);
 
   const filteredPhotoLightbox =
     photoFilter && dismissedPhotoFilter !== photoFilter
@@ -63,8 +171,45 @@ export default function Gallery() {
       : null;
   const activeLightbox = filteredPhotoLightbox ?? lightbox;
 
+  const breadcrumb = useMemo(
+    () => folderBreadcrumb(folders, currentFolderId),
+    [folders, currentFolderId]
+  );
+  const currentFolder = folderById(folders, currentFolderId);
+  const childFolderList = useMemo(
+    () => childFolders(folders, currentFolderId),
+    [folders, currentFolderId]
+  );
+
+  const photoCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const f of folders) {
+      counts[f.id] = countPhotosInFolder(photos, f.id);
+    }
+    return counts;
+  }, [folders, photos]);
+
+  /** Folders visible in the current level, filtered by live search at root / nested. */
+  const visibleFolders = useMemo(() => {
+    const base = childFolderList;
+    const query = q.trim();
+    if (!query) return base;
+    return base.filter((f) => {
+      if (matchesFoldedQuery(f.name, query) || matchesFoldedQuery(f.id, query)) return true;
+      return photos.some(
+        (p) =>
+          (p.folderId || UNSORTED_FOLDER_ID) === f.id && photoMatchesSearchQuery(p, query)
+      );
+    });
+  }, [childFolderList, photos, q]);
+
+  const folderPhotos = useMemo(() => {
+    if (!currentFolderId) return [] as GalleryPhoto[];
+    return photos.filter((p) => (p.folderId || UNSORTED_FOLDER_ID) === currentFolderId);
+  }, [photos, currentFolderId]);
+
   const filtered = useMemo(() => {
-    let list = photos;
+    let list = folderPhotos;
     if (attractionFilter) {
       const att = attractions.find((a) => a.id === attractionFilter);
       const ids = new Set([...(att?.linkedPhotoIds ?? []), ...(att?.photoIds ?? [])]);
@@ -74,13 +219,95 @@ export default function Gallery() {
       if (region !== 'all' && p.region !== region) return false;
       return photoMatchesSearchQuery(p, q);
     });
-  }, [photos, region, q, attractionFilter, attractions]);
+  }, [folderPhotos, region, q, attractionFilter, attractions]);
+
+  const infoPathLabel = useMemo(() => {
+    if (!infoFolder) return '';
+    const trail = folderBreadcrumb(folders, infoFolder.id);
+    return ['Library', ...trail.map((f) => f.name)].join(' / ');
+  }, [folders, infoFolder]);
 
   const { pageSize, setPageSize } = usePageSize();
-  const pagination = usePagination(filtered, pageSize, [region, q, attractionFilter, pageSize]);
+  const pagination = usePagination(filtered, pageSize, [region, q, attractionFilter, pageSize, currentFolderId]);
   const { paginatedItems } = pagination;
 
+  function openFolder(id: string) {
+    setCurrentFolderId(id);
+    setSelected(new Set());
+    setRegion('all');
+    setQ('');
+    setError(null);
+  }
+
+  function goRoot() {
+    setCurrentFolderId(null);
+    setSelected(new Set());
+    setRegion('all');
+    setQ('');
+    setError(null);
+  }
+
+  async function persistFolders(next: PhotoFolder[]) {
+    useStore.setState({ photoFolders: next });
+    const result = await pushTablesToSupabase(['photo_folders'], false);
+    if (!result.ok) throw new Error(result.error ?? 'Failed to save folders');
+  }
+
+  async function handleNewFolder() {
+    setFolderNameModal({ mode: 'create' });
+  }
+
+  async function submitFolderName(name: string) {
+    if (!folderNameModal) return;
+    setSaving(true);
+    setError(null);
+    try {
+      if (folderNameModal.mode === 'create') {
+        const { folders: next } = createFolder(folders, name, currentFolderId);
+        await persistFolders(next);
+        toast.success('Folder created.');
+      } else {
+        await persistFolders(renameFolder(folders, folderNameModal.folder.id, name));
+        toast.success('Folder renamed.');
+      }
+      setFolderNameModal(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save folder');
+      toast.error(e instanceof Error ? e.message : 'Could not save folder');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRenameFolder(folder: PhotoFolder) {
+    setFolderNameModal({ mode: 'rename', folder });
+  }
+
+  async function handleDeleteFolder(folder: PhotoFolder) {
+    const check = canDeleteFolder(folders, folder.id, photos);
+    if (!check.ok) {
+      toast.error(check.reason ?? 'Cannot delete folder');
+      return;
+    }
+    const ok = await confirmDialog(`Delete folder “${folder.name}”?`, { title: 'Delete folder' });
+    if (!ok) return;
+    setSaving(true);
+    try {
+      await persistFolders(folders.filter((f) => f.id !== folder.id));
+      if (currentFolderId === folder.id) goRoot();
+      toast.success('Folder deleted.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not delete folder');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function openAdd() {
+    if (!currentFolderId) {
+      toast.error('Open a folder first, then upload photos into it.');
+      return;
+    }
     setModalMode('add');
     setEditing(null);
     setSaveStatus('');
@@ -103,6 +330,7 @@ export default function Gallery() {
       if (modalMode === 'add') {
         const files = data.files?.length ? data.files : data.file ? [data.file] : [];
         if (!files.length) throw new Error('Add at least one image.');
+        const folderId = currentFolderId || UNSORTED_FOLDER_ID;
         let current = useStore.getState().photos as GalleryPhoto[];
         for (let i = 0; i < files.length; i++) {
           const file = files[i]!;
@@ -119,6 +347,7 @@ export default function Gallery() {
             caption,
             region: data.region,
             tags: data.tags,
+            folderId,
           });
           current = [...current, record];
           useStore.setState({ photos: current });
@@ -137,6 +366,7 @@ export default function Gallery() {
             caption: data.caption,
             region: data.region,
             tags: data.tags,
+            folderId: editing.folderId || currentFolderId || UNSORTED_FOLDER_ID,
           });
         } else {
           setSaveStatus('Saving metadata…');
@@ -203,10 +433,9 @@ export default function Gallery() {
 
   async function handleBulkDelete() {
     if (!selected.size) return;
-    const ok = await confirmDialog(
-      `Delete ${selected.size} photo(s) from the library?`,
-      { title: 'Delete photos' },
-    );
+    const ok = await confirmDialog(`Delete ${selected.size} photo(s) from the library?`, {
+      title: 'Delete photos',
+    });
     if (!ok) return;
     setSaving(true);
     setError(null);
@@ -236,6 +465,30 @@ export default function Gallery() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Bulk delete failed');
       toast.error(e instanceof Error ? e.message : 'Bulk delete failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function movePhotosToFolder(photoIds: string[], folderId: string) {
+    if (!photoIds.length) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const idSet = new Set(photoIds);
+      useStore.setState({
+        photos: (useStore.getState().photos as GalleryPhoto[]).map((p) =>
+          idSet.has(p.id) ? { ...p, folderId } : p
+        ),
+      });
+      const result = await pushTablesToSupabase(['photos'], false);
+      if (!result.ok) throw new Error(result.error ?? 'Failed to move photos');
+      setSelected(new Set());
+      setMoveOpen(false);
+      toast.success(`Moved ${photoIds.length} photo(s).`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Move failed');
+      toast.error(e instanceof Error ? e.message : 'Move failed');
     } finally {
       setSaving(false);
     }
@@ -288,17 +541,64 @@ export default function Gallery() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- navigate within filtered list
   }, [activeLightbox, lightboxIndex, filtered]);
 
+  function handleDragStart(e: DragStartEvent) {
+    const photoId = e.active.data.current?.photoId as string | undefined;
+    setDragPhotoId(photoId ?? null);
+  }
+
+  async function handleDragEnd(e: DragEndEvent) {
+    setDragPhotoId(null);
+    const photoId = e.active.data.current?.photoId as string | undefined;
+    const overId = e.over?.id;
+    if (!photoId || typeof overId !== 'string' || !overId.startsWith('folder-drop-')) return;
+    const folderId = overId.replace('folder-drop-', '');
+    if (!folderId || folderId === currentFolderId) return;
+    const ids = selected.has(photoId) && selected.size > 1 ? [...selected] : [photoId];
+    await movePhotosToFolder(ids, folderId);
+  }
+
+  const dragPhoto = dragPhotoId ? photos.find((p) => p.id === dragPhotoId) : null;
+  const dragThumb = dragPhoto ? photoThumbUrl(dragPhoto) || dragPhoto.url : null;
+
+  const atRoot = currentFolderId === null;
+  const title = atRoot ? 'Photo Library' : currentFolder?.name || 'Folder';
+  const subtitle = atRoot
+    ? 'Folders for tours & attractions'
+    : 'Upload here, or Move to… / drag onto a folder';
+  const totalPhotos = photos.length;
+  const totalFolders = folders.length;
+  const unsortedCount = photoCounts[UNSORTED_FOLDER_ID] ?? 0;
+
   return (
     <div className="phlib">
       <div className="phlib-hero">
-        <div>
-          <h1 className="phlib-title">Photo Library</h1>
-          <p className="phlib-sub">
-            Upload once, then attach photos to tours and attractions from the picker.
-          </p>
+        <div className="phlib-hero-text">
+          <h1 className="phlib-title">{title}</h1>
+          <p className="phlib-sub">{subtitle}</p>
+        </div>
+        <div className="phlib-hero-stats" aria-label="Library summary">
+          <span className="phlib-stat">
+            <strong>{totalFolders}</strong> folders
+          </span>
+          <span className="phlib-stat">
+            <strong>{totalPhotos}</strong> photos
+          </span>
+          {atRoot && (
+            <span className="phlib-stat phlib-stat-muted">
+              <strong>{unsortedCount}</strong> unsorted
+            </span>
+          )}
+          {!atRoot && (
+            <span className="phlib-stat phlib-stat-muted">
+              <strong>{folderPhotos.length}</strong> in this folder
+            </span>
+          )}
         </div>
         <div className="phlib-hero-actions">
-          {filtered.length > 0 && (
+          <button type="button" className="btn btn-o" disabled={saving} onClick={handleNewFolder}>
+            New folder
+          </button>
+          {!atRoot && filtered.length > 0 && (
             <button type="button" className="btn btn-o" disabled={saving} onClick={selectAllFiltered}>
               Select all ({filtered.length})
             </button>
@@ -308,134 +608,173 @@ export default function Gallery() {
               <button type="button" className="btn btn-o" disabled={saving} onClick={clearSelection}>
                 Clear selection
               </button>
+              <button type="button" className="btn btn-o" disabled={saving} onClick={() => setMoveOpen(true)}>
+                Move to…
+              </button>
               <button type="button" className="btn btn-s" disabled={saving} onClick={handleBulkDelete}>
                 Delete {selected.size}
               </button>
             </>
           )}
-          <button type="button" className="btn btn-g" onClick={openAdd} disabled={saving}>
-            Upload photos
-          </button>
+          {!atRoot && (
+            <button type="button" className="btn btn-g" onClick={openAdd} disabled={saving}>
+              Upload photos
+            </button>
+          )}
         </div>
       </div>
+
+      <GalleryFolderBreadcrumb
+        trail={breadcrumb}
+        onGoRoot={goRoot}
+        onGoFolder={(id) => openFolder(id)}
+      />
 
       <div className="phlib-toolbar">
         <input
           className="phlib-search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder='Search tags… e.g. "Can Tho" or CanTho'
+          placeholder={
+            atRoot
+              ? 'Search folders or photos…'
+              : 'Search tags… e.g. "Can Tho" or CanTho'
+          }
         />
-        <div className="phlib-region-tabs">
-          {PHOTO_LIBRARY_REGIONS.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              className={`phlib-region-tab${region === r.id ? ' on' : ''}`}
-              onClick={() => setRegion(r.id)}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
+        {!atRoot && (
+          <div className="phlib-region-tabs">
+            {PHOTO_LIBRARY_REGIONS.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                className={`phlib-region-tab${region === r.id ? ' on' : ''}`}
+                onClick={() => setRegion(r.id)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        )}
         <span className="phlib-count">
-          {selected.size > 0 ? `${selected.size} selected · ` : ''}
-          {filtered.length} photos
+          {atRoot
+            ? `${visibleFolders.length} folder${visibleFolders.length === 1 ? '' : 's'}`
+            : `${selected.size > 0 ? `${selected.size} selected · ` : ''}${filtered.length} photos`}
         </span>
       </div>
 
       {error && <div className="phlib-error">{error}</div>}
-      {attractionFilter && (
+      {!atRoot && attractionFilter && (
         <div className="phlib-filter-note">
           Filtered to attraction <code>{attractionFilter}</code>
         </div>
       )}
 
-      <div className="phlib-grid">
-        {paginatedItems.map((p) => {
-          const thumb = photoThumbUrl(p) || p.url;
-          const isSel = selected.has(p.id);
-          return (
-            <article key={p.id} className={`phlib-card${isSel ? ' selected' : ''}`}>
-              <div className="phlib-card-media">
-                <button
-                  type="button"
-                  className="phlib-card-img-btn"
-                  onClick={() => {
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        {visibleFolders.length > 0 && (
+          <GalleryFolderGrid
+            folders={visibleFolders}
+            photoCounts={photoCounts}
+            onOpen={openFolder}
+            onRename={handleRenameFolder}
+            onDelete={handleDeleteFolder}
+            onInfo={setInfoFolder}
+            acceptPhotoDrop
+          />
+        )}
+
+        {atRoot && visibleFolders.length === 0 && (
+          <EmptyState
+            className="crm-empty-state--flush"
+            variant="photos"
+            title={q.trim() ? 'No folders match your search' : 'No folders yet'}
+            description={
+              q.trim()
+                ? 'Try another name or clear the search to see all folders.'
+                : 'Create a folder to start organizing your photo library.'
+            }
+            action={
+              <>
+                {q.trim() && (
+                  <button type="button" className="btn btn-s btn-sm" onClick={() => setQ('')}>
+                    Clear search
+                  </button>
+                )}
+                {!q.trim() && (
+                  <button type="button" className="btn btn-g btn-sm" onClick={handleNewFolder}>
+                    New folder
+                  </button>
+                )}
+              </>
+            }
+          />
+        )}
+
+        {!atRoot && (
+          <>
+            <div className="phlib-grid">
+              {paginatedItems.map((p) => (
+                <DraggablePhotoCard
+                  key={p.id}
+                  photo={p}
+                  selected={selected.has(p.id)}
+                  onToggleSelect={() => toggleSelect(p.id)}
+                  onOpenLightbox={() => {
                     setDismissedPhotoFilter(null);
                     setLightbox(p);
                   }}
-                >
-                  {thumb ? (
-                    <StorageImage src={thumb} alt={p.caption} fill className="phlib-img" sizes="280px" />
-                  ) : (
-                    <span className="phlib-missing">No image</span>
-                  )}
-                </button>
-                <span
-                  className="phlib-region-badge"
-                  style={{ background: REGION_COLORS[p.region] || '#555' }}
-                >
-                  {p.region}
-                </span>
-                <label className="phlib-select">
-                  <input type="checkbox" checked={isSel} onChange={() => toggleSelect(p.id)} />
-                </label>
-                <div className="phlib-card-actions">
-                  <button type="button" onClick={() => openEdit(p)}>
-                    Edit
-                  </button>
-                </div>
-              </div>
-              <div className="phlib-card-body">
-                <div className="phlib-card-caption">{p.caption || p.id}</div>
-                <div className="phlib-card-meta">
-                  <span>{photoSizeLabel(p)}</span>
-                  {(p.tags ?? []).slice(0, 3).map((t) => (
-                    <span key={t} className="phlib-tag">
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </article>
-          );
-        })}
-      </div>
+                  onEdit={() => openEdit(p)}
+                />
+              ))}
+            </div>
 
-      {!filtered.length && (
-        <EmptyState
-          className="crm-empty-state--flush"
-          variant="photos"
-          title={region !== 'all' || q.trim() || attractionFilter ? 'No photos match your filters' : 'No photos yet'}
-          description={
-            region !== 'all' || q.trim() || attractionFilter
-              ? 'Try another region or search, or clear filters to see the full library.'
-              : 'Upload photos to build your library for attractions and proposals.'
-          }
-          action={
-            <>
-              {(region !== 'all' || q.trim()) && (
-                <button
-                  type="button"
-                  className="btn btn-s btn-sm"
-                  onClick={() => {
-                    setRegion('all');
-                    setQ('');
-                  }}
-                >
-                  Clear filters
-                </button>
-              )}
-              <button type="button" className="btn btn-g btn-sm" onClick={openAdd}>
-                Upload your first photo
-              </button>
-            </>
-          }
-        />
-      )}
+            {!filtered.length && (
+              <EmptyState
+                className="crm-empty-state--flush"
+                variant="photos"
+                title={
+                  region !== 'all' || q.trim() || attractionFilter
+                    ? 'No photos match your filters'
+                    : 'This folder is empty'
+                }
+                description={
+                  region !== 'all' || q.trim() || attractionFilter
+                    ? 'Try another region or search, or clear filters.'
+                    : 'Upload photos here, or move photos from Unsorted with Move to…'
+                }
+                action={
+                  <>
+                    {(region !== 'all' || q.trim()) && (
+                      <button
+                        type="button"
+                        className="btn btn-s btn-sm"
+                        onClick={() => {
+                          setRegion('all');
+                          setQ('');
+                        }}
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                    <button type="button" className="btn btn-g btn-sm" onClick={openAdd}>
+                      Upload photos
+                    </button>
+                  </>
+                }
+              />
+            )}
 
-      {filtered.length > 0 && <PaginationBar {...pagination} onPageSizeChange={setPageSize} />}
+            {filtered.length > 0 && <PaginationBar {...pagination} onPageSizeChange={setPageSize} />}
+          </>
+        )}
+
+        <DragOverlay>
+          {dragThumb ? (
+            <div className="phlib-drag-overlay">
+              <StorageImage src={dragThumb} alt="" fill sizes="80px" className="phlib-img" />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       <GalleryPhotoModal
         open={modalOpen}
@@ -446,6 +785,33 @@ export default function Gallery() {
         onClose={() => !saving && setModalOpen(false)}
         onSave={handleSave}
         onDelete={handleDelete}
+      />
+
+      <GalleryMovePhotosModal
+        open={moveOpen}
+        folders={folders}
+        photoCount={selected.size}
+        currentFolderId={currentFolderId}
+        saving={saving}
+        onClose={() => !saving && setMoveOpen(false)}
+        onConfirm={(folderId) => movePhotosToFolder([...selected], folderId)}
+      />
+
+      <GalleryFolderNameModal
+        open={Boolean(folderNameModal)}
+        title={folderNameModal?.mode === 'rename' ? 'Rename folder' : 'New folder'}
+        initialName={folderNameModal?.mode === 'rename' ? folderNameModal.folder.name : ''}
+        saving={saving}
+        onClose={() => !saving && setFolderNameModal(null)}
+        onSubmit={submitFolderName}
+      />
+
+      <GalleryFolderInfoModal
+        open={Boolean(infoFolder)}
+        folder={infoFolder}
+        pathLabel={infoPathLabel}
+        photoCount={infoFolder ? photoCounts[infoFolder.id] ?? 0 : 0}
+        onClose={() => setInfoFolder(null)}
       />
 
       {activeLightbox && (
@@ -461,7 +827,9 @@ export default function Gallery() {
           <div className="phlib-viewer" onClick={(e) => e.stopPropagation()}>
             <header className="phlib-viewer-bar">
               <div className="phlib-viewer-bar-text">
-                <strong className="phlib-viewer-caption">{activeLightbox.caption || activeLightbox.id}</strong>
+                <strong className="phlib-viewer-caption">
+                  {activeLightbox.caption || activeLightbox.id}
+                </strong>
                 <span className="phlib-viewer-id">{activeLightbox.id}</span>
                 {activeLightbox.displayBytes != null && (
                   <span className="phlib-viewer-size">{formatBytes(activeLightbox.displayBytes)}</span>
@@ -509,7 +877,7 @@ export default function Gallery() {
                   ‹
                 </button>
               )}
-              {(photoDisplayUrl(activeLightbox) || activeLightbox.url) ? (
+              {photoDisplayUrl(activeLightbox) || activeLightbox.url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={photoDisplayUrl(activeLightbox) || activeLightbox.url}

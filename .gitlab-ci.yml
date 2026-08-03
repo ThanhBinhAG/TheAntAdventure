@@ -1,11 +1,18 @@
-# GitLab CI — verify only (lint + build), no deploy
+# GitLab CI
+# - main: package Docker image
+# - other branches: lint + Next build (verify only)
 
 stages:
   - verify
+  - package
 
 variables:
   npm_config_cache: '$CI_PROJECT_DIR/.npm'
   NEXT_TELEMETRY_DISABLED: '1'
+  DOCKER_TLS_CERTDIR: '/certs'
+  IMAGE_TAG: '$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA'
+  IMAGE_LATEST: '$CI_REGISTRY_IMAGE:latest'
+  MNT_FDATA: '/mnt/fdata'
 
 cache:
   key:
@@ -19,6 +26,10 @@ lint:
   image: node:20-alpine
   tags:
     - vm06-deploy-ant-admin
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: never
+    - when: on_success
   script:
     - node --version
     - npm --version
@@ -30,8 +41,48 @@ build:
   image: node:20-alpine
   tags:
     - vm06-deploy-ant-admin
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: never
+    - when: on_success
   script:
     - node --version
     - npm --version
     - npm ci
     - npm run build
+
+# Package production image — main only (build happens inside Dockerfile).
+docker:
+  stage: package
+  image: docker:24-cli
+  services:
+    - docker:24-dind
+  tags:
+    - vm06-deploy-ant-admin
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - when: never
+  script:
+    - docker info
+    - >
+      docker build
+      --build-arg NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL}"
+      --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY}"
+      --build-arg NEXT_PUBLIC_USE_SUPABASE="${NEXT_PUBLIC_USE_SUPABASE:-true}"
+      --build-arg NEXT_PUBLIC_SUPABASE_AUTO_SYNC="${NEXT_PUBLIC_SUPABASE_AUTO_SYNC:-true}"
+      --build-arg NEXT_PUBLIC_SUPABASE_READ_ONLY="${NEXT_PUBLIC_SUPABASE_READ_ONLY:-false}"
+      --build-arg NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY="${NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY}"
+      --build-arg NEXT_PUBLIC_SENTRY_DSN="${NEXT_PUBLIC_SENTRY_DSN}"
+      --build-arg NEXT_PUBLIC_APP_NAME="${NEXT_PUBLIC_APP_NAME:-The Ant Adventures CRM}"
+      --build-arg NEXT_PUBLIC_APP_VERSION="${NEXT_PUBLIC_APP_VERSION:-4.3}"
+      -t "$IMAGE_TAG"
+      -t "$IMAGE_LATEST"
+      .
+    - |
+      if [ -n "${CI_REGISTRY:-}" ]; then
+        docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+        docker push "$IMAGE_TAG"
+        docker push "$IMAGE_LATEST"
+      else
+        echo "CI_REGISTRY not set — image built locally on runner only."
+      fi

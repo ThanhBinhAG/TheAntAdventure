@@ -13,6 +13,11 @@ export type WeatherDestinationCoord = {
   sortOrder: number;
 };
 
+/** This Week featured panels — always shown with full 7-day detail when present in filter. */
+export const FEATURED_WEEKLY_IDS = ['hanoi', 'saigon'] as const;
+
+export type FeaturedWeeklyId = (typeof FEATURED_WEEKLY_IDS)[number];
+
 export const WEATHER_DESTINATIONS: WeatherDestinationCoord[] = [
   { id: 'hanoi', name: 'Hanoi', region: 'north', emoji: '🏛', latitude: 21.0285, longitude: 105.8542, sortOrder: 1 },
   { id: 'sapa', name: 'Sapa', region: 'north', emoji: '⛰', latitude: 22.3364, longitude: 103.8438, elevationM: 1500, sortOrder: 2 },

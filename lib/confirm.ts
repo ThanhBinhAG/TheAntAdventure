@@ -20,7 +20,7 @@ type Listener = (req: ConfirmRequest | null) => void;
 
 let current: ConfirmRequest | null = null;
 const listeners = new Set<Listener>();
-let queue: Array<() => void> = [];
+const queue: Array<() => void> = [];
 
 function emit() {
   listeners.forEach((fn) => fn(current));

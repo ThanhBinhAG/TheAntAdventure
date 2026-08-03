@@ -319,6 +319,7 @@ export interface BackupData {
   tasks: unknown[];
   feedback: unknown[];
   contracts: unknown[];
+  photoFolders: unknown[];
   photos: unknown[];
   messages: ChatMessages;
   calEvents: unknown[];

@@ -12,6 +12,19 @@ npm run dev
 
 Open [http://localhost:3006](http://localhost:3006) → redirects to `/dashboard`.
 
+## Docker (production package)
+
+Requires Docker + Compose. Uses Next.js `output: 'standalone'` ([`Dockerfile`](Dockerfile)).
+
+```bash
+cp .env.example .env.local   # fill Supabase / secrets
+npm run docker:up            # build + run on :3006
+# or: docker compose --env-file .env.local up --build -d
+npm run docker:down
+```
+
+`NEXT_PUBLIC_*` values are baked in at **image build** time (compose build-args). Server secrets (`SUPABASE_SERVICE_ROLE_KEY`, break-glass, cron, …) come from `.env.local` at **runtime**.
+
 ## Environment variables
 
 Edit **`.env.local`** (gitignored). Template: [`.env.example`](.env.example)

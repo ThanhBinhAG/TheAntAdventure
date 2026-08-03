@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAuthContext } from '@/lib/auth/session';
 import { getPhotoStorageClient, uploadGalleryPhotoServer } from '@/lib/storage/upload-gallery-photo-server';
+import { UNSORTED_FOLDER_ID } from '@/lib/gallery/photo-folders';
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_INPUT_BYTES = 10 * 1024 * 1024;
@@ -11,6 +12,7 @@ const metaSchema = z.object({
   caption: z.string().max(500).optional().default(''),
   region: z.string().max(64).optional().default('north'),
   tags: z.array(z.string().max(80)).max(40).optional().default([]),
+  folderId: z.string().min(1).max(64).optional().default(UNSORTED_FOLDER_ID),
 });
 
 export async function POST(request: Request) {
@@ -61,6 +63,7 @@ export async function POST(request: Request) {
     caption: String(form.get('caption') ?? ''),
     region: String(form.get('region') ?? 'north'),
     tags,
+    folderId: String(form.get('folderId') ?? UNSORTED_FOLDER_ID) || UNSORTED_FOLDER_ID,
   });
   if (!meta.success) {
     return NextResponse.json({ ok: false, error: meta.error.issues[0]?.message ?? 'Invalid metadata' }, { status: 400 });
@@ -78,6 +81,7 @@ export async function POST(request: Request) {
       thumb_url: uploaded.thumbUrl,
       storage_path: uploaded.storagePath,
       display_bytes: uploaded.displayBytes,
+      folder_id: meta.data.folderId,
     };
 
     const { error: upsertErr } = await client.from('photos').upsert(row, { onConflict: 'id' });
@@ -107,6 +111,7 @@ export async function POST(request: Request) {
         thumbUrl: uploaded.thumbUrl,
         storagePath: uploaded.storagePath,
         displayBytes: uploaded.displayBytes,
+        folderId: meta.data.folderId,
       },
     });
   } catch (e) {

@@ -25,6 +25,7 @@ Every meaningful code/docs folder has an `AGENTS.md` describing **what that fold
 | [`tests/`](tests/AGENTS.md) | Vitest / Node test suite |
 | [`Personal/`](Personal/AGENTS.md) | Gitignored local notes, changelog, legacy |
 | [`.cursor/`](.cursor/AGENTS.md) | Cursor rules for this repo |
+| [`Dockerfile`](Dockerfile) / [`docker-compose.yml`](docker-compose.yml) | Production image (standalone) + local/VM compose |
 
 Template for new folders:
 

@@ -123,8 +123,8 @@ export default function UserDirectory({
             // Khi đổi filter/trang, giữ bảng cũ trong lúc chờ dữ liệu mới.
             keepPreviousData: true,
 
-            // Khi quay lại tab hoặc có mạng lại, kiểm tra dữ liệu mới.
-            revalidateOnFocus: true,
+            // Danh sách đã được refresh sau các thao tác tạo/sửa/xóa/đổi role.
+            revalidateOnFocus: false,
             focusThrottleInterval: 30_000,
             revalidateOnReconnect: true,
         },

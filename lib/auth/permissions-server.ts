@@ -17,9 +17,77 @@ import {
   hasPermission,
   type PermissionCode,
 } from '@/lib/auth/permissions';
+import {
+  BG_SESSION_COOKIE,
+  isBreakGlassSessionValid,
+} from '@/lib/auth/break-glass';
+
 
 /** Kiểu một dòng do RPC current_permission_codes() trả về. */
 type PermissionRow = { code: string };
+
+/**
+ * Gọi RPC để lấy permission từ cookie session hiện tại.
+ *
+ * Hàm này chỉ đọc quyền; RPC current_permission_codes() tự kiểm tra:
+ * - auth.uid()
+ * - tài khoản còn hoạt động
+ * - tài khoản chưa bị xóa mềm
+ */
+async function readPermissionCodesFromSupabase(): Promise<PermissionCode[]> {
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
+
+  if (!url || !key) {
+    throw new Error('Supabase URL hoặc anon key chưa được cấu hình');
+  }
+
+  const cookieStore = cookies();
+
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll() {
+        // Chỉ đọc permission, không cần ghi lại cookie.
+      },
+    },
+  });
+
+  const { data, error } = await supabase.rpc('current_permission_codes');
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as PermissionRow[])
+    .map((row) => row.code)
+    .filter((code): code is PermissionCode => Boolean(code));
+}
+
+/**
+ * Dùng riêng cho app/(crm)/layout.tsx.
+ *
+ * Middleware đã xác thực user trước đó, nên không cần gọi auth.getUser() lần nữa.
+ * Nếu session không hợp lệ, RPC trả mảng rỗng và PermissionGate sẽ chặn giao diện.
+ *
+ * Không dùng hàm này cho API, vì API cần phân biệt lỗi 401 và 403.
+ */
+export async function getInitialPermissionCodesForCRMLayout(): Promise<
+  PermissionCode[]
+> {
+  const breakGlassToken = cookies()
+    .get(BG_SESSION_COOKIE)
+    ?.value;
+
+  // Break-glass hợp lệ luôn có wildcard permission.
+  if (await isBreakGlassSessionValid(breakGlassToken)) {
+    return ['*'];
+  }
+
+  return readPermissionCodesFromSupabase();
+}
 
 /**
  * Lấy danh sách quyền của request hiện tại.
@@ -37,30 +105,9 @@ export async function getCurrentPermissionCodesForRequest(): Promise<
   // Session break-glass là đường khôi phục khẩn cấp, luôn có toàn quyền.
   if (auth.isBreakGlass && auth.isSuperAdmin) return ['*'];
 
-  const url = getSupabaseUrl();
-  const key = getSupabaseAnonKey();
-  if (!url || !key) {
-    throw new Error('Supabase URL hoặc anon key chưa được cấu hình');
-  }
-
-  const cookieStore = cookies();
-  const supabase = createServerClient(url, key, {
-    cookies: {
-      // Chuyển cookie hiện tại vào Supabase để RPC biết auth.uid() là ai.
-      getAll() {
-        return cookieStore.getAll();
-      },
-      // Route này chỉ đọc quyền, không cần ghi/refresh cookie.
-      setAll() { },
-    },
-  });
-
-  const { data, error } = await supabase.rpc('current_permission_codes');
-  if (error) throw new Error(error.message);
-
-  return ((data ?? []) as PermissionRow[])
-    .map((row) => row.code)
-    .filter((code): code is PermissionCode => Boolean(code));
+  // API vẫn gọi auth.getUser() ở trên để phân biệt 401 và 403 chính xác.
+  // Sau đó dùng chung hàm RPC để lấy danh sách quyền.
+  return readPermissionCodesFromSupabase();
 }
 
 /**

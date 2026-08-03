@@ -111,8 +111,9 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
       });
       const next = searchParams.get('next');
       const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+      // Chuyển người dùng đến trang CRM sau khi API login đã ghi session vào cookie.
+      // Không gọi router.refresh() vì có thể tạo thêm một lượt tải dữ liệu không cần thiết.
       router.push(safeNext);
-      router.refresh();
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Đăng nhập thất bại.';
       logAuthEvent('signIn exception', { error: raw }, 'error');

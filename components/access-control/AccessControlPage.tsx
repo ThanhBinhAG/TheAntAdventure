@@ -54,8 +54,10 @@ export default function AccessControlPage() {
         'access-control/roles-permissions',
         fetchAccessControlData,
         {
+            // Dữ liệu chỉ tải lại sau thao tác lưu hoặc khi bấm nút tải lại.
+            // Không gọi API lại chỉ vì người dùng quay về tab trình duyệt.
             dedupingInterval: 60_000,
-            revalidateOnFocus: true,
+            revalidateOnFocus: false,
             focusThrottleInterval: 30_000,
             revalidateOnReconnect: true,
         },

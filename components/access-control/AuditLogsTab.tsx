@@ -272,7 +272,7 @@ export default function AuditLogsTab() {
             // Audit log ít thay đổi hơn danh sách user.
             dedupingInterval: 30_000,
             keepPreviousData: true,
-            revalidateOnFocus: true,
+            revalidateOnFocus: false,
             focusThrottleInterval: 30_000,
             revalidateOnReconnect: true,
         },

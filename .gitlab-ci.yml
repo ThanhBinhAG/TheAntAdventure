@@ -65,8 +65,7 @@ docker:
     - when: never
   script:
     - docker info
-    - apk add --no-cache bash
-    - export ENV_FILE="$(bash scripts/docker-with-env.sh print)"
+    - export ENV_FILE="$(sh scripts/docker-with-env.sh print)"
     - echo "Building with ENV_FILE=$ENV_FILE"
     - docker compose --env-file "$ENV_FILE" build
     - docker tag the-ant-adventures-crm:local "$IMAGE_TAG"

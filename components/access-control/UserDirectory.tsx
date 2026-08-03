@@ -11,12 +11,8 @@
  * - Tạo tài khoản, sửa tên, đổi role, đổi trạng thái và xóa mềm.
  */
 
-import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useState,
-} from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import useSWR from 'swr';
 import {
     SafetyCertificateOutlined,
     TeamOutlined,
@@ -42,7 +38,6 @@ import {
     updateUserRole,
     type AccessControlRole,
     type AccessControlUser,
-    type AccessControlUsersPage,
     type CreateAccessControlUserInput,
     type ManagedRoleCode,
     type UserListRoleFilter,
@@ -91,11 +86,62 @@ export default function UserDirectory({
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
-    const [data, setData] =
-        useState<AccessControlUsersPage | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] =
-        useState<string | null>(null);
+    /**
+     * Khóa cache xác định một danh sách user cụ thể.
+     *
+     * Mỗi tổ hợp tìm kiếm, role, trạng thái và trang có cache RAM riêng.
+     * Vì vậy khi quay về bộ lọc đã xem, dữ liệu có thể hiển thị ngay
+     * thay vì gọi API lặp lại.
+     */
+    const usersQueryKey = [
+        'access-control/users',
+        keyword,
+        roleFilter,
+        statusFilter,
+        page,
+        pageSize,
+    ] as const;
+
+    const {
+        data,
+        error,
+        isLoading,
+        mutate: reloadUsers,
+    } = useSWR(
+        usersQueryKey,
+        () => fetchAccessControlUsersPage({
+            keyword,
+            role: roleFilter,
+            status: statusFilter,
+            page,
+            pageSize,
+        }),
+        {
+            // Trong 15 giây, không gửi lại cùng một request.
+            dedupingInterval: 15_000,
+
+            // Khi đổi filter/trang, giữ bảng cũ trong lúc chờ dữ liệu mới.
+            keepPreviousData: true,
+
+            // Khi quay lại tab hoặc có mạng lại, kiểm tra dữ liệu mới.
+            revalidateOnFocus: true,
+            focusThrottleInterval: 30_000,
+            revalidateOnReconnect: true,
+        },
+    );
+
+    /** Làm mới danh sách đang xem sau các thao tác thay đổi dữ liệu. */
+    const refreshUsers = useCallback(async (): Promise<void> => {
+        await reloadUsers();
+    }, [reloadUsers]);
+
+    /** Đổi lỗi kỹ thuật của SWR thành text an toàn để hiển thị. */
+    const errorMessage =
+        error instanceof Error
+            ? error.message
+            : error
+                ? 'Không thể tải danh sách user.'
+                : null;
 
     const [selectedUser, setSelectedUser] =
         useState<AccessControlUser | null>(null);
@@ -108,55 +154,6 @@ export default function UserDirectory({
     const [isCreateDrawerOpen, setIsCreateDrawerOpen] =
         useState(false);
     const [savingCreate, setSavingCreate] = useState(false);
-
-    /** Lấy đúng một trang user từ server. */
-    const loadUsers = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-
-        try {
-            const nextData = await fetchAccessControlUsersPage({
-                keyword,
-                role: roleFilter,
-                status: statusFilter,
-                page,
-                pageSize,
-            });
-
-            setData(nextData);
-        } catch (error) {
-            setError(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể tải danh sách user.',
-            );
-        } finally {
-            setLoading(false);
-        }
-    }, [
-        keyword,
-        page,
-        pageSize,
-        roleFilter,
-        statusFilter,
-    ]);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        // Chạy sau khi effect hoàn tất để tránh setState đồng bộ trong effect.
-        void Promise.resolve().then(() => {
-            if (!cancelled) {
-                return loadUsers();
-            }
-
-            return undefined;
-        });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [loadUsers]);
 
     /** Tổng số quyền của role, hiển thị ngắn gọn trong bảng. */
     const permissionCountByRole = useMemo(() => {
@@ -181,7 +178,7 @@ export default function UserDirectory({
             setSelectedUser(null);
 
             // Tải lại đúng trang đang xem để role mới hiển thị ngay.
-            await loadUsers();
+            await refreshUsers();
         } catch (error) {
             toast.error(
                 error instanceof Error
@@ -205,7 +202,7 @@ export default function UserDirectory({
             toast.success('Đã cập nhật thông tin người dùng.');
             setEditingUser(null);
 
-            await loadUsers();
+            await refreshUsers();
         } catch (error) {
             toast.error(
                 error instanceof Error
@@ -256,7 +253,7 @@ export default function UserDirectory({
 
         // Nếu đã ở danh sách mặc định, state không đổi nên tự tải lại ngay.
         if (isDefaultUserList) {
-            void loadUsers();
+            void refreshUsers();
         }
     }
 
@@ -332,7 +329,7 @@ export default function UserDirectory({
                     <UserActionsMenu
                         user={user}
                         onEditInfo={() => setEditingUser(user)}
-                        onChanged={loadUsers}
+                        onChanged={refreshUsers}
                     />
                 </div>
             ),
@@ -430,16 +427,16 @@ export default function UserDirectory({
                 </Button>
             </div>
 
-            {error && (
+            {errorMessage && (
                 <Alert
                     showIcon
                     type="error"
                     message="Không thể tải danh sách user"
-                    description={error}
+                    description={errorMessage}
                     action={
                         <Button
                             size="small"
-                            onClick={() => void loadUsers()}
+                            onClick={() => void refreshUsers()}
                         >
                             Thử lại
                         </Button>
@@ -451,7 +448,7 @@ export default function UserDirectory({
                 rowKey="user_id"
                 columns={columns}
                 dataSource={data?.items ?? []}
-                loading={loading}
+                loading={isLoading}
                 scroll={{ x: 850 }}
                 pagination={{
                     current: data?.page ?? page,

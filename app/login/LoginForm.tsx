@@ -11,7 +11,7 @@ function logAuthEvent(message: string, meta?: Record<string, unknown>, level: 'i
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ category: 'auth', message, level, meta }),
-  }).catch(() => {});
+  }).catch(() => { });
 }
 
 function authErrorMessage(message: string): string {
@@ -178,7 +178,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
         {showDebugLink && (
           <p className="login-hint debug-login-link">
             Admin:{' '}
-            <Link href="/system/debug">System diagnostics</Link> 
+            <Link href="/system/debug">System diagnostics</Link>
           </p>
         )}
       </div>

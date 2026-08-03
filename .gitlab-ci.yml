@@ -1,5 +1,5 @@
 # GitLab CI
-# - main: package Docker image (env from /mnt/fdata/sharing)
+# - main: package Docker image on the runner host Docker (no DinD)
 # - other branches: lint + Next build (verify only)
 
 stages:
@@ -9,7 +9,6 @@ stages:
 variables:
   npm_config_cache: '$CI_PROJECT_DIR/.npm'
   NEXT_TELEMETRY_DISABLED: '1'
-  DOCKER_TLS_CERTDIR: '/certs'
   IMAGE_TAG: 'the-ant-adventures-crm:$CI_COMMIT_SHORT_SHA'
   IMAGE_LATEST: 'the-ant-adventures-crm:latest'
   MNT_FDATA: '/mnt/fdata/the_ant_adventures_crm/'
@@ -51,13 +50,10 @@ build:
     - npm ci
     - npm run build
 
-# Package production image — main only.
-# Secrets: $MNT_FDATA/sharing/.env.local (runner must mount /mnt/fdata).
+# Package on server Docker daemon — main only (shell / host docker, no DinD).
+# Secrets: $MNT_FDATA/sharing/.env.local
 docker:
   stage: package
-  image: docker:24-cli
-  services:
-    - docker:24-dind
   tags:
     - vm06-deploy-ant-admin
   rules:
@@ -76,5 +72,5 @@ docker:
         docker push "$IMAGE_TAG"
         docker push "$IMAGE_LATEST"
       else
-        echo "CI_REGISTRY not set — image built on runner only."
+        echo "CI_REGISTRY not set — image kept on server Docker only."
       fi

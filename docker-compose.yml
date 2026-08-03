@@ -1,0 +1,30 @@
+# Local / VM packaging for The Ant Adventures CRM.
+# Build + run:
+#   docker compose --env-file .env.local up --build -d
+# App: http://localhost:3006
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_USE_SUPABASE: ${NEXT_PUBLIC_USE_SUPABASE:-true}
+        NEXT_PUBLIC_SUPABASE_AUTO_SYNC: ${NEXT_PUBLIC_SUPABASE_AUTO_SYNC:-true}
+        NEXT_PUBLIC_SUPABASE_READ_ONLY: ${NEXT_PUBLIC_SUPABASE_READ_ONLY:-false}
+        NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY: ${NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY:-}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-The Ant Adventures CRM}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-4.3}
+    image: the-ant-adventures-crm:local
+    ports:
+      - "${APP_PORT:-3006}:3006"
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: production
+      PORT: 3006
+      HOSTNAME: 0.0.0.0
+    restart: unless-stopped

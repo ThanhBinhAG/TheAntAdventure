@@ -1,0 +1,13 @@
+---
+description: Maintain nested AGENTS.md overviews in every meaningful folder
+alwaysApply: true
+---
+
+# Nested AGENTS.md
+
+- Every meaningful code/docs folder must have an `AGENTS.md` (Role + Contents + Boundaries).
+- When working in a subtree, read the nearest `AGENTS.md` before editing.
+- When creating a new folder, add `AGENTS.md` in the same change.
+- Keep leaf overviews short; put the child map on the parent.
+- Full convention and top-level map: root [`AGENTS.md`](../../AGENTS.md).
+- Skip only `node_modules`, `.next`, `.git`.

@@ -1,0 +1,235 @@
+'use client';
+
+import Link from 'next/link';
+import Image from 'next/image';
+import { usePathname } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { NAV_SECTIONS, type NavItem } from '@/lib/constants';
+import { useLanguage } from '@/hooks/useLanguage';
+import { useStore } from '@/hooks/useStore';
+import { countActiveTasks } from '@/lib/planner/planner-task-utils';
+import { countTourDesignAttention } from '@/lib/tour-design/tour-design-leads';
+import type { Lead, PageSlug, Task, TourDraft } from '@/lib/types';
+import { PAGE_READ_PERMISSION } from '@/lib/auth/permissions';
+import { usePermissions } from '@/components/PermissionsProvider';
+
+interface SidebarProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ open, onClose }: SidebarProps) {
+  const pathname = usePathname();
+  const { language, t } = useLanguage();
+  const { can, loading, error } = usePermissions();
+  const current = (pathname.split('/').pop() || 'dashboard') as PageSlug;
+  const tasks = useStore((s) => s.tasks) as Task[];
+  const leads = useStore((s) => s.leads) as Lead[];
+  const tourDrafts = useStore((s) => s.tourDrafts) as TourDraft[];
+  const messages = useStore((s) => s.messages);
+
+  const activeTaskCount = useMemo(() => countActiveTasks(tasks), [tasks]);
+  const pendingTourDesign = useMemo(
+    () => countTourDesignAttention(leads, tourDrafts),
+    [leads, tourDrafts]
+  );
+
+  // Chỉ giữ các menu mà user có quyền xem.
+  const visibleSections = useMemo(
+    () =>
+      NAV_SECTIONS
+        .map((section) => ({
+          ...section,
+          items: section.items
+            .map((item) => {
+              // Menu nhóm: chỉ giữ các menu con được phép.
+              if (item.children?.length) {
+                const children = item.children.filter((child) =>
+                  can(PAGE_READ_PERMISSION[child.page]),
+                );
+
+                return children.length > 0
+                  ? { ...item, children }
+                  : null;
+              }
+
+              // Menu đơn: giữ khi có quyền xem trang tương ứng.
+              return can(PAGE_READ_PERMISSION[item.page])
+                ? item
+                : null;
+            })
+            .filter((item): item is NavItem => item !== null),
+        }))
+        .filter((section) => section.items.length > 0),
+    [can],
+  );
+
+  const groupPages = useMemo(() => {
+    return new Set(
+      visibleSections
+        .flatMap((section) => section.items)
+        .filter((item) => item.children?.length)
+        .flatMap((item) => item.children!.map((child) => child.page)),
+    );
+  }, [visibleSections]);//Mỗi khi danh sách menu được phép hiển thị thay đổi, 
+  //Next/React tính lại các trang thuộc menu nhóm.
+  const [openGroup, setOpenGroup] = useState<PageSlug | null>(null);
+  const [previousPage, setPreviousPage] = useState(current);
+
+  // Keep the group holding the active page open across navigations.
+  if (current !== previousPage) {
+    setPreviousPage(current);
+    if (groupPages.has(current)) {
+      const owner = visibleSections.flatMap((s) => s.items).find((i) =>
+        i.children?.some((c) => c.page === current)
+      );
+      setOpenGroup(owner?.page ?? null);
+    }
+  }
+
+  const chatUnread = useMemo(() => {
+    let count = 0;
+    Object.values(messages).forEach((ch) => {
+      count += Array.isArray(ch) ? ch.length : 0;
+    });
+    return count > 0 ? Math.min(count, 99) : 0;
+  }, [messages]);
+
+  return (
+    <>
+      <div id="sb-overlay" className={open ? 'open' : ''} onClick={onClose} />
+      <div id="sb" className={open ? 'open' : ''}>
+        <div className="sb-logo" style={{ padding: '12px 14px 10px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <div
+            style={{
+              width: 112,
+              height: 112,
+              borderRadius: '50%',
+              background: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 8px',
+              overflow: 'hidden',
+            }}
+          >
+            <Image src="/Logo-3.svg" alt="The Ant Adventures" width={100} height={100} style={{ height: 'auto', display: 'block' }} priority />
+          </div>
+          <div
+            style={{
+              textAlign: 'center',
+              fontSize: 9,
+              color: 'rgba(255,255,255,0.65)',
+              letterSpacing: '0.8px',
+              fontStyle: 'italic',
+              lineHeight: 1.4,
+              marginBottom: 5,
+            }}
+          >
+            Where Authentic Adventure Begins
+          </div>
+          <div className="sb-sub" style={{ textAlign: 'center' }}>
+            CRM System · v4.3
+          </div>
+        </div>
+
+
+        {loading ? (
+          <div className="sb-sec">Đang tải quyền…</div>
+        ) : error ? (
+          <div className="sb-sec">Không thể tải quyền</div>
+        ) : (
+          visibleSections.map((section) => (
+            <div key={section.en}>
+              <div className="sb-sec">{language === 'vi' ? section.vi : section.en}</div>
+              {section.items.map((item) =>
+                item.children?.length ? (
+                  <NavGroup
+                    key={item.page}
+                    item={item}
+                    current={current}
+                    open={openGroup === item.page}
+                    label={t(item.en, item.vi)}
+                    onToggle={() => setOpenGroup((prev) => (prev === item.page ? null : item.page))}
+                    onNavigate={onClose}
+                    translate={t}
+                  />
+                ) : (
+                  <Link
+                    key={item.page}
+                    href={`/${item.page}`}
+                    className={`sbi${current === item.page ? ' on' : ''}`}
+                    title={t(item.en, item.vi)}
+                    onClick={onClose}
+                  >
+                    <span className="sb-icon">{item.icon}</span>
+                    <span className="sb-label">{t(item.en, item.vi)}</span>
+                    {item.badge && item.badgeType === 'ceo' && <span className="sb-badge">{item.badge}</span>}
+                    {item.badge && item.badgeType === 'new' && <span className="sb-new">{item.badge}</span>}
+                    {item.page === 'planner' && activeTaskCount > 0 && (
+                      <span className="sb-overdue-badge">{activeTaskCount}</span>
+                    )}
+                    {item.page === 'tourdesign' && pendingTourDesign > 0 && (
+                      <span className="sb-overdue-badge">{pendingTourDesign}</span>
+                    )}
+                    {item.page === 'teamchat' && chatUnread > 0 && (
+                      <span className="sb-chat-badge">{chatUnread}</span>
+                    )}
+                  </Link>
+                )
+              )}
+            </div>
+          )))}
+      </div>
+    </>
+  );
+}
+
+interface NavGroupProps {
+  item: NavItem;
+  current: PageSlug;
+  open: boolean;
+  label: string;
+  onToggle: () => void;
+  onNavigate: () => void;
+  translate: (en: string, vi: string) => string;
+}
+
+function NavGroup({ item, current, open, label, onToggle, onNavigate, translate }: NavGroupProps) {
+  const children = item.children ?? [];
+  const activeChild = children.find((c) => c.page === current);
+
+  return (
+    <div className={`sb-group${open ? ' open' : ''}`}>
+      <button
+        type="button"
+        className={`sbi sb-group-head${activeChild ? ' on' : ''}`}
+        onClick={onToggle}
+        aria-expanded={open}
+        title={label}
+      >
+        <span className="sb-icon">{item.icon}</span>
+        <span className="sb-label">{label}</span>
+        <span className={`sb-caret${open ? ' open' : ''}`}>▸</span>
+      </button>
+
+      {open && (
+        <div className="sb-subnav">
+          {children.map((child) => (
+            <Link
+              key={child.page}
+              href={`/${child.page}`}
+              className={`sbi sb-subitem${current === child.page ? ' on' : ''}`}
+              title={translate(child.en, child.vi)}
+              onClick={onNavigate}
+            >
+              <span className="sb-icon sb-subicon">{child.icon}</span>
+              <span className="sb-label">{translate(child.en, child.vi)}</span>
+              {child.badge && child.badgeType === 'new' && <span className="sb-new">{child.badge}</span>}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

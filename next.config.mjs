@@ -38,6 +38,8 @@ function buildImageRemotePatterns() {
 
 const nextConfig = {
   reactStrictMode: true,
+  // Smaller production image via `node server.js` (see Dockerfile).
+  output: 'standalone',
   // Sharp is a native addon — keep it external so Next does not bundle/break its package exports.
   experimental: {
     serverComponentsExternalPackages: ['sharp'],

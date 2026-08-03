@@ -18,9 +18,9 @@
     "db:bootstrap": "bash scripts/supabase-db.sh bootstrap-existing",
     "knip": "knip",
     "knip:production": "knip --production",
-    "docker:build": "docker compose --env-file .env.local build",
-    "docker:up": "docker compose --env-file .env.local up --build -d",
-    "docker:down": "docker compose down"
+    "docker:build": "bash scripts/docker-with-env.sh build",
+    "docker:up": "bash scripts/docker-with-env.sh up",
+    "docker:down": "bash scripts/docker-with-env.sh down"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -108,6 +108,7 @@ export const PAGE_TITLES: Record<PageSlug, string> = {
   ai: 'AI Requirements ⚡',
   devnotes: 'Dev Notes 📝',
   teamchat: 'Team Chat 💬',
+  'access-control': 'Access Control',
 };
 
 export const VI_LABELS: Record<string, string> = {
@@ -232,6 +233,18 @@ export const NAV_SECTIONS: NavSection[] = [
       { page: 'ai', icon: '⚡', en: 'AI Requirements', vi: 'Yêu cầu AI', badge: 'NEW', badgeType: 'new' },
       { page: 'devnotes', icon: '📝', en: 'Dev Notes', vi: 'Ghi chú kỹ thuật' },
       { page: 'teamchat', icon: '💬', en: 'Team Chat', vi: 'Chat nội bộ' },
+    ],
+  },
+  {
+    en: 'System Administration',
+    vi: 'Quản trị hệ thống',
+    items: [
+      {
+        page: 'access-control',
+        icon: '🛡',
+        en: 'Access Control',
+        vi: 'Quản lý quyền',
+      },
     ],
   },
 ];

@@ -51,7 +51,8 @@ export async function updateSession(request: NextRequest) {
   if (
     pathname.startsWith('/api/auth/login') ||
     pathname.startsWith('/api/auth/logout') ||
-    pathname === '/api/auth/permissions'
+    pathname === '/api/auth/permissions' ||
+    pathname.startsWith('/api/access-control')
 
   ) {
     return NextResponse.next({ request });

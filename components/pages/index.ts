@@ -36,4 +36,5 @@ export const PAGE_COMPONENTS: Record<PageSlug, ComponentType> = {
   ai: loadPage(() => import('./AI')),
   devnotes: loadPage(() => import('./DevNotes')),
   teamchat: loadPage(() => import('./TeamChat')),
+  'access-control': loadPage(() => import('./AccessControl')),
 };

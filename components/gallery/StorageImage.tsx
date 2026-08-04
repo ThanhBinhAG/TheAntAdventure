@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { isNextImageOptimizable } from '@/lib/gallery/storage-image-src';
 
 type Props = {
@@ -16,6 +17,11 @@ type Props = {
   sizes?: string;
 };
 
+/**
+ * Renders storage / remote images. When `src` changes (e.g. after replace + cache-bust),
+ * keeps showing the previous frame until the new URL has loaded so placeholders / old
+ * default backgrounds do not flash.
+ */
 export default function StorageImage({
   src,
   alt,
@@ -27,9 +33,39 @@ export default function StorageImage({
   loading = 'lazy',
   sizes,
 }: Props) {
-  if (!src) return null;
+  const [shownSrc, setShownSrc] = useState(src);
 
-  const useNext = isNextImageOptimizable(src);
+  useEffect(() => {
+    if (!src || src === shownSrc) return;
+
+    let cancelled = false;
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+    const probe = new window.Image();
+    probe.onload = () => {
+      if (!cancelled) setShownSrc(src);
+    };
+    probe.onerror = () => {
+      if (cancelled) return;
+      // Keep previous frame briefly; then adopt new src (CDN may still be catching up).
+      if (!shownSrc) {
+        setShownSrc(src);
+        return;
+      }
+      fallbackTimer = setTimeout(() => {
+        if (!cancelled) setShownSrc(src);
+      }, 500);
+    };
+    probe.src = src;
+    return () => {
+      cancelled = true;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+    };
+  }, [src, shownSrc]);
+
+  // No src → hide (do not clear shownSrc in an effect; that trips set-state-in-effect).
+  if (!src || !shownSrc) return null;
+
+  const useNext = isNextImageOptimizable(shownSrc);
 
   const fillClass = className?.includes('gallery-img-contain')
     ? className
@@ -41,7 +77,8 @@ export default function StorageImage({
         // Raw storage URLs are intentionally rendered without Next optimization.
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
+          key={shownSrc}
+          src={shownSrc}
           alt={alt}
           className={fillClass}
           loading={loading}
@@ -61,7 +98,8 @@ export default function StorageImage({
       // Raw storage URLs are intentionally rendered without Next optimization.
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={src}
+        key={shownSrc}
+        src={shownSrc}
         alt={alt}
         className={className}
         width={width ?? 480}
@@ -73,7 +111,7 @@ export default function StorageImage({
   }
 
   const shared = {
-    src,
+    src: shownSrc,
     alt,
     className: fill ? fillClass : className,
     style,
@@ -82,8 +120,8 @@ export default function StorageImage({
   };
 
   if (fill) {
-    return <Image {...shared} alt={alt} fill />;
+    return <Image key={shownSrc} {...shared} alt={alt} fill />;
   }
 
-  return <Image {...shared} alt={alt} width={width ?? 480} height={height ?? 320} />;
+  return <Image key={shownSrc} {...shared} alt={alt} width={width ?? 480} height={height ?? 320} />;
 }

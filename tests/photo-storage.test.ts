@@ -8,6 +8,7 @@ import {
   photosForProductSlots,
   photoThumbUrl,
   productPhotoSlotStatus,
+  withPhotoCacheBust,
 } from '../lib/gallery/gallery-helpers';
 import { isNextImageOptimizable } from '../lib/gallery/storage-image-src';
 import {
@@ -118,8 +119,27 @@ describe('gallery-helpers storage urls', () => {
   });
 
   it('returns display and thumb urls', () => {
-    assert.equal(photoDisplayUrl(storagePhoto), storagePhoto.url);
-    assert.equal(photoThumbUrl(storagePhoto), storagePhoto.thumbUrl);
+    assert.equal(
+      photoDisplayUrl(storagePhoto),
+      `${storagePhoto.url}?v=98000`
+    );
+    assert.equal(
+      photoThumbUrl(storagePhoto),
+      `${storagePhoto.thumbUrl}?v=98000`
+    );
+  });
+
+  it('skips cache bust when displayBytes is missing', () => {
+    const legacy = { ...storagePhoto, displayBytes: undefined };
+    assert.equal(photoDisplayUrl(legacy), storagePhoto.url);
+    assert.equal(photoThumbUrl(legacy), storagePhoto.thumbUrl);
+  });
+
+  it('withPhotoCacheBust replaces existing v param', () => {
+    assert.equal(
+      withPhotoCacheBust('https://abc.supabase.co/x.webp?v=1', 99),
+      'https://abc.supabase.co/x.webp?v=99'
+    );
   });
 
   it('formats bytes', () => {
@@ -174,8 +194,19 @@ describe('storage-image-src', () => {
 });
 
 describe('galleryImageFileSchema', () => {
+  function fakeImageFile(size: number): File {
+    const file = new File([new Uint8Array(8)], 'shot.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(file, 'size', { value: size });
+    return file;
+  }
+
+  it('accepts files under the 50 MB ceiling', () => {
+    const ok = fakeImageFile(11 * 1024 * 1024);
+    assert.equal(galleryImageFileSchema.parse(ok), ok);
+  });
+
   it('rejects oversized files', () => {
-    const big = { type: 'image/jpeg', size: 11 * 1024 * 1024 } as File;
+    const big = fakeImageFile(51 * 1024 * 1024);
     assert.throws(() => galleryImageFileSchema.parse(big));
   });
 });

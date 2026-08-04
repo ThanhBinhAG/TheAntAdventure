@@ -157,7 +157,7 @@ export default function GalleryPhotoModal({
         <form className="phlib-modal-bd" onSubmit={handleSubmit}>
           <div className="phlib-modal-layout">
             <div className="phlib-modal-col-media">
-              <ModalSection title="Image" hint={mode === 'add' ? 'JPEG, PNG, or WebP · max 10 MB each' : undefined}>
+              <ModalSection title="Image" hint={mode === 'add' ? 'JPEG, PNG, or WebP · large images are compressed automatically · max 50 MB' : undefined}>
                 {mode === 'edit' && (
                   <label className="phlib-check-row">
                     <input

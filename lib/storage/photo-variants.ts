@@ -4,15 +4,13 @@
  */
 import imageCompression from 'browser-image-compression';
 import { z } from 'zod';
-
-const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;
-const MAX_INPUT_BYTES = 10 * 1024 * 1024;
+import { ALLOWED_IMAGE_MIME, MAX_INPUT_BYTES, MAX_INPUT_ERROR } from '@/lib/storage/photo-limits';
 
 export const galleryImageFileSchema = z
   .instanceof(File)
-  .refine((f) => f.size <= MAX_INPUT_BYTES, 'Image must be 10 MB or smaller')
+  .refine((f) => f.size <= MAX_INPUT_BYTES, MAX_INPUT_ERROR)
   .refine(
-    (f) => ALLOWED_MIME.includes(f.type as (typeof ALLOWED_MIME)[number]),
+    (f) => ALLOWED_IMAGE_MIME.includes(f.type as (typeof ALLOWED_IMAGE_MIME)[number]),
     'Only JPEG, PNG, and WebP images are supported'
   );
 

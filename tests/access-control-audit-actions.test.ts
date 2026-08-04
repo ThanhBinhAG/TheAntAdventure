@@ -3,6 +3,23 @@ import { describe, it } from 'node:test';
 import { getAccessControlAuditActionPresentation } from '../lib/access-control/audit-log-presentation';
 
 describe('access-control audit action presentation', () => {
+  it('shows Vietnamese labels for dynamic staff role actions', () => {
+    assert.equal(
+      getAccessControlAuditActionPresentation('staff_role_created').label,
+      'Tạo role',
+    );
+    assert.equal(
+      getAccessControlAuditActionPresentation('staff_role_updated').label,
+      'Cập nhật role',
+    );
+    assert.equal(
+      getAccessControlAuditActionPresentation(
+        'staff_role_permissions_replaced',
+      ).label,
+      'Cập nhật quyền role',
+    );
+  });
+
   it('shows Vietnamese labels for user lifecycle actions', () => {
     assert.equal(
       getAccessControlAuditActionPresentation('user_profile_updated').label,

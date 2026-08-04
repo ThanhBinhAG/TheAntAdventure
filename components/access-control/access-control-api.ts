@@ -12,13 +12,19 @@
  * - API server mới là nơi kiểm tra users.manage và gọi database RPC.
  */
 
-/** Ba role nghiệp vụ hiện có trong CRM. */
-export type ManagedRoleCode =
-    | 'admin'
-    | 'employee';
+/**
+ * Role code động được lấy từ database.
+ *
+ * Ví dụ: admin, sales, tour_operator.
+ */
+export type ManagedRoleCode = string;
 
-/** Role có thể chỉnh permission trực tiếp trên UI. */
-export type EditableRoleCode = 'admin' | 'employee';
+/**
+ * Role nhân viên động có thể được cấu hình permission.
+ *
+ * API/RPC sẽ chặn role hệ thống.
+ */
+export type EditableRoleCode = string;
 
 /** Dữ liệu user dùng để hiển thị trong bảng. */
 export type AccessControlUser = {
@@ -35,6 +41,38 @@ export type AccessControlRole = {
     role_label: string;
     role_description: string | null;
     permission_codes: string[];
+};
+
+/**
+ * Role có thể hiển thị hoặc gán cho user.
+ * is_active giúp UI không gán role đã ngừng dùng.
+ */
+export type AccessControlAssignableRole = AccessControlRole & {
+    is_active: boolean;
+};
+
+/**
+ * Role nhân viên động trả về từ API.
+ *
+ * Bao gồm Nhân viên và các role nghiệp vụ tạo thêm.
+ * Không bao gồm admin hoặc super_admin.
+ */
+export type AccessControlStaffRole = {
+    role_code: string;
+    role_label: string;
+    role_description: string | null;
+    is_active: boolean;
+    sort_order: number;
+    permission_codes: string[];
+    assigned_user_count: number;
+};
+
+/** Dữ liệu tạo role nhân viên mới. */
+export type CreateAccessControlStaffRoleInput = {
+    code: string;
+    label: string;
+    description?: string;
+    sortOrder?: number;
 };
 
 /** Dữ liệu permission trả về từ API. */
@@ -139,6 +177,91 @@ export async function fetchAccessControlData(): Promise<AccessControlData> {
     });
 
     return readApiResponse<AccessControlData>(response);
+}
+
+/** Lấy danh sách role nhân viên động cho UI. */
+export async function fetchAccessControlStaffRoles(): Promise<
+    AccessControlStaffRole[]
+> {
+    const response = await fetch(
+        '/api/access-control/staff-roles',
+        {
+            method: 'GET',
+            cache: 'no-store',
+        },
+    );
+
+    const data = await readApiResponse<{
+        roles: AccessControlStaffRole[];
+    }>(response);
+
+    return data.roles;
+}
+
+/** Tạo role nhân viên động mới. */
+export async function createAccessControlStaffRole(
+    input: CreateAccessControlStaffRoleInput,
+): Promise<void> {
+    const response = await fetch(
+        '/api/access-control/staff-roles',
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(input),
+        },
+    );
+
+    await readApiResponse<Record<string, never>>(response);
+}
+
+/** Sửa thông tin hoặc trạng thái sử dụng của role nhân viên. */
+export async function updateAccessControlStaffRole(input: {
+    code: string;
+    label: string;
+    description?: string;
+    sortOrder: number;
+    isActive: boolean;
+}): Promise<void> {
+    const response = await fetch(
+        '/api/access-control/staff-roles',
+        {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'update_role',
+                ...input,
+            }),
+        },
+    );
+
+    await readApiResponse<Record<string, never>>(response);
+}
+
+/** Lưu toàn bộ permission mới của một role nhân viên. */
+export async function updateAccessControlStaffRolePermissions(
+    roleCode: string,
+    permissionCodes: string[],
+): Promise<void> {
+    const response = await fetch(
+        '/api/access-control/staff-roles',
+        {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'replace_role_permissions',
+                roleCode,
+                permissionCodes,
+            }),
+        },
+    );
+
+    await readApiResponse<Record<string, never>>(response);
 }
 
 /** Gửi yêu cầu đổi role cho một user. */

@@ -24,7 +24,6 @@ import AccessControlUiProvider from './AccessControlUiProvider';
 import UserDirectory from './UserDirectory';
 import {
     fetchAccessControlData,
-    updateRolePermissions,
 } from './access-control-api';
 import styles from './AccessControlPage.module.css';
 import RolesPermissionsTab from './RolesPermissionsTab';
@@ -98,7 +97,7 @@ export default function AccessControlPage() {
                                 ),
                                 children: (
                                     <UserDirectory
-                                        roles={data?.roles ?? []}
+                                        baseRoles={data?.roles ?? []}
                                         permissions={data?.permissions ?? []}
                                     />
                                 ),
@@ -113,13 +112,10 @@ export default function AccessControlPage() {
                                 ),
                                 children: (
                                     <RolesPermissionsTab
-                                        roles={data?.roles ?? []}
                                         permissions={data?.permissions ?? []}
-                                        loading={isLoading}
-                                        error={errorMessage}
-                                        onRetry={reloadData}
-                                        onRoleChanged={reloadData}
-                                        onUpdatePermissions={updateRolePermissions}
+                                        loadingPermissions={isLoading}
+                                        permissionsError={errorMessage}
+                                        onRetryPermissions={reloadData}
                                     />
                                 ),
                             },

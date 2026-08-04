@@ -15,7 +15,6 @@
 
 import { useCallback, useState } from 'react';
 import useSWR from 'swr';
-import { ReloadOutlined } from '@ant-design/icons';
 import {
     Alert,
     Button,
@@ -31,6 +30,9 @@ import {
     getAccessControlAuditActionPresentation,
 } from '@/lib/access-control/audit-log-presentation';
 import styles from './AccessControlPage.module.css';
+import {
+    ACCESS_CONTROL_AUDIT_LOGS_KEY,
+} from './useRefreshAccessControlAuditLogs';
 
 /** Lấy chuỗi từ JSON audit một cách an toàn. */
 function readString(
@@ -50,13 +52,36 @@ function readStringArray(
     );
 }
 
+/** Các action này thay đổi role, nên không có target user để hiển thị. */
+const STAFF_ROLE_ACTIONS = new Set([
+    'staff_role_created',
+    'staff_role_updated',
+    'staff_role_permissions_replaced',
+]);
+
 /** Đổi mã role kỹ thuật thành nhãn dễ đọc trong lịch sử. */
 function getRoleLabel(roleCode: string | null): string {
+    if (!roleCode) return 'Chưa gán role';
+
     if (roleCode === 'super_admin') return 'Super Admin';
     if (roleCode === 'admin') return 'Admin';
     if (roleCode === 'employee') return 'Nhân viên';
 
-    return 'Chưa gán role';
+    // Role động (Sale, Điều hành...) được lưu bằng code riêng trong audit.
+    // Không có bảng role đi kèm log cũ, nên giữ code làm phương án dự phòng.
+    return roleCode;
+}
+
+/** Lấy tên role từ dữ liệu audit; log cũ không có label sẽ dùng role_code. */
+function getAuditRoleLabel(log: AccessControlAuditLog): string {
+    return (
+        readString(log.afterValue.label) ??
+        readString(log.beforeValue.label) ??
+        getRoleLabel(
+            readString(log.afterValue.role_code) ??
+            readString(log.beforeValue.role_code),
+        )
+    );
 }
 
 /** Hiển thị tên hoặc email của user là đối tượng bị thay đổi. */
@@ -70,10 +95,11 @@ function getUserTarget(log: AccessControlAuditLog): string {
 
 /** Lấy đối tượng thay đổi: user hoặc role tùy action audit. */
 function getAuditTarget(log: AccessControlAuditLog): string {
-    if (log.action === 'role_permissions_replaced') {
-        return `Role: ${getRoleLabel(
-            readString(log.afterValue.role_code),
-        )}`;
+    if (
+        log.action === 'role_permissions_replaced' ||
+        STAFF_ROLE_ACTIONS.has(log.action)
+    ) {
+        return `Role: ${getAuditRoleLabel(log)}`;
     }
 
     return getUserTarget(log);
@@ -81,6 +107,27 @@ function getAuditTarget(log: AccessControlAuditLog): string {
 
 /** Tạo câu tóm tắt ngắn phù hợp với từng action audit. */
 function getAuditSummary(log: AccessControlAuditLog): string {
+    if (log.action === 'staff_role_created') {
+        return `Đã tạo role ${getAuditRoleLabel(log)}.`;
+    }
+
+    if (log.action === 'staff_role_updated') {
+        return log.afterValue.is_active === false
+            ? `Đã ngừng sử dụng role ${getAuditRoleLabel(log)}.`
+            : `Đã cập nhật role ${getAuditRoleLabel(log)}.`;
+    }
+
+    if (log.action === 'staff_role_permissions_replaced') {
+        const oldCount = readStringArray(
+            log.beforeValue.permission_codes,
+        ).length;
+        const newCount = readStringArray(
+            log.afterValue.permission_codes,
+        ).length;
+
+        return `${oldCount} quyền → ${newCount} quyền`;
+    }
+
     if (log.action === 'user_role_changed') {
         return `${getRoleLabel(
             readString(log.beforeValue.role_code),
@@ -151,6 +198,10 @@ function AuditLogDetails({
         (code) => !newPermissions.includes(code),
     );
 
+    const isPermissionReplacement =
+        log.action === 'role_permissions_replaced' ||
+        log.action === 'staff_role_permissions_replaced';
+
     if (log.action === 'user_role_changed') {
         return (
             <div className={styles.auditDetails}>
@@ -187,7 +238,7 @@ function AuditLogDetails({
         );
     }
 
-    if (log.action !== 'role_permissions_replaced') {
+    if (!isPermissionReplacement) {
         const roleCode = readString(log.afterValue.role_code);
 
         return (
@@ -212,9 +263,7 @@ function AuditLogDetails({
         <div className={styles.auditDetails}>
             <span>
                 Role được cập nhật:{' '}
-                <strong>
-                    {readString(log.afterValue.role_code) ?? 'Không xác định'}
-                </strong>
+                <strong>{getAuditRoleLabel(log)}</strong>
             </span>
 
             <div>
@@ -255,7 +304,7 @@ export default function AuditLogsTab() {
      * Khi quay lại trang vừa xem, SWR có thể dùng dữ liệu đã tải.
      */
     const auditLogsQueryKey = [
-        'access-control/audit-logs',
+        ACCESS_CONTROL_AUDIT_LOGS_KEY,
         page,
         pageSize,
     ] as const;
@@ -278,7 +327,7 @@ export default function AuditLogsTab() {
         },
     );
 
-    /** Người dùng bấm “Tải lại” thì bỏ cache trang hiện tại và lấy dữ liệu mới. */
+    /** Chỉ dùng khi API lỗi để người dùng yêu cầu tải lại trang log hiện tại. */
     const refreshLogs = useCallback(async (): Promise<void> => {
         await reloadLogs();
     }, [reloadLogs]);
@@ -347,16 +396,7 @@ export default function AuditLogsTab() {
                     <h2 className={styles.sectionTitle}>
                         Danh sách lịch sử thay đổi
                     </h2>
-
                 </div>
-
-                <Button
-                    icon={<ReloadOutlined />}
-                    loading={isLoading}
-                    onClick={() => void refreshLogs()}
-                >
-                    Tải lại
-                </Button>
             </header>
 
             {errorMessage && (

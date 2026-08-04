@@ -23,12 +23,22 @@ import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 
 export const dynamic = 'force-dynamic';
 
+
+/** Mã role động, ví dụ sales hoặc tour_operator. */
+const roleCodeSchema = z.string()
+    .trim()
+    .regex(
+        /^[a-z0-9_]{2,50}$/,
+        'Mã role không hợp lệ.',
+    );
+
 /** Schema kiểm tra dữ liệu PATCH từ frontend. */
 const updateBodySchema = z.discriminatedUnion('action', [
     z.object({
         action: z.literal('set_user_role'),
         userId: z.string().uuid('userId không hợp lệ.'),
-        roleCode: z.enum(['admin', 'employee']),
+        // RPC database sẽ kiểm tra role có tồn tại và có được phép gán hay không.
+        roleCode: roleCodeSchema,
     }),
     z.object({
         action: z.literal('replace_role_permissions'),

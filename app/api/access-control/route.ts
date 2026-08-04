@@ -28,11 +28,11 @@ const updateBodySchema = z.discriminatedUnion('action', [
     z.object({
         action: z.literal('set_user_role'),
         userId: z.string().uuid('userId không hợp lệ.'),
-        roleCode: z.enum(['super_admin', 'admin', 'employee']),
+        roleCode: z.enum(['admin', 'employee']),
     }),
     z.object({
         action: z.literal('replace_role_permissions'),
-        roleCode: z.enum(['admin', 'employee']),
+        roleCode: z.enum(['employee']),
         permissionCodes: z.array(z.string().min(1)).max(100),
     }),
 ]);

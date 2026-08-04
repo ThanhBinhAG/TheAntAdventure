@@ -17,14 +17,13 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
 
-/** Ba role nghiệp vụ hiện có trong CRM. */
+/** Hai role nghiệp vụ hiện có trong CRM. */
 export type ManagedRoleCode =
-    | 'super_admin'
     | 'admin'
     | 'employee';
 
 /** Chỉ cho sửa permission của hai role này từ giao diện. */
-export type EditableRoleCode = 'admin' | 'employee';
+export type EditableRoleCode = 'employee';
 
 /** Dữ liệu một user trả về cho màn hình quản lý quyền. */
 export type AccessControlUser = {
@@ -63,7 +62,6 @@ type AccessControlUserPageRow = AccessControlUser & {
 type AccessControlUserSummaryRow = {
     total_users: number | string;
     active_users: number | string;
-    super_admin_count: number | string;
     admin_count: number | string;
     employee_count: number | string;
     unassigned_count: number | string;
@@ -73,7 +71,6 @@ type AccessControlUserSummaryRow = {
 export type AccessControlUserSummary = {
     totalUsers: number;
     activeUsers: number;
-    superAdminCount: number;
     adminCount: number;
     employeeCount: number;
     unassignedCount: number;
@@ -272,23 +269,12 @@ export async function setAccessControlUserActive(
     throwRpcError(result.error);
 }
 
-/** Xóa mềm user: không xóa auth.users và vẫn giữ audit log. */
-export async function softDeleteAccessControlUser(
-    userId: string,
-) {
-    const supabase = createAccessControlServerClient();
-
-    const result = await supabase.rpc(
-        'soft_delete_access_control_user',
-        {
-            target_user_id: userId,
-        },
-    );
-
-    throwRpcError(result.error);
-}
-
-/** Khôi phục user đã bị xóa mềm. */
+/**
+ * Khôi phục tài khoản đã từng bị xóa mềm trong quá khứ.
+ *
+ * Chức năng xóa mới đã bị bỏ khỏi giao diện/API,
+ * nhưng giữ hàm này để có thể cứu dữ liệu cũ khi cần.
+ */
 export async function restoreAccessControlUser(
     userId: string,
 ) {
@@ -433,7 +419,6 @@ export async function getAccessControlUserSummary(): Promise<AccessControlUserSu
     return {
         totalUsers: toNumber(row?.total_users ?? 0),
         activeUsers: toNumber(row?.active_users ?? 0),
-        superAdminCount: toNumber(row?.super_admin_count ?? 0),
         adminCount: toNumber(row?.admin_count ?? 0),
         employeeCount: toNumber(row?.employee_count ?? 0),
         unassignedCount: toNumber(row?.unassigned_count ?? 0),

@@ -22,7 +22,6 @@ import {
     restoreAccessControlUser,
     setAccessControlUserActive,
     setAccessControlUserRole,
-    softDeleteAccessControlUser,
     updateAccessControlUserProfile,
 } from '@/lib/access-control/server';
 import {
@@ -38,10 +37,8 @@ export const dynamic = 'force-dynamic';
 const querySchema = z.object({
     q: z.string().trim().max(100).optional(),
     role: z.enum([
-        'super_admin',
         'admin',
         'employee',
-        'unassigned',
     ]).optional(),
     status: z.enum([
         'active',
@@ -77,10 +74,6 @@ const updateBodySchema = z.discriminatedUnion('action', [
     }),
 ]);
 
-/** DELETE chỉ xóa mềm một user theo ID. */
-const deleteBodySchema = z.object({
-    userId: z.string().uuid('userId không hợp lệ.'),
-});
 
 /** Dữ liệu cần có để tạo một tài khoản CRM mới. */
 const createBodySchema = z.object({
@@ -96,7 +89,6 @@ const createBodySchema = z.object({
         .min(1, 'Tên hiển thị không được để trống.')
         .max(100, 'Tên hiển thị tối đa 100 ký tự.'),
     roleCode: z.enum([
-        'super_admin',
         'admin',
         'employee',
     ]),
@@ -156,7 +148,7 @@ function errorResponse(error: unknown) {
  * Trình tự:
  * 1. Service-role tạo user trong auth.users.
  * 2. Trigger database tự tạo profiles.
- * 3. RPC cập nhật tên và gán role bằng session Super Admin hiện tại.
+// 3. RPC cập nhật tên và gán role bằng session người quản trị hiện tại.
  * 4. Nếu bước 2 hoặc 3 lỗi, xóa Auth user vừa tạo để tránh dữ liệu dở dang.
  */
 export async function POST(request: Request) {
@@ -349,42 +341,3 @@ export async function PATCH(request: Request) {
     }
 }
 
-/**
- * Xóa mềm user.
- *
- * User không còn hiện trong danh sách và không còn permission,
- * nhưng dữ liệu CRM/audit log vẫn được giữ.
- */
-export async function DELETE(request: Request) {
-    const permission = await checkPermissionForRequest(
-        'users.manage',
-    );
-
-    if (!permission.allowed) {
-        return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
-            { status: permission.status },
-        );
-    }
-
-    const body = await request.json().catch(() => null);
-    const parsed = deleteBodySchema.safeParse(body);
-
-    if (!parsed.success) {
-        return NextResponse.json(
-            {
-                ok: false,
-                error: 'Dữ liệu xóa user không hợp lệ.',
-            },
-            { status: 400 },
-        );
-    }
-
-    try {
-        await softDeleteAccessControlUser(parsed.data.userId);
-
-        return NextResponse.json({ ok: true });
-    } catch (error) {
-        return errorResponse(error);
-    }
-}

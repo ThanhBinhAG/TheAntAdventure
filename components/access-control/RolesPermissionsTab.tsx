@@ -4,13 +4,12 @@
  * Tab cấu hình role và permission.
  *
  * Chức năng:
- * - Chọn role ở cột bên trái.
- * - Xem và chỉnh permission của Admin hoặc Nhân viên ở cột bên phải.
+ * - Chỉnh permission của Nhân viên theo từng nhóm chức năng.
  * - Chọn hoặc bỏ chọn toàn bộ quyền trong một nhóm chức năng.
  * - Lưu permission mới qua API hiện có.
  *
  * Lưu ý:
- * - Super Admin dùng permission wildcard (*) nên chỉ xem, không chỉnh.
+ * - Admin có toàn quyền cố định nên không xuất hiện trong tab này.
  * - API và database RPC vẫn là nơi kiểm tra quyền users.manage.
  */
 
@@ -19,20 +18,14 @@ import {
     useState,
 } from 'react';
 import {
-    LockOutlined,
-    SafetyCertificateOutlined,
     SaveOutlined,
-    TeamOutlined,
-    UserSwitchOutlined,
 } from '@ant-design/icons';
 import {
-    Alert,
     Button,
     Card,
     Checkbox,
     Empty,
     Skeleton,
-    Tag,
 } from 'antd';
 import { confirmDialog } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
@@ -40,7 +33,6 @@ import type {
     AccessControlPermission,
     AccessControlRole,
     EditableRoleCode,
-    ManagedRoleCode,
 } from './access-control-api';
 import styles from './AccessControlPage.module.css';
 
@@ -55,25 +47,6 @@ type RolesPermissionsTabProps = {
         roleCode: EditableRoleCode,
         permissionCodes: string[],
     ) => Promise<void>;
-};
-
-/** Bản nháp checkbox chưa lưu, được tách riêng cho từng role có thể sửa. */
-type PermissionDraftByRole = Partial<
-    Record<EditableRoleCode, string[]>
->;
-
-/** Nhãn hiển thị cho từng role. */
-const ROLE_LABELS: Record<ManagedRoleCode, string> = {
-    super_admin: 'Super Admin',
-    admin: 'Admin',
-    employee: 'Nhân viên',
-};
-
-/** Mô tả ngắn để người quản trị dễ hiểu ý nghĩa mỗi role. */
-const ROLE_DESCRIPTIONS: Record<ManagedRoleCode, string> = {
-    super_admin: 'Toàn quyền hệ thống và quản lý người dùng.',
-    admin: 'Quản lý nghiệp vụ và cấu hình quyền cho nhân viên.',
-    employee: 'Thực hiện công việc nghiệp vụ được cấp quyền.',
 };
 
 /** Nhãn tiếng Việt cho từng nhóm permission. */
@@ -140,18 +113,17 @@ export default function RolesPermissionsTab({
     onRoleChanged,
     onUpdatePermissions,
 }: RolesPermissionsTabProps) {
-    const [selectedRole, setSelectedRole] =
-        useState<ManagedRoleCode>('employee');
-    const [permissionDraftByRole, setPermissionDraftByRole] =
-        useState<PermissionDraftByRole>({});
+    // Tab này chỉ cấu hình Employee, nên một bản nháp là đủ.
+    const [permissionDraft, setPermissionDraft] =
+        useState<string[] | null>(null);
     const [saving, setSaving] = useState(false);
 
-    /** Role hiện đang được chọn trên giao diện. */
+    /** Luôn lấy role Employee từ dữ liệu API. */
     const activeRole = useMemo(() => {
         return roles.find(
-            (role) => role.role_code === selectedRole,
+            (role) => role.role_code === 'employee',
         );
-    }, [roles, selectedRole]);
+    }, [roles]);
 
     /** Danh sách nhóm permission hiển thị ở cột phải. */
     const permissionGroups = useMemo(() => {
@@ -164,35 +136,23 @@ export default function RolesPermissionsTab({
      * Cách này không cần useEffect để chép props vào state.
      */
     const selectedPermissionCodes =
-        selectedRole === 'super_admin'
-            ? []
-            : permissionDraftByRole[selectedRole] ??
-              activeRole?.permission_codes ??
-              [];
+        permissionDraft ??
+        activeRole?.permission_codes ?? [];
 
     const hasChanges =
-        selectedRole !== 'super_admin' &&
         !hasSamePermissions(
             selectedPermissionCodes,
             activeRole?.permission_codes ?? [],
         );
 
-    /** Cập nhật bản nháp của role đang chọn từ thao tác checkbox. */
+    /** Cập nhật bản nháp Employee từ thao tác checkbox. */
     function updatePermissionDraft(
         update: (current: string[]) => string[],
     ) {
-        if (selectedRole === 'super_admin') return;
 
-        const editableRoleCode: EditableRoleCode = selectedRole;
-
-        setPermissionDraftByRole((currentDrafts) => ({
-            ...currentDrafts,
-            [editableRoleCode]: update(
-                currentDrafts[editableRoleCode] ??
-                    activeRole?.permission_codes ??
-                    [],
-            ),
-        }));
+        setPermissionDraft((currentDraft) =>
+            update(currentDraft ?? activeRole?.permission_codes ?? []),
+        );
     }
 
     /** Bật hoặc tắt một permission đơn lẻ. */
@@ -227,19 +187,13 @@ export default function RolesPermissionsTab({
         });
     }
 
-    /** Lưu danh sách permission mới cho Admin hoặc Nhân viên. */
+    /** Lưu danh sách permission mới cho Employee. */
     async function handleSave() {
-        if (
-            selectedRole === 'super_admin' ||
-            !hasChanges
-        ) {
-            return;
-        }
 
-        const editableRoleCode: EditableRoleCode = selectedRole;
+        const editableRoleCode: EditableRoleCode = 'employee';
 
         const confirmed = await confirmDialog(
-            `Bạn sắp cập nhật ${selectedPermissionCodes.length} quyền cho role ${ROLE_LABELS[selectedRole]}.`,
+            `Bạn sắp cập nhật ${selectedPermissionCodes.length} quyền cho Nhân viên.`,
             {
                 title: 'Xác nhận cập nhật quyền',
                 confirmLabel: 'Lưu quyền',
@@ -262,13 +216,7 @@ export default function RolesPermissionsTab({
             await onRoleChanged();
 
             // Dữ liệu mới đã được tải lại từ API, nên bỏ bản nháp cũ.
-            setPermissionDraftByRole((currentDrafts) => {
-                const nextDrafts = { ...currentDrafts };
-
-                delete nextDrafts[editableRoleCode];
-
-                return nextDrafts;
-            });
+            setPermissionDraft(null);
         } catch (error) {
             toast.error(
                 error instanceof Error
@@ -304,230 +252,147 @@ export default function RolesPermissionsTab({
     }
 
     return (
-        <div className={styles.rolesWorkspace}>
-            <aside className={styles.roleList}>
-                <div>
-                    <h2 className={styles.sectionTitle}>Role</h2>
-
-                    <p className={styles.sectionDescription}>
-                        Chọn role cần xem hoặc cấu hình quyền.
-                    </p>
-                </div>
-
-                {(['super_admin', 'admin', 'employee'] as const).map(
-                    (roleCode) => {
-                        const role = roles.find(
-                            (item) => item.role_code === roleCode,
-                        );
-
-                        const permissionCount =
-                            roleCode === 'super_admin'
-                                ? 'Toàn quyền'
-                                : `${role?.permission_codes.length ?? 0} quyền`;
-
-                        const Icon =
-                            roleCode === 'super_admin'
-                                ? SafetyCertificateOutlined
-                                : roleCode === 'admin'
-                                    ? UserSwitchOutlined
-                                    : TeamOutlined;
-
-                        return (
-                            <button
-                                key={roleCode}
-                                type="button"
-                                aria-pressed={
-                                    selectedRole === roleCode
-                                }
-                                className={`${styles.roleChoice} ${selectedRole === roleCode
-                                        ? styles.roleChoiceActive
-                                        : ''
-                                    }`}
-                                onClick={() => {
-                                    setSelectedRole(roleCode);
-                                }}
-                            >
-                                <Icon />
-
-                                <span>
-                                    <strong>
-                                        {ROLE_LABELS[roleCode]}
-                                    </strong>
-
-                                    <small>
-                                        {ROLE_DESCRIPTIONS[roleCode]}
-                                    </small>
-                                </span>
-
-                                <em>{permissionCount}</em>
-                            </button>
-                        );
-                    },
-                )}
-            </aside>
-
+        <div className={styles.permissionsOnlyWorkspace}>
             <section className={styles.permissionWorkspace}>
                 <header className={styles.permissionWorkspaceHeader}>
                     <div>
                         <h2 className={styles.sectionTitle}>
-                            Quyền của {ROLE_LABELS[selectedRole]}
+                            Cấu hình quyền Nhân viên
                         </h2>
 
                         <p className={styles.sectionDescription}>
-                            {ROLE_DESCRIPTIONS[selectedRole]}
+                            Chọn những chức năng Nhân viên được phép sử dụng.
                         </p>
                     </div>
 
-                    <Tag
-                        color={
-                            selectedRole === 'super_admin'
-                                ? 'gold'
-                                : selectedRole === 'admin'
-                                    ? 'green'
-                                    : 'blue'
-                        }
-                    >
-                        {selectedRole === 'super_admin'
-                            ? 'Không thể chỉnh'
-                            : `${selectedPermissionCodes.length} quyền`}
-                    </Tag>
                 </header>
 
-                {selectedRole === 'super_admin' ? (
-                    <Alert
-                        type="warning"
-                        showIcon
-                        icon={<LockOutlined />}
-                        message="Super Admin có toàn quyền hệ thống"
-                        description="Role này sử dụng permission wildcard (*). Không chỉnh bằng checkbox để tránh mất quyền quản trị hệ thống."
-                    />
-                ) : (
-                    <>
-                        <div className={styles.permissionGroups}>
-                            {permissionGroups.map((group) => {
-                                const groupCodes = group.items.map(
-                                    (permission) =>
-                                        permission.permission_code,
-                                );
 
-                                const selectedCount =
-                                    groupCodes.filter((code) =>
-                                        selectedPermissionCodes.includes(code),
-                                    ).length;
+                <>
+                    <div className={styles.permissionGroups}>
+                        {permissionGroups.map((group) => {
+                            const groupCodes = group.items.map(
+                                (permission) =>
+                                    permission.permission_code,
+                            );
 
-                                const isAllSelected =
-                                    selectedCount === groupCodes.length;
+                            const selectedCount =
+                                groupCodes.filter((code) =>
+                                    selectedPermissionCodes.includes(code),
+                                ).length;
 
-                                const isPartlySelected =
-                                    selectedCount > 0 && !isAllSelected;
+                            const isAllSelected =
+                                selectedCount === groupCodes.length;
 
-                                return (
-                                    <Card
-                                        key={group.groupCode}
-                                        size="small"
-                                        className={styles.permissionGroup}
+                            const isPartlySelected =
+                                selectedCount > 0 && !isAllSelected;
+
+                            return (
+                                <Card
+                                    key={group.groupCode}
+                                    size="small"
+                                    className={styles.permissionGroup}
+                                >
+                                    <div
+                                        className={
+                                            styles.permissionGroupHeader
+                                        }
                                     >
-                                        <div
-                                            className={
-                                                styles.permissionGroupHeader
+                                        <strong>{group.label}</strong>
+
+                                        <Checkbox
+                                            checked={isAllSelected}
+                                            indeterminate={
+                                                isPartlySelected
                                             }
+                                            disabled={saving}
+                                            onChange={(event) => {
+                                                togglePermissionGroup(
+                                                    groupCodes,
+                                                    event.target.checked,
+                                                );
+                                            }}
                                         >
-                                            <strong>{group.label}</strong>
+                                            Chọn tất cả
+                                        </Checkbox>
+                                    </div>
 
-                                            <Checkbox
-                                                checked={isAllSelected}
-                                                indeterminate={
-                                                    isPartlySelected
-                                                }
-                                                disabled={saving}
-                                                onChange={(event) => {
-                                                    togglePermissionGroup(
-                                                        groupCodes,
-                                                        event.target.checked,
-                                                    );
-                                                }}
-                                            >
-                                                Chọn tất cả
-                                            </Checkbox>
-                                        </div>
+                                    <span
+                                        className={
+                                            styles.permissionGroupCount
+                                        }
+                                    >
+                                        {selectedCount}/{groupCodes.length}{' '}
+                                        quyền
+                                    </span>
 
-                                        <span
-                                            className={
-                                                styles.permissionGroupCount
-                                            }
-                                        >
-                                            {selectedCount}/{groupCodes.length}{' '}
-                                            quyền
-                                        </span>
-
-                                        <div className={styles.permissionRows}>
-                                            {group.items.map(
-                                                (permission) => (
-                                                    <Checkbox
-                                                        key={
-                                                            permission.permission_code
-                                                        }
-                                                        checked={selectedPermissionCodes.includes(
+                                    <div className={styles.permissionRows}>
+                                        {group.items.map(
+                                            (permission) => (
+                                                <Checkbox
+                                                    key={
+                                                        permission.permission_code
+                                                    }
+                                                    checked={selectedPermissionCodes.includes(
+                                                        permission.permission_code,
+                                                    )}
+                                                    disabled={saving}
+                                                    className={
+                                                        styles.permissionRow
+                                                    }
+                                                    onChange={(event) => {
+                                                        togglePermission(
                                                             permission.permission_code,
-                                                        )}
-                                                        disabled={saving}
+                                                            event.target.checked,
+                                                        );
+                                                    }}
+                                                >
+                                                    <span
                                                         className={
-                                                            styles.permissionRow
+                                                            styles.permissionText
                                                         }
-                                                        onChange={(event) => {
-                                                            togglePermission(
-                                                                permission.permission_code,
-                                                                event.target.checked,
-                                                            );
-                                                        }}
                                                     >
-                                                        <span
+                                                        {
+                                                            permission.permission_description
+                                                        }
+
+                                                        <code
                                                             className={
-                                                                styles.permissionText
+                                                                styles.permissionCode
                                                             }
                                                         >
                                                             {
-                                                                permission.permission_description
+                                                                permission.permission_code
                                                             }
+                                                        </code>
+                                                    </span>
+                                                </Checkbox>
+                                            ),
+                                        )}
+                                    </div>
+                                </Card>
+                            );
+                        })}
+                    </div>
 
-                                                            <code
-                                                                className={
-                                                                    styles.permissionCode
-                                                                }
-                                                            >
-                                                                {
-                                                                    permission.permission_code
-                                                                }
-                                                            </code>
-                                                        </span>
-                                                    </Checkbox>
-                                                ),
-                                            )}
-                                        </div>
-                                    </Card>
-                                );
-                            })}
-                        </div>
+                    <div className={styles.permissionSaveBar}>
+                        <span>
+                            {hasChanges
+                                ? 'Có thay đổi chưa được lưu.'
+                                : 'Permission đang khớp với database.'}
+                        </span>
 
-                        <div className={styles.permissionSaveBar}>
-                            <span>
-                                {hasChanges
-                                    ? 'Có thay đổi chưa được lưu.'
-                                    : 'Permission đang khớp với database.'}
-                            </span>
-
-                            <Button
-                                icon={<SaveOutlined />}
-                                type="primary"
-                                loading={saving}
-                                disabled={!hasChanges}
-                                onClick={() => void handleSave()}
-                            >
-                                Lưu quyền
-                            </Button>
-                        </div>
-                    </>
-                )}
+                        <Button
+                            icon={<SaveOutlined />}
+                            type="primary"
+                            loading={saving}
+                            disabled={!hasChanges}
+                            onClick={() => void handleSave()}
+                        >
+                            Lưu quyền
+                        </Button>
+                    </div>
+                </>
             </section>
         </div>
     );

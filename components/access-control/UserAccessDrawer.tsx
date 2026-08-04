@@ -5,7 +5,7 @@
  *
  * Chức năng:
  * - Hiển thị thông tin tài khoản đang chọn.
- * - Cho Super Admin chọn role mới.
+ * - Cho người quản trị chọn role mới.
  * - Hiển thị các permission hiệu lực của role được chọn.
  * - Gọi hàm onSave từ component cha để cập nhật role qua API.
  *
@@ -69,7 +69,6 @@ function getPermissionGroupLabel(permissionCode: string): string {
 
 /** Đổi role kỹ thuật thành nhãn hiển thị. */
 function getRoleLabel(roleCode: ManagedRoleCode): string {
-    if (roleCode === 'super_admin') return 'Super Admin';
     if (roleCode === 'admin') return 'Admin';
 
     return 'Nhân viên';
@@ -98,14 +97,13 @@ export default function UserAccessDrawer({
         );
     }, [roles, selectedRole]);
 
-    /** Super Admin có wildcard (*) nên không cần liệt kê từng quyền. */
-    const isSuperAdmin =
-        selectedRole === 'super_admin' ||
-        selectedRoleInfo?.permission_codes.includes('*');
+    /** Role có wildcard (*) là toàn quyền, không cần liệt kê từng quyền. */
+    const hasFullAccess =
+        selectedRoleInfo?.permission_codes.includes('*') ?? false;
 
     /** Gom permission theo nhóm để Drawer dễ đọc hơn. */
     const permissionGroups = useMemo(() => {
-        if (isSuperAdmin || !selectedRoleInfo) {
+        if (hasFullAccess || !selectedRoleInfo) {
             return [];
         }
 
@@ -149,7 +147,7 @@ export default function UserAccessDrawer({
                 ),
             }),
         );
-    }, [isSuperAdmin, permissions, selectedRoleInfo]);
+    }, [hasFullAccess, permissions, selectedRoleInfo]);
 
     async function handleSave() {
         if (!user) return;
@@ -211,11 +209,11 @@ export default function UserAccessDrawer({
                         </p>
                     </div>
 
-                    {isSuperAdmin ? (
+                    {hasFullAccess ? (
                         <Alert
                             type="warning"
                             showIcon
-                            message="Super Admin có toàn quyền hệ thống"
+                            message="Admin có toàn quyền hệ thống"
                             description="Role này dùng permission wildcard (*), vì vậy có thể truy cập và quản lý toàn bộ chức năng."
                         />
                     ) : (

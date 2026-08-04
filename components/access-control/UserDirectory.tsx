@@ -57,7 +57,6 @@ type UserDirectoryProps = {
 
 /** Đổi role kỹ thuật thành nhãn dễ đọc. */
 function roleLabel(roleCode: ManagedRoleCode | null): string {
-    if (roleCode === 'super_admin') return 'Super Admin';
     if (roleCode === 'admin') return 'Admin';
     if (roleCode === 'employee') return 'Nhân viên';
 
@@ -66,7 +65,6 @@ function roleLabel(roleCode: ManagedRoleCode | null): string {
 
 /** Màu Tag tương ứng với role. */
 function roleColor(roleCode: ManagedRoleCode | null): string {
-    if (roleCode === 'super_admin') return 'gold';
     if (roleCode === 'admin') return 'green';
     if (roleCode === 'employee') return 'blue';
 
@@ -300,9 +298,6 @@ export default function UserDirectory({
             key: 'permissions',
             width: 150,
             render: (_value: unknown, user) => {
-                if (user.role_code === 'super_admin') {
-                    return <Tag color="gold">Toàn quyền</Tag>;
-                }
 
                 const count = user.role_code
                     ? permissionCountByRole.get(user.role_code) ?? 0
@@ -351,14 +346,6 @@ export default function UserDirectory({
 
                 <div className={styles.summaryCard}>
                     <Statistic
-                        title="Super Admin"
-                        value={summary?.superAdminCount ?? 0}
-                        prefix={<SafetyCertificateOutlined />}
-                    />
-                </div>
-
-                <div className={styles.summaryCard}>
-                    <Statistic
                         title="Admin"
                         value={summary?.adminCount ?? 0}
                         prefix={<UserSwitchOutlined />}
@@ -392,10 +379,8 @@ export default function UserDirectory({
                     value={roleFilter}
                     options={[
                         { value: 'all', label: 'Tất cả role' },
-                        { value: 'super_admin', label: 'Super Admin' },
                         { value: 'admin', label: 'Admin' },
                         { value: 'employee', label: 'Nhân viên' },
-                        { value: 'unassigned', label: 'Chưa gán role' },
                     ]}
                     onChange={(value) => {
                         setRoleFilter(value);

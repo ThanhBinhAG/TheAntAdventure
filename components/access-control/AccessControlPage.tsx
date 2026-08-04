@@ -10,11 +10,8 @@
  * - Gửi yêu cầu đổi role hoặc cập nhật permission.
  */
 
-import {
-    useCallback,
-    useEffect,
-    useState,
-} from 'react';
+import { useCallback, useState } from 'react';
+import useSWR from 'swr';
 import {
     HistoryOutlined,
     SafetyCertificateOutlined,
@@ -28,71 +25,56 @@ import UserDirectory from './UserDirectory';
 import {
     fetchAccessControlData,
     updateRolePermissions,
-    type AccessControlData,
 } from './access-control-api';
 import styles from './AccessControlPage.module.css';
 import RolesPermissionsTab from './RolesPermissionsTab';
 import AuditLogsTab from './AuditLogsTab';
 
 export default function AccessControlPage() {
-    const [data, setData] =
-        useState<AccessControlData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] =
-        useState<string | null>(null);
 
-    /** Tải dữ liệu quản trị từ API. */
-    const loadData = useCallback(async () => {
-        setLoading(true);
-        setError(null);
+    /**
+ * SWR lưu dữ liệu trong RAM của trình duyệt.
+ *
+ * - Không lưu role/permission vào localStorage.
+ * - Trong 60 giây, tránh gọi trùng API khi component render lại.
+ * - Khi quay lại tab trình duyệt, SWR sẽ kiểm tra dữ liệu mới.
+ */
+    /**
+ * Chỉ mở component lịch sử khi Super Admin thật sự bấm tab.
+ * Tránh gọi API audit-logs ngay khi mới vào Access Control.
+ */
+    const [hasOpenedAuditLogs, setHasOpenedAuditLogs] = useState(false);
 
-        try {
-            const nextData = await fetchAccessControlData();
-            setData(nextData);
-        } catch (error) {
-            setError(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể tải dữ liệu phân quyền.',
-            );
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    const {
+        data,
+        error,
+        isLoading,
+        mutate,
+    } = useSWR(
+        'access-control/roles-permissions',
+        fetchAccessControlData,
+        {
+            // Dữ liệu chỉ tải lại sau thao tác lưu hoặc khi bấm nút tải lại.
+            // Không gọi API lại chỉ vì người dùng quay về tab trình duyệt.
+            dedupingInterval: 60_000,
+            revalidateOnFocus: false,
+            focusThrottleInterval: 30_000,
+            revalidateOnReconnect: true,
+        },
+    );
 
-    // Khi Super Admin mở trang, tải dữ liệu lần đầu.
-    // State chỉ được cập nhật sau khi API trả về, tránh render lồng nhau.
-    useEffect(() => {
-        let isCurrent = true;
+    /** Ép SWR tải lại dữ liệu sau khi Super Admin vừa lưu permission. */
+    const reloadData = useCallback(async (): Promise<void> => {
+        await mutate();
+    }, [mutate]);
 
-        async function loadInitialData() {
-            try {
-                const nextData = await fetchAccessControlData();
-
-                if (!isCurrent) return;
-
-                setData(nextData);
-            } catch (error) {
-                if (!isCurrent) return;
-
-                setError(
-                    error instanceof Error
-                        ? error.message
-                        : 'Không thể tải dữ liệu phân quyền.',
-                );
-            } finally {
-                if (isCurrent) {
-                    setLoading(false);
-                }
-            }
-        }
-
-        void loadInitialData();
-
-        return () => {
-            isCurrent = false;
-        };
-    }, []);
+    /** Đổi lỗi kỹ thuật thành text để giao diện hiển thị an toàn. */
+    const errorMessage =
+        error instanceof Error
+            ? error.message
+            : error
+                ? 'Không thể tải dữ liệu phân quyền.'
+                : null;
 
     return (
         <AccessControlUiProvider>
@@ -100,6 +82,11 @@ export default function AccessControlPage() {
 
                 <section className={styles.content}>
                     <Tabs
+                        onChange={(activeKey) => {
+                            if (activeKey === 'audit-logs') {
+                                setHasOpenedAuditLogs(true);
+                            }
+                        }}
                         items={[
                             {
                                 key: 'users',
@@ -128,10 +115,10 @@ export default function AccessControlPage() {
                                     <RolesPermissionsTab
                                         roles={data?.roles ?? []}
                                         permissions={data?.permissions ?? []}
-                                        loading={loading}
-                                        error={error}
-                                        onRetry={loadData}
-                                        onRoleChanged={loadData}
+                                        loading={isLoading}
+                                        error={errorMessage}
+                                        onRetry={reloadData}
+                                        onRoleChanged={reloadData}
                                         onUpdatePermissions={updateRolePermissions}
                                     />
                                 ),
@@ -144,7 +131,7 @@ export default function AccessControlPage() {
                                         Lịch sử thay đổi
                                     </span>
                                 ),
-                                children: <AuditLogsTab />,
+                                children: hasOpenedAuditLogs ? <AuditLogsTab /> : null,
                             },
                         ]}
                     />

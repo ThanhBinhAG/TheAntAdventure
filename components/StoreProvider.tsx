@@ -83,29 +83,49 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!remoteEnabled) return;
 
       try {
+        // Hydrate vẫn lấy dữ liệu thật từ Supabase như trước.
         const ok = await hydrateFromSupabase();
+
         if (cancelled) return;
-        if (ok) useStore.getState().rolloverIncompleteTasks();
+
+        if (ok) {
+          useStore.getState().rolloverIncompleteTasks();
+        }
+
         setRemote(ok);
 
+        // Ping chỉ chạy sau khi hydrate hoàn tất.
         const status = await quickSupabasePing();
-        if (!cancelled) setConn(status);
-      } catch (e) {
-        appLog('store-provider', 'Supabase background init failed', { level: 'warn', error: e });
+
+        if (!cancelled) {
+          setConn(status);
+        }
+      } catch (error) {
+        appLog('store-provider', 'Supabase background init failed', {
+          level: 'warn',
+          error,
+        });
+
         if (!cancelled) {
           setConn({
             ok: false,
             latencyMs: 0,
             tables: {},
-            error: e instanceof Error ? e.message : 'Connection failed',
+            error: error instanceof Error ? error.message : 'Connection failed',
           });
         }
       }
     }
 
-    initSupabase();
+    // Ưu tiên hiển thị Sidebar và trang hiện tại trước.
+    // Sau 400ms mới bắt đầu tải toàn bộ dữ liệu CRM ở nền.
+    const timerId = window.setTimeout(() => {
+      void initSupabase();
+    }, 400);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timerId);
     };
   }, [remoteEnabled]);
 
@@ -119,10 +139,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         .join('\n');
       const ok = await confirmDialog(
         'Push toàn bộ snapshot lên Supabase?\n\n' +
-          'Catalogue (products) chỉ upsert — không xóa orphan.\n' +
-          'Các bảng khác có thể mirror nếu bạn chọn force.\n\n' +
-          (summary || '(empty)') +
-          '\n\nTiếp tục?',
+        'Catalogue (products) chỉ upsert — không xóa orphan.\n' +
+        'Các bảng khác có thể mirror nếu bạn chọn force.\n\n' +
+        (summary || '(empty)') +
+        '\n\nTiếp tục?',
         {
           title: 'Push to Supabase',
           confirmLabel: 'Push',
@@ -164,11 +184,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   async function handleCompleteMigration() {
     const ok = await confirmDialog(
       'Bước này sẽ:\n' +
-        '1. Push toàn bộ data local lên Supabase\n' +
-        '2. So sánh số dòng local vs remote\n' +
-        '3. Xóa cache localStorage (ant-crm-v43)\n' +
-        '4. Load lại từ Supabase\n\n' +
-        'Tiếp tục?',
+      '1. Push toàn bộ data local lên Supabase\n' +
+      '2. So sánh số dòng local vs remote\n' +
+      '3. Xóa cache localStorage (ant-crm-v43)\n' +
+      '4. Load lại từ Supabase\n\n' +
+      'Tiếp tục?',
       {
         title: 'Complete migration',
         confirmLabel: 'Migrate',

@@ -51,7 +51,6 @@ function errorResponse(error: unknown) {
 }
 
 export async function GET(request: Request) {
-    // Lớp bảo vệ thứ nhất: API Next.js.
     const permission = await checkPermissionForRequest(
         'users.manage',
     );

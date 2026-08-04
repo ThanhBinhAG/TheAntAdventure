@@ -45,6 +45,7 @@
     "react-easy-crop": "^6.2.3",
     "server-only": "^0.0.1",
     "sharp": "^0.35.3",
+    "swr": "^2.4.2",
     "xlsx": "^0.18.5",
     "zod": "^4.4.3",
     "zustand": "^4.4.0"

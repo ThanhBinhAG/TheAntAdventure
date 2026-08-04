@@ -11,7 +11,7 @@ function logAuthEvent(message: string, meta?: Record<string, unknown>, level: 'i
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ category: 'auth', message, level, meta }),
-  }).catch(() => {});
+  }).catch(() => { });
 }
 
 function authErrorMessage(message: string): string {
@@ -111,8 +111,9 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
       });
       const next = searchParams.get('next');
       const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+      // Chuyển người dùng đến trang CRM sau khi API login đã ghi session vào cookie.
+      // Không gọi router.refresh() vì có thể tạo thêm một lượt tải dữ liệu không cần thiết.
       router.push(safeNext);
-      router.refresh();
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Đăng nhập thất bại.';
       logAuthEvent('signIn exception', { error: raw }, 'error');
@@ -178,7 +179,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
         {showDebugLink && (
           <p className="login-hint debug-login-link">
             Admin:{' '}
-            <Link href="/system/debug">System diagnostics</Link> 
+            <Link href="/system/debug">System diagnostics</Link>
           </p>
         )}
       </div>

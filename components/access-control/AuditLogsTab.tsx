@@ -13,11 +13,8 @@
  * - API và database đã kiểm tra users.manage trước khi trả log.
  */
 
-import {
-    useCallback,
-    useEffect,
-    useState,
-} from 'react';
+import { useCallback, useState } from 'react';
+import useSWR from 'swr';
 import { ReloadOutlined } from '@ant-design/icons';
 import {
     Alert,
@@ -29,7 +26,6 @@ import type { TableColumnsType } from 'antd';
 import {
     fetchAccessControlAuditLogs,
     type AccessControlAuditLog,
-    type AccessControlAuditLogsPage,
 } from './access-control-api';
 import {
     getAccessControlAuditActionPresentation,
@@ -249,53 +245,50 @@ function AuditLogDetails({
 }
 
 export default function AuditLogsTab() {
-    const [data, setData] =
-        useState<AccessControlAuditLogsPage | null>(null);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] =
-        useState<string | null>(null);
 
-    /** Tải một trang log từ API. */
-    const loadLogs = useCallback(async () => {
-        setLoading(true);
-        setError(null);
+    /**
+     * Cache RAM cho từng trang lịch sử.
+     *
+     * Ví dụ: trang 1 và trang 2 có cache riêng.
+     * Khi quay lại trang vừa xem, SWR có thể dùng dữ liệu đã tải.
+     */
+    const auditLogsQueryKey = [
+        'access-control/audit-logs',
+        page,
+        pageSize,
+    ] as const;
 
-        try {
-            const nextData = await fetchAccessControlAuditLogs({
-                page,
-                pageSize,
-            });
+    const {
+        data,
+        error,
+        isLoading,
+        mutate: reloadLogs,
+    } = useSWR(
+        auditLogsQueryKey,
+        () => fetchAccessControlAuditLogs({ page, pageSize }),
+        {
+            // Audit log ít thay đổi hơn danh sách user.
+            dedupingInterval: 30_000,
+            keepPreviousData: true,
+            revalidateOnFocus: false,
+            focusThrottleInterval: 30_000,
+            revalidateOnReconnect: true,
+        },
+    );
 
-            setData(nextData);
-        } catch (error) {
-            setError(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể tải lịch sử phân quyền.',
-            );
-        } finally {
-            setLoading(false);
-        }
-    }, [page, pageSize]);
+    /** Người dùng bấm “Tải lại” thì bỏ cache trang hiện tại và lấy dữ liệu mới. */
+    const refreshLogs = useCallback(async (): Promise<void> => {
+        await reloadLogs();
+    }, [reloadLogs]);
 
-    useEffect(() => {
-        let cancelled = false;
-
-        // Chạy sau khi effect hoàn tất để không setState đồng bộ trong effect.
-        void Promise.resolve().then(() => {
-            if (!cancelled) {
-                return loadLogs();
-            }
-
-            return undefined;
-        });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [loadLogs]);
+    const errorMessage =
+        error instanceof Error
+            ? error.message
+            : error
+                ? 'Không thể tải lịch sử phân quyền.'
+                : null;
 
     const columns: TableColumnsType<AccessControlAuditLog> = [
         {
@@ -359,23 +352,23 @@ export default function AuditLogsTab() {
 
                 <Button
                     icon={<ReloadOutlined />}
-                    loading={loading}
-                    onClick={() => void loadLogs()}
+                    loading={isLoading}
+                    onClick={() => void refreshLogs()}
                 >
                     Tải lại
                 </Button>
             </header>
 
-            {error && (
+            {errorMessage && (
                 <Alert
                     type="error"
                     showIcon
                     message="Không thể tải lịch sử"
-                    description={error}
+                    description={errorMessage}
                     action={
                         <Button
                             size="small"
-                            onClick={() => void loadLogs()}
+                            onClick={() => void refreshLogs()}
                         >
                             Thử lại
                         </Button>
@@ -387,7 +380,7 @@ export default function AuditLogsTab() {
                 rowKey="id"
                 columns={columns}
                 dataSource={data?.items ?? []}
-                loading={loading}
+                loading={isLoading}
                 scroll={{ x: 900 }}
                 locale={{
                     emptyText: 'Chưa có thay đổi phân quyền nào.',

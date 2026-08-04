@@ -33,12 +33,19 @@ import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 
 export const dynamic = 'force-dynamic';
 
+/** Mã role động do database quản lý. */
+const roleCodeSchema = z.string()
+    .trim()
+    .regex(
+        /^[a-z0-9_]{2,50}$/,
+        'Mã role không hợp lệ.',
+    );
+
 /** Schema kiểm tra query string của API. */
 const querySchema = z.object({
     q: z.string().trim().max(100).optional(),
-    role: z.enum([
-        'admin',
-        'employee',
+    role: z.union([
+        roleCodeSchema
     ]).optional(),
     status: z.enum([
         'active',
@@ -88,10 +95,7 @@ const createBodySchema = z.object({
         .trim()
         .min(1, 'Tên hiển thị không được để trống.')
         .max(100, 'Tên hiển thị tối đa 100 ký tự.'),
-    roleCode: z.enum([
-        'admin',
-        'employee',
-    ]),
+    roleCode: roleCodeSchema,
 });
 
 /** Đọc query param rỗng thành undefined. */

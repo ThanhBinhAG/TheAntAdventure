@@ -28,8 +28,8 @@ import {
     Tag,
 } from 'antd';
 import type {
+    AccessControlAssignableRole,
     AccessControlPermission,
-    AccessControlRole,
     AccessControlUser,
     ManagedRoleCode,
 } from './access-control-api';
@@ -37,7 +37,7 @@ import styles from './AccessControlPage.module.css';
 
 type UserAccessDrawerProps = {
     user: AccessControlUser | null;
-    roles: AccessControlRole[];
+    roles: AccessControlAssignableRole[];
     permissions: AccessControlPermission[];
     saving: boolean;
     onClose: () => void;
@@ -67,13 +67,6 @@ function getPermissionGroupLabel(permissionCode: string): string {
     return labels[groupCode] ?? 'Chức năng khác';
 }
 
-/** Đổi role kỹ thuật thành nhãn hiển thị. */
-function getRoleLabel(roleCode: ManagedRoleCode): string {
-    if (roleCode === 'admin') return 'Admin';
-
-    return 'Nhân viên';
-}
-
 export default function UserAccessDrawer({
     user,
     roles,
@@ -84,7 +77,8 @@ export default function UserAccessDrawer({
 }: UserAccessDrawerProps) {
     const [selectedRole, setSelectedRole] =
         useState<ManagedRoleCode>(
-            () => user?.role_code ?? 'employee',
+            () => user?.role_code ??
+                roles.find((role) => role.is_active)?.role_code ?? '',
         );
 
     // UserDirectory truyền key theo user_id, nên Drawer được tạo lại khi đổi user.
@@ -100,6 +94,14 @@ export default function UserAccessDrawer({
     /** Role có wildcard (*) là toàn quyền, không cần liệt kê từng quyền. */
     const hasFullAccess =
         selectedRoleInfo?.permission_codes.includes('*') ?? false;
+
+    /**
+     * Không gửi request nếu role không đổi hoặc role đang ngừng dùng.
+     * User đang dùng role cũ vẫn có thể chuyển sang một role đang hoạt động khác.
+     */
+    const canSaveRole =
+        Boolean(selectedRoleInfo?.is_active) &&
+        selectedRole !== user?.role_code;
 
     /** Gom permission theo nhóm để Drawer dễ đọc hơn. */
     const permissionGroups = useMemo(() => {
@@ -150,7 +152,7 @@ export default function UserAccessDrawer({
     }, [hasFullAccess, permissions, selectedRoleInfo]);
 
     async function handleSave() {
-        if (!user) return;
+        if (!user || !canSaveRole) return;
 
         await onSave(user.user_id, selectedRole);
     }
@@ -199,7 +201,10 @@ export default function UserAccessDrawer({
                             onChange={setSelectedRole}
                             options={roles.map((role) => ({
                                 value: role.role_code,
-                                label: getRoleLabel(role.role_code),
+                                label: role.is_active
+                                    ? role.role_label
+                                    : `${role.role_label} (ngừng dùng)`,
+                                disabled: !role.is_active,
                             }))}
                         />
 
@@ -248,6 +253,7 @@ export default function UserAccessDrawer({
                         <Button
                             type="primary"
                             loading={saving}
+                            disabled={saving || !canSaveRole}
                             onClick={() => void handleSave()}
                         >
                             Lưu role

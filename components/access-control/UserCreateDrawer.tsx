@@ -25,7 +25,7 @@ import {
     Select,
 } from 'antd';
 import type {
-    AccessControlRole,
+    AccessControlAssignableRole,
     CreateAccessControlUserInput,
     ManagedRoleCode,
 } from './access-control-api';
@@ -33,7 +33,7 @@ import styles from './AccessControlPage.module.css';
 
 type UserCreateDrawerProps = {
     open: boolean;
-    roles: AccessControlRole[];
+    roles: AccessControlAssignableRole[];
     saving: boolean;
     onClose: () => void;
     onCreate: (
@@ -53,9 +53,16 @@ export default function UserCreateDrawer({
     const [displayName, setDisplayName] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    // null nghĩa là ưu tiên Employee, nếu không có thì chọn role khả dụng đầu tiên.
     const [roleCode, setRoleCode] =
-        useState<ManagedRoleCode>('employee');
+        useState<ManagedRoleCode | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    const defaultRoleCode =
+        roles.find((role) => role.role_code === 'employee')?.role_code ??
+        roles[0]?.role_code ??
+        null;
+    const selectedRoleCode = roleCode ?? defaultRoleCode;
 
     /** Đưa form về trạng thái ban đầu, đồng thời xóa mật khẩu khỏi bộ nhớ UI. */
     function resetForm() {
@@ -63,7 +70,7 @@ export default function UserCreateDrawer({
         setDisplayName('');
         setPassword('');
         setConfirmPassword('');
-        setRoleCode('employee');
+        setRoleCode(null);
         setError(null);
     }
 
@@ -104,7 +111,10 @@ export default function UserCreateDrawer({
             return;
         }
 
-        if (!roles.some((role) => role.role_code === roleCode)) {
+        if (
+            !selectedRoleCode ||
+            !roles.some((role) => role.role_code === selectedRoleCode)
+        ) {
             setError('Vui lòng chọn role hợp lệ.');
             return;
         }
@@ -116,7 +126,7 @@ export default function UserCreateDrawer({
                 email: normalizedEmail,
                 password,
                 displayName: normalizedName,
-                roleCode,
+                roleCode: selectedRoleCode,
             });
 
             // Chỉ reset sau thành công để khi lỗi server user không phải nhập lại.
@@ -192,7 +202,7 @@ export default function UserCreateDrawer({
                     <label htmlFor="new-user-role">Role ban đầu</label>
                     <Select<ManagedRoleCode>
                         id="new-user-role"
-                        value={roleCode}
+                        value={selectedRoleCode ?? undefined}
                         disabled={saving}
                         options={roles.map((role) => ({
                             value: role.role_code,

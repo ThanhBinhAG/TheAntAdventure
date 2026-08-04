@@ -12,6 +12,7 @@ Giao diện Quản lý người dùng và phân quyền dành cho tài khoản c
 - `UserActionsMenu.tsx` — menu thao tác nhanh: sửa thông tin, trạng thái và xóa mềm.
 - `UserEditDrawer.tsx` — sửa tên hiển thị của user.
 - `UserCreateDrawer.tsx` — tạo Auth user mới, tên hiển thị và role ban đầu.
+- `useRefreshAccessControlAuditLogs.ts` — làm mới cache lịch sử sau thao tác ghi dữ liệu.
 
 ## Boundaries
 - Chỉ hiển thị và gọi API.

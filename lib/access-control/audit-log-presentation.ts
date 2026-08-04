@@ -28,6 +28,18 @@ const AUDIT_ACTION_PRESENTATIONS: Record<
         label: 'Cập nhật quyền role',
         color: 'green',
     },
+    staff_role_created: {
+        label: 'Tạo role',
+        color: 'green',
+    },
+    staff_role_updated: {
+        label: 'Cập nhật role',
+        color: 'blue',
+    },
+    staff_role_permissions_replaced: {
+        label: 'Cập nhật quyền role',
+        color: 'green',
+    },
     user_profile_updated: {
         label: 'Cập nhật thông tin người dùng',
         color: 'cyan',

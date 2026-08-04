@@ -1,399 +1,259 @@
 'use client';
 
 /**
- * Tab cấu hình role và permission.
+ * Tab cấu hình role nhân viên động.
  *
- * Chức năng:
- * - Chỉnh permission của Nhân viên theo từng nhóm chức năng.
- * - Chọn hoặc bỏ chọn toàn bộ quyền trong một nhóm chức năng.
- * - Lưu permission mới qua API hiện có.
- *
- * Lưu ý:
- * - Admin có toàn quyền cố định nên không xuất hiện trong tab này.
- * - API và database RPC vẫn là nơi kiểm tra quyền users.manage.
+ * Danh sách chỉ hiển thị các role nghiệp vụ, ví dụ: Nhân viên, Sale.
+ * Role hệ thống toàn quyền (admin, super_admin) không xuất hiện. Người quản trị
+ * cấu hình permission một lần cho role rồi gán cùng role đó cho nhiều người.
  */
 
 import {
+    useCallback,
     useMemo,
     useState,
 } from 'react';
+import useSWR from 'swr';
 import {
+    EditOutlined,
+    PlusOutlined,
     SaveOutlined,
 } from '@ant-design/icons';
 import {
+    Alert,
     Button,
     Card,
     Checkbox,
     Empty,
     Skeleton,
+    Tag,
 } from 'antd';
 import { confirmDialog } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
-import type {
-    AccessControlPermission,
-    AccessControlRole,
-    EditableRoleCode,
+import {
+    createAccessControlStaffRole,
+    fetchAccessControlStaffRoles,
+    updateAccessControlStaffRole,
+    updateAccessControlStaffRolePermissions,
+    type AccessControlPermission,
+    type AccessControlStaffRole,
+    type CreateAccessControlStaffRoleInput,
 } from './access-control-api';
+import StaffRoleCreateDrawer from './StaffRoleCreateDrawer';
+import StaffRoleEditDrawer from './StaffRoleEditDrawer';
 import styles from './AccessControlPage.module.css';
+import useRefreshAccessControlAuditLogs from './useRefreshAccessControlAuditLogs';
 
 type RolesPermissionsTabProps = {
-    roles: AccessControlRole[];
     permissions: AccessControlPermission[];
-    loading: boolean;
-    error: string | null;
-    onRetry: () => Promise<void>;
-    onRoleChanged: () => Promise<void>;
-    onUpdatePermissions: (
-        roleCode: EditableRoleCode,
-        permissionCodes: string[],
-    ) => Promise<void>;
+    loadingPermissions: boolean;
+    permissionsError: string | null;
+    onRetryPermissions: () => Promise<void>;
 };
 
-/** Nhãn tiếng Việt cho từng nhóm permission. */
 const GROUP_LABELS: Record<string, string> = {
-    dashboard: 'Bảng điều hành',
-    customers: 'Khách hàng',
-    agents: 'Đại lý B2B',
-    sales: 'Bán hàng',
-    tour_design: 'Thiết kế tour',
-    catalogue: 'Sản phẩm và thư viện ảnh',
-    pricing: 'Bảng giá',
-    operations: 'Vận hành',
-    finance: 'Tài chính',
-    hr: 'Nhân sự',
-    company: 'Thông tin công ty',
-    weather: 'Thời tiết',
-    teamchat: 'Chat nội bộ',
-    devnotes: 'Ghi chú kỹ thuật',
+    dashboard: 'Bảng điều hành', customers: 'Khách hàng', agents: 'Đại lý B2B',
+    sales: 'Bán hàng', tour_design: 'Thiết kế tour', catalogue: 'Sản phẩm và thư viện ảnh',
+    pricing: 'Bảng giá', operations: 'Vận hành', finance: 'Tài chính', hr: 'Nhân sự',
+    company: 'Thông tin công ty', weather: 'Thời tiết', teamchat: 'Chat nội bộ', devnotes: 'Ghi chú kỹ thuật',
 };
 
-/** Gom permission theo phần đứng trước dấu chấm, ví dụ sales.read. */
-function groupPermissions(
-    permissions: AccessControlPermission[],
-) {
+function groupPermissions(permissions: AccessControlPermission[]) {
     const groups = new Map<string, AccessControlPermission[]>();
-
     for (const permission of permissions) {
-        const groupCode = permission.permission_code.split('.')[0];
-        const items = groups.get(groupCode) ?? [];
-
-        items.push(permission);
-        groups.set(groupCode, items);
+        const code = permission.permission_code.split('.')[0];
+        groups.set(code, [...(groups.get(code) ?? []), permission]);
     }
-
-    return Array.from(groups.entries())
-        .map(([groupCode, items]) => ({
-            groupCode,
-            label: GROUP_LABELS[groupCode] ?? groupCode,
-            items,
-        }))
-        .sort((first, second) =>
-            first.label.localeCompare(second.label, 'vi'),
-        );
+    return Array.from(groups.entries()).map(([code, items]) => ({
+        code,
+        label: GROUP_LABELS[code] ?? code,
+        items,
+    }));
 }
 
-/** So sánh hai danh sách quyền mà không quan tâm thứ tự. */
-function hasSamePermissions(
-    first: string[],
-    second: string[],
-): boolean {
-    if (first.length !== second.length) return false;
-
-    const firstSet = new Set(first);
-
-    return second.every((code) => firstSet.has(code));
+function hasSamePermissions(first: string[], second: string[]) {
+    return first.length === second.length && first.every((code) => second.includes(code));
 }
 
 export default function RolesPermissionsTab({
-    roles,
     permissions,
-    loading,
-    error,
-    onRetry,
-    onRoleChanged,
-    onUpdatePermissions,
+    loadingPermissions,
+    permissionsError,
+    onRetryPermissions,
 }: RolesPermissionsTabProps) {
-    // Tab này chỉ cấu hình Employee, nên một bản nháp là đủ.
-    const [permissionDraft, setPermissionDraft] =
-        useState<string[] | null>(null);
+    const refreshAuditLogs = useRefreshAccessControlAuditLogs();
+    const [selectedRoleCode, setSelectedRoleCode] = useState<string | null>(null);
+    const [drafts, setDrafts] = useState<Record<string, string[]>>({});
     const [saving, setSaving] = useState(false);
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editingRole, setEditingRole] = useState<AccessControlStaffRole | null>(null);
 
-    /** Luôn lấy role Employee từ dữ liệu API. */
-    const activeRole = useMemo(() => {
-        return roles.find(
-            (role) => role.role_code === 'employee',
-        );
-    }, [roles]);
+    const { data: roles = [], error: rolesError, isLoading: loadingRoles, mutate } = useSWR(
+        'access-control/staff-roles',
+        fetchAccessControlStaffRoles,
+        { dedupingInterval: 60_000, revalidateOnFocus: false, revalidateOnReconnect: true },
+    );
 
-    /** Danh sách nhóm permission hiển thị ở cột phải. */
-    const permissionGroups = useMemo(() => {
-        return groupPermissions(permissions);
-    }, [permissions]);
+    const activeRole = roles.find((role) => role.role_code === selectedRoleCode)
+        ?? roles.find((role) => role.is_active)
+        ?? roles[0];
 
-    /**
-     * Nếu chưa tick checkbox, đọc quyền thẳng từ dữ liệu API.
-     * Khi người dùng chỉnh sửa, chỉ lưu bản nháp cho đúng role đó.
-     * Cách này không cần useEffect để chép props vào state.
-     */
-    const selectedPermissionCodes =
-        permissionDraft ??
-        activeRole?.permission_codes ?? [];
+    const permissionGroups = useMemo(() => groupPermissions(permissions), [permissions]);
+    const selectedPermissionCodes = activeRole
+        ? drafts[activeRole.role_code] ?? activeRole.permission_codes
+        : [];
+    const hasChanges = activeRole
+        ? !hasSamePermissions(selectedPermissionCodes, activeRole.permission_codes)
+        : false;
 
-    const hasChanges =
-        !hasSamePermissions(
-            selectedPermissionCodes,
-            activeRole?.permission_codes ?? [],
-        );
+    const reloadRoles = useCallback(async () => { await mutate(); }, [mutate]);
 
-    /** Cập nhật bản nháp Employee từ thao tác checkbox. */
-    function updatePermissionDraft(
-        update: (current: string[]) => string[],
-    ) {
-
-        setPermissionDraft((currentDraft) =>
-            update(currentDraft ?? activeRole?.permission_codes ?? []),
-        );
+    function updateDraft(update: (current: string[]) => string[]) {
+        if (!activeRole) return;
+        setDrafts((current) => ({
+            ...current,
+            [activeRole.role_code]: update(current[activeRole.role_code] ?? activeRole.permission_codes),
+        }));
     }
 
-    /** Bật hoặc tắt một permission đơn lẻ. */
-    function togglePermission(
-        permissionCode: string,
-        checked: boolean,
-    ) {
-        updatePermissionDraft((current) => {
-            if (checked) {
-                return [...new Set([...current, permissionCode])];
-            }
-
-            return current.filter(
-                (code) => code !== permissionCode,
-            );
-        });
-    }
-
-    /** Bật hoặc tắt toàn bộ quyền trong một nhóm chức năng. */
-    function togglePermissionGroup(
-        permissionCodes: string[],
-        checked: boolean,
-    ) {
-        updatePermissionDraft((current) => {
-            if (checked) {
-                return [...new Set([...current, ...permissionCodes])];
-            }
-
-            return current.filter(
-                (code) => !permissionCodes.includes(code),
-            );
-        });
-    }
-
-    /** Lưu danh sách permission mới cho Employee. */
-    async function handleSave() {
-
-        const editableRoleCode: EditableRoleCode = 'employee';
-
-        const confirmed = await confirmDialog(
-            `Bạn sắp cập nhật ${selectedPermissionCodes.length} quyền cho Nhân viên.`,
-            {
-                title: 'Xác nhận cập nhật quyền',
-                confirmLabel: 'Lưu quyền',
-                cancelLabel: 'Hủy',
-                danger: false,
-            },
-        );
-
-        if (!confirmed) return;
-
+    async function handleCreate(input: CreateAccessControlStaffRoleInput) {
         setSaving(true);
-
         try {
-            await onUpdatePermissions(
-                editableRoleCode,
-                selectedPermissionCodes,
-            );
-
-            toast.success('Đã cập nhật permission của role.');
-            await onRoleChanged();
-
-            // Dữ liệu mới đã được tải lại từ API, nên bỏ bản nháp cũ.
-            setPermissionDraft(null);
+            await createAccessControlStaffRole(input);
+            await reloadRoles();
+            refreshAuditLogs();
+            setSelectedRoleCode(input.code);
+            setCreateOpen(false);
+            toast.success('Đã tạo role nhân viên.');
         } catch (error) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể cập nhật permission.',
-            );
+            toast.error(error instanceof Error ? error.message : 'Không thể tạo role.');
+            throw error;
         } finally {
             setSaving(false);
         }
     }
 
-    if (loading) {
-        return <Skeleton active paragraph={{ rows: 12 }} />;
+    async function handleEdit(input: { code: string; label: string; description?: string; sortOrder: number; isActive: boolean }) {
+        setSaving(true);
+        try {
+            await updateAccessControlStaffRole(input);
+            await reloadRoles();
+            refreshAuditLogs();
+            setEditingRole(null);
+            toast.success('Đã cập nhật role nhân viên.');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Không thể cập nhật role.');
+        } finally {
+            setSaving(false);
+        }
     }
 
-    if (error) {
-        return (
-            <div className={styles.errorState}>
-                <p>{error}</p>
-
-                <Button
-                    type="primary"
-                    onClick={() => void onRetry()}
-                >
-                    Thử lại
-                </Button>
-            </div>
+    async function handleSavePermissions() {
+        if (!activeRole) return;
+        const confirmed = await confirmDialog(
+            `Bạn sắp cập nhật ${selectedPermissionCodes.length} quyền cho role ${activeRole.role_label}.`,
+            { title: 'Xác nhận cập nhật quyền', confirmLabel: 'Lưu quyền', cancelLabel: 'Hủy', danger: false },
         );
+        if (!confirmed) return;
+        setSaving(true);
+        try {
+            await updateAccessControlStaffRolePermissions(activeRole.role_code, selectedPermissionCodes);
+            await reloadRoles();
+            refreshAuditLogs();
+            setDrafts((current) => {
+                const next = { ...current };
+                delete next[activeRole.role_code];
+                return next;
+            });
+            toast.success('Đã cập nhật permission của role.');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Không thể cập nhật permission.');
+        } finally {
+            setSaving(false);
+        }
     }
 
-    if (!activeRole) {
-        return <Empty description="Không tìm thấy dữ liệu role." />;
-    }
+    if (loadingPermissions) return <Skeleton active paragraph={{ rows: 12 }} />;
+    if (permissionsError) return <Alert type="error" showIcon message="Không thể tải permission" description={permissionsError} action={<Button size="small" onClick={() => void onRetryPermissions()}>Thử lại</Button>} />;
+    if (loadingRoles) return <Skeleton active paragraph={{ rows: 8 }} />;
+    if (rolesError) return <Alert type="error" showIcon message="Không thể tải role nhân viên" description={rolesError instanceof Error ? rolesError.message : 'Vui lòng thử lại.'} action={<Button size="small" onClick={() => void reloadRoles()}>Thử lại</Button>} />;
 
     return (
-        <div className={styles.permissionsOnlyWorkspace}>
-            <section className={styles.permissionWorkspace}>
-                <header className={styles.permissionWorkspaceHeader}>
+        <div className={styles.rolesWorkspace}>
+            <aside className={styles.roleList}>
+                <div className={styles.roleListHeader}>
                     <div>
-                        <h2 className={styles.sectionTitle}>
-                            Cấu hình quyền Nhân viên
-                        </h2>
-
-                        <p className={styles.sectionDescription}>
-                            Chọn những chức năng Nhân viên được phép sử dụng.
-                        </p>
+                        <h2 className={styles.sectionTitle}>Role nhân viên</h2>
+                        <p className={styles.sectionDescription}>Một role có thể dùng cho nhiều nhân viên.</p>
                     </div>
+                    <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>Thêm</Button>
+                </div>
 
-                </header>
-
-
-                <>
-                    <div className={styles.permissionGroups}>
-                        {permissionGroups.map((group) => {
-                            const groupCodes = group.items.map(
-                                (permission) =>
-                                    permission.permission_code,
-                            );
-
-                            const selectedCount =
-                                groupCodes.filter((code) =>
-                                    selectedPermissionCodes.includes(code),
-                                ).length;
-
-                            const isAllSelected =
-                                selectedCount === groupCodes.length;
-
-                            const isPartlySelected =
-                                selectedCount > 0 && !isAllSelected;
-
-                            return (
-                                <Card
-                                    key={group.groupCode}
-                                    size="small"
-                                    className={styles.permissionGroup}
-                                >
-                                    <div
-                                        className={
-                                            styles.permissionGroupHeader
-                                        }
-                                    >
-                                        <strong>{group.label}</strong>
-
-                                        <Checkbox
-                                            checked={isAllSelected}
-                                            indeterminate={
-                                                isPartlySelected
-                                            }
-                                            disabled={saving}
-                                            onChange={(event) => {
-                                                togglePermissionGroup(
-                                                    groupCodes,
-                                                    event.target.checked,
-                                                );
-                                            }}
-                                        >
-                                            Chọn tất cả
-                                        </Checkbox>
-                                    </div>
-
-                                    <span
-                                        className={
-                                            styles.permissionGroupCount
-                                        }
-                                    >
-                                        {selectedCount}/{groupCodes.length}{' '}
-                                        quyền
-                                    </span>
-
-                                    <div className={styles.permissionRows}>
-                                        {group.items.map(
-                                            (permission) => (
-                                                <Checkbox
-                                                    key={
-                                                        permission.permission_code
-                                                    }
-                                                    checked={selectedPermissionCodes.includes(
-                                                        permission.permission_code,
-                                                    )}
-                                                    disabled={saving}
-                                                    className={
-                                                        styles.permissionRow
-                                                    }
-                                                    onChange={(event) => {
-                                                        togglePermission(
-                                                            permission.permission_code,
-                                                            event.target.checked,
-                                                        );
-                                                    }}
-                                                >
-                                                    <span
-                                                        className={
-                                                            styles.permissionText
-                                                        }
-                                                    >
-                                                        {
-                                                            permission.permission_description
-                                                        }
-
-                                                        <code
-                                                            className={
-                                                                styles.permissionCode
-                                                            }
-                                                        >
-                                                            {
-                                                                permission.permission_code
-                                                            }
-                                                        </code>
-                                                    </span>
-                                                </Checkbox>
-                                            ),
-                                        )}
-                                    </div>
-                                </Card>
-                            );
-                        })}
-                    </div>
-
-                    <div className={styles.permissionSaveBar}>
-                        <span>
-                            {hasChanges
-                                ? 'Có thay đổi chưa được lưu.'
-                                : 'Permission đang khớp với database.'}
+                {roles.length === 0 ? (
+                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có role nhân viên" />
+                ) : roles.map((role) => (
+                    <button key={role.role_code} type="button" className={`${styles.roleChoice} ${activeRole?.role_code === role.role_code ? styles.roleChoiceActive : ''}`} onClick={() => setSelectedRoleCode(role.role_code)}>
+                        {/* Tách tên và số quyền thành hai vùng để chữ không bị chèn lên nhau. */}
+                        <span className={styles.roleChoiceContent}>
+                            <span className={styles.roleChoiceText}>
+                                <strong>{role.role_label}</strong>
+                                <small>{role.role_description || 'Chưa có mô tả.'}</small>
+                            </span>
+                            <span className={styles.roleChoiceCount}>
+                                {role.permission_codes.length} quyền
+                            </span>
                         </span>
+                        <span className={styles.roleChoiceFooter}>
+                            <span>{role.assigned_user_count} nhân viên</span>
+                            {!role.is_active && <Tag color="default">Ngừng dùng</Tag>}
+                        </span>
+                    </button>
+                ))}
+            </aside>
 
-                        <Button
-                            icon={<SaveOutlined />}
-                            type="primary"
-                            loading={saving}
-                            disabled={!hasChanges}
-                            onClick={() => void handleSave()}
-                        >
-                            Lưu quyền
-                        </Button>
-                    </div>
-                </>
+            <section className={styles.permissionWorkspace}>
+                {!activeRole ? (
+                    <Empty description="Hãy tạo role nhân viên đầu tiên." />
+                ) : (
+                    <>
+                        <header className={styles.permissionWorkspaceHeader}>
+                            <div>
+                                <h2 className={styles.sectionTitle}>Quyền của {activeRole.role_label}</h2>
+                                <p className={styles.sectionDescription}>{activeRole.role_description || 'Chọn những chức năng role này được phép sử dụng.'}</p>
+                            </div>
+                            <Button icon={<EditOutlined />} onClick={() => setEditingRole(activeRole)}>Sửa role</Button>
+                        </header>
+                        {!activeRole.is_active ? (
+                            <Alert type="warning" showIcon message="Role này đã ngừng sử dụng." description="Không thể sửa permission của role đang ngừng sử dụng." />
+                        ) : (
+                            <>
+                                <div className={styles.permissionGroups}>
+                                    {permissionGroups.map((group) => {
+                                        const codes = group.items.map((item) => item.permission_code);
+                                        const selectedCount = codes.filter((code) => selectedPermissionCodes.includes(code)).length;
+                                        return <Card key={group.code} size="small" className={styles.permissionGroup}>
+                                            <div className={styles.permissionGroupHeader}>
+                                                <strong>{group.label}</strong>
+                                                <Checkbox checked={selectedCount === codes.length} indeterminate={selectedCount > 0 && selectedCount < codes.length} disabled={saving} onChange={(event) => updateDraft((current) => event.target.checked ? [...new Set([...current, ...codes])] : current.filter((code) => !codes.includes(code)))}>Chọn tất cả</Checkbox>
+                                            </div>
+                                            <span className={styles.permissionGroupCount}>{selectedCount}/{codes.length} quyền</span>
+                                            <div className={styles.permissionRows}>
+                                                {group.items.map((permission) => <Checkbox key={permission.permission_code} checked={selectedPermissionCodes.includes(permission.permission_code)} disabled={saving} className={styles.permissionRow} onChange={(event) => updateDraft((current) => event.target.checked ? [...new Set([...current, permission.permission_code])] : current.filter((code) => code !== permission.permission_code))}><span className={styles.permissionText}>{permission.permission_description}<code className={styles.permissionCode}>{permission.permission_code}</code></span></Checkbox>)}
+                                            </div>
+                                        </Card>;
+                                    })}
+                                </div>
+                                <div className={styles.permissionSaveBar}>
+                                    <span>{hasChanges ? 'Có thay đổi chưa được lưu.' : 'Permission đang khớp với database.'}</span>
+                                    <Button icon={<SaveOutlined />} type="primary" loading={saving} disabled={!hasChanges} onClick={() => void handleSavePermissions()}>Lưu quyền</Button>
+                                </div>
+                            </>
+                        )}
+                    </>
+                )}
             </section>
+            <StaffRoleCreateDrawer open={createOpen} saving={saving} onClose={() => setCreateOpen(false)} onSubmit={handleCreate} />
+            <StaffRoleEditDrawer role={editingRole} saving={saving} onClose={() => setEditingRole(null)} onSubmit={handleEdit} />
         </div>
     );
 }

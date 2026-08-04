@@ -41,7 +41,7 @@ type UserCreateDrawerProps = {
     ) => Promise<void>;
 };
 
-/** Drawer form tạo user; chỉ hiển thị khi Super Admin bấm nút Thêm user. */
+/** Drawer form tạo user; chỉ hiển thị khi người quản trị bấm nút Thêm user. */
 export default function UserCreateDrawer({
     open,
     roles,

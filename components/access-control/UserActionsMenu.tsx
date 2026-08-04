@@ -16,7 +16,6 @@
 
 import { useState } from 'react';
 import {
-    DeleteOutlined,
     EditOutlined,
     LockOutlined,
     MoreOutlined,
@@ -30,7 +29,6 @@ import type { MenuProps } from 'antd';
 import { confirmDialog } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
 import {
-    softDeleteUser,
     updateUserActiveStatus,
     type AccessControlUser,
 } from './access-control-api';
@@ -98,37 +96,6 @@ export default function UserActionsMenu({
         }
     }
 
-    /** Xóa mềm user sau khi xác nhận lần cuối. */
-    async function handleSoftDelete() {
-        const confirmed = await confirmDialog(
-            `Xóa tài khoản ${user.email ?? ''} khỏi danh sách? Dữ liệu CRM và lịch sử thay đổi vẫn được giữ.`,
-            {
-                title: 'Xác nhận xóa tài khoản',
-                confirmLabel: 'Xóa tài khoản',
-                cancelLabel: 'Hủy',
-                danger: true,
-            },
-        );
-
-        if (!confirmed) return;
-
-        setSaving(true);
-
-        try {
-            await softDeleteUser(user.user_id);
-
-            toast.success('Đã xóa mềm tài khoản.');
-            await onChanged();
-        } catch (error) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể xóa tài khoản.',
-            );
-        } finally {
-            setSaving(false);
-        }
-    }
 
     const menuItems: MenuProps['items'] = [
         {
@@ -152,16 +119,6 @@ export default function UserActionsMenu({
         },
         {
             type: 'divider',
-        },
-        {
-            key: 'delete',
-            danger: true,
-            icon: <DeleteOutlined />,
-            label: 'Xóa tài khoản',
-            disabled: saving,
-            onClick: () => {
-                void handleSoftDelete();
-            },
         },
     ];
 

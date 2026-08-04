@@ -40,7 +40,7 @@ export default function AccessControlPage() {
  * - Khi quay lại tab trình duyệt, SWR sẽ kiểm tra dữ liệu mới.
  */
     /**
- * Chỉ mở component lịch sử khi Super Admin thật sự bấm tab.
+ * Chỉ mở component lịch sử khi người quản trị thật sự bấm tab.
  * Tránh gọi API audit-logs ngay khi mới vào Access Control.
  */
     const [hasOpenedAuditLogs, setHasOpenedAuditLogs] = useState(false);

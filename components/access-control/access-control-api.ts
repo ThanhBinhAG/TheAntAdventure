@@ -14,7 +14,6 @@
 
 /** Ba role nghiệp vụ hiện có trong CRM. */
 export type ManagedRoleCode =
-    | 'super_admin'
     | 'admin'
     | 'employee';
 
@@ -65,7 +64,6 @@ export type UserListStatusFilter =
 export type AccessControlUserSummary = {
     totalUsers: number;
     activeUsers: number;
-    superAdminCount: number;
     adminCount: number;
     employeeCount: number;
     unassignedCount: number;
@@ -312,30 +310,6 @@ export async function updateUserActiveStatus(
     });
 }
 
-/** Xóa mềm user. User sẽ biến mất khỏi danh sách mặc định. */
-export async function softDeleteUser(
-    userId: string,
-): Promise<void> {
-    const response = await fetch('/api/access-control/users', {
-        method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId }),
-    });
-
-    await readApiResponse<Record<string, never>>(response);
-}
-
-/** Khôi phục user đã bị xóa mềm. */
-export async function restoreUser(
-    userId: string,
-): Promise<void> {
-    await sendUserUpdate({
-        action: 'restore',
-        userId,
-    });
-}
 
 /**
  * Tạo một tài khoản Auth mới, sau đó API sẽ tự tạo profile và gán role.

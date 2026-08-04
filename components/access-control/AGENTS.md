@@ -1,7 +1,7 @@
 # components/access-control/ — Agent overview
 
 ## Role
-Giao diện Quản lý người dùng và phân quyền dành cho Super Admin.
+Giao diện Quản lý người dùng và phân quyền dành cho tài khoản có users.manage.
 
 ## Contents
 - `UserDirectory.tsx` — danh sách user phân trang.

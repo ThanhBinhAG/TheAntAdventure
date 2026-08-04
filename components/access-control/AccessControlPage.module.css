@@ -273,6 +273,11 @@
     gap: 18px;
 }
 
+/* Tab Role & quyền chỉ còn cấu hình Employee nên không cần cột chọn role. */
+.permissionsOnlyWorkspace {
+    width: 100%;
+}
+
 .roleList,
 .permissionWorkspace {
     display: flex;

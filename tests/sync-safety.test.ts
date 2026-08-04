@@ -1,13 +1,25 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import {
+  getHydratedTables,
   getHydrationState,
   isManualPushAllowed,
+  isMessagesHydrated,
   isSyncAllowed,
+  isTableHydrated,
   markHydrationFailed,
   markHydrationPending,
   markHydrationReady,
+  markMessagesHydrated,
+  markTablesHydrated,
 } from '../lib/db/sync-lifecycle';
+import {
+  hydrateWavesCoverAllTables,
+  PAGE_HYDRATE_TABLES,
+  SHELL_HYDRATE_TABLES,
+  SYNC_HYDRATE_WAVES,
+  tablesForPage,
+} from '../lib/db/sync-config';
 import {
   buildOrphanSkipWarning,
   getTablePolicy,
@@ -26,6 +38,7 @@ describe('sync lifecycle', () => {
     else process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
     if (originalKey === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     else process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = originalKey;
+    markHydrationPending();
     markHydrationReady({});
   });
 
@@ -58,6 +71,62 @@ describe('sync lifecycle', () => {
     markHydrationFailed('timeout');
     assert.equal(isSyncAllowed(), false);
     assert.equal(isManualPushAllowed(), true);
+  });
+
+  it('tracks hydrated tables separately from phase', () => {
+    markHydrationPending();
+    assert.equal(isTableHydrated('customers'), false);
+    assert.equal(isMessagesHydrated(), false);
+
+    markTablesHydrated(['customers', 'leads']);
+    markMessagesHydrated();
+    markHydrationReady({ customers: 1, leads: 1 });
+
+    assert.equal(isTableHydrated('customers'), true);
+    assert.equal(isTableHydrated('photos'), false);
+    assert.equal(isMessagesHydrated(), true);
+    assert.deepEqual(getHydratedTables().sort(), ['customers', 'leads']);
+  });
+
+  it('clears hydrated tables on pending', () => {
+    markTablesHydrated(['customers']);
+    markMessagesHydrated();
+    markHydrationPending();
+    assert.equal(isTableHydrated('customers'), false);
+    assert.equal(isMessagesHydrated(), false);
+  });
+});
+
+describe('route boot tables', () => {
+  it('partitions SYNC_ARRAY_TABLES exactly once across three waves', () => {
+    assert.equal(SYNC_HYDRATE_WAVES.length, 3);
+    assert.equal(hydrateWavesCoverAllTables(), true);
+  });
+
+  it('deprecated shell list still documents legacy 7-table set', () => {
+    assert.equal(SHELL_HYDRATE_TABLES.length, 7);
+    assert.equal(SHELL_HYDRATE_TABLES.includes('comms'), false);
+  });
+
+  it('customers boot is 3 tables without comms, bookings, or agents', () => {
+    const boot = tablesForPage('customers');
+    assert.deepEqual(boot.sort(), ['customers', 'feedback', 'leads']);
+    assert.equal(boot.includes('comms'), false);
+    assert.equal(boot.includes('bookings'), false);
+    assert.equal(boot.includes('agents'), false);
+  });
+
+  it('dashboard boot includes bookings and agents; sales includes comms', () => {
+    assert.ok(tablesForPage('dashboard').includes('bookings'));
+    assert.ok(tablesForPage('dashboard').includes('agents'));
+    assert.ok(tablesForPage('sales').includes('comms'));
+  });
+
+  it('gallery and finance declare expected boot tables', () => {
+    assert.ok(tablesForPage('gallery').includes('photos'));
+    assert.ok(tablesForPage('finance').includes('finance'));
+    assert.ok(tablesForPage('tourdesign').includes('products'));
+    assert.deepEqual(PAGE_HYDRATE_TABLES, {});
   });
 });
 

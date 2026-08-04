@@ -1,7 +1,13 @@
 import { isAutoSyncEnabled, isRemoteDataEnabled, isSupabaseReadOnly } from '../env';
 import { TABLE_TO_STORE_KEY, SYNC_ARRAY_TABLES, type SyncArrayTable } from './sync-config';
-import { isSyncAllowed, subscribeHydration } from './sync-lifecycle';
-import { pushSnapshotToSupabase, pushTablesToSupabase } from './sync-push';
+import {
+  filterHydratedTables,
+  getHydratedTables,
+  isMessagesHydrated,
+  isSyncAllowed,
+  subscribeHydration,
+} from './sync-lifecycle';
+import { pushTablesToSupabase } from './sync-push';
 
 export type AutoSyncStatus = 'idle' | 'pending' | 'syncing' | 'synced' | 'error' | 'blocked';
 
@@ -90,17 +96,22 @@ function ensureHydrationListener() {
   });
 }
 
-/** Queue sync for specific tables (debounced) */
+/** Queue sync for specific tables (debounced). Unhydrated tables are ignored. */
 export function scheduleAutoSync(changed?: { tables?: SyncArrayTable[]; messages?: boolean }) {
   ensureHydrationListener();
   if (!isRemoteDataEnabled() || !isAutoSyncEnabled() || isSupabaseReadOnly()) return;
 
-  if (changed?.tables) changed.tables.forEach((t) => pendingTables.add(t));
-  if (changed?.messages) pendingMessages = true;
-  if (!changed) {
-    pendingTables = new Set();
-    pendingMessages = true;
+  if (changed?.tables) {
+    for (const t of filterHydratedTables(changed.tables)) pendingTables.add(t);
   }
+  if (changed?.messages && isMessagesHydrated()) pendingMessages = true;
+  if (!changed) {
+    // Never push unhydrated empty arrays — only tables already in the store.
+    pendingTables = new Set(getHydratedTables());
+    pendingMessages = isMessagesHydrated();
+  }
+
+  if (!pendingTables.size && !pendingMessages) return;
 
   if (!isSyncAllowed()) {
     setSyncState({
@@ -126,15 +137,20 @@ async function flushAutoSync() {
   syncInFlight = true;
   setSyncState({ status: 'syncing', lastError: null });
 
-  const tables = pendingTables.size ? [...pendingTables] : undefined;
-  const messages = pendingMessages;
+  const rawTables = pendingTables.size ? [...pendingTables] : getHydratedTables();
+  const tables = filterHydratedTables(rawTables);
+  const messages = pendingMessages && isMessagesHydrated();
   pendingTables = new Set();
   pendingMessages = false;
 
+  if (!tables.length && !messages) {
+    setSyncState({ status: 'idle', lastError: null });
+    syncInFlight = false;
+    return;
+  }
+
   try {
-    const result = tables || messages
-      ? await pushTablesToSupabase(tables, messages)
-      : await pushSnapshotToSupabase();
+    const result = await pushTablesToSupabase(tables, messages);
 
     if (result.ok) {
       setSyncState({

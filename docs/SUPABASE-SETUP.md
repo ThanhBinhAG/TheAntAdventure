@@ -109,29 +109,37 @@ The app protects against accidental bulk data loss:
 
 Panel ☁ shows hydrate status, blocked sync warnings, and **Push có xác nhận** for manual override.
 
-## 5b. Môi trường DEV vs PROD
+## 5b. Môi trường DEV (local) vs PROD (khách / remote)
 
-**Never run `npm run dev` against the production Supabase project** without safeguards.
+**Never run `npm run dev` against the customer/production Supabase** without safeguards. App connects to **one** DB at a time via env.
 
-| | DEV (local) | PROD (deploy) |
-|--|-------------|---------------|
-| Supabase project | Separate dev instance | Production instance |
-| `NEXT_PUBLIC_SUPABASE_AUTO_SYNC` | `false` recommended | `true` |
-| `NEXT_PUBLIC_SUPABASE_READ_ONLY` | `true` if you must share prod DB | `false` |
-| `reset-v5.sql` | Dev only | Never |
-| `import-v5-data.sql` | Dev for testing | Only with backup |
+| | Local (dev) | Remote (khách / demo) |
+|--|-------------|------------------------|
+| Env file | `.env.local` | Server env, or gitignored `.env.remote.local` backup |
+| Supabase | Docker via `npx supabase start` | Self-hosted / Cloud instance |
+| API URL | `http://127.0.0.1:54321` | e.g. `https://sb.example.com` |
+| Migration | `npm run db:push:local` | `npm run db:push` + `SUPABASE_DB_URL` |
+| Status | `npm run db:status:local` | `npm run db:status` |
+| `NEXT_PUBLIC_SUPABASE_AUTO_SYNC` | `false` recommended at first | `true` when ready |
+| `reset-v5.sql` / wipe | Dev only | Never on customer DB |
 
-### Setup dev project
+### Setup local (recommended daily workflow)
 
-1. Create a second Supabase project (or second self-hosted instance).
-2. Run `schema.sql` → `import-v5-data.sql` on dev only.
-3. Point `.env.local` at dev URL + anon key.
-4. Use `NEXT_PUBLIC_SUPABASE_AUTO_SYNC=false` or `READ_ONLY=true` while experimenting.
+1. `npx supabase start` (Docker required).
+2. Copy keys from `npx supabase status -o env` into `.env.local` (`API_URL`, `ANON_KEY`, `SERVICE_ROLE_KEY`, DB URL on port `54322`).
+3. Keep customer credentials in `.env.remote.local` (gitignored) — do **not** use them for day-to-day `npm run dev`.
+4. New schema: edit `supabase/migrations/` → `npm run db:push:local` → test → only then push remote.
+
+### Setup / push remote (customer)
+
+1. Put Postgres URL in env as `SUPABASE_DB_URL` (see §9a).
+2. Existing DB without CLI history: `npm run db:bootstrap` first.
+3. `npm run db:push` (never `--local`).
 
 ### Checklist before `npm run dev`
 
-- [ ] `.env.local` URL is the **dev** project (not production)
-- [ ] `AUTO_SYNC=false` or `READ_ONLY=true` when testing risky changes
+- [ ] `.env.local` URL is **local** (`127.0.0.1:54321`) or an explicit shared **dev** instance — not production
+- [ ] `AUTO_SYNC=false` or `READ_ONLY=true` when testing risky changes against a shared DB
 - [ ] Run **Verify counts** in ☁ panel after large imports
 
 ### Backup (production)
@@ -337,7 +345,9 @@ Legacy owner-grouped paths (`gallery/tours/…`, `gallery/attractions/…`, `gal
 
 ## 9. Supabase CLI migrations
 
-Schema changes use the **Supabase CLI** (`supabase/migrations/`). Fresh empty DB: `npm run db:push` applies the single baseline (`20260101000000`). SQL Editor path still uses `schema.sql` (keep in sync with that baseline).
+Schema changes use the **Supabase CLI** (`supabase/migrations/`). On **local Docker**, `npx supabase start` applies pending migrations automatically. On **remote**, use `npm run db:push` with `SUPABASE_DB_URL`. SQL Editor path still uses `schema.sql` (keep in sync with migrations).
+
+**Do not** run `db push --local` and expect the customer remote to update — they are separate databases.
 
 ### 9a. One-time setup
 
@@ -345,7 +355,16 @@ Schema changes use the **Supabase CLI** (`supabase/migrations/`). Fresh empty DB
 npm install                    # installs supabase CLI (devDependency)
 ```
 
-**Self-hosted** (e.g. `sb.mitelai.com`) — set in `.env.local`:
+**Local Docker (dev)** — no cloud project required:
+
+```bash
+npx supabase start
+# Then put API/anon/service keys + SUPABASE_DB_URL (port 54322) into .env.local
+npm run db:push:local          # when you add new migrations later
+npm run db:status:local
+```
+
+**Self-hosted remote** (e.g. customer `sb.…`) — keep credentials in deploy env or `.env.remote.local`:
 
 ```env
 SUPABASE_DB_URL=postgresql://postgres:YOUR_PASSWORD@HOST:5432/postgres
@@ -362,12 +381,12 @@ npm run db:link -- --project-ref YOUR_PROJECT_REF
 
 ### 9b. Bootstrap existing database
 
-If the DB already has `schema.sql` applied (no `supabase_migrations.schema_migrations` history) — **do not** `db push` the baseline (tables already exist):
+If the **remote** DB already has `schema.sql` applied (no `supabase_migrations.schema_migrations` history) — **do not** `db push` the baseline (tables already exist):
 
 ```bash
-# Add SUPABASE_DB_URL to .env.local first
+# Add SUPABASE_DB_URL for the remote first
 npm run db:bootstrap           # marks 20260101000000 as applied
-npm run db:status              # local vs remote history
+npm run db:status              # file vs remote history
 ```
 
 Manual repair for a single version:
@@ -381,7 +400,9 @@ bash scripts/supabase-db.sh repair-applied 20260101000000
 ```bash
 npm run db:migration:new -- add_my_column
 # Edit supabase/migrations/<timestamp>_add_my_column.sql
-npm run db:push                # DEV — applies pending migrations
+npm run db:push:local          # apply on local Docker first
+# After verification:
+npm run db:push                # remote — needs SUPABASE_DB_URL
 ```
 
 Checklist per migration:
@@ -399,10 +420,12 @@ Checklist per migration:
 | `npm run db:login` | Supabase Cloud access token |
 | `npm run db:link` | Link CLI to cloud project ref |
 | `npm run db:migration:new -- name` | Create timestamped migration file |
-| `npm run db:push` | Apply pending migrations (`SUPABASE_DB_URL`) |
+| `npm run db:push:local` | Apply pending migrations to **local** Docker |
+| `npm run db:status:local` | List migrations on **local** Docker |
+| `npm run db:push` | Apply pending migrations to **remote** (`SUPABASE_DB_URL`) |
 | `npm run db:pull` | Pull remote schema into new migration |
-| `npm run db:status` | List migration history |
-| `npm run db:bootstrap` | Mark baseline `20260101000000` applied on existing DB |
+| `npm run db:status` | List migration history vs remote |
+| `npm run db:bootstrap` | Mark baseline `20260101000000` applied on existing remote DB |
 
 Helper: [`scripts/supabase-db.sh`](../scripts/supabase-db.sh)
 
@@ -414,7 +437,8 @@ Pre-CLI `migrate-*.sql` files were removed; history note: [`supabase/legacy/LEGA
 
 | Error | Fix |
 |-------|-----|
-| `relation "X" already exists` | Run `npm run db:bootstrap` on existing DB before first push |
-| `SUPABASE_DB_URL is not set` | Add Postgres URL to `.env.local` |
+| `relation "X" already exists` | Run `npm run db:bootstrap` on existing remote DB before first push |
+| `SUPABASE_DB_URL is not set` | Add Postgres URL for **remote** push, or use `db:push:local` for Docker |
 | `Cannot find project ref` | Use `db:push` with `SUPABASE_DB_URL`, or `db:link` for Cloud |
 | RLS blocks after new table | Update `rls-authenticated.sql` and re-run on remote |
+| Access Control API 500 after pull | Migrations not on that DB — local: `db:push:local`; remote: `db:push` |

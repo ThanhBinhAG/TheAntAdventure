@@ -1,3 +1,10 @@
+import {
+  clearRouteCache,
+  pickRouteSnapshot,
+  readRouteCache,
+  shouldRevalidateCache,
+  writeRouteCache,
+} from './route-cache';
 import { withoutAutoSyncAsync } from './auto-sync';
 import { pushSnapshotToSupabase } from './sync-push';
 import { appLog } from '../system/app-logger';
@@ -13,22 +20,32 @@ import type {
   CruiseSupplier,
   ExtendedSupplier,
   Hotel,
+  PageSlug,
   ProductPricing,
   RestaurantSupplier,
   TransportSupplier,
   Attraction,
 } from '../types';
 import {
+  bootTablesForPage,
   countBackupRows,
   MESSAGES_TABLE,
+  SIDEBAR_IDLE_TABLES,
   SYNC_ARRAY_TABLES,
+  SYNC_HYDRATE_WAVES,
   TABLE_TO_STORE_KEY,
   type SyncArrayTable,
 } from './sync-config';
 import {
+  getHydratedTables,
+  getHydrationState,
+  isMessagesHydrated,
+  isTableHydrated,
   markHydrationFailed,
   markHydrationPending,
   markHydrationReady,
+  markMessagesHydrated,
+  markTablesHydrated,
   updateBaselineCounts,
 } from './sync-lifecycle';
 import { db as supabaseDb } from './supabase';
@@ -42,47 +59,207 @@ export {
 } from './sync-lifecycle';
 
 const STORAGE_KEY = 'ant-crm-v43';
-const HYDRATE_TIMEOUT_MS = 12_000;
+const BOOT_TIMEOUT_MS = 8_000;
+const ENSURE_TIMEOUT_MS = 12_000;
 const PING_TIMEOUT_MS = 8_000;
 
-async function fetchRemoteBackup(): Promise<Partial<BackupData> | null> {
-  const results = await Promise.all([
-    ...SYNC_ARRAY_TABLES.map(async (table) => {
+type StoreKey = keyof BackupData;
+
+const bootPromises = new Map<string, Promise<boolean>>();
+const ensureInFlight = new Map<string, Promise<void>>();
+
+let sidebarIdleScheduled = false;
+let visibilityListenerReady = false;
+let pendingRevalidateTables: SyncArrayTable[] | null = null;
+
+async function fetchTables(tables: readonly SyncArrayTable[]): Promise<Partial<BackupData>> {
+  const results = await Promise.all(
+    tables.map(async (table) => {
       const rows = await supabaseDb[table].getAll();
       return [TABLE_TO_STORE_KEY[table], rows] as const;
-    }),
-    supabaseDb.messages.get().then((m) => ['messages', m] as const),
-  ]);
+    })
+  );
 
   const backup: Partial<BackupData> = {};
-  let totalRows = 0;
-  let fetchedAnyTable = false;
-
   for (const [key, value] of results) {
-    if (key === 'messages') {
-      if (value && typeof value === 'object' && Object.keys(value).length > 0) {
-        backup.messages = value as ChatMessages;
-        totalRows += Object.keys(value).length;
-      }
-      fetchedAnyTable = true;
-    } else if (Array.isArray(value)) {
-      // Always attach arrays (including empty) so a wiped product_pricing is not treated as "missing".
+    if (Array.isArray(value)) {
       (backup as Record<string, unknown>)[key] = value;
-      totalRows += value.length;
-      fetchedAnyTable = true;
     }
   }
-
-  return fetchedAnyTable || totalRows > 0 ? backup : null;
+  return backup;
 }
 
-function baselineFromBackup(backup: BackupData): Partial<Record<SyncArrayTable, number>> {
+async function fetchMessages(): Promise<Partial<BackupData>> {
+  const messages = await supabaseDb.messages.get();
+  if (messages && typeof messages === 'object' && Object.keys(messages).length > 0) {
+    return { messages: messages as ChatMessages };
+  }
+  return { messages: {} };
+}
+
+function baselineForTables(
+  tables: readonly SyncArrayTable[],
+  backup: BackupData
+): Partial<Record<SyncArrayTable, number>> {
   const counts = countBackupRows(backup);
   const baseline: Partial<Record<SyncArrayTable, number>> = {};
-  for (const table of SYNC_ARRAY_TABLES) {
+  for (const table of tables) {
     baseline[table] = counts[table] ?? 0;
   }
   return baseline;
+}
+
+function persistRouteCache(slug?: PageSlug): void {
+  const backup = useStore.getState().exportBackup();
+  const tables = getHydratedTables();
+  writeRouteCache(
+    pickRouteSnapshot(backup, tables, isMessagesHydrated()),
+    tables,
+    isMessagesHydrated(),
+    slug
+  );
+}
+
+function markReadyFromStore(): void {
+  const backup = useStore.getState().exportBackup();
+  const tables = getHydratedTables();
+  markHydrationReady(baselineForTables(tables, backup));
+}
+
+async function applyWaveToStore(remote: Partial<BackupData>): Promise<void> {
+  await withoutAutoSyncAsync(async () => {
+    const state = useStore.getState();
+    const hasProducts = Object.prototype.hasOwnProperty.call(remote, 'products');
+    const hasPricing = Object.prototype.hasOwnProperty.call(remote, 'productPricing');
+    const hasAttractions = Object.prototype.hasOwnProperty.call(remote, 'attractions');
+    const hasSupplierSlice =
+      Object.prototype.hasOwnProperty.call(remote, 'hotels') ||
+      Object.prototype.hasOwnProperty.call(remote, 'transport') ||
+      Object.prototype.hasOwnProperty.call(remote, 'restaurants') ||
+      Object.prototype.hasOwnProperty.call(remote, 'cruises') ||
+      Object.prototype.hasOwnProperty.call(remote, 'specialSuppliers');
+
+    const mergedProducts = hasProducts
+      ? mergeRequiredProducts(remote.products as never[])
+      : state.products;
+    const rawPricing: ProductPricing[] = hasPricing
+      ? (remote.productPricing as ProductPricing[])
+      : state.productPricing;
+    const mergedPricing =
+      hasProducts || hasPricing
+        ? pruneProductPricingToProducts(rawPricing, mergedProducts)
+        : state.productPricing;
+    const mergedAttractions = hasAttractions
+      ? mergeAttractionSeeds((remote.attractions as Attraction[]) ?? state.attractions)
+      : state.attractions;
+    const mergedSuppliers = hasSupplierSlice
+      ? mergeSupplierSeeds({
+          hotels: (remote.hotels as Hotel[] | undefined) ?? state.hotels,
+          transport: (remote.transport as TransportSupplier[] | undefined) ?? state.transport,
+          restaurants: (remote.restaurants as RestaurantSupplier[] | undefined) ?? state.restaurants,
+          cruises: (remote.cruises as CruiseSupplier[] | undefined) ?? state.cruises,
+          specialSuppliers:
+            (remote.specialSuppliers as ExtendedSupplier[] | undefined) ?? state.specialSuppliers,
+        })
+      : null;
+
+    const patch: Partial<BackupData> = { ...remote };
+    if (hasProducts) patch.products = mergedProducts;
+    if (hasProducts || hasPricing) patch.productPricing = mergedPricing;
+    if (hasAttractions) patch.attractions = mergedAttractions;
+    if (mergedSuppliers) {
+      patch.hotels = mergedSuppliers.hotels;
+      patch.transport = mergedSuppliers.transport;
+      patch.restaurants = mergedSuppliers.restaurants;
+      patch.cruises = mergedSuppliers.cruises;
+      patch.specialSuppliers = mergedSuppliers.specialSuppliers;
+    }
+
+    const next: BackupData = {
+      ...state.exportBackup(),
+      ...Object.fromEntries((Object.keys(patch) as StoreKey[]).map((key) => [key, patch[key]])),
+      exportedAt: new Date().toISOString(),
+      version: '5.0',
+    } as BackupData;
+
+    state.importBackup(next);
+  });
+}
+
+async function raceTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  const result = await Promise.race([
+    promise.then((data) => ({ timedOut: false as const, data })),
+    new Promise<{ timedOut: true }>((resolve) => {
+      setTimeout(() => resolve({ timedOut: true }), timeoutMs);
+    }),
+  ]);
+  if (result.timedOut) {
+    throw new Error(`${label} timeout after ${timeoutMs}ms`);
+  }
+  return result.data;
+}
+
+async function fetchAndApplyTables(
+  tables: readonly SyncArrayTable[],
+  label: string
+): Promise<void> {
+  const missing = tables.filter((t) => !isTableHydrated(t));
+  if (!missing.length) return;
+
+  const remote = await raceTimeout(fetchTables(missing), BOOT_TIMEOUT_MS, label);
+  await applyWaveToStore(remote);
+  markTablesHydrated(missing);
+  const backup = useStore.getState().exportBackup();
+  updateBaselineCounts(baselineForTables(missing, backup));
+}
+
+async function revalidateTablesInBackground(tables: readonly SyncArrayTable[]): Promise<void> {
+  const toFetch = [...new Set(tables)];
+  try {
+    await fetchAndApplyTables(toFetch, 'Route revalidate');
+    persistRouteCache();
+    appLog('hydrate', 'Route background revalidate done', { meta: { tables: toFetch } });
+  } catch (e) {
+    appLog('hydrate', 'Route background revalidate failed — keeping cache', {
+      level: 'warn',
+      error: e,
+    });
+  }
+}
+
+function ensureVisibilityRevalidateListener(): void {
+  if (visibilityListenerReady || typeof document === 'undefined') return;
+  visibilityListenerReady = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !pendingRevalidateTables?.length) return;
+    const tables = pendingRevalidateTables;
+    pendingRevalidateTables = null;
+    void revalidateTablesInBackground(tables);
+  });
+}
+
+function scheduleDelayedRevalidate(tables: readonly SyncArrayTable[], cacheSavedAt: number): void {
+  if (!shouldRevalidateCache(cacheSavedAt)) return;
+  pendingRevalidateTables = [...new Set(tables)];
+  ensureVisibilityRevalidateListener();
+  if (typeof requestIdleCallback !== 'undefined') {
+    requestIdleCallback(
+      () => {
+        if (!pendingRevalidateTables) return;
+        const t = pendingRevalidateTables;
+        pendingRevalidateTables = null;
+        void revalidateTablesInBackground(t);
+      },
+      { timeout: 5000 }
+    );
+  } else {
+    setTimeout(() => {
+      if (!pendingRevalidateTables) return;
+      const t = pendingRevalidateTables;
+      pendingRevalidateTables = null;
+      void revalidateTablesInBackground(t);
+    }, 3000);
+  }
 }
 
 export async function checkSupabaseConnection(): Promise<ConnectionStatus> {
@@ -121,82 +298,197 @@ export type VerifyResult = {
   mismatches: string[];
 };
 
-export async function hydrateFromSupabase(): Promise<boolean> {
+export function resetShellHydrateGuard() {
+  bootPromises.clear();
+  sidebarIdleScheduled = false;
+  pendingRevalidateTables = null;
+}
+
+async function runPageBoot(slug: PageSlug): Promise<boolean> {
   if (!remoteEnabled()) return false;
 
-  markHydrationPending();
+  const bootTables = bootTablesForPage(slug);
+  const phase = getHydrationState().phase;
+  if (phase !== 'ready') markHydrationPending();
 
   try {
-    const fetchResult = await Promise.race([
-      fetchRemoteBackup().then((data) => ({ timedOut: false as const, data })),
-      new Promise<{ timedOut: true }>((resolve) => {
-        setTimeout(() => resolve({ timedOut: true }), HYDRATE_TIMEOUT_MS);
-      }),
-    ]);
+    const cached = readRouteCache();
+    const cacheCoversBoot =
+      cached &&
+      bootTables.length > 0 &&
+      bootTables.every((t) => cached.tables.includes(t));
 
-    if (fetchResult.timedOut) {
-      markHydrationFailed('Hydrate timeout — kiểm tra kết nối Supabase');
-      return false;
+    if (cacheCoversBoot && cached) {
+      await applyWaveToStore(cached.data);
+      markTablesHydrated(cached.tables);
+      if (cached.messagesHydrated) markMessagesHydrated();
+      markReadyFromStore();
+      appLog('hydrate', 'Route boot from cache', {
+        meta: { slug, tables: bootTables.length, source: 'sessionCache' },
+      });
+      scheduleDelayedRevalidate(bootTables, cached.savedAt);
+    } else {
+      await fetchAndApplyTables(bootTables, `Route boot (${slug})`);
+      markReadyFromStore();
+      persistRouteCache(slug);
+      appLog('hydrate', 'Route boot from network', {
+        meta: { slug, tables: bootTables.length, source: 'network' },
+      });
     }
 
-    const remote = fetchResult.data;
-
-    await withoutAutoSyncAsync(async () => {
-      const state = useStore.getState();
-      const mergedProducts = remote?.products
-        ? mergeRequiredProducts(remote.products as never[])
-        : mergeRequiredProducts(state.products);
-      // Supabase is source of truth — do not re-seed legacy TAA pricing on hydrate.
-      const rawPricing: ProductPricing[] = Array.isArray(remote?.productPricing)
-        ? (remote.productPricing as ProductPricing[])
-        : state.productPricing;
-      const mergedPricing = pruneProductPricingToProducts(rawPricing, mergedProducts);
-      const mergedAttractions = mergeAttractionSeeds(
-        (remote?.attractions as Attraction[] | undefined) ?? state.attractions
-      );
-      const mergedSuppliers = mergeSupplierSeeds({
-        hotels: (remote?.hotels as Hotel[] | undefined) ?? state.hotels,
-        transport: (remote?.transport as TransportSupplier[] | undefined) ?? state.transport,
-        restaurants: (remote?.restaurants as RestaurantSupplier[] | undefined) ?? state.restaurants,
-        cruises: (remote?.cruises as CruiseSupplier[] | undefined) ?? state.cruises,
-        specialSuppliers: (remote?.specialSuppliers as ExtendedSupplier[] | undefined) ?? state.specialSuppliers,
-      });
-
-      if (remote) {
-        state.importBackup({
-          ...state.exportBackup(),
-          ...remote,
-          products: mergedProducts,
-          productPricing: mergedPricing,
-          attractions: mergedAttractions,
-          hotels: mergedSuppliers.hotels,
-          transport: mergedSuppliers.transport,
-          restaurants: mergedSuppliers.restaurants,
-          cruises: mergedSuppliers.cruises,
-          specialSuppliers: mergedSuppliers.specialSuppliers,
-          exportedAt: new Date().toISOString(),
-          version: '5.0',
-        });
-      } else {
-        useStore.setState({
-          products: mergedProducts,
-          productPricing: mergedPricing,
-          attractions: mergedAttractions,
-          hotels: mergedSuppliers.hotels,
-          transport: mergedSuppliers.transport,
-          restaurants: mergedSuppliers.restaurants,
-          cruises: mergedSuppliers.cruises,
-          specialSuppliers: mergedSuppliers.specialSuppliers,
-        });
-      }
-    });
-
-    const backup = useStore.getState().exportBackup();
-    markHydrationReady(baselineFromBackup(backup));
+    if (slug === 'teamchat') await ensureMessagesLoaded();
     return true;
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Hydrate failed';
-    appLog('hydrate', 'Supabase hydrate failed', { level: 'warn', error: e });
+    appLog('hydrate', 'Route boot failed', { level: 'warn', error: e, meta: { slug } });
+    markHydrationFailed(message);
+    return false;
+  }
+}
+
+/**
+ * Fetch PAGE_BOOT_TABLES for the current route. Deduped per slug.
+ */
+export function ensurePageBootLoaded(slug: PageSlug): Promise<boolean> {
+  if (!remoteEnabled()) return Promise.resolve(false);
+  const existing = bootPromises.get(slug);
+  if (existing) return existing;
+
+  const promise = runPageBoot(slug).finally(() => {
+    bootPromises.delete(slug);
+  });
+  bootPromises.set(slug, promise);
+  return promise;
+}
+
+/** Sidebar badges — idle after page paint. */
+export function scheduleSidebarIdleLoad(): void {
+  if (sidebarIdleScheduled) return;
+  sidebarIdleScheduled = true;
+
+  const run = () => {
+    void ensureTablesLoaded(SIDEBAR_IDLE_TABLES).then(() => persistRouteCache());
+  };
+
+  if (typeof requestIdleCallback !== 'undefined') {
+    requestIdleCallback(() => run(), { timeout: 4000 });
+  } else {
+    setTimeout(run, 2500);
+  }
+}
+
+export async function ensureTablesLoaded(tables: readonly SyncArrayTable[]): Promise<void> {
+  if (!remoteEnabled()) return;
+
+  const missing = tables.filter((t) => !isTableHydrated(t));
+  if (!missing.length) return;
+
+  const key = missing.slice().sort().join(',');
+  const existing = ensureInFlight.get(key);
+  if (existing) {
+    await existing;
+    return;
+  }
+
+  const work = (async () => {
+    try {
+      const remote = await raceTimeout(
+        fetchTables(missing),
+        ENSURE_TIMEOUT_MS,
+        `ensureTablesLoaded(${missing.length})`
+      );
+      await applyWaveToStore(remote);
+      markTablesHydrated(missing);
+      const backup = useStore.getState().exportBackup();
+      updateBaselineCounts(baselineForTables(missing, backup));
+      appLog('hydrate', 'ensureTablesLoaded applied', { meta: { tables: missing } });
+    } finally {
+      ensureInFlight.delete(key);
+    }
+  })();
+
+  ensureInFlight.set(key, work);
+  await work;
+}
+
+export async function ensureMessagesLoaded(): Promise<void> {
+  if (!remoteEnabled() || isMessagesHydrated()) return;
+
+  const key = '__messages__';
+  const existing = ensureInFlight.get(key);
+  if (existing) {
+    await existing;
+    return;
+  }
+
+  const work = (async () => {
+    try {
+      const messagesPatch = await raceTimeout(
+        fetchMessages(),
+        ENSURE_TIMEOUT_MS,
+        'ensureMessagesLoaded'
+      );
+      await applyWaveToStore(messagesPatch);
+      markMessagesHydrated();
+      persistRouteCache();
+    } finally {
+      ensureInFlight.delete(key);
+    }
+  })();
+
+  ensureInFlight.set(key, work);
+  await work;
+}
+
+/** Route-first boot + sidebar idle. */
+export async function ensurePageDataLoaded(slug: PageSlug): Promise<boolean> {
+  const ok = await ensurePageBootLoaded(slug);
+  if (!ok) return false;
+  scheduleSidebarIdleLoad();
+  return true;
+}
+
+/** @deprecated Use ensurePageBootLoaded — kept for callers during migration. */
+export function hydrateShellFromSupabase(): Promise<boolean> {
+  return ensurePageBootLoaded('dashboard');
+}
+
+export async function ensureAllTablesLoaded(): Promise<boolean> {
+  const ok = await ensurePageBootLoaded('dashboard');
+  if (!ok) markHydrationPending();
+
+  for (const wave of SYNC_HYDRATE_WAVES) {
+    const need = wave.filter((t) => !isTableHydrated(t));
+    if (need.length) await ensureTablesLoaded(need);
+  }
+  const stillMissing = SYNC_ARRAY_TABLES.filter((t) => !isTableHydrated(t));
+  if (stillMissing.length) await ensureTablesLoaded(stillMissing);
+
+  await ensureMessagesLoaded();
+  markReadyFromStore();
+  persistRouteCache();
+  return true;
+}
+
+export async function hydrateFromSupabase(): Promise<boolean> {
+  resetShellHydrateGuard();
+  clearRouteCache();
+  markHydrationPending();
+
+  if (!remoteEnabled()) return false;
+
+  try {
+    for (const wave of SYNC_HYDRATE_WAVES) {
+      const need = wave.filter((t) => !isTableHydrated(t));
+      if (need.length) await ensureTablesLoaded(need);
+    }
+    await ensureMessagesLoaded();
+    markReadyFromStore();
+    persistRouteCache();
+    return true;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Hydrate failed';
+    appLog('hydrate', 'Full hydrate failed', { level: 'warn', error: e });
     markHydrationFailed(message);
     return false;
   }
@@ -210,31 +502,33 @@ export async function verifyLocalMatchesRemote(): Promise<VerifyResult> {
   const remote = health.tables;
   const mismatches: string[] = [];
 
-  for (const table of [...SYNC_ARRAY_TABLES, MESSAGES_TABLE]) {
+  const tables = getHydratedTables();
+  for (const table of tables) {
     const l = local[table] ?? 0;
     const r = remote[table] ?? 0;
     if (l !== r) mismatches.push(`${table}: local=${l}, remote=${r}`);
+  }
+  if (isMessagesHydrated()) {
+    const l = local[MESSAGES_TABLE] ?? 0;
+    const r = remote[MESSAGES_TABLE] ?? 0;
+    if (l !== r) mismatches.push(`${MESSAGES_TABLE}: local=${l}, remote=${r}`);
   }
 
   return { ok: mismatches.length === 0 && health.ok, local, remote, mismatches };
 }
 
-/** Remove persisted browser cache so next load comes from Supabase */
 export function clearLocalPersistedData() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEY);
 }
 
-/**
- * Full migration: push → verify → clear localStorage → hydrate from remote.
- * Returns reload hint when successful.
- */
 export async function completeMigrationToSupabase(): Promise<{
   ok: boolean;
   error?: string;
   verify?: VerifyResult;
   needsReload?: boolean;
 }> {
+  await ensureAllTablesLoaded();
   const push = await pushSnapshotToSupabase({ force: true });
   if (!push.ok) return { ok: false, error: push.error };
 
@@ -251,6 +545,8 @@ export async function completeMigrationToSupabase(): Promise<{
 
   updateBaselineCounts(countBackupRows(useStore.getState().exportBackup()));
   clearLocalPersistedData();
+  clearRouteCache();
+  resetShellHydrateGuard();
   await hydrateFromSupabase();
   return { ok: true, verify, needsReload: true };
 }

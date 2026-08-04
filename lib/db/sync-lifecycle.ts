@@ -7,14 +7,21 @@ export type HydrationState = {
   phase: HydrationPhase;
   error: string | null;
   baselineCounts: Partial<Record<SyncArrayTable, number>>;
+  hydratedTables: SyncArrayTable[];
+  messagesHydrated: boolean;
 };
 
 const listeners = new Set<(state: HydrationState) => void>();
+
+const hydratedTables = new Set<SyncArrayTable>();
+let messagesHydrated = false;
 
 let hydrationState: HydrationState = {
   phase: 'pending',
   error: null,
   baselineCounts: {},
+  hydratedTables: [],
+  messagesHydrated: false,
 };
 
 function emit() {
@@ -24,6 +31,13 @@ function emit() {
 function setState(patch: Partial<HydrationState>) {
   hydrationState = { ...hydrationState, ...patch };
   emit();
+}
+
+function snapshotHydrated() {
+  return {
+    hydratedTables: [...hydratedTables] as SyncArrayTable[],
+    messagesHydrated,
+  };
 }
 
 export function getHydrationState(): HydrationState {
@@ -39,26 +53,67 @@ export function subscribeHydration(listener: (state: HydrationState) => void) {
 }
 
 export function markHydrationPending() {
-  setState({ phase: 'pending', error: null });
+  hydratedTables.clear();
+  messagesHydrated = false;
+  setState({
+    phase: 'pending',
+    error: null,
+    baselineCounts: {},
+    ...snapshotHydrated(),
+  });
 }
 
 export function markHydrationReady(baselineCounts: Partial<Record<SyncArrayTable, number>>) {
-  setState({ phase: 'ready', error: null, baselineCounts: { ...baselineCounts } });
+  setState({
+    phase: 'ready',
+    error: null,
+    baselineCounts: { ...baselineCounts },
+    ...snapshotHydrated(),
+  });
 }
 
 export function markHydrationFailed(error: string) {
-  setState({ phase: 'failed', error });
+  setState({ phase: 'failed', error, ...snapshotHydrated() });
 }
 
 export function updateBaselineCounts(counts: Partial<Record<SyncArrayTable, number>>) {
-  setState({ baselineCounts: { ...hydrationState.baselineCounts, ...counts } });
+  setState({
+    baselineCounts: { ...hydrationState.baselineCounts, ...counts },
+    ...snapshotHydrated(),
+  });
+}
+
+export function markTablesHydrated(tables: readonly SyncArrayTable[]) {
+  for (const table of tables) hydratedTables.add(table);
+  setState(snapshotHydrated());
+}
+
+export function markMessagesHydrated() {
+  messagesHydrated = true;
+  setState(snapshotHydrated());
+}
+
+export function isTableHydrated(table: SyncArrayTable): boolean {
+  return hydratedTables.has(table);
+}
+
+export function isMessagesHydrated(): boolean {
+  return messagesHydrated;
+}
+
+export function getHydratedTables(): SyncArrayTable[] {
+  return [...hydratedTables];
+}
+
+export function filterHydratedTables(tables: readonly SyncArrayTable[]): SyncArrayTable[] {
+  return tables.filter((t) => hydratedTables.has(t));
 }
 
 export function getBaselineCount(table: SyncArrayTable): number {
   return hydrationState.baselineCounts[table] ?? 0;
 }
 
-/** Auto-sync only runs after a successful hydrate. */
+/** Auto-sync only runs after a successful hydrate (shell or full). */
 export function isSyncAllowed(): boolean {
   if (!isRemoteDataEnabled()) return false;
   return hydrationState.phase === 'ready';

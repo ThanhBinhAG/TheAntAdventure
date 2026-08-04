@@ -258,31 +258,36 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   participant SP as StoreProvider
-  participant HY as hydrateFromSupabase
+  participant PG as PageDataGate
+  participant HY as ensurePageBootLoaded
   participant DB as lib/db/supabase
   participant SB as Supabase
   participant Z as Zustand store
   participant HL as sync-lifecycle
   participant AS as AutoSyncListener
-  SP->>HY: app start
-  HY->>DB: getAll for 28 sync tables + messages
-  DB->>SB: browser Supabase queries
+  SP->>HL: markHydrationPending only
+  PG->>HY: PAGE_BOOT_TABLES for route slug
+  HY->>HY: sessionStorage route cache if covers boot
+  HY->>DB: boot tables network or delayed revalidate
+  DB->>SB: PostgREST selects
   SB-->>HY: rows
-  HY->>Z: importBackup + seed merges (auto-sync suppressed)
-  HY->>HL: mark ready + baseline row counts
+  HY->>Z: importBackup boot slice
+  HY->>HL: mark ready plus hydratedTables
+  PG->>PG: scheduleSidebarIdleLoad tasks tour_drafts
   Z-->>AS: subsequent state mutation
   AS->>AS: debounce 2.5 seconds
-  AS->>DB: upsert changed table(s)
+  AS->>DB: upsert only hydrated table(s)
   DB->>SB: upsert + guarded mirror deletion
 ```
 
 Important implementation nodes:
 
-- `lib/db/sync-config.ts` maps 28 table names to `BackupData`/Zustand keys and declares FK-safe write waves.
-- `lib/db/mappers.ts` transforms domain models ↔ SQL rows.
-- `lib/db/sync-lifecycle.ts` blocks automatic writes until a successful hydrate records baseline counts; a failed hydrate permits only an explicitly confirmed manual push.
+- `lib/db/sync-config.ts` maps 28 table names to `BackupData`/Zustand keys, declares `PAGE_BOOT_TABLES` (per-route boot), `SIDEBAR_IDLE_TABLES`, `PROFILE_LAZY_TABLES`, and FK-safe write waves.
+- `lib/db/route-cache.ts` — sessionStorage route snapshot (5 min TTL); background revalidate only after 60s or on tab visible.
+- `lib/db/mappers.ts` transforms domain models ↔ SQL rows.- `lib/db/sync-lifecycle.ts` tracks `hydratedTables` / messages; blocks automatic writes until boot ready; auto-sync must not push unhydrated tables.
 - `lib/db/sync-policy.ts` makes `products` and `product_pricing` upsert-only. Other synchronized tables skip orphan deletion when the local row count is below 90% of the hydrated baseline; `force` can bypass that guard for mirror tables.
-- `lib/db/supabase.ts` still reads and writes many full tables (`select('*')`) and can delete remote IDs absent from a local snapshot when the guard permits it. Nested booking, hotel, product and attraction associations are replaced per parent during sync.
+- `lib/db/supabase.ts` reads nested associations via PostgREST embeds (one request per parent table) and can delete remote IDs absent from a local snapshot when the guard permits it. Nested booking, hotel, product and attraction associations are replaced per parent during sync.
+- `components/PageDataGate.tsx` boots route tables; `CustomerProfileModal` lazy-loads `comms` + `bookings`.
 
 ### Sales to proposal to booking
 

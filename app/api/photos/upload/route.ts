@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { getAuthContext } from '@/lib/auth/session';
 import { getPhotoStorageClient, uploadGalleryPhotoServer } from '@/lib/storage/upload-gallery-photo-server';
 import { UNSORTED_FOLDER_ID } from '@/lib/gallery/photo-folders';
+import { ALLOWED_IMAGE_MIME, MAX_INPUT_BYTES, MAX_INPUT_ERROR } from '@/lib/storage/photo-limits';
 
-const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const MAX_INPUT_BYTES = 10 * 1024 * 1024;
+const ALLOWED_MIME = new Set<string>(ALLOWED_IMAGE_MIME);
 
 const metaSchema = z.object({
   photoId: z.string().min(1).max(64),
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Only JPEG, PNG, and WebP are supported' }, { status: 400 });
   }
   if (file.size > MAX_INPUT_BYTES) {
-    return NextResponse.json({ ok: false, error: 'Image must be 10 MB or smaller' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: MAX_INPUT_ERROR }, { status: 400 });
   }
 
   let tags: string[] = [];

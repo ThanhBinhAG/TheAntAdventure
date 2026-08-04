@@ -310,11 +310,11 @@ If Tour Product photos vanish on refresh with `new row violates row-level securi
 | Library thumbnail | `gallery/{photoId}/thumb.webp` |
 | Guide avatar | `guides/{guideId}/avatar.webp` |
 
-Bucket: **`photos`** (public). Max file size after Sharp compression: 5 MB (bucket limit).
+Bucket: **`photos`** (public). Max **input** upload: **50 MB** (hard ceiling). After Sharp compression, stored WebP variants are typically well under the bucket’s **5 MB** file-size limit.
 
 ### Upload via app
 
-Gallery → **Upload photos** sends the file to `POST /api/photos/upload`. The server uses **Sharp** to create WebP thumb (≤400px) + display (≤1280px), uploads both to Storage, and upserts the `photos` row (+ `photo_tags`).
+Gallery → **Upload photos** sends the file to `POST /api/photos/upload`. The server uses **Sharp** to create WebP thumb (≤400px) + display (≤1280px) — including inputs larger than 10 MB up to the 50 MB ceiling — then uploads both to Storage and upserts the `photos` row (+ `photo_tags`).
 
 Tour Products attach photos via **Photo Library picker** → `product_photos` (not ownership on the photo row).
 

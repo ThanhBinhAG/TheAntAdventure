@@ -353,31 +353,22 @@ async function syncBookings(rows: Row[], options: SyncTableOptions = {}): Promis
 async function getTaggedRows(handler: TableHandler): Promise<Row[]> {
   const client = supabase();
   if (!client) return [];
+  if (!handler.tagTable) return getSimpleRows(handler);
 
-  const { data: base, error } = await client.from(handler.table).select('*');
+  // Single PostgREST embed instead of base + tags selects.
+  // Dynamic embed string is not parseable by supabase-js typings — cast result.
+  const { data, error } = await client
+    .from(handler.table)
+    .select(`*, ${handler.tagTable}(*)` as '*');
   if (error) throw error;
-  if (!base?.length) return [];
+  if (!data?.length) return [];
 
-  const ids = base.map((r) => String((r as unknown as Row)[handler.pk]));
-  const tagsByParent = new Map<string, string[]>();
-
-  if (handler.tagTable && handler.tagParentKey) {
-    const { data: tags, error: tagErr } = await client
-      .from(handler.tagTable)
-      .select('*')
-      .in(handler.tagParentKey, ids);
-    if (tagErr) throw tagErr;
-    for (const t of tags ?? []) {
-      const parentId = String((t as unknown as Row)[handler.tagParentKey!]);
-      if (!tagsByParent.has(parentId)) tagsByParent.set(parentId, []);
-      tagsByParent.get(parentId)!.push(String((t as unknown as Row).tag));
-    }
-  }
-
-  return base.map((r) => {
-    const row = r as Row;
-    const id = String(row[handler.pk]);
-    return handler.fromRow(row, tagsByParent.get(id) ?? []);
+  return (data as unknown as Row[]).map((raw) => {
+    const row = { ...raw };
+    const nested = row[handler.tagTable!] as Row[] | undefined;
+    delete row[handler.tagTable!];
+    const tags = (nested ?? []).map((t) => String(t.tag));
+    return handler.fromRow(row, tags);
   });
 }
 
@@ -393,14 +384,20 @@ async function getHotels(): Promise<Hotel[]> {
   const client = supabase();
   if (!client) return [];
 
-  const [hotelRes, roomRes] = await Promise.all([
-    client.from('hotels').select('*'),
-    client.from('hotel_rooms').select('*'),
-  ]);
-  if (hotelRes.error) throw hotelRes.error;
-  if (roomRes.error) throw roomRes.error;
+  const { data, error } = await client.from('hotels').select('*, hotel_rooms(*)');
+  if (error) throw error;
 
-  return assembleHotels((hotelRes.data ?? []) as Row[], (roomRes.data ?? []) as Row[]) as unknown as Hotel[];
+  const hotelRows: Row[] = [];
+  const roomRows: Row[] = [];
+  for (const raw of (data ?? []) as Row[]) {
+    const rooms = (raw.hotel_rooms as Row[] | undefined) ?? [];
+    const { hotel_rooms: _rooms, ...hotel } = raw;
+    void _rooms;
+    hotelRows.push(hotel);
+    roomRows.push(...rooms);
+  }
+
+  return assembleHotels(hotelRows, roomRows) as unknown as Hotel[];
 }
 
 async function syncHotelRooms(hotel: Hotel) {
@@ -450,17 +447,20 @@ async function getProducts(): Promise<Product[]> {
   const client = supabase();
   if (!client) return [];
 
-  const [prodRes, linkRes] = await Promise.all([
-    client.from('products').select('*'),
-    client.from('product_photos').select('*'),
-  ]);
-  if (prodRes.error) throw prodRes.error;
-  if (linkRes.error) throw linkRes.error;
+  const { data, error } = await client.from('products').select('*, product_photos(*)');
+  if (error) throw error;
 
-  return assembleProducts(
-    (prodRes.data ?? []) as Row[],
-    (linkRes.data ?? []) as Row[]
-  ) as unknown as Product[];
+  const baseRows: Row[] = [];
+  const linkRows: Row[] = [];
+  for (const raw of (data ?? []) as Row[]) {
+    const links = (raw.product_photos as Row[] | undefined) ?? [];
+    const { product_photos: _links, ...base } = raw;
+    void _links;
+    baseRows.push(base);
+    linkRows.push(...links);
+  }
+
+  return assembleProducts(baseRows, linkRows) as unknown as Product[];
 }
 
 async function syncProducts(rows: Row[], options: SyncTableOptions = {}): Promise<SyncTableResult> {
@@ -515,17 +515,20 @@ async function getAttractions(): Promise<Attraction[]> {
   const client = supabase();
   if (!client) return [];
 
-  const [attRes, linkRes] = await Promise.all([
-    client.from('attractions').select('*'),
-    client.from('attraction_photos').select('*'),
-  ]);
-  if (attRes.error) throw attRes.error;
-  if (linkRes.error) throw linkRes.error;
+  const { data, error } = await client.from('attractions').select('*, attraction_photos(*)');
+  if (error) throw error;
 
-  return assembleAttractions(
-    (attRes.data ?? []) as Row[],
-    (linkRes.data ?? []) as Row[]
-  ) as unknown as Attraction[];
+  const baseRows: Row[] = [];
+  const linkRows: Row[] = [];
+  for (const raw of (data ?? []) as Row[]) {
+    const links = (raw.attraction_photos as Row[] | undefined) ?? [];
+    const { attraction_photos: _links, ...base } = raw;
+    void _links;
+    baseRows.push(base);
+    linkRows.push(...links);
+  }
+
+  return assembleAttractions(baseRows, linkRows) as unknown as Attraction[];
 }
 
 async function syncAttractions(rows: Row[], options: SyncTableOptions = {}): Promise<SyncTableResult> {
@@ -593,20 +596,31 @@ async function getBookings(): Promise<Booking[]> {
   const client = supabase();
   if (!client) return [];
 
-  const [bookRes, itinRes, actRes] = await Promise.all([
-    client.from('bookings').select('*'),
-    client.from('booking_itinerary').select('*'),
-    client.from('booking_activities').select('*'),
-  ]);
-  if (bookRes.error) throw bookRes.error;
-  if (itinRes.error) throw itinRes.error;
-  if (actRes.error) throw actRes.error;
+  const { data, error } = await client
+    .from('bookings')
+    .select('*, booking_itinerary(*, booking_activities(*))');
+  if (error) throw error;
 
-  return assembleBookings(
-    (bookRes.data ?? []) as Row[],
-    (itinRes.data ?? []) as Row[],
-    (actRes.data ?? []) as Row[]
-  );
+  const bookingRows: Row[] = [];
+  const itineraryRows: Row[] = [];
+  const activityRows: Row[] = [];
+
+  for (const raw of (data ?? []) as Row[]) {
+    const days = (raw.booking_itinerary as Row[] | undefined) ?? [];
+    const { booking_itinerary: _itin, ...booking } = raw;
+    void _itin;
+    bookingRows.push(booking);
+
+    for (const day of days) {
+      const activities = (day.booking_activities as Row[] | undefined) ?? [];
+      const { booking_activities: _acts, ...itin } = day;
+      void _acts;
+      itineraryRows.push(itin);
+      activityRows.push(...activities);
+    }
+  }
+
+  return assembleBookings(bookingRows, itineraryRows, activityRows);
 }
 
 function makeTableApi(table: SyncArrayTable) {
@@ -736,17 +750,22 @@ export const db = {
       const client = supabase();
       if (!client) return null;
 
-      const [msgRes, rxRes] = await Promise.all([
-        client.from('chat_messages').select('*'),
-        client.from('chat_reactions').select('*'),
-      ]);
-      if (msgRes.error) throw msgRes.error;
-      if (rxRes.error) throw rxRes.error;
+      const { data, error } = await client
+        .from('chat_messages')
+        .select('*, chat_reactions(*)');
+      if (error) throw error;
 
-      const messages = messagesFromRows(
-        (msgRes.data ?? []) as Row[],
-        (rxRes.data ?? []) as Row[]
-      );
+      const msgRows: Row[] = [];
+      const rxRows: Row[] = [];
+      for (const raw of (data ?? []) as Row[]) {
+        const reactions = (raw.chat_reactions as Row[] | undefined) ?? [];
+        const { chat_reactions: _rx, ...msg } = raw;
+        void _rx;
+        msgRows.push(msg);
+        rxRows.push(...reactions);
+      }
+
+      const messages = messagesFromRows(msgRows, rxRows);
       return Object.keys(messages).length ? messages : null;
     },
     upsert: syncMessages,

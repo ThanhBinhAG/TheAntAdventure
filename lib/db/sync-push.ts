@@ -1,7 +1,14 @@
 import { isRemoteDataEnabled, isSupabaseReadOnly } from '../env';
 import { useStore } from '../store';
 import type { BackupData } from '../types';
-import { isManualPushAllowed, isSyncAllowed, updateBaselineCounts } from './sync-lifecycle';
+import {
+  filterHydratedTables,
+  getHydratedTables,
+  isManualPushAllowed,
+  isMessagesHydrated,
+  isSyncAllowed,
+  updateBaselineCounts,
+} from './sync-lifecycle';
 import type { SyncTableOptions } from './sync-policy';
 import {
   countBackupRows,
@@ -64,7 +71,14 @@ export async function pushTablesToSupabase(
 
   try {
     const backup = useStore.getState().exportBackup();
-    const waves = resolveWaves(tables);
+    // Never push unhydrated tables (empty local arrays would wipe remote).
+    const target =
+      tables !== undefined ? filterHydratedTables(tables) : getHydratedTables();
+    if (!target.length && !(includeMessages && isMessagesHydrated())) {
+      return { ok: false, error: 'No hydrated tables to push' };
+    }
+
+    const waves = resolveWaves(target);
     const syncOptions: SyncTableOptions = { force: options.force };
     const warnings: string[] = [];
 
@@ -78,7 +92,7 @@ export async function pushTablesToSupabase(
       void results;
     }
 
-    if (includeMessages && Object.keys(backup.messages ?? {}).length) {
+    if (includeMessages && isMessagesHydrated() && Object.keys(backup.messages ?? {}).length) {
       const msgResult = await supabaseDb.messages.upsert(backup.messages, syncOptions);
       if (msgResult.skippedOrphanDelete && msgResult.warning) warnings.push(msgResult.warning);
     }
@@ -93,6 +107,7 @@ export async function pushTablesToSupabase(
   }
 }
 
+/** Push only currently hydrated tables (+ messages if loaded). Call ensureAllTablesLoaded first for a full snapshot. */
 export async function pushSnapshotToSupabase(options: PushOptions = {}) {
   return pushTablesToSupabase(undefined, true, options);
 }

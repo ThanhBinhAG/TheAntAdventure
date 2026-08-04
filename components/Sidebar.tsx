@@ -110,7 +110,9 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
     }
   }
 
+  // Unread badge: 0 until messages idle-load / Team Chat hydrate (not part of shell boot).
   const chatUnread = useMemo(() => {
+    if (!messages || typeof messages !== 'object') return 0;
     let count = 0;
     Object.values(messages).forEach((ch) => {
       count += Array.isArray(ch) ? ch.length : 0;

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AutoSyncListener } from '@/components/AutoSyncListener';
-import { appLog } from '@/lib/system/app-logger';
 import {
   getAutoSyncState,
   subscribeAutoSync,
@@ -12,18 +11,19 @@ import {
   checkSupabaseConnection,
   clearLocalPersistedData,
   completeMigrationToSupabase,
+  ensureAllTablesLoaded,
   getHydrationState,
-  hydrateFromSupabase,
+  hydrateShellFromSupabase,
   isRemoteDataEnabled,
   pushSnapshotToSupabase,
-  quickSupabasePing,
+  resetShellHydrateGuard,
   subscribeHydration,
   verifyLocalMatchesRemote,
   type ConnectionStatus,
   type HydrationState,
   type VerifyResult,
 } from '@/lib/db/hydrate';
-import { markHydrationFailed, updateBaselineCounts } from '@/lib/db/sync-lifecycle';
+import { markHydrationFailed, markHydrationPending, updateBaselineCounts } from '@/lib/db/sync-lifecycle';
 import { countBackupRows } from '@/lib/db/sync-config';
 import { isAutoSyncEnabled, isSupabaseReadOnly } from '@/lib/env';
 import { useStore } from '@/lib/store';
@@ -47,7 +47,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const readOnly = isSupabaseReadOnly();
 
   useEffect(() => subscribeAutoSync(setAutoSync), []);
-  useEffect(() => subscribeHydration(setHydration), []);
+  useEffect(
+    () =>
+      subscribeHydration((state) => {
+        setHydration(state);
+        if (state.phase === 'ready') {
+          setRemote(true);
+          useStore.getState().rolloverIncompleteTasks();
+        }
+      }),
+    []
+  );
 
   useEffect(() => {
     clearLocalPersistedData();
@@ -55,6 +65,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       markHydrationFailed(
         'Supabase bắt buộc — bật NEXT_PUBLIC_USE_SUPABASE=true và cấu hình URL + anon key trong .env.local'
       );
+    } else {
+      markHydrationPending();
     }
   }, [remoteEnabled]);
 
@@ -68,67 +80,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const runHydrate = useCallback(async () => {
     if (!remoteEnabled) return false;
-    const ok = await hydrateFromSupabase();
+    resetShellHydrateGuard();
+    const ok = await hydrateShellFromSupabase();
     if (ok) useStore.getState().rolloverIncompleteTasks();
     setRemote(ok);
-    const status = await quickSupabasePing();
-    setConn(status);
+    await runConnectionCheck();
     return ok;
-  }, [remoteEnabled]);
+  }, [remoteEnabled, runConnectionCheck]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function initSupabase() {
-      if (!remoteEnabled) return;
-
-      try {
-        // Hydrate vẫn lấy dữ liệu thật từ Supabase như trước.
-        const ok = await hydrateFromSupabase();
-
-        if (cancelled) return;
-
-        if (ok) {
-          useStore.getState().rolloverIncompleteTasks();
-        }
-
-        setRemote(ok);
-
-        // Ping chỉ chạy sau khi hydrate hoàn tất.
-        const status = await quickSupabasePing();
-
-        if (!cancelled) {
-          setConn(status);
-        }
-      } catch (error) {
-        appLog('store-provider', 'Supabase background init failed', {
-          level: 'warn',
-          error,
-        });
-
-        if (!cancelled) {
-          setConn({
-            ok: false,
-            latencyMs: 0,
-            tables: {},
-            error: error instanceof Error ? error.message : 'Connection failed',
-          });
-        }
-      }
-    }
-
-    // Ưu tiên hiển thị Sidebar và trang hiện tại trước.
-    // Sau 400ms mới bắt đầu tải toàn bộ dữ liệu CRM ở nền.
-    const timerId = window.setTimeout(() => {
-      void initSupabase();
-    }, 400);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timerId);
-    };
-  }, [remoteEnabled]);
-
+  // Route-first boot: PageDataGate calls ensurePageBootLoaded per route — no global fetch here.
   async function handleSync(force = false) {
     if (force) {
       const backup = useStore.getState().exportBackup();
@@ -139,6 +99,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         .join('\n');
       const ok = await confirmDialog(
         'Push toàn bộ snapshot lên Supabase?\n\n' +
+        'Sẽ tải đủ mọi bảng chưa hydrate trước khi push.\n' +
         'Catalogue (products) chỉ upsert — không xóa orphan.\n' +
         'Các bảng khác có thể mirror nếu bạn chọn force.\n\n' +
         (summary || '(empty)') +
@@ -153,6 +114,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
 
     setSyncing(true);
+    // Full push must not wipe remote with empty unhydrated arrays.
+    await ensureAllTablesLoaded();
     const result = await pushSnapshotToSupabase({ force });
     setSyncing(false);
     if (result.ok) {

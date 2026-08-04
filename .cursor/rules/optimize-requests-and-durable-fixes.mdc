@@ -1,0 +1,40 @@
+---
+description: Optimize page requests, edge cases, and durable fixes when coding
+alwaysApply: true
+---
+
+# Request optimization, edge cases, durable fixes
+
+When implementing or fixing code, treat these as **default obligations** — not optional polish.
+
+## 1. Page request budget
+
+Before finishing, ask: *what does this route actually need to paint?*
+
+1. **Separate shell vs data** — Next.js bundles (~20–25 dev requests) ≠ Supabase/API calls. Optimize data fetches separately; do not conflate with framework assets.
+2. **Fetch only what the UI uses now** — Prefer route-scoped boot ([`PAGE_BOOT_TABLES`](../lib/db/sync-config.ts)), lazy/modal/on-tab loads, and idle/deferred work (`requestIdleCallback`) over global prefetch.
+3. **Avoid duplicate work** — No double-fetch on cache hit, Strict Mode remount, or boot + page + ping for the same table. Dedupe in-flight promises.
+4. **Call out trade-offs** — If a change adds requests, state why and whether deferral/lazy-load is viable.
+
+## 2. Edge cases and failure modes
+
+For every behavior change, briefly consider:
+
+- **Empty / slow / offline** — loading states, timeouts, stale cache, partial hydrate.
+- **Auth & permissions** — unauthenticated, read-only, missing row, wrong tenant.
+- **Concurrency** — navigate away mid-fetch, rapid tab switch, F5 during pending hydrate.
+- **Data integrity** — auto-sync pushing unhydrated tables, orphan deletes, race with user edits.
+- **Regression surface** — other routes reusing the same hook/provider/API.
+
+Prefer fixing root cause over silent swallow; document non-obvious guards in code only when logic is not self-evident.
+
+## 3. Long-term fixes over patches
+
+When multiple fixes exist, prefer the approach that:
+
+1. **Aligns with existing patterns** — extend `hydrate.ts`, `sync-config`, `PageDataGate`, etc.; smallest diff that solves the class of problem.
+2. **Scales to new routes** — config/maps over one-off `if (page === 'customers')` scattered in UI.
+3. **Stays maintainable** — no new deps unless justified; reuse stack (Next.js 14, Supabase, Zustand).
+4. **Leaves observability** — update tests for boot maps/cache/lifecycle; note user-visible behavior in `Personal/CHANGELOG.md` when applicable.
+
+**Avoid:** global shell prefetch “because it's easy”, immediate background revalidate on every cache hit, boot-time pings duplicating hydrate, and one-line hacks that hide the next route's bug.

@@ -2,8 +2,10 @@
 # Supabase CLI helpers — load SUPABASE_DB_URL from .env.local and run db commands.
 # Usage:
 #   bash scripts/supabase-db.sh push
+#   bash scripts/supabase-db.sh push-local
 #   bash scripts/supabase-db.sh pull
 #   bash scripts/supabase-db.sh status
+#   bash scripts/supabase-db.sh status-local
 #   bash scripts/supabase-db.sh repair-applied 20260101000000
 #   bash scripts/supabase-db.sh link --project-ref YOUR_REF
 set -euo pipefail
@@ -41,6 +43,9 @@ case "$cmd" in
     require_db_url
     run_cli db push --db-url "$SUPABASE_DB_URL" "$@"
     ;;
+  push-local)
+    run_cli db push --local "$@"
+    ;;
   pull)
     require_db_url
     run_cli db pull "$@" --db-url "$SUPABASE_DB_URL"
@@ -51,6 +56,9 @@ case "$cmd" in
     else
       run_cli migration list "$@"
     fi
+    ;;
+  status-local)
+    run_cli migration list --local "$@"
     ;;
   repair-applied)
     require_db_url
@@ -87,16 +95,21 @@ case "$cmd" in
 Supabase DB helper
 
 Commands:
-  push                 Apply pending migrations (needs SUPABASE_DB_URL)
+  push                 Apply pending migrations to remote (needs SUPABASE_DB_URL)
+  push-local           Apply pending migrations to local Docker (`supabase start`)
   pull [name]          Pull remote schema into a new migration file
-  status               List local vs remote migration history
+  status               List migration history vs remote (needs SUPABASE_DB_URL)
+  status-local         List migration history on local Docker
   repair-applied TS    Mark migration TIMESTAMP as applied on remote
   bootstrap-existing   Repair baseline 20260101000000 on existing DB
   link [flags]         supabase link (Supabase Cloud or self-hosted project ref)
   login                supabase login (Supabase Cloud access token)
   new NAME             Create supabase/migrations/<timestamp>_NAME.sql
 
-Set in .env.local:
+Dev (local Docker): use push-local / status-local — no SUPABASE_DB_URL required.
+Remote (customer): set SUPABASE_DB_URL in .env.local or .env.remote.local then push/status.
+
+Set for remote:
   SUPABASE_DB_URL=postgresql://postgres:PASSWORD@HOST:5432/postgres
   SUPABASE_PROJECT_REF=...   (optional, for supabase link)
 EOF

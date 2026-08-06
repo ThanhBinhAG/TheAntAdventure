@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Drawer tạo permission mới.
+ * Drawer quản lý catalog permission và nhóm permission.
  *
  * Chỉ Super Admin mới mở được từ UI, nhưng quyền thực tế vẫn được Supabase RPC
  * kiểm tra lại. Không tin cậy điều kiện hiển thị ở trình duyệt.
@@ -59,7 +59,7 @@ export default function PermissionCreateDrawer({
 
     return (
         <Drawer
-            title="Thêm chức năng"
+            title="Thêm quyền / nhóm quyền"
             open={open}
             width={480}
             destroyOnHidden
@@ -176,7 +176,7 @@ export default function PermissionCreateDrawer({
                         htmlType="submit"
                         loading={saving}
                     >
-                        Tạo chức năng
+                        Tạo quyền
                     </Button>
                 </div>
             </Form>

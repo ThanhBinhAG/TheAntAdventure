@@ -18,6 +18,7 @@ import {
     useMemo,
     useState,
 } from 'react';
+import useSWR from 'swr';
 import {
     Alert,
     Button,
@@ -25,20 +26,21 @@ import {
     Descriptions,
     Drawer,
     Select,
+    Skeleton,
     Tag,
 } from 'antd';
-import type {
-    AccessControlAssignableRole,
-    AccessControlPermission,
-    AccessControlUser,
-    ManagedRoleCode,
+import {
+    fetchAccessControlData,
+    type AccessControlAssignableRole,
+    type AccessControlPermission,
+    type AccessControlUser,
+    type ManagedRoleCode,
 } from './access-control-api';
 import styles from './AccessControlPage.module.css';
 
 type UserAccessDrawerProps = {
     user: AccessControlUser | null;
     roles: AccessControlAssignableRole[];
-    permissions: AccessControlPermission[];
     saving: boolean;
     onClose: () => void;
     onSave: (
@@ -46,6 +48,9 @@ type UserAccessDrawerProps = {
         roleCode: ManagedRoleCode,
     ) => Promise<void>;
 };
+
+/** Mảng rỗng dùng chung để useMemo không nhận một `[]` mới mỗi lần render. */
+const EMPTY_PERMISSIONS: AccessControlPermission[] = [];
 
 /** Đổi tên nhóm kỹ thuật thành tên dễ hiểu trên giao diện. */
 function getPermissionGroupLabel(permissionCode: string): string {
@@ -70,7 +75,6 @@ function getPermissionGroupLabel(permissionCode: string): string {
 export default function UserAccessDrawer({
     user,
     roles,
-    permissions,
     saving,
     onClose,
     onSave,
@@ -94,6 +98,39 @@ export default function UserAccessDrawer({
     /** Role có wildcard (*) là toàn quyền, không cần liệt kê từng quyền. */
     const hasFullAccess =
         selectedRoleInfo?.permission_codes.includes('*') ?? false;
+
+    /**
+     * Chỉ tải catalog khi Drawer đang mở cho role không dùng wildcard (*).
+     *
+     * Dùng chung SWR key với tab Role & quyền. Nếu tab đó đã tải catalog,
+     * Drawer dùng ngay cache RAM thay vì gọi thêm API.
+     */
+    const {
+        data: permissionCatalogData,
+        error: permissionCatalogError,
+        isLoading: loadingPermissions,
+        mutate: reloadPermissions,
+    } = useSWR(
+        user && !hasFullAccess
+            ? 'access-control/roles-permissions'
+            : null,
+        fetchAccessControlData,
+        {
+            dedupingInterval: 60_000,
+            revalidateOnFocus: false,
+            revalidateOnReconnect: true,
+        },
+    );
+
+    const permissions =
+        permissionCatalogData?.permissions ?? EMPTY_PERMISSIONS;
+
+    const permissionsError =
+        permissionCatalogError instanceof Error
+            ? permissionCatalogError.message
+            : permissionCatalogError
+                ? 'Không thể tải mô tả quyền.'
+                : null;
 
     /**
      * Không gửi request nếu role không đổi hoặc role đang ngừng dùng.
@@ -220,6 +257,23 @@ export default function UserAccessDrawer({
                             showIcon
                             message="Admin có toàn quyền hệ thống"
                             description="Role này dùng permission wildcard (*), vì vậy có thể truy cập và quản lý toàn bộ chức năng."
+                        />
+                    ) : loadingPermissions ? (
+                        <Skeleton active paragraph={{ rows: 6 }} />
+                    ) : permissionsError ? (
+                        <Alert
+                            type="error"
+                            showIcon
+                            message="Không thể tải danh sách quyền"
+                            description={permissionsError}
+                            action={
+                                <Button
+                                    size="small"
+                                    onClick={() => void reloadPermissions()}
+                                >
+                                    Thử lại
+                                </Button>
+                            }
                         />
                     ) : (
                         <section className={styles.effectivePermissions}>

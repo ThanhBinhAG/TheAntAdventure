@@ -1,87 +1,46 @@
 'use client';
 
 /**
- * Trang Quản lý người dùng & phân quyền.
+ * Trang Quản lý người dùng và phân quyền.
  *
  * Chức năng:
- * - Lấy role và permission từ GET /api/access-control.
- * - Lấy danh sách user phân trang từ /api/access-control/users.
- * - Lấy lịch sử thay đổi từ /api/access-control/audit-logs.
- * - Gửi yêu cầu đổi role hoặc cập nhật permission.
+ * - Tab Người dùng chỉ tải users và role có thể gán.
+ * - Tab Role & quyền mới tải catalog permission khi được mở.
+ * - Tab Lịch sử chỉ tải audit log khi được mở.
+ *
+ * Mục đích:
+ * - Không tải dữ liệu chưa cần dùng khi mới vào Access Control.
+ * - Mỗi tab tự chịu trách nhiệm tải dữ liệu của chính nó.
  */
 
-import { useCallback, useState } from 'react';
-import useSWR from 'swr';
+import { useState } from 'react';
 import {
     HistoryOutlined,
     SafetyCertificateOutlined,
     TeamOutlined,
 } from '@ant-design/icons';
-import {
-    Tabs,
-} from 'antd';
+import { Tabs } from 'antd';
 import AccessControlUiProvider from './AccessControlUiProvider';
 import UserDirectory from './UserDirectory';
-import {
-    fetchAccessControlData,
-} from './access-control-api';
 import styles from './AccessControlPage.module.css';
 import RolesPermissionsTab from './RolesPermissionsTab';
 import AuditLogsTab from './AuditLogsTab';
 
 export default function AccessControlPage() {
-
-    /**
- * SWR lưu dữ liệu trong RAM của trình duyệt.
- *
- * - Không lưu role/permission vào localStorage.
- * - Trong 60 giây, tránh gọi trùng API khi component render lại.
- * - Khi quay lại tab trình duyệt, SWR sẽ kiểm tra dữ liệu mới.
- */
-    /**
- * Chỉ mở component lịch sử khi người quản trị thật sự bấm tab.
- * Tránh gọi API audit-logs ngay khi mới vào Access Control.
- */
+    // Chỉ mount tab nặng sau lần người dùng thật sự mở nó.
+    const [hasOpenedRoles, setHasOpenedRoles] = useState(false);
     const [hasOpenedAuditLogs, setHasOpenedAuditLogs] = useState(false);
-
-    const {
-        data,
-        error,
-        isLoading,
-        mutate,
-    } = useSWR(
-        'access-control/roles-permissions',
-        fetchAccessControlData,
-        {
-            // Dữ liệu chỉ tải lại sau thao tác lưu hoặc khi bấm nút tải lại.
-            // Không gọi API lại chỉ vì người dùng quay về tab trình duyệt.
-            dedupingInterval: 60_000,
-            revalidateOnFocus: false,
-            focusThrottleInterval: 30_000,
-            revalidateOnReconnect: true,
-        },
-    );
-
-    /** Ép SWR tải lại dữ liệu sau khi Super Admin vừa lưu permission. */
-    const reloadData = useCallback(async (): Promise<void> => {
-        await mutate();
-    }, [mutate]);
-
-    /** Đổi lỗi kỹ thuật thành text để giao diện hiển thị an toàn. */
-    const errorMessage =
-        error instanceof Error
-            ? error.message
-            : error
-                ? 'Không thể tải dữ liệu phân quyền.'
-                : null;
 
     return (
         <AccessControlUiProvider>
             <div className={styles.page}>
-
                 <section className={styles.content}>
                     <Tabs
                         onChange={(activeKey) => {
+                            if (activeKey === 'roles') {
+                                setHasOpenedRoles(true);
+                            }
+
                             if (activeKey === 'audit-logs') {
                                 setHasOpenedAuditLogs(true);
                             }
@@ -95,12 +54,7 @@ export default function AccessControlPage() {
                                         Người dùng
                                     </span>
                                 ),
-                                children: (
-                                    <UserDirectory
-                                        baseRoles={data?.roles ?? []}
-                                        permissions={data?.permissions ?? []}
-                                    />
-                                ),
+                                children: <UserDirectory />,
                             },
                             {
                                 key: 'roles',
@@ -110,16 +64,9 @@ export default function AccessControlPage() {
                                         Role & quyền
                                     </span>
                                 ),
-                                children: (
-                                    <RolesPermissionsTab
-                                        permissions={data?.permissions ?? []}
-                                        loadingPermissions={isLoading}
-                                        permissionsError={errorMessage}
-                                        onRetryPermissions={reloadData}
-                                        canCreatePermission={data?.canCreatePermission ?? false}
-                                        onPermissionsChanged={reloadData}
-                                    />
-                                ),
+                                children: hasOpenedRoles
+                                    ? <RolesPermissionsTab />
+                                    : null,
                             },
                             {
                                 key: 'audit-logs',
@@ -129,7 +76,9 @@ export default function AccessControlPage() {
                                         Lịch sử thay đổi
                                     </span>
                                 ),
-                                children: hasOpenedAuditLogs ? <AuditLogsTab /> : null,
+                                children: hasOpenedAuditLogs
+                                    ? <AuditLogsTab />
+                                    : null,
                             },
                         ]}
                     />

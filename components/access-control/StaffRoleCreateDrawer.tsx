@@ -51,12 +51,29 @@ export default function StaffRoleCreateDrawer({
     async function handleFinish(
         values: CreateAccessControlStaffRoleInput,
     ) {
-        await onSubmit({
-            ...values,
-            code: values.code.trim(),
-            label: values.label.trim(),
-            description: values.description?.trim(),
-        });
+        try {
+            await onSubmit({
+                ...values,
+                code: values.code.trim(),
+                label: values.label.trim(),
+                description: values.description?.trim(),
+            });
+        } catch (error) {
+            /**
+             * Giữ Drawer mở và hiển thị lỗi tại đúng trường người dùng cần sửa.
+             * Ví dụ API trả 409 khi mã role đã tồn tại.
+             */
+            form.setFields([
+                {
+                    name: 'code',
+                    errors: [
+                        error instanceof Error
+                            ? error.message
+                            : 'Không thể tạo role. Vui lòng thử lại.',
+                    ],
+                },
+            ]);
+        }
     }
 
     return (
@@ -88,6 +105,9 @@ export default function StaffRoleCreateDrawer({
                                 'code',
                                 toRoleCode(event.target.value),
                             );
+                            form.setFields([
+                                { name: 'code', errors: [] },
+                            ]);
                         }}
                     />
                 </Form.Item>
@@ -107,7 +127,15 @@ export default function StaffRoleCreateDrawer({
                         },
                     ]}
                 >
-                    <Input placeholder="sales" />
+                    <Input
+                        placeholder="sales"
+                        onChange={() => {
+                            // Người dùng đã sửa mã, nên bỏ lỗi trùng cũ.
+                            form.setFields([
+                                { name: 'code', errors: [] },
+                            ]);
+                        }}
+                    />
                 </Form.Item>
 
                 <Form.Item label="Mô tả" name="description">

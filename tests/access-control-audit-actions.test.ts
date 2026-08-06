@@ -5,6 +5,14 @@ import { getAccessControlAuditActionPresentation } from '../lib/access-control/a
 describe('access-control audit action presentation', () => {
   it('shows Vietnamese labels for dynamic staff role actions', () => {
     assert.equal(
+      getAccessControlAuditActionPresentation('permission_created').label,
+      'Thêm chức năng',
+    );
+    assert.equal(
+      getAccessControlAuditActionPresentation('permission_created').color,
+      'green',
+    );
+    assert.equal(
       getAccessControlAuditActionPresentation('staff_role_created').label,
       'Tạo role',
     );

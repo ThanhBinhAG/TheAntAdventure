@@ -3,7 +3,8 @@
  *
  * Chức năng:
  * - GET: trả users, roles và permissions cho giao diện.
- * - PATCH: đổi role user hoặc thay permission của admin/employee.
+ * - PATCH: đổi role user hoặc thay permission của role nhân viên.
+ * - POST: Super Admin tạo mục permission và nhóm permission mới.
  *
  * Bảo mật:
  * - Kiểm tra users.manage tại API.
@@ -18,7 +19,11 @@ import {
     getAccessControlData,
     replaceAccessControlRolePermissions,
     setAccessControlUserRole,
+    createAccessControlPermission,
 } from '@/lib/access-control/server';
+import {
+    createAccessControlPermissionBodySchema,
+} from '@/lib/access-control/permission-input';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 
 export const dynamic = 'force-dynamic';
@@ -52,13 +57,28 @@ function errorResponse(error: unknown) {
     if (error instanceof AccessControlRpcError) {
         if (error.code === '42501') {
             return NextResponse.json(
-                { ok: false, error: 'You are not authorized to perform this action.' },//Bạn không có quyền thực hiện thao tác này.
+                { ok: false, error: error.message },
                 { status: 403 },
             );
         }
+
+        if (error.code === '22023') {
+            return NextResponse.json(
+                { ok: false, error: error.message },
+                { status: 400 },
+            );
+        }
+
+        if (error.code === '23505') {
+            return NextResponse.json(
+                { ok: false, error: 'Mã quyền này đã tồn tại.' },
+                { status: 409 },
+            );
+        }
     }
+
     return NextResponse.json(
-        { ok: false, error: 'Unable to process the authorization request.' },//Không thể xử lý yêu cầu phân quyền.
+        { ok: false, error: 'Không thể xử lý yêu cầu phân quyền.' },
         { status: 500 },
     );
 }
@@ -133,6 +153,32 @@ export async function PATCH(request: Request) {
     }
 }
 
+export async function POST(request: Request) {
+    // UI có thể bị sửa bằng DevTools, nên vẫn kiểm tra quyền ở API và RPC.
+    const permission = await checkPermissionForRequest('users.manage');
 
+    if (!permission.allowed) {
+        return NextResponse.json(
+            { ok: false, error: 'Unauthorized' },
+            { status: permission.status },
+        );
+    }
 
+    const body = await request.json().catch(() => null);
+    const parsed = createAccessControlPermissionBodySchema.safeParse(body);
 
+    if (!parsed.success) {
+        return NextResponse.json(
+            { ok: false, error: 'Dữ liệu chức năng không hợp lệ.' },
+            { status: 400 },
+        );
+    }
+
+    try {
+        await createAccessControlPermission(parsed.data);
+
+        return NextResponse.json({ ok: true }, { status: 201 });
+    } catch (error) {
+        return errorResponse(error);
+    }
+}

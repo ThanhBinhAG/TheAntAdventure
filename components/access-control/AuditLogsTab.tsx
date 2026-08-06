@@ -93,8 +93,36 @@ function getUserTarget(log: AccessControlAuditLog): string {
     );
 }
 
+/** Permission không thuộc một user cụ thể, mà thuộc danh mục quyền. */
+function getPermissionCatalogTarget(): string {
+    return 'Danh mục quyền';
+}
+
+function getCreatedPermissionLabel(
+    log: AccessControlAuditLog,
+): string {
+    return (
+        readString(log.afterValue.permission_description) ??
+        readString(log.afterValue.permission_code) ??
+        'Chức năng không xác định'
+    );
+}
+
+function getCreatedPermissionGroupLabel(
+    log: AccessControlAuditLog,
+): string {
+    return (
+        readString(log.afterValue.group_label) ??
+        readString(log.afterValue.group_code) ??
+        'Nhóm không xác định'
+    );
+}
+
 /** Lấy đối tượng thay đổi: user hoặc role tùy action audit. */
 function getAuditTarget(log: AccessControlAuditLog): string {
+    if (log.action === 'permission_created') {
+        return getPermissionCatalogTarget();
+    }
     if (
         log.action === 'role_permissions_replaced' ||
         STAFF_ROLE_ACTIONS.has(log.action)
@@ -107,6 +135,9 @@ function getAuditTarget(log: AccessControlAuditLog): string {
 
 /** Tạo câu tóm tắt ngắn phù hợp với từng action audit. */
 function getAuditSummary(log: AccessControlAuditLog): string {
+    if (log.action === 'permission_created') {
+        return `Đã thêm ${getCreatedPermissionLabel(log)} vào nhóm ${getCreatedPermissionGroupLabel(log)}.`;
+    }
     if (log.action === 'staff_role_created') {
         return `Đã tạo role ${getAuditRoleLabel(log)}.`;
     }
@@ -201,6 +232,32 @@ function AuditLogDetails({
     const isPermissionReplacement =
         log.action === 'role_permissions_replaced' ||
         log.action === 'staff_role_permissions_replaced';
+
+    if (log.action === 'permission_created') {
+        const permissionCode = readString(
+            log.afterValue.permission_code,
+        );
+
+        return (
+            <div className={styles.auditDetails}>
+                <span>
+                    Chức năng:{' '}
+                    <strong>{getCreatedPermissionLabel(log)}</strong>
+                </span>
+
+                <span>
+                    Nhóm chức năng:{' '}
+                    <strong>{getCreatedPermissionGroupLabel(log)}</strong>
+                </span>
+
+                {permissionCode && (
+                    <span>
+                        Mã quyền nội bộ: <code>{permissionCode}</code>
+                    </span>
+                )}
+            </div>
+        );
+    }
 
     if (log.action === 'user_role_changed') {
         return (

@@ -5,7 +5,6 @@
  * - Tìm theo tên/email.
  * - Lọc theo role và trạng thái.
  * - Phân trang dữ liệu ở server.
- * - Trả thêm thống kê user theo role.
  * - Tạo Auth user, profile và role ban đầu.
  *
  * Bảo mật:
@@ -17,7 +16,6 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
     AccessControlRpcError,
-    getAccessControlUserSummary,
     getAccessControlUsersPage,
     restoreAccessControlUser,
     setAccessControlUserActive,
@@ -260,22 +258,18 @@ export async function GET(request: Request) {
                 : undefined;
 
     try {
-        const [usersPage, summary] = await Promise.all([
-            getAccessControlUsersPage({
-                searchText: parsed.data.q,
-                roleCode: parsed.data.role ?? null,
-                isActive,
-                page: parsed.data.page,
-                pageSize: parsed.data.pageSize,
-            }),
-            getAccessControlUserSummary(),
-        ]);
+        const usersPage = await getAccessControlUsersPage({
+            searchText: parsed.data.q,
+            roleCode: parsed.data.role ?? null,
+            isActive,
+            page: parsed.data.page,
+            pageSize: parsed.data.pageSize,
+        });
 
         return NextResponse.json(
             {
                 ok: true,
                 ...usersPage,
-                summary,
             },
             {
                 headers: {
@@ -344,4 +338,3 @@ export async function PATCH(request: Request) {
         return errorResponse(error);
     }
 }
-

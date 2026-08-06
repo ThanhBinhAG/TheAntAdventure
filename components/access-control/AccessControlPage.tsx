@@ -116,6 +116,8 @@ export default function AccessControlPage() {
                                         loadingPermissions={isLoading}
                                         permissionsError={errorMessage}
                                         onRetryPermissions={reloadData}
+                                        canCreatePermission={data?.canCreatePermission ?? false}
+                                        onPermissionsChanged={reloadData}
                                     />
                                 ),
                             },

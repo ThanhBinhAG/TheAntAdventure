@@ -138,13 +138,6 @@
 }
 
 
-.permissionCode {
-    display: inline-block;
-    margin-top: 3px;
-    color: var(--m);
-    font-size: 10.5px;
-}
-
 .userDirectory {
     display: flex;
     flex-direction: column;
@@ -407,6 +400,13 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
+}
+
+.permissionWorkspaceActions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .permissionGroup {

@@ -20,6 +20,10 @@ const AUDIT_ACTION_PRESENTATIONS: Record<
     string,
     AccessControlAuditActionPresentation
 > = {
+    permission_created: {
+        label: 'Thêm chức năng',
+        color: 'green',
+    },
     user_role_changed: {
         label: 'Đổi role người dùng',
         color: 'blue',

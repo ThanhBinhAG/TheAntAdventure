@@ -16,6 +16,9 @@ import {
     replaceAccessControlStaffRolePermissions,
     updateAccessControlStaffRole,
 } from '@/lib/access-control/server';
+import {
+    getStaffRoleRpcErrorResponse,
+} from '@/lib/access-control/staff-role-error';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 
 export const dynamic = 'force-dynamic';
@@ -62,20 +65,15 @@ const updateBodySchema = z.discriminatedUnion('action', [
 /** Đổi lỗi RPC thành HTTP response an toàn cho frontend. */
 function errorResponse(error: unknown) {
     if (error instanceof AccessControlRpcError) {
-        if (error.code === '42501') {
-            return NextResponse.json(
-                { ok: false, error: error.message },
-                { status: 403 },
-            );
-        }
+        const response = getStaffRoleRpcErrorResponse(
+            error.code,
+            error.message,
+        );
 
-        if (
-            error.code === '22023' ||
-            error.code === '23505'
-        ) {
+        if (response) {
             return NextResponse.json(
-                { ok: false, error: error.message },
-                { status: 400 },
+                { ok: false, error: response.error },
+                { status: response.status },
             );
         }
     }

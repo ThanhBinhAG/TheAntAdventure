@@ -34,14 +34,12 @@ import {
     fetchAccessControlUsersPage,
     updateUserRole,
     type AccessControlAssignableRole,
-    type AccessControlRole,
     type AccessControlStaffRole,
     type AccessControlUser,
     type CreateAccessControlUserInput,
     type ManagedRoleCode,
     type UserListRoleFilter,
     type UserListStatusFilter,
-    type AccessControlPermission,
     updateUserDisplayName,
 } from './access-control-api';
 import styles from './AccessControlPage.module.css';
@@ -50,12 +48,6 @@ import UserEditDrawer from './UserEditDrawer';
 import UserCreateDrawer from './UserCreateDrawer';
 import useRefreshAccessControlAuditLogs from './useRefreshAccessControlAuditLogs';
 
-type UserDirectoryProps = {
-    // Dữ liệu nền hiện chỉ dùng để lấy role Admin toàn quyền.
-    // Các role nghiệp vụ như Nhân viên, Sale lấy từ API role động.
-    baseRoles: AccessControlRole[];
-    permissions: AccessControlPermission[];
-};
 
 /** Đổi dữ liệu role nghiệp vụ từ API về kiểu dùng chung của UI User. */
 function toUserRoleOption(
@@ -88,10 +80,22 @@ function roleColor(roleCode: ManagedRoleCode | null): string {
     return roleCode ? 'blue' : 'default';
 }
 
-export default function UserDirectory({
-    baseRoles,
-    permissions,
-}: UserDirectoryProps) {
+/**
+ * Admin là role hệ thống toàn quyền.
+ *
+ * Role nhân viên như Nhân viên, Sale, Điều hành vẫn lấy động từ database.
+ * Khai báo Admin tại đây giúp tab Người dùng không cần tải catalog permission
+ * chỉ để biết Admin có quyền wildcard (*).
+ */
+const SYSTEM_ADMIN_ROLE: AccessControlAssignableRole = {
+    role_code: 'admin',
+    role_label: 'Admin',
+    role_description: 'Quản trị viên có toàn quyền hệ thống.',
+    permission_codes: ['*'],
+    is_active: true,
+};
+
+export default function UserDirectory() {
     const refreshAuditLogs = useRefreshAccessControlAuditLogs();
     const [keywordInput, setKeywordInput] = useState('');
     const [keyword, setKeyword] = useState('');
@@ -125,24 +129,17 @@ export default function UserDirectory({
      * Nhân viên, Sale và các role tạo thêm lấy từ database.
      * Super Admin không nằm trong hai nguồn này nên vẫn hoàn toàn ẩn.
      */
-    const userRoleOptions = useMemo<AccessControlAssignableRole[]>(() => {
-        const adminRole = baseRoles.find(
-            (role) => role.role_code === 'admin',
-        );
-
-        const roles: AccessControlAssignableRole[] = [];
-
-        if (adminRole) {
-            roles.push({
-                ...adminRole,
-                is_active: true,
-            });
-        }
-
-        roles.push(...staffRoles.map(toUserRoleOption));
-
-        return roles;
-    }, [baseRoles, staffRoles]);
+    /**
+     * Admin là role hệ thống cố định.
+     * Các role nghiệp vụ lấy từ API staff-roles.
+     */
+    const userRoleOptions = useMemo<AccessControlAssignableRole[]>(
+        () => [
+            SYSTEM_ADMIN_ROLE,
+            ...staffRoles.map(toUserRoleOption),
+        ],
+        [staffRoles],
+    );
 
     /** Role ngừng dùng vẫn hiển thị ở user cũ, nhưng không được gán cho user mới. */
     const activeUserRoleOptions = useMemo(
@@ -534,7 +531,6 @@ export default function UserDirectory({
                 key={selectedUser?.user_id ?? 'no-user-selected'}
                 user={selectedUser}
                 roles={userRoleOptions}
-                permissions={permissions}
                 saving={savingRole}
                 onClose={() => setSelectedUser(null)}
                 onSave={handleSaveRole}

@@ -7,6 +7,7 @@ Giao diện Quản lý người dùng và phân quyền dành cho tài khoản c
 - `UserDirectory.tsx` — danh sách user phân trang.
 - `UserAccessDrawer.tsx` — xem quyền hiệu lực và đổi role.
 - `RolesPermissionsTab.tsx` — cấu hình permission theo role.
+- `PermissionCreateDrawer.tsx` — form Super Admin thêm nhóm và permission vào catalog database.
 - `AuditLogsTab.tsx` — lịch sử đổi role và permission.
 - `access-control-api.ts` — client gọi API Access Control.
 - `UserActionsMenu.tsx` — menu thao tác nhanh: sửa thông tin, trạng thái và xóa mềm.

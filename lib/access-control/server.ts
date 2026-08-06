@@ -10,7 +10,6 @@
  * - Không dùng service-role.
  * - Database RPC vẫn tự kiểm tra users.manage để bảo vệ thêm một lớp.
  */
-
 import 'server-only';
 
 import { createServerClient } from '@supabase/ssr';
@@ -50,9 +49,10 @@ export type AccessControlRole = {
 };
 
 /**
- * Role nhân viên động do Admin tạo từ Access Control.
+ * Role có thể cấu hình cho nhân viên.
  *
- * Không dùng cho admin, super_admin hoặc employee chuyển tiếp.
+ * Bao gồm employee và các role mới như Sale, Điều hành...
+ * Không dùng cho role hệ thống admin và super_admin.
  */
 export type AccessControlStaffRole = {
     role_code: string;
@@ -79,21 +79,17 @@ type AccessControlStaffRoleRow = {
 export type AccessControlPermission = {
     permission_code: string;
     permission_description: string;
+    group_code: string;
+    group_label: string;
+    group_sort_order: number;
 };
-/**
- * Một chức vụ động trong Access Control.
- *
- * permissionCodes là quyền mẫu của chức vụ.
- * assignedUserCount cho biết hiện có bao nhiêu nhân viên đang được gán.
- */
-export type AccessControlJobPosition = {
-    position_code: string;
-    position_label: string;
-    position_description: string | null;
-    is_active: boolean;
-    sort_order: number;
-    permission_codes: string[];
-    assigned_user_count: number;
+
+export type CreateAccessControlPermissionInput = {
+    code: string;
+    description: string;
+    groupCode: string;
+    groupLabel: string;
+    groupSortOrder?: number;
 };
 
 /** Bộ lọc role cho danh sách user. */
@@ -105,24 +101,6 @@ export type AccessControlUserRoleFilter =
 /** Dữ liệu user trả về từ RPC phân trang. */
 type AccessControlUserPageRow = AccessControlUser & {
     total_count: number | string;
-};
-
-/** Dữ liệu thống kê raw từ PostgreSQL. */
-type AccessControlUserSummaryRow = {
-    total_users: number | string;
-    active_users: number | string;
-    admin_count: number | string;
-    employee_count: number | string;
-    unassigned_count: number | string;
-};
-
-/** Dữ liệu thống kê đã đổi về number để frontend dùng dễ hơn. */
-export type AccessControlUserSummary = {
-    totalUsers: number;
-    activeUsers: number;
-    adminCount: number;
-    employeeCount: number;
-    unassignedCount: number;
 };
 
 /** Kết quả danh sách user theo từng trang. */
@@ -251,19 +229,26 @@ function throwRpcError(error: {
 export async function getAccessControlData() {
     const supabase = createAccessControlServerClient();
 
-    const [rolesResult, permissionsResult] = await Promise.all([
+    const [
+        rolesResult,
+        permissionsResult,
+        superAdminResult,
+    ] = await Promise.all([
         supabase.rpc('list_access_control_roles'),
         supabase.rpc('list_access_control_permissions'),
+        supabase.rpc('is_current_super_admin'),
     ]);
 
     throwRpcError(rolesResult.error);
     throwRpcError(permissionsResult.error);
+    throwRpcError(superAdminResult.error);
 
     return {
         roles: (rolesResult.data ?? []) as AccessControlRole[],
         permissions: (
             permissionsResult.data ?? []
         ) as AccessControlPermission[],
+        canCreatePermission: Boolean(superAdminResult.data),
     };
 }
 
@@ -361,143 +346,6 @@ export async function replaceAccessControlStaffRolePermissions(
         {
             target_role_code: roleCode,
             requested_permission_codes: permissionCodes,
-        },
-    );
-
-    throwRpcError(result.error);
-}
-
-/** Dữ liệu thô PostgreSQL trả về từ RPC chức vụ. */
-type AccessControlJobPositionRow = {
-    position_code: string;
-    position_label: string;
-    position_description: string | null;
-    is_active: boolean;
-    sort_order: number | string;
-    permission_codes: string[] | null;
-    assigned_user_count: number | string;
-};
-
-/**
- * Lấy danh sách chức vụ để hiển thị trên Access Control.
- *
- * RPC tự kiểm tra users.manage ở database.
- */
-export async function getAccessControlJobPositions(): Promise<
-    AccessControlJobPosition[]
-> {
-    const supabase = createAccessControlServerClient();
-
-    const result = await supabase.rpc(
-        'list_access_control_job_positions',
-    );
-
-    throwRpcError(result.error);
-
-    return (
-        (result.data ?? []) as AccessControlJobPositionRow[]
-    ).map((position) => ({
-        position_code: position.position_code,
-        position_label: position.position_label,
-        position_description: position.position_description,
-        is_active: position.is_active,
-        sort_order: toNumber(position.sort_order),
-        permission_codes: position.permission_codes ?? [],
-        assigned_user_count: toNumber(position.assigned_user_count),
-    }));
-}
-
-/**
- * Tạo một chức vụ mới.
- *
- * code là mã kỹ thuật ổn định, ví dụ sales hoặc tour_operator.
- * label là tên người dùng nhìn thấy trên giao diện.
- */
-export async function createAccessControlJobPosition(input: {
-    code: string;
-    label: string;
-    description?: string;
-    sortOrder?: number;
-}): Promise<void> {
-    const supabase = createAccessControlServerClient();
-
-    const result = await supabase.rpc(
-        'create_access_control_job_position',
-        {
-            input_code: input.code,
-            input_label: input.label,
-            input_description: input.description ?? null,
-            input_sort_order: input.sortOrder ?? 0,
-        },
-    );
-
-    throwRpcError(result.error);
-}
-
-/**
- * Cập nhật thông tin hoặc trạng thái sử dụng của một chức vụ.
- *
- * Không đổi code vì code được dùng làm khóa liên kết trong database.
- */
-export async function updateAccessControlJobPosition(input: {
-    code: string;
-    label: string;
-    description?: string;
-    sortOrder: number;
-    isActive: boolean;
-}): Promise<void> {
-    const supabase = createAccessControlServerClient();
-
-    const result = await supabase.rpc(
-        'update_access_control_job_position',
-        {
-            target_code: input.code,
-            new_label: input.label,
-            new_description: input.description ?? null,
-            new_sort_order: input.sortOrder,
-            new_is_active: input.isActive,
-        },
-    );
-
-    throwRpcError(result.error);
-}
-
-/**
- * Thay toàn bộ permission của một chức vụ bằng danh sách checkbox mới.
- */
-export async function replaceAccessControlJobPositionPermissions(
-    positionCode: string,
-    permissionCodes: string[],
-): Promise<void> {
-    const supabase = createAccessControlServerClient();
-
-    const result = await supabase.rpc(
-        'replace_job_position_permissions',
-        {
-            target_position_code: positionCode,
-            requested_permission_codes: permissionCodes,
-        },
-    );
-
-    throwRpcError(result.error);
-}
-
-/**
- * Gán hoặc bỏ chức vụ của một Employee.
- *
- * positionCode null nghĩa là bỏ phân công chức vụ.
- */
-export async function setAccessControlUserPosition(
-    userId: string,
-    positionCode: string | null,
-): Promise<void> {
-    const supabase = createAccessControlServerClient();
-
-    const result = await supabase.rpc(
-        'set_access_control_user_position',
-        {
-            target_user_id: userId,
-            new_position_code: positionCode,
         },
     );
 
@@ -686,31 +534,6 @@ export async function getAccessControlAuditLogs(input: {
     };
 }
 
-/**
- * Lấy số lượng user theo role để hiển thị các thẻ thống kê.
- */
-export async function getAccessControlUserSummary(): Promise<AccessControlUserSummary> {
-    const supabase = createAccessControlServerClient();
-
-    const result = await supabase.rpc(
-        'get_access_control_user_summary',
-    );
-
-    throwRpcError(result.error);
-
-    const row = (
-        result.data ?? []
-    )[0] as AccessControlUserSummaryRow | undefined;
-
-    return {
-        totalUsers: toNumber(row?.total_users ?? 0),
-        activeUsers: toNumber(row?.active_users ?? 0),
-        adminCount: toNumber(row?.admin_count ?? 0),
-        employeeCount: toNumber(row?.employee_count ?? 0),
-        unassignedCount: toNumber(row?.unassigned_count ?? 0),
-    };
-}
-
 /** Thay toàn bộ permission của role admin hoặc employee. */
 export async function replaceAccessControlRolePermissions(
     roleCode: EditableRoleCode,
@@ -722,6 +545,25 @@ export async function replaceAccessControlRolePermissions(
         target_role_code: roleCode,
         requested_permission_codes: permissionCodes,
     });
+
+    throwRpcError(result.error);
+}
+
+export async function createAccessControlPermission(
+    input: CreateAccessControlPermissionInput,
+): Promise<void> {
+    const supabase = createAccessControlServerClient();
+
+    const result = await supabase.rpc(
+        'create_access_control_permission',
+        {
+            input_code: input.code,
+            input_description: input.description,
+            input_group_code: input.groupCode,
+            input_group_label: input.groupLabel,
+            input_group_sort_order: input.groupSortOrder ?? null,
+        },
+    );
 
     throwRpcError(result.error);
 }

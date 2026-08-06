@@ -31,44 +31,66 @@ import {
 import { confirmDialog } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
 import {
+    createAccessControlPermission,
     createAccessControlStaffRole,
     fetchAccessControlStaffRoles,
     updateAccessControlStaffRole,
     updateAccessControlStaffRolePermissions,
     type AccessControlPermission,
     type AccessControlStaffRole,
+    type CreateAccessControlPermissionInput,
     type CreateAccessControlStaffRoleInput,
 } from './access-control-api';
 import StaffRoleCreateDrawer from './StaffRoleCreateDrawer';
 import StaffRoleEditDrawer from './StaffRoleEditDrawer';
+import PermissionCreateDrawer from './PermissionCreateDrawer';
 import styles from './AccessControlPage.module.css';
 import useRefreshAccessControlAuditLogs from './useRefreshAccessControlAuditLogs';
+
 
 type RolesPermissionsTabProps = {
     permissions: AccessControlPermission[];
     loadingPermissions: boolean;
     permissionsError: string | null;
     onRetryPermissions: () => Promise<void>;
+    canCreatePermission: boolean;
+    onPermissionsChanged: () => Promise<void>;
 };
 
-const GROUP_LABELS: Record<string, string> = {
-    dashboard: 'Bảng điều hành', customers: 'Khách hàng', agents: 'Đại lý B2B',
-    sales: 'Bán hàng', tour_design: 'Thiết kế tour', catalogue: 'Sản phẩm và thư viện ảnh',
-    pricing: 'Bảng giá', operations: 'Vận hành', finance: 'Tài chính', hr: 'Nhân sự',
-    company: 'Thông tin công ty', weather: 'Thời tiết', teamchat: 'Chat nội bộ', devnotes: 'Ghi chú kỹ thuật',
+
+type PermissionGroup = {
+    code: string;
+    label: string;
+    sortOrder: number;
+    items: AccessControlPermission[];
 };
 
-function groupPermissions(permissions: AccessControlPermission[]) {
-    const groups = new Map<string, AccessControlPermission[]>();
+function groupPermissions(
+    permissions: AccessControlPermission[],
+): PermissionGroup[] {
+    const groups = new Map<string, PermissionGroup>();
+
     for (const permission of permissions) {
-        const code = permission.permission_code.split('.')[0];
-        groups.set(code, [...(groups.get(code) ?? []), permission]);
+        const group = groups.get(permission.group_code);
+
+        if (group) {
+            group.items.push(permission);
+            continue;
+        }
+
+        groups.set(permission.group_code, {
+            code: permission.group_code,
+            label: permission.group_label,
+            sortOrder: permission.group_sort_order,
+            items: [permission],
+        });
     }
-    return Array.from(groups.entries()).map(([code, items]) => ({
-        code,
-        label: GROUP_LABELS[code] ?? code,
-        items,
-    }));
+
+    return [...groups.values()].sort(
+        (first, second) =>
+            first.sortOrder - second.sortOrder ||
+            first.label.localeCompare(second.label, 'vi'),
+    );
 }
 
 function hasSamePermissions(first: string[], second: string[]) {
@@ -80,6 +102,8 @@ export default function RolesPermissionsTab({
     loadingPermissions,
     permissionsError,
     onRetryPermissions,
+    canCreatePermission,
+    onPermissionsChanged,
 }: RolesPermissionsTabProps) {
     const refreshAuditLogs = useRefreshAccessControlAuditLogs();
     const [selectedRoleCode, setSelectedRoleCode] = useState<string | null>(null);
@@ -87,6 +111,9 @@ export default function RolesPermissionsTab({
     const [saving, setSaving] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [editingRole, setEditingRole] = useState<AccessControlStaffRole | null>(null);
+    // State của Drawer phải thuộc component để React giữ đúng theo từng lần render.
+    const [permissionCreateOpen, setPermissionCreateOpen] = useState(false);
+    const [creatingPermission, setCreatingPermission] = useState(false);
 
     const { data: roles = [], error: rolesError, isLoading: loadingRoles, mutate } = useSWR(
         'access-control/staff-roles',
@@ -99,6 +126,14 @@ export default function RolesPermissionsTab({
         ?? roles[0];
 
     const permissionGroups = useMemo(() => groupPermissions(permissions), [permissions]);
+    const permissionGroupOptions = useMemo(
+        () => permissionGroups.map(({ code, label, sortOrder }) => ({
+            code,
+            label,
+            sortOrder,
+        })),
+        [permissionGroups],
+    );
     const selectedPermissionCodes = activeRole
         ? drafts[activeRole.role_code] ?? activeRole.permission_codes
         : [];
@@ -107,6 +142,33 @@ export default function RolesPermissionsTab({
         : false;
 
     const reloadRoles = useCallback(async () => { await mutate(); }, [mutate]);
+
+    async function handleCreatePermission(
+        input: CreateAccessControlPermissionInput,
+    ) {
+        setCreatingPermission(true);
+
+        try {
+            await createAccessControlPermission(input);
+
+            // Database là nguồn dữ liệu chuẩn: reload để lấy cả permission lẫn nhóm mới.
+            await onPermissionsChanged();
+            refreshAuditLogs();
+            setPermissionCreateOpen(false);
+            toast.success('Đã thêm chức năng mới.');
+        } catch (error) {
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : 'Không thể thêm chức năng mới.',
+            );
+
+            // Không đóng Drawer khi lỗi để Super Admin sửa và gửi lại dữ liệu.
+            throw error;
+        } finally {
+            setCreatingPermission(false);
+        }
+    }
 
     function updateDraft(update: (current: string[]) => string[]) {
         if (!activeRole) return;
@@ -221,7 +283,19 @@ export default function RolesPermissionsTab({
                                 <h2 className={styles.sectionTitle}>Quyền của {activeRole.role_label}</h2>
                                 <p className={styles.sectionDescription}>{activeRole.role_description || 'Chọn những chức năng role này được phép sử dụng.'}</p>
                             </div>
-                            <Button icon={<EditOutlined />} onClick={() => setEditingRole(activeRole)}>Sửa role</Button>
+                            <div className={styles.permissionWorkspaceActions}>
+                                {/* Chỉ là lớp UX; API và RPC vẫn chặn mọi role khác. */}
+                                {canCreatePermission && (
+                                    <Button
+                                        type="primary"
+                                        icon={<PlusOutlined />}
+                                        onClick={() => setPermissionCreateOpen(true)}
+                                    >
+                                        Thêm chức năng
+                                    </Button>
+                                )}
+                                <Button icon={<EditOutlined />} onClick={() => setEditingRole(activeRole)}>Sửa role</Button>
+                            </div>
                         </header>
                         {!activeRole.is_active ? (
                             <Alert type="warning" showIcon message="Role này đã ngừng sử dụng." description="Không thể sửa permission của role đang ngừng sử dụng." />
@@ -238,7 +312,7 @@ export default function RolesPermissionsTab({
                                             </div>
                                             <span className={styles.permissionGroupCount}>{selectedCount}/{codes.length} quyền</span>
                                             <div className={styles.permissionRows}>
-                                                {group.items.map((permission) => <Checkbox key={permission.permission_code} checked={selectedPermissionCodes.includes(permission.permission_code)} disabled={saving} className={styles.permissionRow} onChange={(event) => updateDraft((current) => event.target.checked ? [...new Set([...current, permission.permission_code])] : current.filter((code) => code !== permission.permission_code))}><span className={styles.permissionText}>{permission.permission_description}<code className={styles.permissionCode}>{permission.permission_code}</code></span></Checkbox>)}
+                                                {group.items.map((permission) => <Checkbox key={permission.permission_code} checked={selectedPermissionCodes.includes(permission.permission_code)} disabled={saving} className={styles.permissionRow} onChange={(event) => updateDraft((current) => event.target.checked ? [...new Set([...current, permission.permission_code])] : current.filter((code) => code !== permission.permission_code))}><span className={styles.permissionText}>{permission.permission_description}</span></Checkbox>)}
                                             </div>
                                         </Card>;
                                     })}
@@ -254,6 +328,13 @@ export default function RolesPermissionsTab({
             </section>
             <StaffRoleCreateDrawer open={createOpen} saving={saving} onClose={() => setCreateOpen(false)} onSubmit={handleCreate} />
             <StaffRoleEditDrawer role={editingRole} saving={saving} onClose={() => setEditingRole(null)} onSubmit={handleEdit} />
+            <PermissionCreateDrawer
+                open={permissionCreateOpen}
+                saving={creatingPermission}
+                groups={permissionGroupOptions}
+                onClose={() => setPermissionCreateOpen(false)}
+                onSubmit={handleCreatePermission}
+            />
         </div>
     );
 }

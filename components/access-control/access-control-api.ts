@@ -79,11 +79,23 @@ export type CreateAccessControlStaffRoleInput = {
 export type AccessControlPermission = {
     permission_code: string;
     permission_description: string;
+    group_code: string;
+    group_label: string;
+    group_sort_order: number;
 };
 
 export type AccessControlData = {
     roles: AccessControlRole[];
     permissions: AccessControlPermission[];
+    canCreatePermission: boolean;
+};
+
+export type CreateAccessControlPermissionInput = {
+    code: string;
+    description: string;
+    groupCode: string;
+    groupLabel: string;
+    groupSortOrder?: number;
 };
 
 /** Role dùng để lọc danh sách user. */
@@ -98,15 +110,6 @@ export type UserListStatusFilter =
     | 'active'
     | 'inactive';
 
-/** Thống kê user cho các thẻ ở đầu trang. */
-export type AccessControlUserSummary = {
-    totalUsers: number;
-    activeUsers: number;
-    adminCount: number;
-    employeeCount: number;
-    unassignedCount: number;
-};
-
 /** Kết quả API danh sách user phân trang. */
 export type AccessControlUsersPage = {
     items: AccessControlUser[];
@@ -114,7 +117,6 @@ export type AccessControlUsersPage = {
     page: number;
     pageSize: number;
     totalPages: number;
-    summary: AccessControlUserSummary;
 };
 
 /** Dữ liệu Super Admin nhập khi tạo một tài khoản mới. */
@@ -167,6 +169,20 @@ async function readApiResponse<T>(
     }
 
     return body as T;
+}
+
+export async function createAccessControlPermission(
+    input: CreateAccessControlPermissionInput,
+): Promise<void> {
+    const response = await fetch('/api/access-control', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(input),
+    });
+
+    await readApiResponse<Record<string, never>>(response);
 }
 
 /** Lấy dữ liệu cho toàn bộ trang Access Control. */

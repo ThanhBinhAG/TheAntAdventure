@@ -19,6 +19,10 @@ import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import {
     accessControlAuditLogsQuerySchema,
 } from '@/lib/access-control/audit-log-input';
+import {
+    accessControlError,
+    accessControlPermissionError,
+} from '@/lib/access-control/api-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,19 +33,19 @@ function errorResponse(error: unknown) {
         error.code === '42501'
     ) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Bạn không có quyền xem lịch sử phân quyền.',
-            },
+            accessControlError(
+                'ACCESS_DENIED',
+                'Bạn không có quyền xem lịch sử phân quyền.',
+            ),
             { status: 403 },
         );
     }
 
     return NextResponse.json(
-        {
-            ok: false,
-            error: 'Không thể tải lịch sử phân quyền.',
-        },
+        accessControlError(
+            'AUDIT_LOG_LOAD_FAILED',
+            'Không thể tải lịch sử phân quyền.',
+        ),
         { status: 500 },
     );
 }
@@ -53,7 +57,7 @@ export async function GET(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -67,10 +71,10 @@ export async function GET(request: Request) {
 
     if (!parsed.success) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Tham số phân trang không hợp lệ.',
-            },
+            accessControlError(
+                'INVALID_AUDIT_LOG_QUERY',
+                'Tham số phân trang không hợp lệ.',
+            ),
             { status: 400 },
         );
     }

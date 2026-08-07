@@ -61,4 +61,14 @@ describe('access-control audit action presentation', () => {
       'future_action',
     );
   });
+
+  it('returns the English label without changing the database action code', () => {
+    assert.equal(
+      getAccessControlAuditActionPresentation(
+        'staff_role_created',
+        'en',
+      ).label,
+      'Create Role',
+    );
+  });
 });

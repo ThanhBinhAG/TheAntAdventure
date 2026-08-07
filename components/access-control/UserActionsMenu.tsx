@@ -6,7 +6,6 @@
  * Chức năng:
  * - Mở Drawer sửa tên hiển thị.
  * - Kích hoạt hoặc vô hiệu hóa user.
- * - Xóa mềm user sau khi xác nhận.
  *
  * Lưu ý:
  * - Component chỉ gọi API client.
@@ -27,13 +26,17 @@ import {
 } from 'antd';
 import type { MenuProps } from 'antd';
 import { confirmDialog } from '@/lib/confirm';
+import { useLanguage } from '@/hooks/useLanguage';
+import {
+    tac,
+    tacTemplate,
+} from '@/lib/i18n/pages/access-control';
 import { toast } from '@/lib/toast';
 import {
+    getAccessControlErrorMessage,
     updateUserActiveStatus,
     type AccessControlUser,
 } from './access-control-api';
-
-
 
 type UserActionsMenuProps = {
     user: AccessControlUser;
@@ -46,6 +49,7 @@ export default function UserActionsMenu({
     onEditInfo,
     onChanged,
 }: UserActionsMenuProps) {
+    const { language } = useLanguage();
     const [saving, setSaving] = useState(false);
 
     /** Đổi trạng thái hoạt động của user sau khi xác nhận. */
@@ -53,17 +57,21 @@ export default function UserActionsMenu({
         const nextIsActive = !user.is_active;
 
         const confirmed = await confirmDialog(
-            nextIsActive
-                ? `Kích hoạt lại tài khoản ${user.email ?? ''}?`
-                : `Vô hiệu hóa tài khoản ${user.email ?? ''}?`,
+            tacTemplate(
+                nextIsActive
+                    ? 'activateUserQuestion'
+                    : 'deactivateUserQuestion',
+                language,
+                { email: user.email ?? '' },
+            ),
             {
                 title: nextIsActive
-                    ? 'Xác nhận kích hoạt'
-                    : 'Xác nhận vô hiệu hóa',
+                    ? tac('activateUserConfirmation', language)
+                    : tac('deactivateUserConfirmation', language),
                 confirmLabel: nextIsActive
-                    ? 'Kích hoạt'
-                    : 'Vô hiệu hóa',
-                cancelLabel: 'Hủy',
+                    ? tac('activate', language)
+                    : tac('deactivate', language),
+                cancelLabel: tac('cancel', language),
                 danger: !nextIsActive,
             },
         );
@@ -80,28 +88,27 @@ export default function UserActionsMenu({
 
             toast.success(
                 nextIsActive
-                    ? 'Đã kích hoạt tài khoản.'
-                    : 'Đã vô hiệu hóa tài khoản.',
+                    ? tac('userActivated', language)
+                    : tac('userDeactivated', language),
             );
 
             await onChanged();
         } catch (error) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể cập nhật trạng thái user.',
-            );
+            toast.error(getAccessControlErrorMessage(
+                error,
+                language,
+                'updateUserStatusFailed',
+            ));
         } finally {
             setSaving(false);
         }
     }
 
-
     const menuItems: MenuProps['items'] = [
         {
             key: 'edit-info',
             icon: <EditOutlined />,
-            label: 'Sửa thông tin',
+            label: tac('editInformation', language),
             onClick: onEditInfo,
         },
         {
@@ -110,8 +117,8 @@ export default function UserActionsMenu({
                 ? <LockOutlined />
                 : <UnlockOutlined />,
             label: user.is_active
-                ? 'Vô hiệu hóa'
-                : 'Kích hoạt',
+                ? tac('deactivate', language)
+                : tac('activate', language),
             disabled: saving,
             onClick: () => {
                 void handleChangeActiveStatus();
@@ -128,7 +135,7 @@ export default function UserActionsMenu({
             trigger={['click']}
         >
             <Button
-                aria-label="Mở menu thao tác user"
+                aria-label={tac('openUserActions', language)}
                 icon={<MoreOutlined />}
                 loading={saving}
                 size="small"

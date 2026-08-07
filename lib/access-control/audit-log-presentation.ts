@@ -3,12 +3,18 @@
  *
  * Chức năng:
  * - Giữ tên action của database ở một nơi duy nhất.
- * - Trả về nhãn tiếng Việt và màu Tag tương ứng cho giao diện.
+ * - Trả về nhãn theo ngôn ngữ hiện tại và màu Tag tương ứng cho giao diện.
  * - Giữ action lạ hiển thị nguyên văn để dễ chẩn đoán khi mở rộng sau này.
  *
  * Lưu ý:
  * - File này chỉ chứa dữ liệu thuần, không phụ thuộc React hay Supabase.
  */
+
+import type { AppLanguage } from '@/lib/i18n/stages';
+import {
+    tac,
+    type AccessControlKey,
+} from '@/lib/i18n/pages/access-control';
 
 export type AccessControlAuditActionPresentation = {
     label: string;
@@ -18,54 +24,56 @@ export type AccessControlAuditActionPresentation = {
 /** Bảng quy đổi action database sang cách hiển thị trên UI. */
 const AUDIT_ACTION_PRESENTATIONS: Record<
     string,
-    AccessControlAuditActionPresentation
+    Omit<AccessControlAuditActionPresentation, 'label'> & {
+        labelKey: AccessControlKey;
+    }
 > = {
     permission_created: {
-        label: 'Thêm chức năng',
+        labelKey: 'auditPermissionCreated',
         color: 'green',
     },
     user_role_changed: {
-        label: 'Đổi role người dùng',
+        labelKey: 'auditUserRoleChanged',
         color: 'blue',
     },
     role_permissions_replaced: {
-        label: 'Cập nhật quyền role',
+        labelKey: 'auditRolePermissionsReplaced',
         color: 'green',
     },
     staff_role_created: {
-        label: 'Tạo role',
+        labelKey: 'auditStaffRoleCreated',
         color: 'green',
     },
     staff_role_updated: {
-        label: 'Cập nhật role',
+        labelKey: 'auditStaffRoleUpdated',
         color: 'blue',
     },
     staff_role_deleted: {
-        label: 'Xóa role',
+        labelKey: 'auditStaffRoleDeleted',
         color: 'red',
     },
     staff_role_permissions_replaced: {
-        label: 'Cập nhật quyền role',
+        labelKey: 'auditStaffRolePermissionsReplaced',
         color: 'green',
     },
     user_profile_updated: {
-        label: 'Cập nhật thông tin người dùng',
+        labelKey: 'auditUserProfileUpdated',
         color: 'cyan',
     },
     user_activated: {
-        label: 'Kích hoạt tài khoản',
+        labelKey: 'auditUserActivated',
         color: 'green',
     },
     user_deactivated: {
-        label: 'Vô hiệu hóa tài khoản',
+        labelKey: 'auditUserDeactivated',
         color: 'orange',
     },
     user_soft_deleted: {
-        label: 'Xóa mềm tài khoản',
+        labelKey: 'auditUserSoftDeleted',
         color: 'red',
     },
     user_restored: {
-        label: 'Khôi phục tài khoản',
+        labelKey: 'auditUserRestored',
         color: 'cyan',
     },
 };
@@ -73,9 +81,19 @@ const AUDIT_ACTION_PRESENTATIONS: Record<
 /** Lấy nhãn và màu hiển thị cho một action audit. */
 export function getAccessControlAuditActionPresentation(
     action: string,
+    language: AppLanguage = 'vi',
 ): AccessControlAuditActionPresentation {
-    return AUDIT_ACTION_PRESENTATIONS[action] ?? {
-        label: action,
-        color: 'default',
+    const presentation = AUDIT_ACTION_PRESENTATIONS[action];
+
+    if (!presentation) {
+        return {
+            label: action,
+            color: 'default',
+        };
+    }
+
+    return {
+        label: tac(presentation.labelKey, language),
+        color: presentation.color,
     };
 }

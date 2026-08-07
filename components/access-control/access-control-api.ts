@@ -12,6 +12,13 @@
  * - API server mới là nơi kiểm tra users.manage và gọi database RPC.
  */
 
+import type { AccessControlErrorCode } from '@/lib/access-control/api-error';
+import type { AppLanguage } from '@/lib/i18n/stages';
+import {
+    tac,
+    type AccessControlKey,
+} from '@/lib/i18n/pages/access-control';
+
 /**
  * Role code động được lấy từ database.
  *
@@ -177,7 +184,70 @@ export type AuthLoginEventsPage = {
 
 type ApiResponse<T> =
     | ({ ok: true } & T)
-    | { ok: false; error?: string };
+    | {
+        ok: false;
+        error?: string;
+        errorCode?: AccessControlErrorCode;
+    };
+
+/** Lỗi API có mã ổn định để UI không phụ thuộc câu chữ từ server/database. */
+export class AccessControlApiError extends Error {
+    constructor(
+        message: string,
+        public readonly code?: AccessControlErrorCode,
+        public readonly status?: number,
+    ) {
+        super(message);
+        this.name = 'AccessControlApiError';
+    }
+}
+
+const ERROR_MESSAGE_KEYS: Record<
+    AccessControlErrorCode,
+    AccessControlKey
+> = {
+    AUTH_UNAUTHORIZED: 'unauthorized',
+    ACCESS_DENIED: 'accessDenied',
+    INVALID_ACCESS_CONTROL_REQUEST: 'invalidRequest',
+    INVALID_USER_CREATE_REQUEST: 'invalidRequest',
+    INVALID_USER_UPDATE_REQUEST: 'invalidRequest',
+    INVALID_USER_LIST_FILTER: 'invalidRequest',
+    INVALID_STAFF_ROLE_REQUEST: 'invalidRequest',
+    INVALID_STAFF_ROLE_UPDATE_REQUEST: 'invalidRequest',
+    INVALID_STAFF_ROLE_CODE: 'invalidRequest',
+    INVALID_AUDIT_LOG_QUERY: 'invalidRequest',
+    INVALID_LOGIN_HISTORY_FILTER: 'invalidRequest',
+    USER_EMAIL_UNAVAILABLE: 'emailUnavailable',
+    RESERVED_EMAIL_FORBIDDEN: 'reservedEmailForbidden',
+    AUTH_ADMIN_UNAVAILABLE: 'authAdminUnavailable',
+    PERMISSION_CODE_EXISTS: 'permissionCodeExists',
+    ROLE_CODE_EXISTS: 'roleCodeExists',
+    ROLE_IN_USE: 'roleInUse',
+    ACCESS_CONTROL_REQUEST_FAILED: 'accessControlRequestFailed',
+    USER_OPERATION_FAILED: 'userOperationFailed',
+    STAFF_ROLE_OPERATION_FAILED: 'staffRoleOperationFailed',
+    AUDIT_LOG_LOAD_FAILED: 'auditLogLoadFailed',
+    LOGIN_HISTORY_LOAD_FAILED: 'loadLoginHistoryFailed',
+    LOGIN_HISTORY_FORBIDDEN: 'loginHistoryForbidden',
+    SUPER_ADMIN_STATUS_FAILED: 'superAdminStatusFailed',
+};
+
+/** Dịch lỗi Access Control theo code; lỗi cũ chưa có code giữ nguyên message. */
+export function getAccessControlErrorMessage(
+    error: unknown,
+    language: AppLanguage,
+    fallback: AccessControlKey,
+): string {
+    if (error instanceof AccessControlApiError && error.code) {
+        return tac(ERROR_MESSAGE_KEYS[error.code], language);
+    }
+
+    if (error instanceof Error && error.message) {
+        return error.message;
+    }
+
+    return tac(fallback, language);
+}
 
 /** Đọc response API và ném lỗi dễ hiểu nếu request thất bại. */
 async function readApiResponse<T>(
@@ -186,10 +256,12 @@ async function readApiResponse<T>(
     const body = (await response.json().catch(() => ({}))) as ApiResponse<T>;
 
     if (!response.ok || !body.ok) {
-        throw new Error(
+        throw new AccessControlApiError(
             'error' in body && body.error
                 ? body.error
                 : 'Không thể xử lý yêu cầu phân quyền.',
+            'errorCode' in body ? body.errorCode : undefined,
+            response.status,
         );
     }
 

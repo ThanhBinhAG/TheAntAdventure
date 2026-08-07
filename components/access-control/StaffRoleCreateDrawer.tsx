@@ -13,8 +13,11 @@ import {
     Form,
     Input,
 } from 'antd';
-import type {
-    CreateAccessControlStaffRoleInput,
+import { useLanguage } from '@/hooks/useLanguage';
+import { tac } from '@/lib/i18n/pages/access-control';
+import {
+    getAccessControlErrorMessage,
+    type CreateAccessControlStaffRoleInput,
 } from './access-control-api';
 import styles from './AccessControlPage.module.css';
 
@@ -46,6 +49,7 @@ export default function StaffRoleCreateDrawer({
     onClose,
     onSubmit,
 }: StaffRoleCreateDrawerProps) {
+    const { language } = useLanguage();
     const [form] = Form.useForm<CreateAccessControlStaffRoleInput>();
 
     async function handleFinish(
@@ -67,9 +71,11 @@ export default function StaffRoleCreateDrawer({
                 {
                     name: 'code',
                     errors: [
-                        error instanceof Error
-                            ? error.message
-                            : 'Không thể tạo role. Vui lòng thử lại.',
+                        getAccessControlErrorMessage(
+                            error,
+                            language,
+                            'createRoleFailedRetry',
+                        ),
                     ],
                 },
             ]);
@@ -78,7 +84,7 @@ export default function StaffRoleCreateDrawer({
 
     return (
         <Drawer
-            title="Thêm role nhân viên"
+            title={tac('createStaffRole', language)}
             open={open}
             width={480}
             destroyOnHidden
@@ -90,16 +96,16 @@ export default function StaffRoleCreateDrawer({
                 onFinish={(values) => void handleFinish(values)}
             >
                 <Form.Item
-                    label="Tên role"
+                    label={tac('roleName', language)}
                     name="label"
                     rules={[{
                         required: true,
-                        message: 'Vui lòng nhập tên role.',
+                        message: tac('roleNameRequired', language),
                     }]}
                 >
                     <Input
                         autoFocus
-                        placeholder="Ví dụ: Nhân viên Sales"
+                        placeholder={tac('exampleStaffSales', language)}
                         onChange={(event) => {
                             form.setFieldValue(
                                 'code',
@@ -113,17 +119,17 @@ export default function StaffRoleCreateDrawer({
                 </Form.Item>
 
                 <Form.Item
-                    label="Mã role"
+                    label={tac('roleCode', language)}
                     name="code"
-                    extra="Mã kỹ thuật không đổi sau khi tạo."
+                    extra={tac('roleCodeHint', language)}
                     rules={[
                         {
                             required: true,
-                            message: 'Vui lòng nhập mã role.',
+                            message: tac('roleCodeRequired', language),
                         },
                         {
                             pattern: /^[a-z0-9_]{2,50}$/,
-                            message: 'Chỉ dùng chữ thường, số và dấu gạch dưới.',
+                            message: tac('lowercaseCodeRule', language),
                         },
                     ]}
                 >
@@ -138,16 +144,16 @@ export default function StaffRoleCreateDrawer({
                     />
                 </Form.Item>
 
-                <Form.Item label="Mô tả" name="description">
+                <Form.Item label={tac('description', language)} name="description">
                     <Input.TextArea rows={3} />
                 </Form.Item>
 
                 <div className={styles.drawerActions}>
                     <Button onClick={onClose} disabled={saving}>
-                        Hủy
+                        {tac('cancel', language)}
                     </Button>
                     <Button type="primary" htmlType="submit" loading={saving}>
-                        Tạo role
+                        {tac('createRole', language)}
                     </Button>
                 </div>
             </Form>

@@ -21,6 +21,8 @@ import {
     SafetyCertificateOutlined,
     TeamOutlined,
 } from '@ant-design/icons';
+import { useLanguage } from '@/hooks/useLanguage';
+import { tac } from '@/lib/i18n/pages/access-control';
 import {
     fetchAccessControlSuperAdminStatus,
 } from './access-control-api';
@@ -33,6 +35,8 @@ import RolesPermissionsTab from './RolesPermissionsTab';
 import AuditLogsTab from './AuditLogsTab';
 
 export default function AccessControlPage() {
+    const { language } = useLanguage();
+
     // Chỉ mount tab nặng sau lần người dùng thật sự mở nó.
     const [hasOpenedRoles, setHasOpenedRoles] = useState(false);
     const [hasOpenedAuditLogs, setHasOpenedAuditLogs] = useState(false);
@@ -82,7 +86,7 @@ export default function AccessControlPage() {
                                 label: (
                                     <span className={styles.tabLabel}>
                                         <TeamOutlined />
-                                        Người dùng
+                                        {tac('users', language)}
                                     </span>
                                 ),
                                 children: <UserDirectory />,
@@ -92,7 +96,7 @@ export default function AccessControlPage() {
                                 label: (
                                     <span className={styles.tabLabel}>
                                         <SafetyCertificateOutlined />
-                                        Role & quyền
+                                        {tac('rolesAndPermissions', language)}
                                     </span>
                                 ),
                                 children: hasOpenedRoles
@@ -104,7 +108,7 @@ export default function AccessControlPage() {
                                 label: (
                                     <span className={styles.tabLabel}>
                                         <HistoryOutlined />
-                                        Lịch sử thay đổi
+                                        {tac('changeHistory', language)}
                                     </span>
                                 ),
                                 children: hasOpenedAuditLogs
@@ -118,7 +122,7 @@ export default function AccessControlPage() {
                                         label: (
                                             <span className={styles.tabLabel}>
                                                 <LoginOutlined />
-                                                Lịch sử đăng nhập
+                                                {tac('loginHistory', language)}
                                             </span>
                                         ),
                                         children: hasOpenedLoginHistory

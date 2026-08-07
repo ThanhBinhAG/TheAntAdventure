@@ -33,6 +33,10 @@ import {
     createAccessControlUserBodySchema,
     optionalAccessControlQueryParam,
 } from '@/lib/access-control/user-input';
+import {
+    accessControlError,
+    accessControlPermissionError,
+} from '@/lib/access-control/api-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,10 +44,14 @@ export const dynamic = 'force-dynamic';
 function errorResponse(error: unknown) {
     if (error instanceof AccessControlAuthAdminError) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: error.message,
-            },
+            accessControlError(
+                error.status === 503
+                    ? 'AUTH_ADMIN_UNAVAILABLE'
+                    : error.status === 403
+                        ? 'RESERVED_EMAIL_FORBIDDEN'
+                        : 'USER_EMAIL_UNAVAILABLE',
+                error.message,
+            ),
             { status: error.status },
         );
     }
@@ -54,10 +62,12 @@ function errorResponse(error: unknown) {
             error.code === '22023'
         ) {
             return NextResponse.json(
-                {
-                    ok: false,
-                    error: error.message,
-                },
+                accessControlError(
+                    error.code === '42501'
+                        ? 'ACCESS_DENIED'
+                        : 'INVALID_USER_UPDATE_REQUEST',
+                    error.message,
+                ),
                 {
                     status: error.code === '42501'
                         ? 403
@@ -68,10 +78,10 @@ function errorResponse(error: unknown) {
     }
 
     return NextResponse.json(
-        {
-            ok: false,
-            error: 'Không thể xử lý thao tác người dùng.',
-        },
+        accessControlError(
+            'USER_OPERATION_FAILED',
+            'Không thể xử lý thao tác người dùng.',
+        ),
         { status: 500 },
     );
 }
@@ -92,7 +102,7 @@ export async function POST(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -102,10 +112,10 @@ export async function POST(request: Request) {
 
     if (!parsed.success) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Dữ liệu tạo tài khoản không hợp lệ.',
-            },
+            accessControlError(
+                'INVALID_USER_CREATE_REQUEST',
+                'Dữ liệu tạo tài khoản không hợp lệ.',
+            ),
             { status: 400 },
         );
     }
@@ -157,7 +167,7 @@ export async function GET(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -174,10 +184,10 @@ export async function GET(request: Request) {
 
     if (!parsed.success) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Bộ lọc danh sách user không hợp lệ.',
-            },
+            accessControlError(
+                'INVALID_USER_LIST_FILTER',
+                'Bộ lọc danh sách user không hợp lệ.',
+            ),
             { status: 400 },
         );
     }
@@ -226,7 +236,7 @@ export async function PATCH(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -236,10 +246,10 @@ export async function PATCH(request: Request) {
 
     if (!parsed.success) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Dữ liệu cập nhật user không hợp lệ.',
-            },
+            accessControlError(
+                'INVALID_USER_UPDATE_REQUEST',
+                'Dữ liệu cập nhật user không hợp lệ.',
+            ),
             { status: 400 },
         );
     }

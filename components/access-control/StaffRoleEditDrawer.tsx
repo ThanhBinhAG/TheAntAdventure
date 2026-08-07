@@ -12,6 +12,8 @@ import {
     Input,
     Switch,
 } from 'antd';
+import { useLanguage } from '@/hooks/useLanguage';
+import { tac } from '@/lib/i18n/pages/access-control';
 import type {
     AccessControlStaffRole,
 } from './access-control-api';
@@ -36,6 +38,7 @@ export default function StaffRoleEditDrawer({
     onClose,
     onSubmit,
 }: StaffRoleEditDrawerProps) {
+    const { language } = useLanguage();
     const [form] = Form.useForm();
 
     async function handleFinish(values: {
@@ -57,7 +60,7 @@ export default function StaffRoleEditDrawer({
 
     return (
         <Drawer
-            title="Sửa role nhân viên"
+            title={tac('editStaffRole', language)}
             open={Boolean(role)}
             width={480}
             destroyOnHidden
@@ -73,21 +76,21 @@ export default function StaffRoleEditDrawer({
             }}
         >
             <Form form={form} layout="vertical" onFinish={(values) => void handleFinish(values)}>
-                <Form.Item label="Mã role">
+                <Form.Item label={tac('roleCode', language)}>
                     <Input value={role?.role_code} disabled />
                 </Form.Item>
-                <Form.Item label="Tên role" name="label" rules={[{ required: true, message: 'Vui lòng nhập tên role.' }]}>
+                <Form.Item label={tac('roleName', language)} name="label" rules={[{ required: true, message: tac('roleNameRequired', language) }]}>
                     <Input />
                 </Form.Item>
-                <Form.Item label="Mô tả" name="description">
+                <Form.Item label={tac('description', language)} name="description">
                     <Input.TextArea rows={3} />
                 </Form.Item>
-                <Form.Item label="Đang sử dụng" name="isActive" valuePropName="checked">
-                    <Switch checkedChildren="Có" unCheckedChildren="Không" />
+                <Form.Item label={tac('activeRole', language)} name="isActive" valuePropName="checked">
+                    <Switch checkedChildren={tac('yes', language)} unCheckedChildren={tac('no', language)} />
                 </Form.Item>
                 <div className={styles.drawerActions}>
-                    <Button onClick={onClose} disabled={saving}>Hủy</Button>
-                    <Button type="primary" htmlType="submit" loading={saving}>Lưu thay đổi</Button>
+                    <Button onClick={onClose} disabled={saving}>{tac('cancel', language)}</Button>
+                    <Button type="primary" htmlType="submit" loading={saving}>{tac('saveChanges', language)}</Button>
                 </div>
             </Form>
         </Drawer>

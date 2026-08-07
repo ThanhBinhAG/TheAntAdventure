@@ -23,6 +23,8 @@ import {
     Input,
 } from 'antd';
 import type { AccessControlUser } from './access-control-api';
+import { useLanguage } from '@/hooks/useLanguage';
+import { tac } from '@/lib/i18n/pages/access-control';
 import styles from './AccessControlPage.module.css';
 
 type UserEditDrawerProps = {
@@ -41,6 +43,7 @@ export default function UserEditDrawer({
     onClose,
     onSave,
 }: UserEditDrawerProps) {
+    const { language } = useLanguage();
     const [displayName, setDisplayName] = useState(
         () => user?.display_name ?? '',
     );
@@ -57,7 +60,7 @@ export default function UserEditDrawer({
         const normalizedName = displayName.trim();
 
         if (!normalizedName) {
-            setError('Tên hiển thị không được để trống.');
+            setError(tac('displayNameRequired', language));
             return;
         }
 
@@ -69,7 +72,7 @@ export default function UserEditDrawer({
 
     return (
         <Drawer
-            title="Sửa thông tin người dùng"
+            title={tac('editUserInfo', language)}
             open={Boolean(user)}
             width={480}
             onClose={onClose}
@@ -83,13 +86,13 @@ export default function UserEditDrawer({
                     }}
                 >
                     <div className={styles.drawerReadOnlyField}>
-                        <span>Email</span>
-                        <strong>{user.email ?? 'Chưa có email'}</strong>
+                        <span>{tac('email', language)}</span>
+                        <strong>{user.email ?? tac('noEmail', language)}</strong>
                     </div>
 
                     <div className={styles.drawerField}>
                         <label htmlFor="user-display-name">
-                            Tên hiển thị
+                            {tac('displayName', language)}
                         </label>
 
                         <Input
@@ -111,7 +114,7 @@ export default function UserEditDrawer({
                             disabled={saving}
                             onClick={onClose}
                         >
-                            Hủy
+                            {tac('cancel', language)}
                         </Button>
 
                         <Button
@@ -119,7 +122,7 @@ export default function UserEditDrawer({
                             type="primary"
                             loading={saving}
                         >
-                            Lưu thông tin
+                            {tac('saveUserInfo', language)}
                         </Button>
                     </div>
                 </form>

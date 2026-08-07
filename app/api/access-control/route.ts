@@ -27,6 +27,10 @@ import {
     accessControlRoleUpdateBodySchema,
 } from '@/lib/access-control/role-input';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
+import {
+    accessControlError,
+    accessControlPermissionError,
+} from '@/lib/access-control/api-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,28 +40,37 @@ function errorResponse(error: unknown) {
     if (error instanceof AccessControlRpcError) {
         if (error.code === '42501') {
             return NextResponse.json(
-                { ok: false, error: error.message },
+                accessControlError('ACCESS_DENIED', error.message),
                 { status: 403 },
             );
         }
 
         if (error.code === '22023') {
             return NextResponse.json(
-                { ok: false, error: error.message },
+                accessControlError(
+                    'INVALID_ACCESS_CONTROL_REQUEST',
+                    error.message,
+                ),
                 { status: 400 },
             );
         }
 
         if (error.code === '23505') {
             return NextResponse.json(
-                { ok: false, error: 'Mã quyền này đã tồn tại.' },
+                accessControlError(
+                    'PERMISSION_CODE_EXISTS',
+                    'Mã quyền này đã tồn tại.',
+                ),
                 { status: 409 },
             );
         }
     }
 
     return NextResponse.json(
-        { ok: false, error: 'Không thể xử lý yêu cầu phân quyền.' },
+        accessControlError(
+            'ACCESS_CONTROL_REQUEST_FAILED',
+            'Không thể xử lý yêu cầu phân quyền.',
+        ),
         { status: 500 },
     );
 }
@@ -68,7 +81,7 @@ export async function GET() {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -96,7 +109,7 @@ export async function PATCH(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -105,10 +118,10 @@ export async function PATCH(request: Request) {
 
     if (!parsed.success) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Dữ liệu cập nhật không hợp lệ.',
-            },
+            accessControlError(
+                'INVALID_ACCESS_CONTROL_REQUEST',
+                'Dữ liệu cập nhật không hợp lệ.',
+            ),
             { status: 400 },
         );
     }
@@ -138,7 +151,7 @@ export async function POST(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -148,7 +161,10 @@ export async function POST(request: Request) {
 
     if (!parsed.success) {
         return NextResponse.json(
-            { ok: false, error: 'Dữ liệu chức năng không hợp lệ.' },
+            accessControlError(
+                'INVALID_ACCESS_CONTROL_REQUEST',
+                'Dữ liệu chức năng không hợp lệ.',
+            ),
             { status: 400 },
         );
     }

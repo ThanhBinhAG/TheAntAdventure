@@ -11,7 +11,9 @@
 
 import type { ReactNode } from 'react';
 import { ConfigProvider } from 'antd';
+import enUS from 'antd/locale/en_US';
 import viVN from 'antd/locale/vi_VN';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type AccessControlUiProviderProps = {
     children: ReactNode;
@@ -20,9 +22,14 @@ type AccessControlUiProviderProps = {
 export default function AccessControlUiProvider({
     children,
 }: AccessControlUiProviderProps) {
+    // Dùng chung state EN/VN của Topbar để Access Control đổi ngôn ngữ đồng bộ CRM.
+    const { language } = useLanguage();
+
     return (
         <ConfigProvider
-            locale={viVN}
+            // Ant Design tự dịch các thành phần nội bộ như Pagination và DatePicker.
+            // Text do dự án tự viết sẽ được chuyển ở các giai đoạn tiếp theo qua tac().
+            locale={language === 'vi' ? viVN : enUS}
             theme={{
                 token: {
                     // Màu thương hiệu CRM hiện tại.

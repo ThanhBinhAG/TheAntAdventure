@@ -33,6 +33,13 @@ import {
     Tag,
     Tooltip,
 } from 'antd';
+import { useLanguage } from '@/hooks/useLanguage';
+import {
+    tac,
+    tacPermission,
+    tacPermissionGroup,
+    tacTemplate,
+} from '@/lib/i18n/pages/access-control';
 import { confirmDialog } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
 import { usePermissions } from '@/components/PermissionsProvider';
@@ -42,6 +49,7 @@ import {
     deleteAccessControlStaffRole,
     fetchAccessControlData,
     fetchAccessControlStaffRoles,
+    getAccessControlErrorMessage,
     updateAccessControlStaffRole,
     updateAccessControlStaffRolePermissions,
     type AccessControlPermission,
@@ -69,12 +77,14 @@ const EMPTY_PERMISSIONS: AccessControlPermission[] = [];
 type PermissionGroup = {
     code: string;
     label: string;
+    databaseLabel: string;
     sortOrder: number;
     items: AccessControlPermission[];
 };
 
 function groupPermissions(
     permissions: AccessControlPermission[],
+    language: 'en' | 'vi',
 ): PermissionGroup[] {
     const groups = new Map<string, PermissionGroup>();
 
@@ -82,22 +92,41 @@ function groupPermissions(
         const group = groups.get(permission.group_code);
 
         if (group) {
-            group.items.push(permission);
+            group.items.push({
+                ...permission,
+                permission_description: tacPermission(
+                    permission.permission_code,
+                    permission.permission_description,
+                    language,
+                ),
+            });
             continue;
         }
 
         groups.set(permission.group_code, {
             code: permission.group_code,
-            label: permission.group_label,
+            label: tacPermissionGroup(
+                permission.group_code,
+                permission.group_label,
+                language,
+            ),
+            databaseLabel: permission.group_label,
             sortOrder: permission.group_sort_order,
-            items: [permission],
+            items: [{
+                ...permission,
+                permission_description: tacPermission(
+                    permission.permission_code,
+                    permission.permission_description,
+                    language,
+                ),
+            }],
         });
     }
 
     return [...groups.values()].sort(
         (first, second) =>
             first.sortOrder - second.sortOrder ||
-            first.label.localeCompare(second.label, 'vi'),
+            first.label.localeCompare(second.label, language),
     );
 }
 
@@ -106,6 +135,7 @@ function hasSamePermissions(first: string[], second: string[]) {
 }
 
 export default function RolesPermissionsTab() {
+    const { language } = useLanguage();
     /**
  * Chỉ chạy khi tab Role & quyền đã được mở.
  * AccessControlPage chỉ mount component này sau khi người dùng bấm tab.
@@ -133,11 +163,13 @@ export default function RolesPermissionsTab() {
         accessControlData?.canCreatePermission ?? false;
 
     const permissionsError =
-        permissionCatalogError instanceof Error
-            ? permissionCatalogError.message
-            : permissionCatalogError
-                ? 'Không thể tải dữ liệu permission.'
-                : null;
+        permissionCatalogError
+            ? getAccessControlErrorMessage(
+                permissionCatalogError,
+                language,
+                'loadPermissionsFailed',
+            )
+            : null;
 
     /** Tải lại catalog sau khi tạo permission hoặc nhóm permission mới. */
     const reloadPermissions = useCallback(async (): Promise<void> => {
@@ -170,7 +202,10 @@ export default function RolesPermissionsTab() {
         ?? roles.find((role) => role.is_active)
         ?? roles[0];
 
-    const permissionGroups = useMemo(() => groupPermissions(permissions), [permissions]);
+    const permissionGroups = useMemo(
+        () => groupPermissions(permissions, language),
+        [language, permissions],
+    );
     const visiblePermissionGroups = useMemo(
         () => filterPermissionGroupsByQuery(
             permissionGroups,
@@ -179,9 +214,15 @@ export default function RolesPermissionsTab() {
         [permissionGroups, permissionSearch],
     );
     const permissionGroupOptions = useMemo(
-        () => permissionGroups.map(({ code, label, sortOrder }) => ({
+        () => permissionGroups.map(({
             code,
             label,
+            databaseLabel,
+            sortOrder,
+        }) => ({
+            code,
+            label,
+            databaseLabel,
             sortOrder,
         })),
         [permissionGroups],
@@ -207,13 +248,13 @@ export default function RolesPermissionsTab() {
             await reloadPermissions();
             refreshAuditLogs();
             setPermissionCreateOpen(false);
-            toast.success('Đã thêm quyền hoặc nhóm quyền mới.');
+            toast.success(tac('createPermissionOrGroupSuccess', language));
         } catch (error) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể thêm quyền hoặc nhóm quyền mới.',
-            );
+            toast.error(getAccessControlErrorMessage(
+                error,
+                language,
+                'createPermissionOrGroupFailed',
+            ));
 
             // Không đóng Drawer khi lỗi để Super Admin sửa và gửi lại dữ liệu.
             throw error;
@@ -248,7 +289,7 @@ export default function RolesPermissionsTab() {
             refreshAuditLogs();
             setSelectedRoleCode(input.code);
             setCreateOpen(false);
-            toast.success('Đã tạo role nhân viên.');
+            toast.success(tac('staffRoleCreated', language));
         } finally {
             setSaving(false);
         }
@@ -261,9 +302,13 @@ export default function RolesPermissionsTab() {
             await reloadRoles();
             refreshAuditLogs();
             setEditingRole(null);
-            toast.success('Đã cập nhật role nhân viên.');
+            toast.success(tac('staffRoleUpdated', language));
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Không thể cập nhật role.');
+            toast.error(getAccessControlErrorMessage(
+                error,
+                language,
+                'updateRoleFailed',
+            ));
         } finally {
             setSaving(false);
         }
@@ -273,11 +318,13 @@ export default function RolesPermissionsTab() {
         if (!activeRole) return;
 
         const confirmed = await confirmDialog(
-            `Xóa role ${activeRole.role_label}? Permission của role này cũng sẽ bị xóa và không thể khôi phục.`,
+            tacTemplate('deleteRoleConfirmation', language, {
+                role: activeRole.role_label,
+            }),
             {
-                title: 'Xác nhận xóa role',
-                confirmLabel: 'Xóa role',
-                cancelLabel: 'Hủy',
+                title: tac('confirmDeleteRole', language),
+                confirmLabel: tac('deleteRoleButton', language),
+                cancelLabel: tac('cancel', language),
                 danger: true,
             },
         );
@@ -294,13 +341,13 @@ export default function RolesPermissionsTab() {
             ));
             // Role vừa xóa không còn hợp lệ để giữ làm lựa chọn hiện tại.
             setSelectedRoleCode(null);
-            toast.success('Đã xóa role nhân viên.');
+            toast.success(tac('staffRoleDeleted', language));
         } catch (error) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể xóa role nhân viên.',
-            );
+            toast.error(getAccessControlErrorMessage(
+                error,
+                language,
+                'deleteStaffRoleFailed',
+            ));
         } finally {
             setSaving(false);
         }
@@ -309,8 +356,16 @@ export default function RolesPermissionsTab() {
     async function handleSavePermissions() {
         if (!activeRole) return;
         const confirmed = await confirmDialog(
-            `Bạn sắp cập nhật ${selectedPermissionCodes.length} quyền cho role ${activeRole.role_label}.`,
-            { title: 'Xác nhận cập nhật quyền', confirmLabel: 'Lưu quyền', cancelLabel: 'Hủy', danger: false },
+            tacTemplate('updatePermissionsConfirmation', language, {
+                count: selectedPermissionCodes.length,
+                role: activeRole.role_label,
+            }),
+            {
+                title: tac('confirmUpdatePermissions', language),
+                confirmLabel: tac('savePermissions', language),
+                cancelLabel: tac('cancel', language),
+                danger: false,
+            },
         );
         if (!confirmed) return;
         setSaving(true);
@@ -323,47 +378,51 @@ export default function RolesPermissionsTab() {
                 delete next[activeRole.role_code];
                 return next;
             });
-            toast.success('Đã cập nhật permission của role.');
+            toast.success(tac('permissionsUpdated', language));
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Không thể cập nhật permission.');
+            toast.error(getAccessControlErrorMessage(
+                error,
+                language,
+                'updatePermissionsFailed',
+            ));
         } finally {
             setSaving(false);
         }
     }
 
     if (loadingPermissions) return <Skeleton active paragraph={{ rows: 12 }} />;
-    if (permissionsError) return <Alert type="error" showIcon message="Không thể tải permission" description={permissionsError} action={<Button size="small" onClick={() => void reloadPermissions()}>Thử lại</Button>} />;
+    if (permissionsError) return <Alert type="error" showIcon message={tac('loadPermissionsFailed', language)} description={permissionsError} action={<Button size="small" onClick={() => void reloadPermissions()}>{tac('retry', language)}</Button>} />;
     if (loadingRoles) return <Skeleton active paragraph={{ rows: 8 }} />;
-    if (rolesError) return <Alert type="error" showIcon message="Không thể tải role nhân viên" description={rolesError instanceof Error ? rolesError.message : 'Vui lòng thử lại.'} action={<Button size="small" onClick={() => void reloadRoles()}>Thử lại</Button>} />;
+    if (rolesError) return <Alert type="error" showIcon message={tac('loadRolesFailed', language)} description={getAccessControlErrorMessage(rolesError, language, 'retryMessage')} action={<Button size="small" onClick={() => void reloadRoles()}>{tac('retry', language)}</Button>} />;
 
     return (
         <div className={styles.rolesWorkspace}>
             <aside className={styles.roleList}>
                 <div className={styles.roleListHeader}>
                     <div>
-                        <h2 className={styles.sectionTitle}>Danh sách role</h2>
-                        <p className={styles.sectionDescription}>Mỗi role có thể dùng cho nhiều nhân viên.</p>
+                        <h2 className={styles.sectionTitle}>{tac('roleList', language)}</h2>
+                        <p className={styles.sectionDescription}>{tac('roleListDescription', language)}</p>
                     </div>
-                    <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>Thêm role</Button>
+                    <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>{tac('addRole', language)}</Button>
                 </div>
 
                 {roles.length === 0 ? (
-                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có role nhân viên" />
+                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tac('noStaffRoles', language)} />
                 ) : roles.map((role) => (
                     <button key={role.role_code} type="button" className={`${styles.roleChoice} ${activeRole?.role_code === role.role_code ? styles.roleChoiceActive : ''}`} onClick={() => setSelectedRoleCode(role.role_code)}>
                         {/* Tách tên và số quyền thành hai vùng để chữ không bị chèn lên nhau. */}
                         <span className={styles.roleChoiceContent}>
                             <span className={styles.roleChoiceText}>
                                 <strong>{role.role_label}</strong>
-                                <small>{role.role_description || 'Chưa có mô tả.'}</small>
+                                <small>{role.role_description || tac('noRoleDescription', language)}</small>
                             </span>
                             <span className={styles.roleChoiceCount}>
-                                {role.permission_codes.length} quyền
+                                {role.permission_codes.length} {tac('permissionCount', language)}
                             </span>
                         </span>
                         <span className={styles.roleChoiceFooter}>
-                            <span>{role.assigned_user_count} nhân viên</span>
-                            {!role.is_active && <Tag color="default">Ngừng dùng</Tag>}
+                            <span>{role.assigned_user_count} {tac('employeeCount', language)}</span>
+                            {!role.is_active && <Tag color="default">{tac('inactiveRoleBadge', language)}</Tag>}
                         </span>
                     </button>
                 ))}
@@ -371,20 +430,20 @@ export default function RolesPermissionsTab() {
 
             <section className={styles.permissionWorkspace}>
                 {!activeRole ? (
-                    <Empty description="Hãy tạo role nhân viên đầu tiên." />
+                    <Empty description={tac('createFirstRole', language)} />
                 ) : (
                     <>
                         <header className={styles.permissionWorkspaceHeader}>
                             <div>
-                                <h2 className={styles.sectionTitle}>Cấu hình quyền: {activeRole.role_label}</h2>
-                                <p className={styles.sectionDescription}>{activeRole.role_description || 'Chỉnh sửa quyền được cấp cho role này.'}</p>
+                                <h2 className={styles.sectionTitle}>{tacTemplate('configureRole', language, { role: activeRole.role_label })}</h2>
+                                <p className={styles.sectionDescription}>{activeRole.role_description || tac('editRolePermissionsHint', language)}</p>
                             </div>
                             <div className={styles.permissionWorkspaceActions}>
-                                <Button icon={<EditOutlined />} onClick={() => setEditingRole(activeRole)}>Sửa role</Button>
+                                <Button icon={<EditOutlined />} onClick={() => setEditingRole(activeRole)}>{tac('editRoleButton', language)}</Button>
                                 <Tooltip
                                     title={activeRole.assigned_user_count > 0
-                                        ? `Cần chuyển ${activeRole.assigned_user_count} nhân viên sang role khác trước.`
-                                        : 'Xóa role này'}
+                                        ? tacTemplate('moveUsersBeforeDelete', language, { count: activeRole.assigned_user_count })
+                                        : tac('deleteRoleHint', language)}
                                 >
                                     {/* span giúp Tooltip vẫn hoạt động khi Button bị disabled. */}
                                     <span>
@@ -394,7 +453,7 @@ export default function RolesPermissionsTab() {
                                             disabled={saving || activeRole.assigned_user_count > 0}
                                             onClick={() => void handleDeleteRole()}
                                         >
-                                            Xóa role
+                                            {tac('deleteRoleButton', language)}
                                         </Button>
                                     </span>
                                 </Tooltip>
@@ -405,13 +464,14 @@ export default function RolesPermissionsTab() {
                                 {formatPermissionAssignmentSummary(
                                     selectedPermissionCodes.length,
                                     permissions.length,
+                                    tac('permissionSummary', language),
                                 )}
                             </span>
                             {/* Catalog là dữ liệu toàn hệ thống, không phải quyền của riêng role đang chọn. */}
                             {canManagePermissionCatalog && (
                                 <div className={styles.permissionCatalogAction}>
                                     <span className={styles.permissionCatalogNote}>
-                                        Chỉ Super Admin
+                                        {tac('superAdminOnly', language)}
                                     </span>
                                     <Button
                                         type="link"
@@ -419,22 +479,22 @@ export default function RolesPermissionsTab() {
                                         className={styles.permissionCatalogButton}
                                         onClick={() => setPermissionCreateOpen(true)}
                                     >
-                                        Thêm quyền / nhóm quyền
+                                        {tac('addPermissionOrGroup', language)}
                                     </Button>
                                 </div>
                             )}
                         </div>
                         <Input
-                            aria-label="Tìm quyền hoặc nhóm chức năng"
+                            aria-label={tac('searchPermissions', language)}
                             allowClear
                             className={styles.permissionSearch}
-                            placeholder="Tìm quyền hoặc nhóm chức năng..."
+                            placeholder={tac('searchPermissions', language)}
                             prefix={<SearchOutlined />}
                             value={permissionSearch}
                             onChange={(event) => setPermissionSearch(event.target.value)}
                         />
                         {!activeRole.is_active ? (
-                            <Alert type="warning" showIcon message="Role này đã ngừng sử dụng." description="Không thể sửa permission của role đang ngừng sử dụng." />
+                            <Alert type="warning" showIcon message={tac('roleDisabled', language)} description={tac('roleInactiveDescription', language)} />
                         ) : (
                             <>
                                 <div className={styles.permissionGroups}>
@@ -442,7 +502,7 @@ export default function RolesPermissionsTab() {
                                         <Empty
                                             className={styles.permissionSearchEmpty}
                                             image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                            description="Không tìm thấy quyền hoặc nhóm chức năng phù hợp"
+                                            description={tac('noMatchingPermissions', language)}
                                         />
                                     ) : visiblePermissionGroups.map((group) => {
                                         const codes = group.items.map((item) => item.permission_code);
@@ -451,11 +511,11 @@ export default function RolesPermissionsTab() {
                                             <div className={styles.permissionGroupHeader}>
                                                 <div className={styles.permissionGroupTitle}>
                                                     <strong>{group.label}</strong>
-                                                    <span>{selectedCount}/{codes.length} quyền</span>
+                                                    <span>{selectedCount}/{codes.length} {tac('permissionCount', language)}</span>
                                                 </div>
                                                 {codes.length > 1 && !permissionSearch.trim() && (
                                                     <Checkbox
-                                                        aria-label={`Chọn tất cả quyền trong nhóm ${group.label}`}
+                                                        aria-label={tacTemplate('selectAllGroupPermissions', language, { group: group.label })}
                                                         checked={selectedCount === codes.length}
                                                         indeterminate={selectedCount > 0 && selectedCount < codes.length}
                                                         disabled={saving}
@@ -472,17 +532,17 @@ export default function RolesPermissionsTab() {
                                 <div className={styles.permissionSaveBar}>
                                     <span aria-live="polite">
                                         {hasChanges
-                                            ? 'Có thay đổi chưa lưu.'
-                                            : 'Chưa có thay đổi cần lưu.'}
+                                            ? tac('unsavedChanges', language)
+                                            : tac('noUnsavedChanges', language)}
                                     </span>
                                     <div className={styles.permissionSaveActions}>
                                         <Button
                                             disabled={!hasChanges || saving}
                                             onClick={handleDiscardPermissionChanges}
                                         >
-                                            Hủy thay đổi
+                                            {tac('discardChanges', language)}
                                         </Button>
-                                        <Button icon={<SaveOutlined />} type="primary" loading={saving} disabled={!hasChanges} onClick={() => void handleSavePermissions()}>Lưu thay đổi</Button>
+                                        <Button icon={<SaveOutlined />} type="primary" loading={saving} disabled={!hasChanges} onClick={() => void handleSavePermissions()}>{tac('savePermissions', language)}</Button>
                                     </div>
                                 </div>
                             </>

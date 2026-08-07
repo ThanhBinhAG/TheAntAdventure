@@ -26,12 +26,15 @@ import {
     Tag,
 } from 'antd';
 import type { TableColumnsType } from 'antd';
+import { useLanguage } from '@/hooks/useLanguage';
+import { tac } from '@/lib/i18n/pages/access-control';
 import { toast } from '@/lib/toast';
 import UserAccessDrawer from './UserAccessDrawer';
 import {
     createAccessControlUser,
     fetchAccessControlStaffRoles,
     fetchAccessControlUsersPage,
+    getAccessControlErrorMessage,
     updateUserRole,
     type AccessControlAssignableRole,
     type AccessControlStaffRole,
@@ -66,8 +69,9 @@ function toUserRoleOption(
 function roleLabel(
     roleCode: ManagedRoleCode | null,
     roleByCode: ReadonlyMap<string, AccessControlAssignableRole>,
+    unassignedRoleLabel: string,
 ): string {
-    if (!roleCode) return 'Chưa gán role';
+    if (!roleCode) return unassignedRoleLabel;
 
     // Nếu dữ liệu role cũ không còn tồn tại, hiện code để dễ kiểm tra.
     return roleByCode.get(roleCode)?.role_label ?? roleCode;
@@ -96,6 +100,7 @@ const SYSTEM_ADMIN_ROLE: AccessControlAssignableRole = {
 };
 
 export default function UserDirectory() {
+    const { language } = useLanguage();
     const refreshAuditLogs = useRefreshAccessControlAuditLogs();
     const [keywordInput, setKeywordInput] = useState('');
     const [keyword, setKeyword] = useState('');
@@ -161,23 +166,25 @@ export default function UserDirectory() {
     /** Bộ lọc tự có role mới tạo như Sale mà không cần sửa code lần nữa. */
     const roleFilterOptions = useMemo(
         () => [
-            { value: 'all', label: 'Tất cả role' },
+            { value: 'all', label: tac('allRoles', language) },
             ...userRoleOptions.map((role) => ({
                 value: role.role_code,
                 label: role.is_active
                     ? role.role_label
-                    : `${role.role_label} (ngừng dùng)`,
+                    : `${role.role_label} ${tac('roleDisabledSuffix', language)}`,
             })),
         ],
-        [userRoleOptions],
+        [language, userRoleOptions],
     );
 
     const staffRolesErrorMessage =
-        staffRolesError instanceof Error
-            ? staffRolesError.message
-            : staffRolesError
-                ? 'Không thể tải danh sách role.'
-                : null;
+        staffRolesError
+            ? getAccessControlErrorMessage(
+                staffRolesError,
+                language,
+                'loadRolesFailed',
+            )
+            : null;
 
     /**
      * Khóa cache xác định một danh sách user cụ thể.
@@ -236,11 +243,13 @@ export default function UserDirectory() {
 
     /** Đổi lỗi kỹ thuật của SWR thành text an toàn để hiển thị. */
     const errorMessage =
-        error instanceof Error
-            ? error.message
-            : error
-                ? 'Không thể tải danh sách user.'
-                : null;
+        error
+            ? getAccessControlErrorMessage(
+                error,
+                language,
+                'loadUsersFailed',
+            )
+            : null;
 
     const [selectedUser, setSelectedUser] =
         useState<AccessControlUser | null>(null);
@@ -263,18 +272,18 @@ export default function UserDirectory() {
         try {
             await updateUserRole(userId, roleCode);
 
-            toast.success('Đã cập nhật role người dùng.');
+            toast.success(tac('userRoleUpdated', language));
             setSelectedUser(null);
 
             // Tải lại đúng trang đang xem để role mới hiển thị ngay.
             await refreshUsers();
             refreshAuditLogs();
         } catch (error) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể cập nhật role người dùng.',
-            );
+            toast.error(getAccessControlErrorMessage(
+                error,
+                language,
+                'updateUserRoleFailed',
+            ));
         } finally {
             setSavingRole(false);
         }
@@ -289,17 +298,17 @@ export default function UserDirectory() {
         try {
             await updateUserDisplayName(userId, displayName);
 
-            toast.success('Đã cập nhật thông tin người dùng.');
+            toast.success(tac('userProfileUpdated', language));
             setEditingUser(null);
 
             await refreshUsers();
             refreshAuditLogs();
         } catch (error) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể cập nhật thông tin user.',
-            );
+            toast.error(getAccessControlErrorMessage(
+                error,
+                language,
+                'updateUserFailed',
+            ));
         } finally {
             setSavingEdit(false);
         }
@@ -314,11 +323,11 @@ export default function UserDirectory() {
         try {
             await createAccessControlUser(input);
         } catch (error) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể tạo tài khoản.',
-            );
+            toast.error(getAccessControlErrorMessage(
+                error,
+                language,
+                'createUserFailed',
+            ));
 
             // Drawer bắt lỗi này để giữ nguyên dữ liệu form cho người dùng sửa.
             throw error;
@@ -326,7 +335,7 @@ export default function UserDirectory() {
             setSavingCreate(false);
         }
 
-        toast.success('Đã tạo tài khoản và gán role ban đầu.');
+        toast.success(tac('userCreated', language));
         setIsCreateDrawerOpen(false);
         refreshAuditLogs();
 
@@ -351,12 +360,12 @@ export default function UserDirectory() {
 
     const columns: TableColumnsType<AccessControlUser> = [
         {
-            title: 'Người dùng',
+            title: tac('user', language),
             key: 'user',
             render: (_value: unknown, user) => (
                 <div>
                     <strong>
-                        {user.display_name || user.email || 'Chưa đặt tên'}
+                        {user.display_name || user.email || tac('unnamedUser', language)}
                     </strong>
 
                     {user.display_name && user.email && (
@@ -368,22 +377,28 @@ export default function UserDirectory() {
             ),
         },
         {
-            title: 'Role',
+            title: tac('role', language),
             key: 'role',
             width: 150,
             render: (_value: unknown, user) => (
                 <Tag color={roleColor(user.role_code)}>
-                    {roleLabel(user.role_code, roleByCode)}
+                    {roleLabel(
+                        user.role_code,
+                        roleByCode,
+                        tac('unassignedRole', language),
+                    )}
                 </Tag>
             ),
         },
         {
-            title: 'Trạng thái',
+            title: tac('status', language),
             key: 'status',
             width: 130,
             render: (_value: unknown, user) => (
                 <Tag color={user.is_active ? 'green' : 'red'}>
-                    {user.is_active ? 'Hoạt động' : 'Đã khóa'}
+                    {user.is_active
+                        ? tac('active', language)
+                        : tac('locked', language)}
                 </Tag>
             ),
         },
@@ -401,7 +416,7 @@ export default function UserDirectory() {
         //     },
         // },
         {
-            title: 'Thao tác',
+            title: tac('actions', language),
             key: 'actions',
             width: 165,
             render: (_value: unknown, user) => (
@@ -416,7 +431,7 @@ export default function UserDirectory() {
                         }
                         onClick={() => setSelectedUser(user)}
                     >
-                        Phân quyền
+                        {tac('managePermissions', language)}
                     </Button>
 
                     <UserActionsMenu
@@ -434,7 +449,7 @@ export default function UserDirectory() {
             <div className={styles.userToolbar}>
                 <Input.Search
                     allowClear
-                    placeholder="Tìm theo tên hoặc email"
+                    placeholder={tac('searchUsers', language)}
                     value={keywordInput}
                     onChange={(event) => {
                         setKeywordInput(event.target.value);
@@ -457,9 +472,9 @@ export default function UserDirectory() {
                 <Select<UserListStatusFilter>
                     value={statusFilter}
                     options={[
-                        { value: 'all', label: 'Mọi trạng thái' },
-                        { value: 'active', label: 'Hoạt động' },
-                        { value: 'inactive', label: 'Đã khóa' },
+                        { value: 'all', label: tac('allStatuses', language) },
+                        { value: 'active', label: tac('active', language) },
+                        { value: 'inactive', label: tac('locked', language) },
                     ]}
                     onChange={(value) => {
                         setStatusFilter(value);
@@ -478,7 +493,7 @@ export default function UserDirectory() {
                     }
                     onClick={() => setIsCreateDrawerOpen(true)}
                 >
-                    Thêm người dùng mới
+                    {tac('addNewUser', language)}
                 </Button>
             </div>
 
@@ -486,14 +501,14 @@ export default function UserDirectory() {
                 <Alert
                     showIcon
                     type="error"
-                    message="Không thể tải danh sách user"
+                    message={tac('loadUsersFailed', language)}
                     description={errorMessage}
                     action={
                         <Button
                             size="small"
                             onClick={() => void refreshUsers()}
                         >
-                            Thử lại
+                            {tac('retry', language)}
                         </Button>
                     }
                 />
@@ -503,7 +518,7 @@ export default function UserDirectory() {
                 <Alert
                     showIcon
                     type="error"
-                    message="Không thể tải role"
+                    message={tac('loadRolesFailed', language)}
                     description={staffRolesErrorMessage}
                 />
             )}

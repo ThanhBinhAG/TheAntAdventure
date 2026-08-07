@@ -18,8 +18,12 @@ import {
 import type { TableColumnsType } from 'antd';
 import {
     fetchAuthLoginEvents,
+    getAccessControlErrorMessage,
     type AuthLoginEvent,
 } from './access-control-api';
+import { useLanguage } from '@/hooks/useLanguage';
+import { tac } from '@/lib/i18n/pages/access-control';
+import type { AppLanguage } from '@/lib/i18n/stages';
 import styles from './AccessControlPage.module.css';
 
 const LOGIN_HISTORY_KEY = 'access-control/login-history';
@@ -54,26 +58,29 @@ const EMPTY_FILTERS: FilterForm = {
     to: '',
 };
 
-function formatDateTime(value: string): string {
+function formatDateTime(value: string, language: AppLanguage): string {
     const date = new Date(value);
 
     if (Number.isNaN(date.getTime())) return value;
 
-    return new Intl.DateTimeFormat('vi-VN', {
+    return new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-US', {
         dateStyle: 'short',
         timeStyle: 'medium',
     }).format(date);
 }
 
-function getUserName(event: AuthLoginEvent): string {
+function getUserName(
+    event: AuthLoginEvent,
+    language: AppLanguage,
+): string {
     if (event.authMethod === 'break_glass') {
-        return 'Truy cập khẩn cấp';
+        return tac('emergencyAccess', language);
     }
 
     return (
         event.userDisplayName ??
         event.userEmail ??
-        'Người dùng đã bị xoá'
+        tac('deletedUser', language)
     );
 }
 
@@ -89,6 +96,7 @@ function toIsoOrUndefined(value: string): string | undefined {
 }
 
 export default function LoginHistoryTab() {
+    const { language } = useLanguage();
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [filterForm, setFilterForm] =
@@ -138,7 +146,7 @@ export default function LoginHistoryTab() {
 
         if (from && to && from > to) {
             setFilterError(
-                'Thời gian bắt đầu phải trước thời gian kết thúc.',
+                tac('loginTimeRangeInvalid', language),
             );
             return;
         }
@@ -162,25 +170,27 @@ export default function LoginHistoryTab() {
     };
 
     const errorMessage =
-        error instanceof Error
-            ? error.message
-            : error
-                ? 'Không thể tải lịch sử đăng nhập.'
-                : null;
+        error
+            ? getAccessControlErrorMessage(
+                error,
+                language,
+                'loadLoginHistoryFailed',
+            )
+            : null;
 
     const columns: TableColumnsType<AuthLoginEvent> = [
         {
-            title: 'Thời gian',
+            title: tac('time', language),
             dataIndex: 'createdAt',
             width: 170,
-            render: (value: string) => formatDateTime(value),
+            render: (value: string) => formatDateTime(value, language),
         },
         {
-            title: 'Người dùng',
+            title: tac('user', language),
             key: 'user',
             render: (_value: unknown, event) => (
                 <div>
-                    <strong>{getUserName(event)}</strong>
+                    <strong>{getUserName(event, language)}</strong>
 
                     {event.userDisplayName && event.userEmail && (
                         <div className={styles.userEmail}>
@@ -191,7 +201,7 @@ export default function LoginHistoryTab() {
             ),
         },
         {
-            title: 'Thiết bị',
+            title: tac('device', language),
             key: 'device',
             render: (_value: unknown, event) => (
                 `${event.browserName} • ${event.operatingSystem}`
@@ -202,18 +212,18 @@ export default function LoginHistoryTab() {
             dataIndex: 'ipAddress',
             width: 150,
             render: (value: string | null) => (
-                value ?? 'Không xác định'
+                value ?? tac('unknown', language)
             ),
         },
         {
-            title: 'Phương thức',
+            title: tac('authMethod', language),
             dataIndex: 'authMethod',
             width: 140,
             render: (value: AuthLoginEvent['authMethod']) => (
                 <Tag color={value === 'break_glass' ? 'orange' : 'green'}>
                     {value === 'break_glass'
-                        ? 'Khẩn cấp'
-                        : 'Mật khẩu'}
+                        ? tac('emergencyAccess', language)
+                        : tac('password', language)}
                 </Tag>
             ),
         },
@@ -224,24 +234,23 @@ export default function LoginHistoryTab() {
             <header className={styles.auditHeader}>
                 <div>
                     <h2 className={styles.sectionTitle}>
-                        Lịch sử đăng nhập
+                        {tac('loginHistory', language)}
                     </h2>
                     <p className={styles.sectionDescription}>
-                        Theo dõi lần đăng nhập thành công và thông tin
-                        thiết bị của người dùng.
+                        {tac('loginHistoryDescription', language)}
                     </p>
                 </div>
 
                 <Button onClick={() => void refreshEvents()}>
-                    Tải lại
+                    {tac('refresh', language)}
                 </Button>
             </header>
 
             <div className={styles.loginHistoryFilters}>
                 <Input
                     allowClear
-                    aria-label="Tìm người dùng theo tên hoặc email"
-                    placeholder="Tên hoặc email người dùng"
+                    aria-label={tac('findUser', language)}
+                    placeholder={tac('userNameOrEmail', language)}
                     value={filterForm.userQuery}
                     onChange={(event) => {
                         setFilterForm((current) => ({
@@ -254,8 +263,8 @@ export default function LoginHistoryTab() {
 
                 <Input
                     allowClear
-                    aria-label="Lọc theo địa chỉ IP"
-                    placeholder="Địa chỉ IP"
+                    aria-label={tac('filterIpAddress', language)}
+                    placeholder={tac('ipAddress', language)}
                     value={filterForm.ipAddress}
                     onChange={(event) => {
                         setFilterForm((current) => ({
@@ -268,14 +277,14 @@ export default function LoginHistoryTab() {
 
                 <Select<DeviceType>
                     allowClear
-                    aria-label="Lọc theo loại thiết bị"
-                    placeholder="Tất cả thiết bị"
+                    aria-label={tac('filterDeviceType', language)}
+                    placeholder={tac('allDevices', language)}
                     value={filterForm.deviceType}
                     options={[
-                        { value: 'desktop', label: 'Máy tính' },
-                        { value: 'mobile', label: 'Điện thoại' },
-                        { value: 'tablet', label: 'Máy tính bảng' },
-                        { value: 'unknown', label: 'Không xác định' },
+                        { value: 'desktop', label: tac('desktop', language) },
+                        { value: 'mobile', label: tac('mobile', language) },
+                        { value: 'tablet', label: tac('tablet', language) },
+                        { value: 'unknown', label: tac('unknown', language) },
                     ]}
                     onChange={(deviceType) => {
                         setFilterForm((current) => ({
@@ -287,7 +296,7 @@ export default function LoginHistoryTab() {
 
                 <div className={styles.loginHistoryDateRange}>
                     <Input
-                        aria-label="Từ thời gian"
+                        aria-label={tac('fromTime', language)}
                         type="datetime-local"
                         value={filterForm.from}
                         onChange={(event) => {
@@ -299,7 +308,7 @@ export default function LoginHistoryTab() {
                     />
 
                     <Input
-                        aria-label="Đến thời gian"
+                        aria-label={tac('toTime', language)}
                         type="datetime-local"
                         value={filterForm.to}
                         onChange={(event) => {
@@ -313,11 +322,11 @@ export default function LoginHistoryTab() {
 
                 <div className={styles.loginHistoryFilterActions}>
                     <Button type="primary" onClick={applyFilters}>
-                        Lọc
+                        {tac('filter', language)}
                     </Button>
 
                     <Button onClick={clearFilters}>
-                        Xóa lọc
+                        {tac('clearFilters', language)}
                     </Button>
                 </div>
             </div>
@@ -334,14 +343,14 @@ export default function LoginHistoryTab() {
                 <Alert
                     type="error"
                     showIcon
-                    message="Không thể tải lịch sử đăng nhập"
+                    message={tac('loadLoginHistoryFailed', language)}
                     description={errorMessage}
                     action={
                         <Button
                             size="small"
                             onClick={() => void refreshEvents()}
                         >
-                            Thử lại
+                            {tac('retry', language)}
                         </Button>
                     }
                 />
@@ -354,7 +363,7 @@ export default function LoginHistoryTab() {
                     scroll={{ x: 760 }}
                     locale={{
                         emptyText: (
-                            <Empty description="Không có lịch sử phù hợp." />
+                            <Empty description={tac('noMatchingLoginHistory', language)} />
                         ),
                     }}
                     pagination={{

@@ -31,11 +31,19 @@ import {
 } from 'antd';
 import {
     fetchAccessControlData,
+    getAccessControlErrorMessage,
     type AccessControlAssignableRole,
     type AccessControlPermission,
     type AccessControlUser,
     type ManagedRoleCode,
 } from './access-control-api';
+import { useLanguage } from '@/hooks/useLanguage';
+import {
+    tac,
+    tacPermission,
+    tacPermissionGroup,
+    tacTemplate,
+} from '@/lib/i18n/pages/access-control';
 import styles from './AccessControlPage.module.css';
 
 type UserAccessDrawerProps = {
@@ -52,26 +60,6 @@ type UserAccessDrawerProps = {
 /** Mảng rỗng dùng chung để useMemo không nhận một `[]` mới mỗi lần render. */
 const EMPTY_PERMISSIONS: AccessControlPermission[] = [];
 
-/** Đổi tên nhóm kỹ thuật thành tên dễ hiểu trên giao diện. */
-function getPermissionGroupLabel(permissionCode: string): string {
-    const groupCode = permissionCode.split('.')[0];
-
-    const labels: Record<string, string> = {
-        dashboard: 'Bảng điều hành',
-        customers: 'Khách hàng',
-        sales: 'Bán hàng',
-        pricing: 'Báo giá',
-        products: 'Sản phẩm',
-        gallery: 'Thư viện ảnh',
-        planner: 'Kế hoạch',
-        weather: 'Thời tiết',
-        teamchat: 'Team chat',
-        users: 'Quản lý người dùng',
-    };
-
-    return labels[groupCode] ?? 'Chức năng khác';
-}
-
 export default function UserAccessDrawer({
     user,
     roles,
@@ -79,6 +67,7 @@ export default function UserAccessDrawer({
     onClose,
     onSave,
 }: UserAccessDrawerProps) {
+    const { language } = useLanguage();
     const [selectedRole, setSelectedRole] =
         useState<ManagedRoleCode>(
             () => user?.role_code ??
@@ -126,11 +115,13 @@ export default function UserAccessDrawer({
         permissionCatalogData?.permissions ?? EMPTY_PERMISSIONS;
 
     const permissionsError =
-        permissionCatalogError instanceof Error
-            ? permissionCatalogError.message
-            : permissionCatalogError
-                ? 'Không thể tải mô tả quyền.'
-                : null;
+        permissionCatalogError
+            ? getAccessControlErrorMessage(
+                permissionCatalogError,
+                language,
+                'loadPermissionDescriptionsFailed',
+            )
+            : null;
 
     /**
      * Không gửi request nếu role không đổi hoặc role đang ngừng dùng.
@@ -156,7 +147,12 @@ export default function UserAccessDrawer({
         const groups = new Map<string, string[]>();
 
         for (const permissionCode of selectedRoleInfo.permission_codes) {
-            const groupName = getPermissionGroupLabel(permissionCode);
+            const groupCode = permissionCode.split('.')[0];
+            const groupName = tacPermissionGroup(
+                groupCode,
+                tac('otherFeatureGroup', language),
+                language,
+            );
             const currentGroup = groups.get(groupName) ?? [];
 
             currentGroup.push(permissionCode);
@@ -166,7 +162,10 @@ export default function UserAccessDrawer({
         return Array.from(groups.entries()).map(
             ([groupName, permissionCodes]) => ({
                 key: groupName,
-                label: `${groupName} (${permissionCodes.length} quyền)`,
+                label: tacTemplate('permissionGroupSummary', language, {
+                    group: groupName,
+                    count: permissionCodes.length,
+                }),
                 children: (
                     <div className={styles.effectivePermissionList}>
                         {permissionCodes.map((permissionCode) => (
@@ -175,8 +174,12 @@ export default function UserAccessDrawer({
                                 className={styles.effectivePermissionItem}
                             >
                                 <strong>
-                                    {descriptionByCode.get(permissionCode) ??
-                                        permissionCode}
+                                    {tacPermission(
+                                        permissionCode,
+                                        descriptionByCode.get(permissionCode) ??
+                                            permissionCode,
+                                        language,
+                                    )}
                                 </strong>
 
                                 <code>{permissionCode}</code>
@@ -186,7 +189,7 @@ export default function UserAccessDrawer({
                 ),
             }),
         );
-    }, [hasFullAccess, permissions, selectedRoleInfo]);
+    }, [hasFullAccess, language, permissions, selectedRoleInfo]);
 
     async function handleSave() {
         if (!user || !canSaveRole) return;
@@ -196,7 +199,7 @@ export default function UserAccessDrawer({
 
     return (
         <Drawer
-            title="Phân quyền người dùng"
+            title={tac('assignUserRole', language)}
             open={Boolean(user)}
             width={560}
             onClose={onClose}
@@ -209,26 +212,26 @@ export default function UserAccessDrawer({
                         column={1}
                         size="small"
                     >
-                        <Descriptions.Item label="Người dùng">
-                            {user.display_name || 'Chưa đặt tên'}
+                        <Descriptions.Item label={tac('user', language)}>
+                            {user.display_name || tac('unnamedUser', language)}
                         </Descriptions.Item>
 
-                        <Descriptions.Item label="Email">
-                            {user.email || 'Chưa có email'}
+                        <Descriptions.Item label={tac('email', language)}>
+                            {user.email || tac('noEmail', language)}
                         </Descriptions.Item>
 
-                        <Descriptions.Item label="Trạng thái">
+                        <Descriptions.Item label={tac('status', language)}>
                             <Tag color={user.is_active ? 'green' : 'red'}>
                                 {user.is_active
-                                    ? 'Hoạt động'
-                                    : 'Đã khóa'}
+                                    ? tac('active', language)
+                                    : tac('locked', language)}
                             </Tag>
                         </Descriptions.Item>
                     </Descriptions>
 
                     <div className={styles.drawerField}>
                         <label htmlFor="user-role-select">
-                            Role của người dùng
+                            {tac('role', language)}
                         </label>
 
                         <Select
@@ -240,14 +243,17 @@ export default function UserAccessDrawer({
                                 value: role.role_code,
                                 label: role.is_active
                                     ? role.role_label
-                                    : `${role.role_label} (ngừng dùng)`,
+                                    : `${role.role_label} ${tac(
+                                        'roleDisabledSuffix',
+                                        language,
+                                    )}`,
                                 disabled: !role.is_active,
                             }))}
                         />
 
                         <p>
                             {selectedRoleInfo?.role_description ??
-                                'Role chưa có mô tả.'}
+                                tac('noRoleDescription', language)}
                         </p>
                     </div>
 
@@ -255,8 +261,8 @@ export default function UserAccessDrawer({
                         <Alert
                             type="warning"
                             showIcon
-                            message="Admin có toàn quyền hệ thống"
-                            description="Role này dùng permission wildcard (*), vì vậy có thể truy cập và quản lý toàn bộ chức năng."
+                            message={tac('fullAccessTitle', language)}
+                            description={tac('fullAccessDescription', language)}
                         />
                     ) : loadingPermissions ? (
                         <Skeleton active paragraph={{ rows: 6 }} />
@@ -264,29 +270,37 @@ export default function UserAccessDrawer({
                         <Alert
                             type="error"
                             showIcon
-                            message="Không thể tải danh sách quyền"
+                            message={tac('cannotLoadPermissions', language)}
                             description={permissionsError}
                             action={
                                 <Button
                                     size="small"
                                     onClick={() => void reloadPermissions()}
                                 >
-                                    Thử lại
+                                    {tac('retry', language)}
                                 </Button>
                             }
                         />
                     ) : (
                         <section className={styles.effectivePermissions}>
                             <div>
-                                <h3>Quyền hiệu lực sau khi lưu</h3>
+                                <h3>
+                                    {tac(
+                                        'effectivePermissionsAfterSave',
+                                        language,
+                                    )}
+                                </h3>
 
                                 <p>
-                                    Role này có{' '}
-                                    <strong>
-                                        {selectedRoleInfo?.permission_codes.length ??
-                                            0}
-                                    </strong>{' '}
-                                    quyền.
+                                    {tacTemplate(
+                                        'rolePermissionTotal',
+                                        language,
+                                        {
+                                            count:
+                                                selectedRoleInfo?.permission_codes
+                                                    .length ?? 0,
+                                        },
+                                    )}
                                 </p>
                             </div>
 
@@ -301,7 +315,7 @@ export default function UserAccessDrawer({
 
                     <div className={styles.drawerActions}>
                         <Button onClick={onClose} disabled={saving}>
-                            Hủy
+                            {tac('cancel', language)}
                         </Button>
 
                         <Button
@@ -310,7 +324,7 @@ export default function UserAccessDrawer({
                             disabled={saving || !canSaveRole}
                             onClick={() => void handleSave()}
                         >
-                            Lưu role
+                            {tac('saveRole', language)}
                         </Button>
                     </div>
                 </div>

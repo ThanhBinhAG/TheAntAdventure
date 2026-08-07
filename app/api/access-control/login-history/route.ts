@@ -8,6 +8,7 @@ import { getAuthContext } from '@/lib/auth/session';
 import {
     parseAuthLoginHistoryQuery,
 } from '@/lib/access-control/login-history-input';
+import { accessControlError } from '@/lib/access-control/api-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,10 +18,10 @@ function errorResponse(error: unknown) {
         error.code === '42501'
     ) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Chỉ Super Admin được xem lịch sử đăng nhập.',
-            },
+            accessControlError(
+                'LOGIN_HISTORY_FORBIDDEN',
+                'Chỉ Super Admin được xem lịch sử đăng nhập.',
+            ),
             { status: 403 },
         );
     }
@@ -30,16 +31,19 @@ function errorResponse(error: unknown) {
         error.code === '22023'
     ) {
         return NextResponse.json(
-            { ok: false, error: error.message },
+            accessControlError(
+                'INVALID_LOGIN_HISTORY_FILTER',
+                error.message,
+            ),
             { status: 400 },
         );
     }
 
     return NextResponse.json(
-        {
-            ok: false,
-            error: 'Không thể tải lịch sử đăng nhập.',
-        },
+        accessControlError(
+            'LOGIN_HISTORY_LOAD_FAILED',
+            'Không thể tải lịch sử đăng nhập.',
+        ),
         { status: 500 },
     );
 }
@@ -49,7 +53,7 @@ export async function GET(request: Request) {
 
     if (!auth.authenticated) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlError('AUTH_UNAUTHORIZED', 'Unauthorized'),
             { status: 401 },
         );
     }
@@ -60,10 +64,10 @@ export async function GET(request: Request) {
 
         if (!isSuperAdmin) {
             return NextResponse.json(
-                {
-                    ok: false,
-                    error: 'Chỉ Super Admin được xem lịch sử đăng nhập.',
-                },
+                accessControlError(
+                    'LOGIN_HISTORY_FORBIDDEN',
+                    'Chỉ Super Admin được xem lịch sử đăng nhập.',
+                ),
                 { status: 403 },
             );
         }
@@ -76,10 +80,10 @@ export async function GET(request: Request) {
 
     if (!parsed.success) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Bộ lọc lịch sử đăng nhập không hợp lệ.',
-            },
+            accessControlError(
+                'INVALID_LOGIN_HISTORY_FILTER',
+                'Bộ lọc lịch sử đăng nhập không hợp lệ.',
+            ),
             { status: 400 },
         );
     }

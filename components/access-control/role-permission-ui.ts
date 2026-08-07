@@ -12,8 +12,11 @@ export function discardRolePermissionDraft(
 export function formatPermissionAssignmentSummary(
     assignedCount: number,
     catalogCount: number,
+    template = 'Đã cấp {assigned} / {total} quyền',
 ): string {
-    return `Đã cấp ${assignedCount} / ${catalogCount} quyền`;
+    return template
+        .replace('{assigned}', String(assignedCount))
+        .replace('{total}', String(catalogCount));
 }
 
 type PermissionSearchItem = {

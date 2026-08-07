@@ -29,6 +29,8 @@ import type {
     CreateAccessControlUserInput,
     ManagedRoleCode,
 } from './access-control-api';
+import { useLanguage } from '@/hooks/useLanguage';
+import { tac } from '@/lib/i18n/pages/access-control';
 import styles from './AccessControlPage.module.css';
 
 type UserCreateDrawerProps = {
@@ -49,6 +51,7 @@ export default function UserCreateDrawer({
     onClose,
     onCreate,
 }: UserCreateDrawerProps) {
+    const { language } = useLanguage();
     const [email, setEmail] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [password, setPassword] = useState('');
@@ -92,22 +95,22 @@ export default function UserCreateDrawer({
         const normalizedName = displayName.trim();
 
         if (!normalizedEmail.includes('@')) {
-            setError('Vui lòng nhập email hợp lệ.');
+            setError(tac('invalidEmail', language));
             return;
         }
 
         if (!normalizedName) {
-            setError('Tên hiển thị không được để trống.');
+            setError(tac('displayNameRequired', language));
             return;
         }
 
         if (password.length < 8) {
-            setError('Mật khẩu cần ít nhất 8 ký tự.');
+            setError(tac('passwordMinLength', language));
             return;
         }
 
         if (password !== confirmPassword) {
-            setError('Xác nhận mật khẩu chưa khớp.');
+            setError(tac('passwordMismatch', language));
             return;
         }
 
@@ -115,7 +118,7 @@ export default function UserCreateDrawer({
             !selectedRoleCode ||
             !roles.some((role) => role.role_code === selectedRoleCode)
         ) {
-            setError('Vui lòng chọn role hợp lệ.');
+            setError(tac('validRoleRequired', language));
             return;
         }
 
@@ -138,7 +141,7 @@ export default function UserCreateDrawer({
 
     return (
         <Drawer
-            title="Thêm người dùng mới"
+            title={tac('addNewUser', language)}
             open={open}
             width={480}
             destroyOnHidden
@@ -153,8 +156,7 @@ export default function UserCreateDrawer({
                 }}
             >
                 <p className={styles.createUserHint}>
-                    Tài khoản sẽ được kích hoạt ngay và người dùng có thể
-                    đăng nhập bằng email cùng mật khẩu ban đầu này.
+                    {tac('createUserHint', language)}
                 </p>
 
                 {error && (
@@ -174,7 +176,7 @@ export default function UserCreateDrawer({
                         value={email}
                         disabled={saving}
                         maxLength={255}
-                        placeholder="nhanvien@company.com"
+                        placeholder={tac('emailExample', language)}
                         onChange={(event) => {
                             setEmail(event.target.value);
                         }}
@@ -183,7 +185,7 @@ export default function UserCreateDrawer({
 
                 <div className={styles.drawerField}>
                     <label htmlFor="new-user-display-name">
-                        Tên hiển thị
+                        {tac('displayName', language)}
                     </label>
                     <Input
                         id="new-user-display-name"
@@ -199,7 +201,9 @@ export default function UserCreateDrawer({
                 </div>
 
                 <div className={styles.drawerField}>
-                    <label htmlFor="new-user-role">Role ban đầu</label>
+                    <label htmlFor="new-user-role">
+                        {tac('initialRole', language)}
+                    </label>
                     <Select<ManagedRoleCode>
                         id="new-user-role"
                         value={selectedRoleCode ?? undefined}
@@ -214,7 +218,7 @@ export default function UserCreateDrawer({
 
                 <div className={styles.drawerField}>
                     <label htmlFor="new-user-password">
-                        Mật khẩu ban đầu
+                        {tac('initialPassword', language)}
                     </label>
                     <Input.Password
                         id="new-user-password"
@@ -222,7 +226,7 @@ export default function UserCreateDrawer({
                         value={password}
                         disabled={saving}
                         maxLength={72}
-                        placeholder="Ít nhất 8 ký tự"
+                        placeholder={tac('passwordMinimumHint', language)}
                         onChange={(event) => {
                             setPassword(event.target.value);
                         }}
@@ -231,7 +235,7 @@ export default function UserCreateDrawer({
 
                 <div className={styles.drawerField}>
                     <label htmlFor="new-user-confirm-password">
-                        Xác nhận mật khẩu
+                        {tac('confirmPassword', language)}
                     </label>
                     <Input.Password
                         id="new-user-confirm-password"
@@ -250,7 +254,7 @@ export default function UserCreateDrawer({
                         disabled={saving}
                         onClick={handleClose}
                     >
-                        Hủy
+                        {tac('cancel', language)}
                     </Button>
 
                     <Button
@@ -258,7 +262,7 @@ export default function UserCreateDrawer({
                         type="primary"
                         loading={saving}
                     >
-                        Tạo tài khoản
+                        {tac('addUser', language)}
                     </Button>
                 </div>
             </form>

@@ -13,8 +13,9 @@ import {
     Drawer,
     Form,
     Input,
-    InputNumber,
 } from 'antd';
+import { useLanguage } from '@/hooks/useLanguage';
+import { tac } from '@/lib/i18n/pages/access-control';
 import type {
     CreateAccessControlPermissionInput,
 } from './access-control-api';
@@ -23,6 +24,8 @@ import styles from './AccessControlPage.module.css';
 type PermissionGroupOption = {
     code: string;
     label: string;
+    /** Nhãn gốc database, dùng khi gửi API để không ghi đè bản dịch hiển thị. */
+    databaseLabel: string;
     sortOrder: number;
 };
 
@@ -43,23 +46,30 @@ export default function PermissionCreateDrawer({
     onClose,
     onSubmit,
 }: PermissionCreateDrawerProps) {
+    const { language } = useLanguage();
     const [form] = Form.useForm<CreateAccessControlPermissionInput>();
 
     async function handleFinish(
         values: CreateAccessControlPermissionInput,
     ) {
+        const groupCode = values.groupCode.trim();
+        const existingGroup = groups.find((group) => group.code === groupCode);
+
         await onSubmit({
             ...values,
             code: values.code.trim(),
             description: values.description.trim(),
-            groupCode: values.groupCode.trim(),
-            groupLabel: values.groupLabel.trim(),
+            groupCode,
+
+            // Với nhóm có sẵn, giữ nguyên label trong database. Nhờ vậy việc
+            // xem UI tiếng Anh không vô tình đổi dữ liệu nhóm sang tiếng Anh.
+            groupLabel: existingGroup?.databaseLabel ?? values.groupLabel.trim(),
         });
     }
 
     return (
         <Drawer
-            title="Thêm quyền / nhóm quyền"
+            title={tac('createPermissionOrGroup', language)}
             open={open}
             width={480}
             destroyOnHidden
@@ -75,17 +85,17 @@ export default function PermissionCreateDrawer({
                 onFinish={(values) => void handleFinish(values)}
             >
                 <Form.Item
-                    label="Mã nhóm chức năng"
+                    label={tac('groupCode', language)}
                     name="groupCode"
-                    extra="Chọn nhóm cũ hoặc nhập mã mới, ví dụ: reports."
+                    extra={tac('groupCodeHint', language)}
                     rules={[
                         {
                             required: true,
-                            message: 'Vui lòng nhập mã nhóm.',
+                            message: tac('groupCodeRequired', language),
                         },
                         {
                             pattern: /^[a-z][a-z0-9_]{1,49}$/,
-                            message: 'Chỉ dùng chữ thường, số và dấu gạch dưới.',
+                            message: tac('lowercaseCodeRule', language),
                         },
                     ]}
                 >
@@ -101,10 +111,7 @@ export default function PermissionCreateDrawer({
 
                             // Giảm nhập tay sai tên khi dùng nhóm đã tồn tại.
                             if (group) {
-                                form.setFieldValue(
-                                    'groupLabel',
-                                    group.label,
-                                );
+                                form.setFieldValue('groupLabel', group.label);
                             }
                         }}
                     >
@@ -113,41 +120,32 @@ export default function PermissionCreateDrawer({
                 </Form.Item>
 
                 <Form.Item
-                    label="Tên nhóm chức năng"
+                    label={tac('groupLabel', language)}
                     name="groupLabel"
-                    extra="Bắt buộc khi đây là nhóm mới."
+                    extra={tac('groupLabelHint', language)}
                     rules={[
                         {
                             required: true,
-                            message: 'Vui lòng nhập tên nhóm.',
+                            message: tac('groupLabelRequired', language),
                         },
                     ]}
                 >
-                    <Input placeholder="Báo cáo" />
+                    <Input placeholder={tac('exampleReports', language)} />
                 </Form.Item>
 
                 <Form.Item
-                    label="Thứ tự nhóm"
-                    name="groupSortOrder"
-                    extra="Có thể để trống; nhóm mới sẽ được đặt cuối danh sách."
-                >
-                    <InputNumber min={0} max={10_000} precision={0} />
-                </Form.Item>
-
-                <Form.Item
-                    label="Mã quyền"
+                    label={tac('permissionCode', language)}
                     name="code"
-                    extra="Mã kỹ thuật ổn định, ví dụ: reports.read."
+                    extra={tac('permissionCodeHint', language)}
                     rules={[
                         {
                             required: true,
-                            message: 'Vui lòng nhập mã quyền.',
+                            message: tac('permissionCodeRequired', language),
                         },
                         {
                             pattern:
                                 /^[a-z][a-z0-9_]{1,49}\.[a-z][a-z0-9_]{1,49}$/,
-                            message:
-                                'Mã phải theo dạng module.action.',
+                            message: tac('permissionCodeRule', language),
                         },
                     ]}
                 >
@@ -155,28 +153,28 @@ export default function PermissionCreateDrawer({
                 </Form.Item>
 
                 <Form.Item
-                    label="Tên chức năng"
+                    label={tac('permissionName', language)}
                     name="description"
                     rules={[
                         {
                             required: true,
-                            message: 'Vui lòng nhập tên chức năng.',
+                            message: tac('permissionNameRequired', language),
                         },
                     ]}
                 >
-                    <Input placeholder="Xem báo cáo" />
+                    <Input placeholder={tac('exampleViewReports', language)} />
                 </Form.Item>
 
                 <div className={styles.drawerActions}>
                     <Button onClick={onClose} disabled={saving}>
-                        Hủy
+                        {tac('cancel', language)}
                     </Button>
                     <Button
                         type="primary"
                         htmlType="submit"
                         loading={saving}
                     >
-                        Tạo quyền
+                        {tac('createPermission', language)}
                     </Button>
                 </div>
             </Form>

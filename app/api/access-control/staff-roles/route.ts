@@ -26,6 +26,10 @@ import {
     updateAccessControlStaffRoleBodySchema,
 } from '@/lib/access-control/staff-role-input';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
+import {
+    accessControlError,
+    accessControlPermissionError,
+} from '@/lib/access-control/api-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,17 +43,26 @@ function errorResponse(error: unknown) {
 
         if (response) {
             return NextResponse.json(
-                { ok: false, error: response.error },
+                accessControlError(
+                    error.code === '23505'
+                        ? 'ROLE_CODE_EXISTS'
+                        : error.code === '23503'
+                            ? 'ROLE_IN_USE'
+                            : error.code === '42501'
+                                ? 'ACCESS_DENIED'
+                                : 'INVALID_STAFF_ROLE_UPDATE_REQUEST',
+                    response.error,
+                ),
                 { status: response.status },
             );
         }
     }
 
     return NextResponse.json(
-        {
-            ok: false,
-            error: 'Không thể xử lý yêu cầu role nhân viên.',
-        },
+        accessControlError(
+            'STAFF_ROLE_OPERATION_FAILED',
+            'Không thể xử lý yêu cầu role nhân viên.',
+        ),
         { status: 500 },
     );
 }
@@ -62,7 +75,7 @@ export async function GET() {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -92,7 +105,7 @@ export async function POST(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -102,7 +115,10 @@ export async function POST(request: Request) {
 
     if (!parsed.success) {
         return NextResponse.json(
-            { ok: false, error: 'Dữ liệu role không hợp lệ.' },
+            accessControlError(
+                'INVALID_STAFF_ROLE_REQUEST',
+                'Dữ liệu role không hợp lệ.',
+            ),
             { status: 400 },
         );
     }
@@ -124,7 +140,7 @@ export async function PATCH(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -134,7 +150,10 @@ export async function PATCH(request: Request) {
 
     if (!parsed.success) {
         return NextResponse.json(
-            { ok: false, error: 'Dữ liệu cập nhật role không hợp lệ.' },
+            accessControlError(
+                'INVALID_STAFF_ROLE_UPDATE_REQUEST',
+                'Dữ liệu cập nhật role không hợp lệ.',
+            ),
             { status: 400 },
         );
     }
@@ -174,7 +193,7 @@ export async function DELETE(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -184,7 +203,10 @@ export async function DELETE(request: Request) {
 
     if (!parsed.success) {
         return NextResponse.json(
-            { ok: false, error: 'Mã role không hợp lệ.' },
+            accessControlError(
+                'INVALID_STAFF_ROLE_CODE',
+                'Mã role không hợp lệ.',
+            ),
             { status: 400 },
         );
     }

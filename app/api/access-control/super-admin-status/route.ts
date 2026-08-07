@@ -6,6 +6,10 @@ import {
 import {
     checkPermissionForRequest,
 } from '@/lib/auth/permissions-server';
+import {
+    accessControlError,
+    accessControlPermissionError,
+} from '@/lib/access-control/api-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +19,7 @@ export async function GET() {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -43,10 +47,10 @@ export async function GET() {
                 : 500;
 
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Không thể xác nhận quyền Super Admin.',
-            },
+            accessControlError(
+                'SUPER_ADMIN_STATUS_FAILED',
+                'Không thể xác nhận quyền Super Admin.',
+            ),
             { status },
         );
     }

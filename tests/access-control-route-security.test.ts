@@ -38,3 +38,19 @@ test('history routes keep server-side filters and authorization guards', () => {
   assert.match(loginSource, /isCurrentAccessControlSuperAdmin\(\)/);
   assert.match(loginSource, /status:\s*403/);
 });
+
+test('Access Control routes use the structured error contract', () => {
+  const routes = [
+    'app/api/access-control/route.ts',
+    'app/api/access-control/users/route.ts',
+    'app/api/access-control/staff-roles/route.ts',
+    'app/api/access-control/audit-logs/route.ts',
+    'app/api/access-control/login-history/route.ts',
+    'app/api/access-control/super-admin-status/route.ts',
+  ];
+
+  for (const path of routes) {
+    const source = readProjectFile(path);
+    assert.match(source, /accessControlError\(/);
+  }
+});

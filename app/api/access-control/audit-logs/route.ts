@@ -11,20 +11,16 @@
  */
 
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import {
     AccessControlRpcError,
     getAccessControlAuditLogs,
 } from '@/lib/access-control/server';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
+import {
+    accessControlAuditLogsQuerySchema,
+} from '@/lib/access-control/audit-log-input';
 
 export const dynamic = 'force-dynamic';
-
-/** Kiểm tra page và pageSize từ query string. */
-const querySchema = z.object({
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(100).default(20),
-});
 
 /** Chuyển lỗi RPC thành HTTP response an toàn. */
 function errorResponse(error: unknown) {
@@ -64,7 +60,7 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url);
 
-    const parsed = querySchema.safeParse({
+    const parsed = accessControlAuditLogsQuerySchema.safeParse({
         page: url.searchParams.get('page') ?? undefined,
         pageSize: url.searchParams.get('pageSize') ?? undefined,
     });

@@ -13,5 +13,8 @@ export function getStaffRoleRpcErrorResponse(
         };
     }
 
+    // Role vẫn được user_roles tham chiếu nên không thể xóa hoặc ngừng dùng.
+    if (code === '23503') return { status: 409, error: message };
+
     return null;
 }

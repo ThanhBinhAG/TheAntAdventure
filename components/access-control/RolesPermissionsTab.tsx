@@ -15,6 +15,7 @@ import {
 } from 'react';
 import useSWR from 'swr';
 import {
+    DeleteOutlined,
     EditOutlined,
     PlusOutlined,
     SaveOutlined,
@@ -30,6 +31,7 @@ import {
     Input,
     Skeleton,
     Tag,
+    Tooltip,
 } from 'antd';
 import { confirmDialog } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
@@ -37,6 +39,7 @@ import { usePermissions } from '@/components/PermissionsProvider';
 import {
     createAccessControlPermission,
     createAccessControlStaffRole,
+    deleteAccessControlStaffRole,
     fetchAccessControlData,
     fetchAccessControlStaffRoles,
     updateAccessControlStaffRole,
@@ -266,6 +269,43 @@ export default function RolesPermissionsTab() {
         }
     }
 
+    async function handleDeleteRole() {
+        if (!activeRole) return;
+
+        const confirmed = await confirmDialog(
+            `Xóa role ${activeRole.role_label}? Permission của role này cũng sẽ bị xóa và không thể khôi phục.`,
+            {
+                title: 'Xác nhận xóa role',
+                confirmLabel: 'Xóa role',
+                cancelLabel: 'Hủy',
+                danger: true,
+            },
+        );
+        if (!confirmed) return;
+
+        setSaving(true);
+        try {
+            await deleteAccessControlStaffRole(activeRole.role_code);
+            await reloadRoles();
+            refreshAuditLogs();
+            setDrafts((current) => discardRolePermissionDraft(
+                current,
+                activeRole.role_code,
+            ));
+            // Role vừa xóa không còn hợp lệ để giữ làm lựa chọn hiện tại.
+            setSelectedRoleCode(null);
+            toast.success('Đã xóa role nhân viên.');
+        } catch (error) {
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : 'Không thể xóa role nhân viên.',
+            );
+        } finally {
+            setSaving(false);
+        }
+    }
+
     async function handleSavePermissions() {
         if (!activeRole) return;
         const confirmed = await confirmDialog(
@@ -341,6 +381,23 @@ export default function RolesPermissionsTab() {
                             </div>
                             <div className={styles.permissionWorkspaceActions}>
                                 <Button icon={<EditOutlined />} onClick={() => setEditingRole(activeRole)}>Sửa role</Button>
+                                <Tooltip
+                                    title={activeRole.assigned_user_count > 0
+                                        ? `Cần chuyển ${activeRole.assigned_user_count} nhân viên sang role khác trước.`
+                                        : 'Xóa role này'}
+                                >
+                                    {/* span giúp Tooltip vẫn hoạt động khi Button bị disabled. */}
+                                    <span>
+                                        <Button
+                                            danger
+                                            icon={<DeleteOutlined />}
+                                            disabled={saving || activeRole.assigned_user_count > 0}
+                                            onClick={() => void handleDeleteRole()}
+                                        >
+                                            Xóa role
+                                        </Button>
+                                    </span>
+                                </Tooltip>
                             </div>
                         </header>
                         <div className={styles.permissionWorkspaceMeta}>

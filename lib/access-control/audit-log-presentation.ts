@@ -40,6 +40,10 @@ const AUDIT_ACTION_PRESENTATIONS: Record<
         label: 'Cập nhật role',
         color: 'blue',
     },
+    staff_role_deleted: {
+        label: 'Xóa role',
+        color: 'red',
+    },
     staff_role_permissions_replaced: {
         label: 'Cập nhật quyền role',
         color: 'green',

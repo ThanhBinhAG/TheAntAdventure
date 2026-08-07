@@ -168,7 +168,6 @@ export default function UserDirectory() {
                     ? role.role_label
                     : `${role.role_label} (ngừng dùng)`,
             })),
-            { value: 'unassigned', label: 'Chưa gán role' },
         ],
         [userRoleOptions],
     );

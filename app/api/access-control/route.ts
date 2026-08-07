@@ -13,7 +13,6 @@
  */
 
 import { NextResponse } from "next/server";
-import { z } from 'zod';
 import {
     AccessControlRpcError,
     getAccessControlData,
@@ -24,33 +23,13 @@ import {
 import {
     createAccessControlPermissionBodySchema,
 } from '@/lib/access-control/permission-input';
+import {
+    accessControlRoleUpdateBodySchema,
+} from '@/lib/access-control/role-input';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 
 export const dynamic = 'force-dynamic';
 
-
-/** Mã role động, ví dụ sales hoặc tour_operator. */
-const roleCodeSchema = z.string()
-    .trim()
-    .regex(
-        /^[a-z0-9_]{2,50}$/,
-        'Mã role không hợp lệ.',
-    );
-
-/** Schema kiểm tra dữ liệu PATCH từ frontend. */
-const updateBodySchema = z.discriminatedUnion('action', [
-    z.object({
-        action: z.literal('set_user_role'),
-        userId: z.string().uuid('userId không hợp lệ.'),
-        // RPC database sẽ kiểm tra role có tồn tại và có được phép gán hay không.
-        roleCode: roleCodeSchema,
-    }),
-    z.object({
-        action: z.literal('replace_role_permissions'),
-        roleCode: z.enum(['employee']),
-        permissionCodes: z.array(z.string().min(1)).max(100),
-    }),
-]);
 
 /** Chuyển lỗi database thành HTTP response an toàn cho frontend. */
 function errorResponse(error: unknown) {
@@ -122,7 +101,7 @@ export async function PATCH(request: Request) {
         );
     }
     const body = await request.json().catch(() => null);
-    const parsed = updateBodySchema.safeParse(body);
+    const parsed = accessControlRoleUpdateBodySchema.safeParse(body);
 
     if (!parsed.success) {
         return NextResponse.json(

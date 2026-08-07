@@ -56,6 +56,7 @@ function readStringArray(
 const STAFF_ROLE_ACTIONS = new Set([
     'staff_role_created',
     'staff_role_updated',
+    'staff_role_deleted',
     'staff_role_permissions_replaced',
 ]);
 
@@ -146,6 +147,10 @@ function getAuditSummary(log: AccessControlAuditLog): string {
         return log.afterValue.is_active === false
             ? `Đã ngừng sử dụng role ${getAuditRoleLabel(log)}.`
             : `Đã cập nhật role ${getAuditRoleLabel(log)}.`;
+    }
+
+    if (log.action === 'staff_role_deleted') {
+        return `Đã xóa role ${getAuditRoleLabel(log)}.`;
     }
 
     if (log.action === 'staff_role_permissions_replaced') {

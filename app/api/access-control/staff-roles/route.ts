@@ -5,13 +5,14 @@
  * - GET: lấy danh sách role nhân viên.
  * - POST: tạo role mới.
  * - PATCH: sửa role hoặc lưu permission.
+ * - DELETE: xóa role không còn nhân viên nào được gán.
  */
 
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import {
     AccessControlRpcError,
     createAccessControlStaffRole,
+    deleteAccessControlStaffRole,
     getAccessControlStaffRoles,
     replaceAccessControlStaffRolePermissions,
     updateAccessControlStaffRole,
@@ -19,48 +20,14 @@ import {
 import {
     getStaffRoleRpcErrorResponse,
 } from '@/lib/access-control/staff-role-error';
+import {
+    createAccessControlStaffRoleBodySchema,
+    deleteAccessControlStaffRoleBodySchema,
+    updateAccessControlStaffRoleBodySchema,
+} from '@/lib/access-control/staff-role-input';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 
 export const dynamic = 'force-dynamic';
-
-/** Mã role kỹ thuật ổn định, ví dụ sales hoặc tour_operator. */
-const roleCodeSchema = z.string()
-    .trim()
-    .regex(
-        /^[a-z0-9_]{2,50}$/,
-        'Mã role không hợp lệ.',
-    );
-
-/** Dữ liệu tạo role nhân viên. */
-const createBodySchema = z.object({
-    code: roleCodeSchema,
-    label: z.string()
-        .trim()
-        .min(1, 'Tên role không được để trống.')
-        .max(100, 'Tên role tối đa 100 ký tự.'),
-    description: z.string().trim().max(500).optional(),
-    sortOrder: z.number().int().min(0).max(10_000).default(0),
-});
-
-/** Dữ liệu cập nhật role hoặc permission. */
-const updateBodySchema = z.discriminatedUnion('action', [
-    z.object({
-        action: z.literal('update_role'),
-        code: roleCodeSchema,
-        label: z.string()
-            .trim()
-            .min(1, 'Tên role không được để trống.')
-            .max(100, 'Tên role tối đa 100 ký tự.'),
-        description: z.string().trim().max(500).optional(),
-        sortOrder: z.number().int().min(0).max(10_000),
-        isActive: z.boolean(),
-    }),
-    z.object({
-        action: z.literal('replace_role_permissions'),
-        roleCode: roleCodeSchema,
-        permissionCodes: z.array(z.string().min(1)).max(100),
-    }),
-]);
 
 /** Đổi lỗi RPC thành HTTP response an toàn cho frontend. */
 function errorResponse(error: unknown) {
@@ -131,7 +98,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => null);
-    const parsed = createBodySchema.safeParse(body);
+    const parsed = createAccessControlStaffRoleBodySchema.safeParse(body);
 
     if (!parsed.success) {
         return NextResponse.json(
@@ -163,7 +130,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json().catch(() => null);
-    const parsed = updateBodySchema.safeParse(body);
+    const parsed = updateAccessControlStaffRoleBodySchema.safeParse(body);
 
     if (!parsed.success) {
         return NextResponse.json(
@@ -192,6 +159,38 @@ export async function PATCH(request: Request) {
                 parsed.data.permissionCodes,
             );
         }
+
+        return NextResponse.json({ ok: true });
+    } catch (error) {
+        return errorResponse(error);
+    }
+}
+
+/** Xóa role nhân viên động đã không còn được gán cho user nào. */
+export async function DELETE(request: Request) {
+    const permission = await checkPermissionForRequest(
+        'users.manage',
+    );
+
+    if (!permission.allowed) {
+        return NextResponse.json(
+            { ok: false, error: 'Unauthorized' },
+            { status: permission.status },
+        );
+    }
+
+    const body = await request.json().catch(() => null);
+    const parsed = deleteAccessControlStaffRoleBodySchema.safeParse(body);
+
+    if (!parsed.success) {
+        return NextResponse.json(
+            { ok: false, error: 'Mã role không hợp lệ.' },
+            { status: 400 },
+        );
+    }
+
+    try {
+        await deleteAccessControlStaffRole(parsed.data.code);
 
         return NextResponse.json({ ok: true });
     } catch (error) {

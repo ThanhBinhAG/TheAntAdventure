@@ -26,6 +26,10 @@ describe('access-control audit action presentation', () => {
       ).label,
       'Cập nhật quyền role',
     );
+    assert.equal(
+      getAccessControlAuditActionPresentation('staff_role_deleted').label,
+      'Xóa role',
+    );
   });
 
   it('shows Vietnamese labels for user lifecycle actions', () => {

@@ -19,4 +19,17 @@ describe('access-control staff role errors', () => {
     );
     assert.equal(getStaffRoleRpcErrorResponse('XX000', 'Lỗi lạ'), null);
   });
+
+  it('returns a conflict when the role is still assigned to users', () => {
+    assert.deepEqual(
+      getStaffRoleRpcErrorResponse(
+        '23503',
+        'Hãy chuyển toàn bộ nhân viên sang role khác trước.',
+      ),
+      {
+        status: 409,
+        error: 'Hãy chuyển toàn bộ nhân viên sang role khác trước.',
+      },
+    );
+  });
 });

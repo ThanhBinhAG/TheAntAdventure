@@ -14,11 +14,17 @@
  */
 
 import { useState } from 'react';
+import useSWR from 'swr';
 import {
     HistoryOutlined,
+    LoginOutlined,
     SafetyCertificateOutlined,
     TeamOutlined,
 } from '@ant-design/icons';
+import {
+    fetchAccessControlSuperAdminStatus,
+} from './access-control-api';
+import LoginHistoryTab from './LoginHistoryTab';
 import { Tabs } from 'antd';
 import AccessControlUiProvider from './AccessControlUiProvider';
 import UserDirectory from './UserDirectory';
@@ -30,6 +36,28 @@ export default function AccessControlPage() {
     // Chỉ mount tab nặng sau lần người dùng thật sự mở nó.
     const [hasOpenedRoles, setHasOpenedRoles] = useState(false);
     const [hasOpenedAuditLogs, setHasOpenedAuditLogs] = useState(false);
+    const [hasOpenedLoginHistory, setHasOpenedLoginHistory] =
+        useState(false);
+
+    const {
+        data: superAdminStatus,
+        isValidating: validatingSuperAdminStatus,
+    } = useSWR(
+        'access-control/super-admin-status',
+        fetchAccessControlSuperAdminStatus,
+        {
+            // Không dùng cache Super Admin của session đăng nhập trước.
+            revalidateOnMount: true,
+            dedupingInterval: 0,
+            revalidateOnFocus: false,
+            revalidateOnReconnect: true,
+        },
+    );
+
+    // Trong lúc API đang xác nhận, mặc định ẩn tab để Admin không thấy nhầm.
+    const canViewLoginHistory =
+        !validatingSuperAdminStatus &&
+        superAdminStatus?.isSuperAdmin === true;
 
     return (
         <AccessControlUiProvider>
@@ -43,6 +71,9 @@ export default function AccessControlPage() {
 
                             if (activeKey === 'audit-logs') {
                                 setHasOpenedAuditLogs(true);
+                            }
+                            if (activeKey === 'login-history') {
+                                setHasOpenedLoginHistory(true);
                             }
                         }}
                         items={[
@@ -80,6 +111,22 @@ export default function AccessControlPage() {
                                     ? <AuditLogsTab />
                                     : null,
                             },
+                            ...(canViewLoginHistory
+                                ? [
+                                    {
+                                        key: 'login-history',
+                                        label: (
+                                            <span className={styles.tabLabel}>
+                                                <LoginOutlined />
+                                                Lịch sử đăng nhập
+                                            </span>
+                                        ),
+                                        children: hasOpenedLoginHistory
+                                            ? <LoginHistoryTab />
+                                            : null,
+                                    },
+                                ]
+                                : []),
                         ]}
                     />
                 </section>

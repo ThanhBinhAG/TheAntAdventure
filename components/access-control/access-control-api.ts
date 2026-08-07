@@ -149,6 +149,31 @@ export type AccessControlAuditLogsPage = {
     totalPages: number;
 };
 
+export type AccessControlSuperAdminStatus = {
+    isSuperAdmin: boolean;
+};
+
+export type AuthLoginEvent = {
+    id: number;
+    userId: string | null;
+    userEmail: string | null;
+    userDisplayName: string | null;
+    eventType: string;
+    authMethod: 'password' | 'break_glass';
+    ipAddress: string | null;
+    browserName: string;
+    operatingSystem: string;
+    deviceType: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+    createdAt: string;
+};
+
+export type AuthLoginEventsPage = {
+    items: AuthLoginEvent[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+};
 
 type ApiResponse<T> =
     | ({ ok: true } & T)
@@ -251,6 +276,24 @@ export async function updateAccessControlStaffRole(input: {
                 action: 'update_role',
                 ...input,
             }),
+        },
+    );
+
+    await readApiResponse<Record<string, never>>(response);
+}
+
+/** Xóa role nhân viên động sau khi role không còn được gán cho user nào. */
+export async function deleteAccessControlStaffRole(
+    code: string,
+): Promise<void> {
+    const response = await fetch(
+        '/api/access-control/staff-roles',
+        {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ code }),
         },
     );
 
@@ -386,6 +429,68 @@ export async function fetchAccessControlAuditLogs(input: {
     );
 
     return readApiResponse<AccessControlAuditLogsPage>(response);
+}
+
+/** Xác định chính xác session hiện tại có phải Super Admin hay không. */
+export async function fetchAccessControlSuperAdminStatus(): Promise<
+    AccessControlSuperAdminStatus
+> {
+    const response = await fetch(
+        '/api/access-control/super-admin-status',
+        {
+            method: 'GET',
+            cache: 'no-store',
+        },
+    );
+
+    return readApiResponse<AccessControlSuperAdminStatus>(response);
+}
+
+/** Lấy danh sách lịch sử đăng nhập có phân trang. */
+/** Lấy lịch sử đăng nhập có phân trang và bộ lọc server-side. */
+export async function fetchAuthLoginEvents(input: {
+    page: number;
+    pageSize: number;
+    userQuery?: string;
+    ipAddress?: string;
+    deviceType?: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+    from?: string;
+    to?: string;
+}): Promise<AuthLoginEventsPage> {
+    const query = new URLSearchParams({
+        page: String(input.page),
+        pageSize: String(input.pageSize),
+    });
+
+    if (input.userQuery?.trim()) {
+        query.set('user', input.userQuery.trim());
+    }
+
+    if (input.ipAddress?.trim()) {
+        query.set('ip', input.ipAddress.trim());
+    }
+
+    if (input.deviceType) {
+        query.set('deviceType', input.deviceType);
+    }
+
+    if (input.from) {
+        query.set('from', input.from);
+    }
+
+    if (input.to) {
+        query.set('to', input.to);
+    }
+
+    const response = await fetch(
+        `/api/access-control/login-history?${query.toString()}`,
+        {
+            method: 'GET',
+            cache: 'no-store',
+        },
+    );
+
+    return readApiResponse<AuthLoginEventsPage>(response);
 }
 
 /**

@@ -16,6 +16,41 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
 
+type AuthLoginEventRow = {
+    id: number | string;
+    user_id: string | null;
+    user_email: string | null;
+    user_display_name: string | null;
+    event_type: string;
+    auth_method: 'password' | 'break_glass';
+    ip_address: string | null;
+    browser_name: string;
+    operating_system: string;
+    device_type: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+    created_at: string;
+    total_count: number | string;
+};
+
+export type AuthLoginEventsPage = {
+    items: Array<{
+        id: number;
+        userId: string | null;
+        userEmail: string | null;
+        userDisplayName: string | null;
+        eventType: string;
+        authMethod: 'password' | 'break_glass';
+        ipAddress: string | null;
+        browserName: string;
+        operatingSystem: string;
+        deviceType: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+        createdAt: string;
+    }>;
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+};
+
 /**
  * Role code động do database quản lý.
  *
@@ -333,6 +368,25 @@ export async function updateAccessControlStaffRole(input: {
 }
 
 /**
+ * Xóa một role nhân viên động không còn được gán cho user nào.
+ *
+ * RPC là lớp quyết định cuối cùng: UI chỉ hỗ trợ trải nghiệm, không được phép
+ * tự tin rằng số nhân viên hiển thị vẫn đúng tại thời điểm xóa.
+ */
+export async function deleteAccessControlStaffRole(
+    roleCode: string,
+): Promise<void> {
+    const supabase = createAccessControlServerClient();
+
+    const result = await supabase.rpc(
+        'delete_access_control_staff_role',
+        { target_role_code: roleCode },
+    );
+
+    throwRpcError(result.error);
+}
+
+/**
  * Thay toàn bộ permission của một role nhân viên bằng danh sách mới.
  */
 export async function replaceAccessControlStaffRolePermissions(
@@ -531,6 +585,77 @@ export async function getAccessControlAuditLogs(input: {
             1,
             Math.ceil(totalCount / input.pageSize),
         ),
+    };
+}
+
+/**
+ * Kiểm tra chính xác role của session hiện tại là super_admin.
+ *
+ * Không thay bằng users.manage vì Admin thường cũng có thể có quyền đó,
+ * còn lịch sử IP/thiết bị chỉ dành cho Super Admin.
+ */
+export async function isCurrentAccessControlSuperAdmin(): Promise<boolean> {
+    const supabase = createAccessControlServerClient();
+
+    const result = await supabase.rpc('is_current_super_admin');
+
+    throwRpcError(result.error);
+
+    return Boolean(result.data);
+}
+
+/** Lấy lịch sử đăng nhập đã phân trang từ RPC bảo mật. */
+export async function getAuthLoginEvents(input: {
+    page: number;
+    pageSize: number;
+    userId?: string;
+    userQuery?: string;
+    ipAddress?: string;
+    deviceType?: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+    from?: string;
+    to?: string;
+}): Promise<AuthLoginEventsPage> {
+    const supabase = createAccessControlServerClient();
+
+    const result = await supabase.rpc(
+        'list_auth_login_events',
+        {
+            page_number: input.page,
+            page_size: input.pageSize,
+            filter_user_id: input.userId ?? null,
+            filter_user_query: input.userQuery ?? null,
+            filter_ip_address: input.ipAddress ?? null,
+            filter_device_type: input.deviceType ?? null,
+            filter_from: input.from ?? null,
+            filter_to: input.to ?? null,
+        },
+    );
+
+    throwRpcError(result.error);
+
+    const rows = (result.data ?? []) as AuthLoginEventRow[];
+    const totalCount = rows.length > 0
+        ? toNumber(rows[0].total_count)
+        : 0;
+
+    return {
+        items: rows.map((row) => ({
+            id: toNumber(row.id),
+            userId: row.user_id,
+            userEmail: row.user_email,
+            userDisplayName: row.user_display_name,
+            eventType: row.event_type,
+            authMethod: row.auth_method,
+            ipAddress: row.ip_address,
+            browserName: row.browser_name,
+            operatingSystem: row.operating_system,
+            deviceType: row.device_type,
+            createdAt: row.created_at,
+        })),
+        totalCount,
+        page: input.page,
+        pageSize: input.pageSize,
+        totalPages: Math.max(1, Math.ceil(totalCount / input.pageSize)),
     };
 }
 

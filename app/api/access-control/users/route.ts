@@ -13,7 +13,6 @@
  */
 
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import {
     AccessControlRpcError,
     getAccessControlUsersPage,
@@ -28,81 +27,14 @@ import {
     rollbackNewAccessControlAuthUser,
 } from '@/lib/auth/access-control-admin';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
+import {
+    accessControlUsersQuerySchema,
+    accessControlUserUpdateBodySchema,
+    createAccessControlUserBodySchema,
+    optionalAccessControlQueryParam,
+} from '@/lib/access-control/user-input';
 
 export const dynamic = 'force-dynamic';
-
-/** Mã role động do database quản lý. */
-const roleCodeSchema = z.string()
-    .trim()
-    .regex(
-        /^[a-z0-9_]{2,50}$/,
-        'Mã role không hợp lệ.',
-    );
-
-/** Schema kiểm tra query string của API. */
-const querySchema = z.object({
-    q: z.string().trim().max(100).optional(),
-    role: z.union([
-        roleCodeSchema
-    ]).optional(),
-    status: z.enum([
-        'active',
-        'inactive',
-    ]).optional(),
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(100).default(10),
-});
-
-/**
- * Dữ liệu các thao tác cập nhật user.
- *
- * action giúp một API xử lý rõ từng loại thao tác,
- * nhưng vẫn kiểm tra dữ liệu đầu vào bằng Zod.
- */
-const updateBodySchema = z.discriminatedUnion('action', [
-    z.object({
-        action: z.literal('update_profile'),
-        userId: z.string().uuid('userId không hợp lệ.'),
-        displayName: z.string()
-            .trim()
-            .min(1, 'Tên hiển thị không được để trống.')
-            .max(100, 'Tên hiển thị tối đa 100 ký tự.'),
-    }),
-    z.object({
-        action: z.literal('set_active'),
-        userId: z.string().uuid('userId không hợp lệ.'),
-        isActive: z.boolean(),
-    }),
-    z.object({
-        action: z.literal('restore'),
-        userId: z.string().uuid('userId không hợp lệ.'),
-    }),
-]);
-
-
-/** Dữ liệu cần có để tạo một tài khoản CRM mới. */
-const createBodySchema = z.object({
-    email: z.string()
-        .trim()
-        .email('Email không hợp lệ.')
-        .max(255, 'Email tối đa 255 ký tự.'),
-    password: z.string()
-        .min(8, 'Mật khẩu cần ít nhất 8 ký tự.')
-        .max(72, 'Mật khẩu tối đa 72 ký tự.'),
-    displayName: z.string()
-        .trim()
-        .min(1, 'Tên hiển thị không được để trống.')
-        .max(100, 'Tên hiển thị tối đa 100 ký tự.'),
-    roleCode: roleCodeSchema,
-});
-
-/** Đọc query param rỗng thành undefined. */
-function optionalQueryParam(
-    url: URL,
-    name: string,
-): string | undefined {
-    return url.searchParams.get(name) || undefined;
-}
 
 /** Chuyển lỗi RPC thành HTTP response phù hợp. */
 function errorResponse(error: unknown) {
@@ -166,7 +98,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => null);
-    const parsed = createBodySchema.safeParse(body);
+    const parsed = createAccessControlUserBodySchema.safeParse(body);
 
     if (!parsed.success) {
         return NextResponse.json(
@@ -232,12 +164,12 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url);
 
-    const parsed = querySchema.safeParse({
-        q: optionalQueryParam(url, 'q'),
-        role: optionalQueryParam(url, 'role'),
-        status: optionalQueryParam(url, 'status'),
-        page: optionalQueryParam(url, 'page'),
-        pageSize: optionalQueryParam(url, 'pageSize'),
+    const parsed = accessControlUsersQuerySchema.safeParse({
+        q: optionalAccessControlQueryParam(url, 'q'),
+        role: optionalAccessControlQueryParam(url, 'role'),
+        status: optionalAccessControlQueryParam(url, 'status'),
+        page: optionalAccessControlQueryParam(url, 'page'),
+        pageSize: optionalAccessControlQueryParam(url, 'pageSize'),
     });
 
     if (!parsed.success) {
@@ -300,7 +232,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json().catch(() => null);
-    const parsed = updateBodySchema.safeParse(body);
+    const parsed = accessControlUserUpdateBodySchema.safeParse(body);
 
     if (!parsed.success) {
         return NextResponse.json(

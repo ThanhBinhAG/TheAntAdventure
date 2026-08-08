@@ -1,6 +1,6 @@
 # GraphRAG Memory — The Ant Adventures CRM
 
-> Snapshot: 2026-08-05 · phạm vi: mã nguồn đang có trong repository, không bao gồm `node_modules` hay `.next`. Bao gồm trạng thái Access Control role động đã kiểm chứng trên Supabase local.
+> Snapshot: 2026-08-07 · phạm vi: mã nguồn đang có trong repository, không bao gồm `node_modules` hay `.next`. Bao gồm trạng thái Access Control role động, cache SWR, i18n EN/VI và đối chiếu permission-sidebar trên Supabase local.
 >
 > Mục đích: đây là memory map để truy vết nhanh **chức năng → file → dữ liệu → luồng chạy**. Các sơ đồ là các cạnh có hướng; tên trong dấu backtick là node có thể tìm bằng `rg`.
 
@@ -374,6 +374,63 @@ RBAC uses permission codes as the enforcement primitive. A user has one role; a 
 
 `users.manage` is the sole permission required to open and operate Access Control. In the current local data, Admin and Super Admin obtain it through wildcard `*`.
 
+### Current sidebar-to-permission binding
+
+The current system has **two separate mappings**. They are consistent for the existing menu, but they are not automatically linked by a database foreign key:
+
+1. `public.permissions.group_code` groups checkboxes in **Role & Permissions**. `permission_groups` supplies the group label/order. For example, `catalogue.read` is displayed in the `catalogue` group.
+2. `lib/auth/permissions.ts` owns `PAGE_READ_PERMISSION`, a handwritten `PageSlug -> permission code` map. `Sidebar` and `PermissionGate` use this map to decide whether a user can see/open a page.
+
+```mermaid
+flowchart LR
+  DB[permissions.group_code] --> RP[Role & Permissions checkbox groups]
+  MAP[PAGE_READ_PERMISSION in TypeScript] --> SB[Sidebar visibility]
+  MAP --> PG[PermissionGate for direct URL]
+  CODES[current_permission_codes] --> SB
+  CODES --> PG
+```
+
+Current page bindings are:
+
+| Sidebar feature(s) | Required page-read permission | Current granularity |
+|---|---|---|
+| Dashboard | `dashboard.read` | one feature |
+| Daily Planner + Sales Pipeline | `sales.read` | grouped |
+| Clients | `customers.read` | one feature |
+| B2B Agents | `agents.read` | one feature |
+| Tour Design | `tour_design.read` | one feature |
+| Tour Products + Photo Gallery + Attraction Schedule | `catalogue.read` | grouped |
+| Pricing, Essentials + Accommodation & Cruises | `pricing.read` | grouped |
+| Weather Guide | `weather.read` | one feature |
+| Bookings + Contracts + Suppliers + Guides + Post-tour | `operations.read` | grouped |
+| Finance + Tax | `finance.read` | grouped |
+| Salary + Human Resources | `hr.read` | grouped |
+| About + Culture + Regulations | `company.read` | grouped |
+| AI Requirements + Dev Notes | `devnotes.read` | grouped |
+| Team Chat | `teamchat.read` | one feature |
+| Access Control | `users.manage` | system-management exception |
+
+`*.write` codes do not decide sidebar visibility. The sidebar/page gate checks only `*.read`; a write code has effect only where that feature's UI action and server API/RPC explicitly check it. At the snapshot date, general CRM CRUD is not yet uniformly protected by feature-level `*.write` checks.
+
+### Agreed RBAC target — one sidebar feature, `read` + `write`
+
+The agreed direction is to make each navigable sidebar leaf a feature. Each feature will own exactly two ordinary business permissions:
+
+```text
+<feature>.read  = user can see the menu and open the page
+<feature>.write = user can create/update/delete within that feature
+```
+
+Examples: `bookings.read` + `bookings.write`, `contracts.read` + `contracts.write`, `gallery.read` + `gallery.write`. Pricing subpages will be separate features (`pricing`, `pricing_essentials`, `pricing_accommodation`) rather than one broad Pricing permission. The wildcard `*` remains for Admin/Super Admin. Access Control will keep stricter API/RPC protections during transition; `users.manage` must not be removed until its protected routes and database RPCs have been migrated and tested.
+
+Implementation plan, not yet applied:
+
+1. Add `page_slug` and `is_navigation_feature` to `permission_groups`; seed one group per sidebar leaf.
+2. Seed each navigation group with its `read` and `write` permission, then grant equivalent new permissions to existing roles before changing page checks, so no user loses access during migration.
+3. Replace grouped entries such as `catalogue.*` and `operations.*` in `PAGE_READ_PERMISSION` with per-feature codes; expose `readPermissionForPage()` and `writePermissionForPage()` helpers for Sidebar, `PermissionGate` and feature actions.
+4. Make Role & Permissions show each sidebar feature as a two-checkbox card. Stop normal UI creation of arbitrary permission groups that have no menu/function mapping.
+5. Add UI and API/RPC checks for every feature write command, then retire legacy `*.export`, `*.refresh` and grouped permission codes only after compatibility verification.
+
 ### Permission data and enforcement graph
 
 ```mermaid
@@ -461,7 +518,7 @@ When a user creates a new account, the audit trail is currently produced by `use
 
 ### Future extension direction
 
-Create a shared staff role first, then assign existing permission codes to it. Add a new permission code only when a new action must be separated. For record-specific scope, add ownership/assignment fields and enforce them with RLS after replacing full-table mirror synchronization with record-level server commands.
+Create a shared staff role first, then assign feature-level `read`/`write` permissions to it. Add a new permission pair only when a new sidebar feature is introduced; add it through a migration plus the navigation map, not only through the Access Control UI. For record-specific scope, add ownership/assignment fields and enforce them with RLS after replacing full-table mirror synchronization with record-level server commands.
 
 ## 9. Known integrity and delivery constraints
 
@@ -478,7 +535,7 @@ Create a shared staff role first, then assign existing permission codes to it. A
 
 ## 10. Verification status
 
-- Static source/database review: refreshed for Access Control routes, UI, server services, SWR cache keys, migrations and local database state on 2026-08-05.
+- Static source/database review: refreshed for Access Control routes, UI, server services, SWR cache keys, structured API errors, EN/VI labels, migrations and local database state on 2026-08-07.
 - `npx supabase migration list --local`: local and remote histories matched through `20260804154323_retire_legacy_job_positions`; use this command after local migration changes rather than `db:status`, which requires a linked hosted Supabase project.
 - `npm run typecheck` and `npm run lint`: passed on 2026-08-05.
 - `npm test`: 275 of 277 tests passed in the latest full run. The two failures are `ENOENT` reads for the ignored Essentials and Accommodation XLSX workbooks; no test assertion failed.

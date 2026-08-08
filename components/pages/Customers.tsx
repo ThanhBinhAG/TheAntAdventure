@@ -10,6 +10,7 @@ import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
+import { usePagePermission } from '@/hooks/usePagePermission';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import CustomerProfileModal from '@/components/customers/CustomerProfileModal';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
@@ -37,6 +38,7 @@ const STAGE_FILTERS: { value: string; label: string; style?: React.CSSProperties
 ];
 
 export default function Customers() {
+  const { canWrite } = usePagePermission('customers');
   const customers = useStore((s) => s.customers);
   const leads = useStore((s) => s.leads);
   const feedback = useStore((s) => s.feedback) as { custId?: string; nps?: number }[];
@@ -144,7 +146,13 @@ export default function Customers() {
           ))}
         </select>
         <div style={{ flex: 1 }} />
-        <button className="btn btn-p btn-sm" type="button" onClick={() => setFormMode('add')}>
+        <button
+          className="btn btn-p btn-sm"
+          type="button"
+          onClick={() => setFormMode('add')}
+          disabled={!canWrite}
+          title={!canWrite ? 'You need write permission for Customers to add a customer' : undefined}
+        >
           + Add Customer
         </button>
       </div>
@@ -201,7 +209,13 @@ export default function Customers() {
                       Clear filters
                     </button>
                   )}
-                  <button type="button" className="btn btn-p btn-sm" onClick={() => setFormMode('add')}>
+                  <button
+                    type="button"
+                    className="btn btn-p btn-sm"
+                    onClick={() => setFormMode('add')}
+                    disabled={!canWrite}
+                    title={!canWrite ? 'You need write permission for Customers to add a customer' : undefined}
+                  >
                     + Add Customer
                   </button>
                 </>

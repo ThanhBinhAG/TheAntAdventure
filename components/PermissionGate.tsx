@@ -15,7 +15,7 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { PAGE_READ_PERMISSION } from '@/lib/auth/permissions';
+import { canReadPage } from '@/lib/auth/permissions';
 import { usePermissions } from '@/components/PermissionsProvider';
 import type { PageSlug } from '@/lib/types';
 
@@ -31,12 +31,9 @@ export function PermissionGate({
     const {
         loading,
         error,
-        can,
+        permissionCodes,
         loadPermissions,
     } = usePermissions();
-
-    //Tra quyền bên PAGE_READ_PERMISSION
-    const requiredPermission = PAGE_READ_PERMISSION[page];
 
     // Không render trang trước khi biết chính xác user có quyền hay không.
     if (loading) {
@@ -75,7 +72,7 @@ export function PermissionGate({
     }
 
     // User thiếu quyền thì không mount nội dung trang.
-    if (!can(requiredPermission)) {
+    if (!canReadPage(permissionCodes, page)) {
         return (
             <section className="card" role="alert">
                 <div className="card-hd">

@@ -38,6 +38,8 @@ import {
   type PhotoFolder,
 } from '@/lib/gallery/photo-folders';
 import StorageImage from '@/components/gallery/StorageImage';
+import { toast } from '@/lib/toast';
+import { usePagePermission } from '@/hooks/usePagePermission';
 import GalleryPhotoModal, {
   type GalleryModalMode,
   type GalleryPhotoRecord,
@@ -52,7 +54,6 @@ import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
-import { toast } from '@/lib/toast';
 import { confirmDialog } from '@/lib/confirm';
 
 const REGION_COLORS: Record<string, string> = {
@@ -128,6 +129,7 @@ function DraggablePhotoCard({
 }
 
 export default function Gallery() {
+  const { canWrite } = usePagePermission('gallery');
   const searchParams = useSearchParams();
   const photoFilter = searchParams.get('photo') || '';
   const attractionFilter = searchParams.get('attraction') || '';
@@ -611,13 +613,19 @@ export default function Gallery() {
               <button type="button" className="btn btn-o" disabled={saving} onClick={() => setMoveOpen(true)}>
                 Move to…
               </button>
-              <button type="button" className="btn btn-s" disabled={saving} onClick={handleBulkDelete}>
+              <button type="button" className="btn btn-s" disabled={saving || !canWrite} onClick={handleBulkDelete}>
                 Delete {selected.size}
               </button>
             </>
           )}
           {!atRoot && (
-            <button type="button" className="btn btn-g" onClick={openAdd} disabled={saving}>
+            <button
+              type="button"
+              className="btn btn-g"
+              onClick={openAdd}
+              disabled={saving || !canWrite}
+              title={!canWrite ? 'You need write permission for Gallery to upload photos' : undefined}
+            >
               Upload photos
             </button>
           )}

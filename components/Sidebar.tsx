@@ -10,7 +10,7 @@ import { useStore } from '@/hooks/useStore';
 import { countActiveTasks } from '@/lib/planner/planner-task-utils';
 import { countTourDesignAttention } from '@/lib/tour-design/tour-design-leads';
 import type { Lead, PageSlug, Task, TourDraft } from '@/lib/types';
-import { PAGE_READ_PERMISSION } from '@/lib/auth/permissions';
+import { canReadPage, canWritePage } from '@/lib/auth/permissions';
 import { usePermissions } from '@/components/PermissionsProvider';
 import CompanyLogoEditor from '@/components/sidebar/CompanyLogoEditor';
 import StorageImage from '@/components/gallery/StorageImage';
@@ -27,7 +27,7 @@ interface SidebarProps {
 export default function Sidebar({ open, onClose, pinned, onPinnedChange }: SidebarProps) {
   const pathname = usePathname();
   const { language, t } = useLanguage();
-  const { can, loading, error } = usePermissions();
+  const { permissionCodes, loading, error } = usePermissions();
   const current = (pathname.split('/').pop() || 'dashboard') as PageSlug;
   const tasks = useStore((s) => s.tasks) as Task[];
   const leads = useStore((s) => s.leads) as Lead[];
@@ -69,7 +69,7 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
               // Menu nhóm: chỉ giữ các menu con được phép.
               if (item.children?.length) {
                 const children = item.children.filter((child) =>
-                  can(PAGE_READ_PERMISSION[child.page]),
+                  canReadPage(permissionCodes, child.page),
                 );
 
                 return children.length > 0
@@ -78,14 +78,14 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
               }
 
               // Menu đơn: giữ khi có quyền xem trang tương ứng.
-              return can(PAGE_READ_PERMISSION[item.page])
+              return canReadPage(permissionCodes, item.page)
                 ? item
                 : null;
             })
             .filter((item): item is NavItem => item !== null),
         }))
         .filter((section) => section.items.length > 0),
-    [can],
+    [permissionCodes],
   );
 
   const groupPages = useMemo(() => {
@@ -120,7 +120,7 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
     return count > 0 ? Math.min(count, 99) : 0;
   }, [messages]);
 
-  const canEditLogo = can('company.read');
+  const canEditLogo = canWritePage(permissionCodes, 'about');
   const displayLogo = logoUrl || DEFAULT_LOGO;
   const isCustomLogo = Boolean(logoUrl);
 

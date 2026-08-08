@@ -20,7 +20,6 @@ import {
     PlusOutlined,
     SaveOutlined,
     SearchOutlined,
-    SettingOutlined,
 } from '@ant-design/icons';
 import {
     Alert,
@@ -42,9 +41,7 @@ import {
 } from '@/lib/i18n/pages/access-control';
 import { confirmDialog } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
-import { usePermissions } from '@/components/PermissionsProvider';
 import {
-    createAccessControlPermission,
     createAccessControlStaffRole,
     deleteAccessControlStaffRole,
     fetchAccessControlData,
@@ -54,12 +51,10 @@ import {
     updateAccessControlStaffRolePermissions,
     type AccessControlPermission,
     type AccessControlStaffRole,
-    type CreateAccessControlPermissionInput,
     type CreateAccessControlStaffRoleInput,
 } from './access-control-api';
 import StaffRoleCreateDrawer from './StaffRoleCreateDrawer';
 import StaffRoleEditDrawer from './StaffRoleEditDrawer';
-import PermissionCreateDrawer from './PermissionCreateDrawer';
 import {
     discardRolePermissionDraft,
     filterPermissionGroupsByQuery,
@@ -159,8 +154,7 @@ export default function RolesPermissionsTab() {
 
     const permissions =
         accessControlData?.permissions ?? EMPTY_PERMISSIONS;
-    const canCreatePermission =
-        accessControlData?.canCreatePermission ?? false;
+    // Removed unused canCreatePermission
 
     const permissionsError =
         permissionCatalogError
@@ -175,7 +169,7 @@ export default function RolesPermissionsTab() {
     const reloadPermissions = useCallback(async (): Promise<void> => {
         await reloadPermissionCatalog();
     }, [reloadPermissionCatalog]);
-    const { can } = usePermissions();
+    // Removed unused usePermissions hook call
     const refreshAuditLogs = useRefreshAccessControlAuditLogs();
     const [selectedRoleCode, setSelectedRoleCode] = useState<string | null>(null);
     const [drafts, setDrafts] = useState<Record<string, string[]>>({});
@@ -184,13 +178,7 @@ export default function RolesPermissionsTab() {
     const [editingRole, setEditingRole] = useState<AccessControlStaffRole | null>(null);
     const [permissionSearch, setPermissionSearch] = useState('');
     // State của Drawer phải thuộc component để React giữ đúng theo từng lần render.
-    const [permissionCreateOpen, setPermissionCreateOpen] = useState(false);
-    const [creatingPermission, setCreatingPermission] = useState(false);
-
-    // `canCreatePermission` được xác nhận lại ở API/RPC. Kiểm tra wildcard
-    // ở client là lớp hiển thị bổ sung, tránh cache cũ của một session Super
-    // Admin làm Admin thấy nhầm action trong lúc SWR đang tải lại.
-    const canManagePermissionCatalog = canCreatePermission && can('*');
+    // Removed super admin custom permission creation state
 
     const { data: roles = [], error: rolesError, isLoading: loadingRoles, mutate } = useSWR(
         'access-control/staff-roles',
@@ -198,9 +186,23 @@ export default function RolesPermissionsTab() {
         { dedupingInterval: 60_000, revalidateOnFocus: false, revalidateOnReconnect: true },
     );
 
-    const activeRole = roles.find((role) => role.role_code === selectedRoleCode)
-        ?? roles.find((role) => role.is_active)
-        ?? roles[0];
+    const catalogPermissionCodes = useMemo(
+        () => new Set(permissions.map((p) => p.permission_code)),
+        [permissions],
+    );
+
+    const processedRoles = useMemo(() => {
+        return roles.map((role) => ({
+            ...role,
+            permission_codes: role.permission_codes.filter(
+                (code) => code === '*' || code === 'users.manage' || catalogPermissionCodes.has(code)
+            ),
+        }));
+    }, [roles, catalogPermissionCodes]);
+
+    const activeRole = processedRoles.find((role) => role.role_code === selectedRoleCode)
+        ?? processedRoles.find((role) => role.is_active)
+        ?? processedRoles[0];
 
     const permissionGroups = useMemo(
         () => groupPermissions(permissions, language),
@@ -213,20 +215,7 @@ export default function RolesPermissionsTab() {
         ),
         [permissionGroups, permissionSearch],
     );
-    const permissionGroupOptions = useMemo(
-        () => permissionGroups.map(({
-            code,
-            label,
-            databaseLabel,
-            sortOrder,
-        }) => ({
-            code,
-            label,
-            databaseLabel,
-            sortOrder,
-        })),
-        [permissionGroups],
-    );
+    // Removed unused permissionGroupOptions
     const selectedPermissionCodes = activeRole
         ? drafts[activeRole.role_code] ?? activeRole.permission_codes
         : [];
@@ -236,32 +225,7 @@ export default function RolesPermissionsTab() {
 
     const reloadRoles = useCallback(async () => { await mutate(); }, [mutate]);
 
-    async function handleCreatePermission(
-        input: CreateAccessControlPermissionInput,
-    ) {
-        setCreatingPermission(true);
-
-        try {
-            await createAccessControlPermission(input);
-
-            // Database là nguồn dữ liệu chuẩn: reload để lấy cả permission lẫn nhóm mới.
-            await reloadPermissions();
-            refreshAuditLogs();
-            setPermissionCreateOpen(false);
-            toast.success(tac('createPermissionOrGroupSuccess', language));
-        } catch (error) {
-            toast.error(getAccessControlErrorMessage(
-                error,
-                language,
-                'createPermissionOrGroupFailed',
-            ));
-
-            // Không đóng Drawer khi lỗi để Super Admin sửa và gửi lại dữ liệu.
-            throw error;
-        } finally {
-            setCreatingPermission(false);
-        }
-    }
+    // Removed handleCreatePermission
 
     function updateDraft(update: (current: string[]) => string[]) {
         if (!activeRole) return;
@@ -406,9 +370,9 @@ export default function RolesPermissionsTab() {
                     <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>{tac('addRole', language)}</Button>
                 </div>
 
-                {roles.length === 0 ? (
+                {processedRoles.length === 0 ? (
                     <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tac('noStaffRoles', language)} />
-                ) : roles.map((role) => (
+                ) : processedRoles.map((role) => (
                     <button key={role.role_code} type="button" className={`${styles.roleChoice} ${activeRole?.role_code === role.role_code ? styles.roleChoiceActive : ''}`} onClick={() => setSelectedRoleCode(role.role_code)}>
                         {/* Tách tên và số quyền thành hai vùng để chữ không bị chèn lên nhau. */}
                         <span className={styles.roleChoiceContent}>
@@ -468,21 +432,7 @@ export default function RolesPermissionsTab() {
                                 )}
                             </span>
                             {/* Catalog là dữ liệu toàn hệ thống, không phải quyền của riêng role đang chọn. */}
-                            {canManagePermissionCatalog && (
-                                <div className={styles.permissionCatalogAction}>
-                                    <span className={styles.permissionCatalogNote}>
-                                        {tac('superAdminOnly', language)}
-                                    </span>
-                                    <Button
-                                        type="link"
-                                        icon={<SettingOutlined />}
-                                        className={styles.permissionCatalogButton}
-                                        onClick={() => setPermissionCreateOpen(true)}
-                                    >
-                                        {tac('addPermissionOrGroup', language)}
-                                    </Button>
-                                </div>
-                            )}
+                            {/* Removed add permission link */}
                         </div>
                         <Input
                             aria-label={tac('searchPermissions', language)}
@@ -552,13 +502,7 @@ export default function RolesPermissionsTab() {
             </section>
             <StaffRoleCreateDrawer open={createOpen} saving={saving} onClose={() => setCreateOpen(false)} onSubmit={handleCreate} />
             <StaffRoleEditDrawer role={editingRole} saving={saving} onClose={() => setEditingRole(null)} onSubmit={handleEdit} />
-            <PermissionCreateDrawer
-                open={permissionCreateOpen}
-                saving={creatingPermission}
-                groups={permissionGroupOptions}
-                onClose={() => setPermissionCreateOpen(false)}
-                onSubmit={handleCreatePermission}
-            />
+            {/* Removed PermissionCreateDrawer */}
         </div>
     );
 }

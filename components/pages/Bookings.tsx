@@ -11,6 +11,7 @@ import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 import type { Booking } from '@/lib/types';
 import { toast } from '@/lib/toast';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 const STATUS_COLORS: Record<string, string> = {
   'Deposit Paid': 'bdg-a',
@@ -59,6 +60,7 @@ const emptyNewBooking = {
 };
 
 export default function Bookings() {
+  const { canWrite } = usePagePermission('bookings');
   const bookings = useStore((s) => s.bookings);
   const customers = useStore((s) => s.customers);
   const addBooking = useStore((s) => s.addBooking);
@@ -210,7 +212,13 @@ export default function Bookings() {
           <option>Nov 2026</option>
         </select>
         <div style={{ flex: 1 }} />
-        <button className="btn btn-p btn-sm" type="button" onClick={openNewBooking}>
+        <button
+          className="btn btn-p btn-sm"
+          type="button"
+          onClick={openNewBooking}
+          disabled={!canWrite}
+          title={!canWrite ? 'You need write permission for Bookings to create a booking' : undefined}
+        >
           + New Booking
         </button>
       </div>

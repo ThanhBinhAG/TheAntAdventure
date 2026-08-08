@@ -36,6 +36,7 @@ import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
 import type { SalesKey } from '@/lib/i18n/pages/sales';
 import type { Lead, TourDraft } from '@/lib/types';
 import { toast } from '@/lib/toast';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 const LOST_REASONS = ['Price too high', 'Chose competitor', 'Dates unavailable', 'No response', 'Changed plans', 'Other'];
 
@@ -377,6 +378,7 @@ export default function Sales() {
   const bookings = useStore((s) => s.bookings);
   const upsertTourDraft = useStore((s) => s.upsertTourDraft);
   const addComm = useStore((s) => s.addComm);
+  const { canWrite } = usePagePermission('sales');
   const { saveFromForm } = useRegisterCustomer();
   const [tab, setTab] = useState<SalesTab>(() =>
     urlLeadId ? 'list' : urlTab === 'list' || urlTab === 'pipeline' ? urlTab : 'pipeline'
@@ -477,6 +479,10 @@ export default function Sales() {
   }
 
   function moveStage(leadId: string, newStage: string) {
+    if (!canWrite) {
+      toast.error('You do not have permission to edit sales.');
+      return;
+    }
     if (newStage === 'Lost') {
       const lead = leads.find((l) => l.id === leadId);
       setLostModal({
@@ -652,8 +658,14 @@ export default function Sales() {
           ))}
         </div>
         <div style={{ flex: 1 }} />
-        <button className="btn btn-p btn-sm" type="button" onClick={() => setFormOpen(true)}>
-          {tc('newClientBtn')}
+        <button
+          className="btn btn-p btn-sm"
+          type="button"
+          onClick={() => setFormOpen(true)}
+          disabled={!canWrite}
+          title={!canWrite ? 'You need write permission for Sales to register a lead' : undefined}
+        >
+          + Register Lead
         </button>
       </div>
 

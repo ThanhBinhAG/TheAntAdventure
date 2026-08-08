@@ -45,10 +45,12 @@ import { getCustomerName } from '@/lib/core/crm-utils';
 import type { ExperienceOverride, OutlineStatus, Product, TourOutlineDay } from '@/lib/types';
 import { paxToTierN, sumSellForProducts } from '@/lib/tour-design/tour-pricing';
 import { toast } from '@/lib/toast';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 const STEPS = ['Client Brief', 'Outline', 'Tour Experiences', 'Pricing', 'AI Export'] as const;
 
 export default function TourDesign() {
+  const { canWrite } = usePagePermission('tourdesign');
   const searchParams = useSearchParams();
   const products = useStore((s) => s.products);
   const customers = useStore((s) => s.customers);
@@ -718,7 +720,7 @@ export default function TourDesign() {
                 persistDraft({ step: 3, selectedCodes, selectedPackageId });
                 goToStep(3);
               }}
-              disabled={selectedCodes.length === 0 && !selectedPackageId}
+              disabled={(selectedCodes.length === 0 && !selectedPackageId) || !canWrite}
             >
               Next: Pricing →
             </button>

@@ -35,6 +35,7 @@ import {
   mkPct,
 } from '@/lib/pricing/pricing-utils';
 import { toast } from '@/lib/toast';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 type PricingTab = 'pricelist' | 'costbuilder' | 'markup';
 
@@ -46,6 +47,7 @@ function formatPdfDownloadError(message: string): string {
 }
 
 export default function Pricing() {
+  const { canWrite } = usePagePermission('pricing');
   const searchParams = useSearchParams();
   const highlightCode = searchParams.get('product') ?? '';
 
@@ -401,7 +403,13 @@ export default function Pricing() {
                             );
                           })}
                           <td style={{ whiteSpace: 'nowrap' }}>
-                            <button type="button" className="btn btn-s btn-sm" onClick={() => setEditRow(t)}>
+                            <button
+                              type="button"
+                              className="btn btn-s btn-sm"
+                              onClick={() => setEditRow(t)}
+                              disabled={!canWrite}
+                              title={!canWrite ? 'You need write permission for Pricing to edit price' : undefined}
+                            >
                               Edit
                             </button>
                           </td>

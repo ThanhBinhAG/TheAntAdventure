@@ -5,7 +5,6 @@
  * - Tìm theo tên/email.
  * - Lọc theo role và trạng thái.
  * - Phân trang dữ liệu ở server.
- * - Trả thêm thống kê user theo role.
  * - Tạo Auth user, profile và role ban đầu.
  *
  * Bảo mật:
@@ -14,10 +13,8 @@
  */
 
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import {
     AccessControlRpcError,
-    getAccessControlUserSummary,
     getAccessControlUsersPage,
     restoreAccessControlUser,
     setAccessControlUserActive,
@@ -30,86 +27,31 @@ import {
     rollbackNewAccessControlAuthUser,
 } from '@/lib/auth/access-control-admin';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
+import {
+    accessControlUsersQuerySchema,
+    accessControlUserUpdateBodySchema,
+    createAccessControlUserBodySchema,
+    optionalAccessControlQueryParam,
+} from '@/lib/access-control/user-input';
+import {
+    accessControlError,
+    accessControlPermissionError,
+} from '@/lib/access-control/api-error';
 
 export const dynamic = 'force-dynamic';
-
-/** Schema kiểm tra query string của API. */
-const querySchema = z.object({
-    q: z.string().trim().max(100).optional(),
-    role: z.enum([
-        'admin',
-        'employee',
-    ]).optional(),
-    status: z.enum([
-        'active',
-        'inactive',
-    ]).optional(),
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(100).default(10),
-});
-
-/**
- * Dữ liệu các thao tác cập nhật user.
- *
- * action giúp một API xử lý rõ từng loại thao tác,
- * nhưng vẫn kiểm tra dữ liệu đầu vào bằng Zod.
- */
-const updateBodySchema = z.discriminatedUnion('action', [
-    z.object({
-        action: z.literal('update_profile'),
-        userId: z.string().uuid('userId không hợp lệ.'),
-        displayName: z.string()
-            .trim()
-            .min(1, 'Tên hiển thị không được để trống.')
-            .max(100, 'Tên hiển thị tối đa 100 ký tự.'),
-    }),
-    z.object({
-        action: z.literal('set_active'),
-        userId: z.string().uuid('userId không hợp lệ.'),
-        isActive: z.boolean(),
-    }),
-    z.object({
-        action: z.literal('restore'),
-        userId: z.string().uuid('userId không hợp lệ.'),
-    }),
-]);
-
-
-/** Dữ liệu cần có để tạo một tài khoản CRM mới. */
-const createBodySchema = z.object({
-    email: z.string()
-        .trim()
-        .email('Email không hợp lệ.')
-        .max(255, 'Email tối đa 255 ký tự.'),
-    password: z.string()
-        .min(8, 'Mật khẩu cần ít nhất 8 ký tự.')
-        .max(72, 'Mật khẩu tối đa 72 ký tự.'),
-    displayName: z.string()
-        .trim()
-        .min(1, 'Tên hiển thị không được để trống.')
-        .max(100, 'Tên hiển thị tối đa 100 ký tự.'),
-    roleCode: z.enum([
-        'admin',
-        'employee',
-    ]),
-});
-
-/** Đọc query param rỗng thành undefined. */
-function optionalQueryParam(
-    url: URL,
-    name: string,
-): string | undefined {
-    return url.searchParams.get(name) || undefined;
-}
 
 /** Chuyển lỗi RPC thành HTTP response phù hợp. */
 function errorResponse(error: unknown) {
     if (error instanceof AccessControlAuthAdminError) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: error.message,
-            },
+            accessControlError(
+                error.status === 503
+                    ? 'AUTH_ADMIN_UNAVAILABLE'
+                    : error.status === 403
+                        ? 'RESERVED_EMAIL_FORBIDDEN'
+                        : 'USER_EMAIL_UNAVAILABLE',
+                error.message,
+            ),
             { status: error.status },
         );
     }
@@ -120,10 +62,12 @@ function errorResponse(error: unknown) {
             error.code === '22023'
         ) {
             return NextResponse.json(
-                {
-                    ok: false,
-                    error: error.message,
-                },
+                accessControlError(
+                    error.code === '42501'
+                        ? 'ACCESS_DENIED'
+                        : 'INVALID_USER_UPDATE_REQUEST',
+                    error.message,
+                ),
                 {
                     status: error.code === '42501'
                         ? 403
@@ -134,10 +78,10 @@ function errorResponse(error: unknown) {
     }
 
     return NextResponse.json(
-        {
-            ok: false,
-            error: 'Không thể xử lý thao tác người dùng.',
-        },
+        accessControlError(
+            'USER_OPERATION_FAILED',
+            'Không thể xử lý thao tác người dùng.',
+        ),
         { status: 500 },
     );
 }
@@ -158,20 +102,20 @@ export async function POST(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
 
     const body = await request.json().catch(() => null);
-    const parsed = createBodySchema.safeParse(body);
+    const parsed = createAccessControlUserBodySchema.safeParse(body);
 
     if (!parsed.success) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Dữ liệu tạo tài khoản không hợp lệ.',
-            },
+            accessControlError(
+                'INVALID_USER_CREATE_REQUEST',
+                'Dữ liệu tạo tài khoản không hợp lệ.',
+            ),
             { status: 400 },
         );
     }
@@ -223,27 +167,27 @@ export async function GET(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
 
     const url = new URL(request.url);
 
-    const parsed = querySchema.safeParse({
-        q: optionalQueryParam(url, 'q'),
-        role: optionalQueryParam(url, 'role'),
-        status: optionalQueryParam(url, 'status'),
-        page: optionalQueryParam(url, 'page'),
-        pageSize: optionalQueryParam(url, 'pageSize'),
+    const parsed = accessControlUsersQuerySchema.safeParse({
+        q: optionalAccessControlQueryParam(url, 'q'),
+        role: optionalAccessControlQueryParam(url, 'role'),
+        status: optionalAccessControlQueryParam(url, 'status'),
+        page: optionalAccessControlQueryParam(url, 'page'),
+        pageSize: optionalAccessControlQueryParam(url, 'pageSize'),
     });
 
     if (!parsed.success) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Bộ lọc danh sách user không hợp lệ.',
-            },
+            accessControlError(
+                'INVALID_USER_LIST_FILTER',
+                'Bộ lọc danh sách user không hợp lệ.',
+            ),
             { status: 400 },
         );
     }
@@ -256,22 +200,18 @@ export async function GET(request: Request) {
                 : undefined;
 
     try {
-        const [usersPage, summary] = await Promise.all([
-            getAccessControlUsersPage({
-                searchText: parsed.data.q,
-                roleCode: parsed.data.role ?? null,
-                isActive,
-                page: parsed.data.page,
-                pageSize: parsed.data.pageSize,
-            }),
-            getAccessControlUserSummary(),
-        ]);
+        const usersPage = await getAccessControlUsersPage({
+            searchText: parsed.data.q,
+            roleCode: parsed.data.role ?? null,
+            isActive,
+            page: parsed.data.page,
+            pageSize: parsed.data.pageSize,
+        });
 
         return NextResponse.json(
             {
                 ok: true,
                 ...usersPage,
-                summary,
             },
             {
                 headers: {
@@ -296,20 +236,20 @@ export async function PATCH(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
 
     const body = await request.json().catch(() => null);
-    const parsed = updateBodySchema.safeParse(body);
+    const parsed = accessControlUserUpdateBodySchema.safeParse(body);
 
     if (!parsed.success) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Dữ liệu cập nhật user không hợp lệ.',
-            },
+            accessControlError(
+                'INVALID_USER_UPDATE_REQUEST',
+                'Dữ liệu cập nhật user không hợp lệ.',
+            ),
             { status: 400 },
         );
     }
@@ -340,4 +280,3 @@ export async function PATCH(request: Request) {
         return errorResponse(error);
     }
 }
-

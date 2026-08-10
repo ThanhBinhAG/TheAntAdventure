@@ -12,13 +12,26 @@
  * - API server mới là nơi kiểm tra users.manage và gọi database RPC.
  */
 
-/** Ba role nghiệp vụ hiện có trong CRM. */
-export type ManagedRoleCode =
-    | 'admin'
-    | 'employee';
+import type { AccessControlErrorCode } from '@/lib/access-control/api-error';
+import type { AppLanguage } from '@/lib/i18n/stages';
+import {
+    tac,
+    type AccessControlKey,
+} from '@/lib/i18n/pages/access-control';
 
-/** Role có thể chỉnh permission trực tiếp trên UI. */
-export type EditableRoleCode = 'admin' | 'employee';
+/**
+ * Role code động được lấy từ database.
+ *
+ * Ví dụ: admin, sales, tour_operator.
+ */
+export type ManagedRoleCode = string;
+
+/**
+ * Role nhân viên động có thể được cấu hình permission.
+ *
+ * API/RPC sẽ chặn role hệ thống.
+ */
+export type EditableRoleCode = string;
 
 /** Dữ liệu user dùng để hiển thị trong bảng. */
 export type AccessControlUser = {
@@ -37,15 +50,59 @@ export type AccessControlRole = {
     permission_codes: string[];
 };
 
+/**
+ * Role có thể hiển thị hoặc gán cho user.
+ * is_active giúp UI không gán role đã ngừng dùng.
+ */
+export type AccessControlAssignableRole = AccessControlRole & {
+    is_active: boolean;
+};
+
+/**
+ * Role nhân viên động trả về từ API.
+ *
+ * Bao gồm Nhân viên và các role nghiệp vụ tạo thêm.
+ * Không bao gồm admin hoặc super_admin.
+ */
+export type AccessControlStaffRole = {
+    role_code: string;
+    role_label: string;
+    role_description: string | null;
+    is_active: boolean;
+    sort_order: number;
+    permission_codes: string[];
+    assigned_user_count: number;
+};
+
+/** Dữ liệu tạo role nhân viên mới. */
+export type CreateAccessControlStaffRoleInput = {
+    code: string;
+    label: string;
+    description?: string;
+    sortOrder?: number;
+};
+
 /** Dữ liệu permission trả về từ API. */
 export type AccessControlPermission = {
     permission_code: string;
     permission_description: string;
+    group_code: string;
+    group_label: string;
+    group_sort_order: number;
 };
 
 export type AccessControlData = {
     roles: AccessControlRole[];
     permissions: AccessControlPermission[];
+    canCreatePermission: boolean;
+};
+
+export type CreateAccessControlPermissionInput = {
+    code: string;
+    description: string;
+    groupCode: string;
+    groupLabel: string;
+    groupSortOrder?: number;
 };
 
 /** Role dùng để lọc danh sách user. */
@@ -60,15 +117,6 @@ export type UserListStatusFilter =
     | 'active'
     | 'inactive';
 
-/** Thống kê user cho các thẻ ở đầu trang. */
-export type AccessControlUserSummary = {
-    totalUsers: number;
-    activeUsers: number;
-    adminCount: number;
-    employeeCount: number;
-    unassignedCount: number;
-};
-
 /** Kết quả API danh sách user phân trang. */
 export type AccessControlUsersPage = {
     items: AccessControlUser[];
@@ -76,7 +124,6 @@ export type AccessControlUsersPage = {
     page: number;
     pageSize: number;
     totalPages: number;
-    summary: AccessControlUserSummary;
 };
 
 /** Dữ liệu Super Admin nhập khi tạo một tài khoản mới. */
@@ -109,10 +156,98 @@ export type AccessControlAuditLogsPage = {
     totalPages: number;
 };
 
+export type AccessControlSuperAdminStatus = {
+    isSuperAdmin: boolean;
+};
+
+export type AuthLoginEvent = {
+    id: number;
+    userId: string | null;
+    userEmail: string | null;
+    userDisplayName: string | null;
+    eventType: string;
+    authMethod: 'password' | 'break_glass';
+    ipAddress: string | null;
+    browserName: string;
+    operatingSystem: string;
+    deviceType: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+    createdAt: string;
+};
+
+export type AuthLoginEventsPage = {
+    items: AuthLoginEvent[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+};
 
 type ApiResponse<T> =
     | ({ ok: true } & T)
-    | { ok: false; error?: string };
+    | {
+        ok: false;
+        error?: string;
+        errorCode?: AccessControlErrorCode;
+    };
+
+/** Lỗi API có mã ổn định để UI không phụ thuộc câu chữ từ server/database. */
+export class AccessControlApiError extends Error {
+    constructor(
+        message: string,
+        public readonly code?: AccessControlErrorCode,
+        public readonly status?: number,
+    ) {
+        super(message);
+        this.name = 'AccessControlApiError';
+    }
+}
+
+const ERROR_MESSAGE_KEYS: Record<
+    AccessControlErrorCode,
+    AccessControlKey
+> = {
+    AUTH_UNAUTHORIZED: 'unauthorized',
+    ACCESS_DENIED: 'accessDenied',
+    INVALID_ACCESS_CONTROL_REQUEST: 'invalidRequest',
+    INVALID_USER_CREATE_REQUEST: 'invalidRequest',
+    INVALID_USER_UPDATE_REQUEST: 'invalidRequest',
+    INVALID_USER_LIST_FILTER: 'invalidRequest',
+    INVALID_STAFF_ROLE_REQUEST: 'invalidRequest',
+    INVALID_STAFF_ROLE_UPDATE_REQUEST: 'invalidRequest',
+    INVALID_STAFF_ROLE_CODE: 'invalidRequest',
+    INVALID_AUDIT_LOG_QUERY: 'invalidRequest',
+    INVALID_LOGIN_HISTORY_FILTER: 'invalidRequest',
+    USER_EMAIL_UNAVAILABLE: 'emailUnavailable',
+    RESERVED_EMAIL_FORBIDDEN: 'reservedEmailForbidden',
+    AUTH_ADMIN_UNAVAILABLE: 'authAdminUnavailable',
+    PERMISSION_CODE_EXISTS: 'permissionCodeExists',
+    ROLE_CODE_EXISTS: 'roleCodeExists',
+    ROLE_IN_USE: 'roleInUse',
+    ACCESS_CONTROL_REQUEST_FAILED: 'accessControlRequestFailed',
+    USER_OPERATION_FAILED: 'userOperationFailed',
+    STAFF_ROLE_OPERATION_FAILED: 'staffRoleOperationFailed',
+    AUDIT_LOG_LOAD_FAILED: 'auditLogLoadFailed',
+    LOGIN_HISTORY_LOAD_FAILED: 'loadLoginHistoryFailed',
+    LOGIN_HISTORY_FORBIDDEN: 'loginHistoryForbidden',
+    SUPER_ADMIN_STATUS_FAILED: 'superAdminStatusFailed',
+};
+
+/** Dịch lỗi Access Control theo code; lỗi cũ chưa có code giữ nguyên message. */
+export function getAccessControlErrorMessage(
+    error: unknown,
+    language: AppLanguage,
+    fallback: AccessControlKey,
+): string {
+    if (error instanceof AccessControlApiError && error.code) {
+        return tac(ERROR_MESSAGE_KEYS[error.code], language);
+    }
+
+    if (error instanceof Error && error.message) {
+        return error.message;
+    }
+
+    return tac(fallback, language);
+}
 
 /** Đọc response API và ném lỗi dễ hiểu nếu request thất bại. */
 async function readApiResponse<T>(
@@ -121,14 +256,30 @@ async function readApiResponse<T>(
     const body = (await response.json().catch(() => ({}))) as ApiResponse<T>;
 
     if (!response.ok || !body.ok) {
-        throw new Error(
+        throw new AccessControlApiError(
             'error' in body && body.error
                 ? body.error
                 : 'Không thể xử lý yêu cầu phân quyền.',
+            'errorCode' in body ? body.errorCode : undefined,
+            response.status,
         );
     }
 
     return body as T;
+}
+
+export async function createAccessControlPermission(
+    input: CreateAccessControlPermissionInput,
+): Promise<void> {
+    const response = await fetch('/api/access-control', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(input),
+    });
+
+    await readApiResponse<Record<string, never>>(response);
 }
 
 /** Lấy dữ liệu cho toàn bộ trang Access Control. */
@@ -139,6 +290,109 @@ export async function fetchAccessControlData(): Promise<AccessControlData> {
     });
 
     return readApiResponse<AccessControlData>(response);
+}
+
+/** Lấy danh sách role nhân viên động cho UI. */
+export async function fetchAccessControlStaffRoles(): Promise<
+    AccessControlStaffRole[]
+> {
+    const response = await fetch(
+        '/api/access-control/staff-roles',
+        {
+            method: 'GET',
+            cache: 'no-store',
+        },
+    );
+
+    const data = await readApiResponse<{
+        roles: AccessControlStaffRole[];
+    }>(response);
+
+    return data.roles;
+}
+
+/** Tạo role nhân viên động mới. */
+export async function createAccessControlStaffRole(
+    input: CreateAccessControlStaffRoleInput,
+): Promise<void> {
+    const response = await fetch(
+        '/api/access-control/staff-roles',
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(input),
+        },
+    );
+
+    await readApiResponse<Record<string, never>>(response);
+}
+
+/** Sửa thông tin hoặc trạng thái sử dụng của role nhân viên. */
+export async function updateAccessControlStaffRole(input: {
+    code: string;
+    label: string;
+    description?: string;
+    sortOrder: number;
+    isActive: boolean;
+}): Promise<void> {
+    const response = await fetch(
+        '/api/access-control/staff-roles',
+        {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'update_role',
+                ...input,
+            }),
+        },
+    );
+
+    await readApiResponse<Record<string, never>>(response);
+}
+
+/** Xóa role nhân viên động sau khi role không còn được gán cho user nào. */
+export async function deleteAccessControlStaffRole(
+    code: string,
+): Promise<void> {
+    const response = await fetch(
+        '/api/access-control/staff-roles',
+        {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ code }),
+        },
+    );
+
+    await readApiResponse<Record<string, never>>(response);
+}
+
+/** Lưu toàn bộ permission mới của một role nhân viên. */
+export async function updateAccessControlStaffRolePermissions(
+    roleCode: string,
+    permissionCodes: string[],
+): Promise<void> {
+    const response = await fetch(
+        '/api/access-control/staff-roles',
+        {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'replace_role_permissions',
+                roleCode,
+                permissionCodes,
+            }),
+        },
+    );
+
+    await readApiResponse<Record<string, never>>(response);
 }
 
 /** Gửi yêu cầu đổi role cho một user. */
@@ -247,6 +501,68 @@ export async function fetchAccessControlAuditLogs(input: {
     );
 
     return readApiResponse<AccessControlAuditLogsPage>(response);
+}
+
+/** Xác định chính xác session hiện tại có phải Super Admin hay không. */
+export async function fetchAccessControlSuperAdminStatus(): Promise<
+    AccessControlSuperAdminStatus
+> {
+    const response = await fetch(
+        '/api/access-control/super-admin-status',
+        {
+            method: 'GET',
+            cache: 'no-store',
+        },
+    );
+
+    return readApiResponse<AccessControlSuperAdminStatus>(response);
+}
+
+/** Lấy danh sách lịch sử đăng nhập có phân trang. */
+/** Lấy lịch sử đăng nhập có phân trang và bộ lọc server-side. */
+export async function fetchAuthLoginEvents(input: {
+    page: number;
+    pageSize: number;
+    userQuery?: string;
+    ipAddress?: string;
+    deviceType?: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+    from?: string;
+    to?: string;
+}): Promise<AuthLoginEventsPage> {
+    const query = new URLSearchParams({
+        page: String(input.page),
+        pageSize: String(input.pageSize),
+    });
+
+    if (input.userQuery?.trim()) {
+        query.set('user', input.userQuery.trim());
+    }
+
+    if (input.ipAddress?.trim()) {
+        query.set('ip', input.ipAddress.trim());
+    }
+
+    if (input.deviceType) {
+        query.set('deviceType', input.deviceType);
+    }
+
+    if (input.from) {
+        query.set('from', input.from);
+    }
+
+    if (input.to) {
+        query.set('to', input.to);
+    }
+
+    const response = await fetch(
+        `/api/access-control/login-history?${query.toString()}`,
+        {
+            method: 'GET',
+            cache: 'no-store',
+        },
+    );
+
+    return readApiResponse<AuthLoginEventsPage>(response);
 }
 
 /**

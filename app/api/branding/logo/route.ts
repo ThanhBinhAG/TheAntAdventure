@@ -41,7 +41,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const perm = await checkPermissionForRequest('company.read');
+  const perm = await checkPermissionForRequest('about.write');
   if (!perm.allowed) {
     return json(
       { ok: false, error: perm.status === 401 ? 'Unauthorized' : 'Forbidden' },
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE() {
-  const perm = await checkPermissionForRequest('company.read');
+  const perm = await checkPermissionForRequest('about.write');
   if (!perm.allowed) {
     return json(
       { ok: false, error: perm.status === 401 ? 'Unauthorized' : 'Forbidden' },

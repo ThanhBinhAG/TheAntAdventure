@@ -14,11 +14,13 @@ import type { PricingStatusFilter } from '@/lib/products/product-pricing-helpers
 import { useStore } from '@/hooks/useStore';
 import type { Product } from '@/lib/types';
 import { toast } from '@/lib/toast';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 type ViewTab = 'library' | 'modules';
 type ShellMode = 'catalog' | 'modules' | 'manage';
 
 export default function Products() {
+  const { canWrite } = usePagePermission('products');
   const products = useStore((s) => s.products);
   const productPricing = useStore((s) => s.productPricing);
   const addProduct = useStore((s) => s.addProduct);
@@ -281,8 +283,14 @@ export default function Products() {
 
           {pickMode && !formOpen && (
             <>
-              <button type="button" className="btn btn-p btn-sm" onClick={openFormForNew}>
-                + New
+              <button
+                type="button"
+                className="btn btn-p btn-sm"
+                onClick={openFormForNew}
+                disabled={!canWrite}
+                title={!canWrite ? 'You need write permission for Products to add a product' : undefined}
+              >
+                + New Product
               </button>
               <button
                 type="button"

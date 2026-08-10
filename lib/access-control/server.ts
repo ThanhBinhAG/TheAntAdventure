@@ -10,7 +10,6 @@
  * - Không dùng service-role.
  * - Database RPC vẫn tự kiểm tra users.manage để bảo vệ thêm một lớp.
  */
-
 import 'server-only';
 
 import { createServerClient } from '@supabase/ssr';
@@ -18,13 +17,55 @@ import { cookies } from 'next/headers';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
-/** Hai role nghiệp vụ hiện có trong CRM. */
-export type ManagedRoleCode =
-    | 'admin'
-    | 'employee';
+type AuthLoginEventRow = {
+    id: number | string;
+    user_id: string | null;
+    user_email: string | null;
+    user_display_name: string | null;
+    event_type: string;
+    auth_method: 'password' | 'break_glass';
+    ip_address: string | null;
+    browser_name: string;
+    operating_system: string;
+    device_type: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+    created_at: string;
+    total_count: number | string;
+};
 
-/** Chỉ cho sửa permission của hai role này từ giao diện. */
-export type EditableRoleCode = 'employee';
+export type AuthLoginEventsPage = {
+    items: Array<{
+        id: number;
+        userId: string | null;
+        userEmail: string | null;
+        userDisplayName: string | null;
+        eventType: string;
+        authMethod: 'password' | 'break_glass';
+        ipAddress: string | null;
+        browserName: string;
+        operatingSystem: string;
+        deviceType: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+        createdAt: string;
+    }>;
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+};
+
+/**
+ * Role code động do database quản lý.
+ *
+ * Ví dụ: admin, employee, sales, tour_operator.
+ * Database RPC mới là nơi kiểm tra role có hợp lệ hay không.
+ */
+export type ManagedRoleCode = string;
+
+/**
+ * Role nhân viên động có thể cấu hình permission.
+ *
+ * UI và database sẽ chặn role hệ thống như admin/super_admin.
+ */
+export type EditableRoleCode = string;
 
 /** Dữ liệu một user trả về cho màn hình quản lý quyền. */
 export type AccessControlUser = {
@@ -43,11 +84,50 @@ export type AccessControlRole = {
     permission_codes: string[];
 };
 
+/**
+ * Role có thể cấu hình cho nhân viên.
+ *
+ * Bao gồm employee và các role mới như Sale, Điều hành...
+ * Không dùng cho role hệ thống admin và super_admin.
+ */
+export type AccessControlStaffRole = {
+    role_code: string;
+    role_label: string;
+    role_description: string | null;
+    is_active: boolean;
+    sort_order: number;
+    permission_codes: string[];
+    assigned_user_count: number;
+};
+
+/** Dữ liệu thô PostgreSQL trả về từ RPC role nhân viên. */
+type AccessControlStaffRoleRow = {
+    role_code: string;
+    role_label: string;
+    role_description: string | null;
+    is_active: boolean;
+    sort_order: number | string;
+    permission_codes: string[] | null;
+    assigned_user_count: number | string;
+};
+
 /** Dữ liệu một permission để hiển thị checkbox trên UI. */
 export type AccessControlPermission = {
     permission_code: string;
     permission_description: string;
+    group_code: string;
+    group_label: string;
+    group_sort_order: number;
 };
+
+export type CreateAccessControlPermissionInput = {
+    code: string;
+    description: string;
+    groupCode: string;
+    groupLabel: string;
+    groupSortOrder?: number;
+};
+
 /** Bộ lọc role cho danh sách user. */
 export type AccessControlUserRoleFilter =
     | ManagedRoleCode
@@ -57,24 +137,6 @@ export type AccessControlUserRoleFilter =
 /** Dữ liệu user trả về từ RPC phân trang. */
 type AccessControlUserPageRow = AccessControlUser & {
     total_count: number | string;
-};
-
-/** Dữ liệu thống kê raw từ PostgreSQL. */
-type AccessControlUserSummaryRow = {
-    total_users: number | string;
-    active_users: number | string;
-    admin_count: number | string;
-    employee_count: number | string;
-    unassigned_count: number | string;
-};
-
-/** Dữ liệu thống kê đã đổi về number để frontend dùng dễ hơn. */
-export type AccessControlUserSummary = {
-    totalUsers: number;
-    activeUsers: number;
-    adminCount: number;
-    employeeCount: number;
-    unassignedCount: number;
 };
 
 /** Kết quả danh sách user theo từng trang. */
@@ -204,20 +266,146 @@ function throwRpcError(error: {
 export async function getAccessControlData() {
     const supabase = createAccessControlServerClient();
 
-    const [rolesResult, permissionsResult] = await Promise.all([
+    const [
+        rolesResult,
+        permissionsResult,
+        superAdminResult,
+    ] = await Promise.all([
         supabase.rpc('list_access_control_roles'),
         supabase.rpc('list_access_control_permissions'),
+        supabase.rpc('is_current_super_admin'),
     ]);
 
     throwRpcError(rolesResult.error);
     throwRpcError(permissionsResult.error);
+    throwRpcError(superAdminResult.error);
 
     return {
         roles: (rolesResult.data ?? []) as AccessControlRole[],
         permissions: (
             permissionsResult.data ?? []
         ) as AccessControlPermission[],
+        canCreatePermission: Boolean(superAdminResult.data),
     };
+}
+
+/**
+ * Lấy role nhân viên động để cấu hình permission và gán cho user.
+ */
+export async function getAccessControlStaffRoles(): Promise<
+    AccessControlStaffRole[]
+> {
+    const supabase = createAccessControlServerClient();
+
+    const result = await supabase.rpc(
+        'list_access_control_staff_roles',
+    );
+
+    throwRpcError(result.error);
+
+    return (
+        (result.data ?? []) as AccessControlStaffRoleRow[]
+    ).map((role) => ({
+        role_code: role.role_code,
+        role_label: role.role_label,
+        role_description: role.role_description,
+        is_active: role.is_active,
+        sort_order: toNumber(role.sort_order),
+        permission_codes: role.permission_codes ?? [],
+        assigned_user_count: toNumber(role.assigned_user_count),
+    }));
+}
+
+/**
+ * Tạo role nhân viên động.
+ *
+ * code không đổi sau khi tạo vì được dùng trong user_roles
+ * và role_permissions.
+ */
+export async function createAccessControlStaffRole(input: {
+    code: string;
+    label: string;
+    description?: string;
+    sortOrder?: number;
+}): Promise<void> {
+    const supabase = createAccessControlServerClient();
+
+    const result = await supabase.rpc(
+        'create_access_control_staff_role',
+        {
+            input_code: input.code,
+            input_label: input.label,
+            input_description: input.description ?? null,
+            input_sort_order: input.sortOrder ?? 0,
+        },
+    );
+
+    throwRpcError(result.error);
+}
+
+/**
+ * Sửa tên, mô tả, thứ tự hoặc trạng thái hoạt động của role nhân viên.
+ */
+export async function updateAccessControlStaffRole(input: {
+    code: string;
+    label: string;
+    description?: string;
+    sortOrder: number;
+    isActive: boolean;
+}): Promise<void> {
+    const supabase = createAccessControlServerClient();
+
+    const result = await supabase.rpc(
+        'update_access_control_staff_role',
+        {
+            target_role_code: input.code,
+            new_label: input.label,
+            new_description: input.description ?? null,
+            new_sort_order: input.sortOrder,
+            new_is_active: input.isActive,
+        },
+    );
+
+    throwRpcError(result.error);
+}
+
+/**
+ * Xóa một role nhân viên động không còn được gán cho user nào.
+ *
+ * RPC là lớp quyết định cuối cùng: UI chỉ hỗ trợ trải nghiệm, không được phép
+ * tự tin rằng số nhân viên hiển thị vẫn đúng tại thời điểm xóa.
+ */
+export async function deleteAccessControlStaffRole(
+    roleCode: string,
+): Promise<void> {
+    const supabase = createAccessControlServerClient();
+
+    const result = await supabase.rpc(
+        'delete_access_control_staff_role',
+        { target_role_code: roleCode },
+    );
+
+    throwRpcError(result.error);
+}
+
+/**
+ * Thay toàn bộ permission của một role nhân viên bằng danh sách mới.
+ */
+export async function replaceAccessControlStaffRolePermissions(
+    roleCode: string,
+    permissionCodes: string[],
+): Promise<void> {
+    const supabase = createAccessControlServerClient();
+
+    const result = await supabase.rpc(
+        'replace_access_control_staff_role_permissions',
+        {
+            target_role_code: roleCode,
+            requested_permission_codes: permissionCodes,
+        },
+    );
+
+    throwRpcError(result.error);
 }
 
 /** Đổi role của một user. */
@@ -403,27 +591,73 @@ export async function getAccessControlAuditLogs(input: {
 }
 
 /**
- * Lấy số lượng user theo role để hiển thị các thẻ thống kê.
+ * Kiểm tra chính xác role của session hiện tại là super_admin.
+ *
+ * Không thay bằng users.manage vì Admin thường cũng có thể có quyền đó,
+ * còn lịch sử IP/thiết bị chỉ dành cho Super Admin.
  */
-export async function getAccessControlUserSummary(): Promise<AccessControlUserSummary> {
+export async function isCurrentAccessControlSuperAdmin(): Promise<boolean> {
+    const supabase = createAccessControlServerClient();
+
+    const result = await supabase.rpc('is_current_super_admin');
+
+    throwRpcError(result.error);
+
+    return Boolean(result.data);
+}
+
+/** Lấy lịch sử đăng nhập đã phân trang từ RPC bảo mật. */
+export async function getAuthLoginEvents(input: {
+    page: number;
+    pageSize: number;
+    userId?: string;
+    userQuery?: string;
+    ipAddress?: string;
+    deviceType?: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+    from?: string;
+    to?: string;
+}): Promise<AuthLoginEventsPage> {
     const supabase = createAccessControlServerClient();
 
     const result = await supabase.rpc(
-        'get_access_control_user_summary',
+        'list_auth_login_events',
+        {
+            page_number: input.page,
+            page_size: input.pageSize,
+            filter_user_id: input.userId ?? null,
+            filter_user_query: input.userQuery ?? null,
+            filter_ip_address: input.ipAddress ?? null,
+            filter_device_type: input.deviceType ?? null,
+            filter_from: input.from ?? null,
+            filter_to: input.to ?? null,
+        },
     );
 
     throwRpcError(result.error);
 
-    const row = (
-        result.data ?? []
-    )[0] as AccessControlUserSummaryRow | undefined;
+    const rows = (result.data ?? []) as AuthLoginEventRow[];
+    const totalCount = rows.length > 0
+        ? toNumber(rows[0].total_count)
+        : 0;
 
     return {
-        totalUsers: toNumber(row?.total_users ?? 0),
-        activeUsers: toNumber(row?.active_users ?? 0),
-        adminCount: toNumber(row?.admin_count ?? 0),
-        employeeCount: toNumber(row?.employee_count ?? 0),
-        unassignedCount: toNumber(row?.unassigned_count ?? 0),
+        items: rows.map((row) => ({
+            id: toNumber(row.id),
+            userId: row.user_id,
+            userEmail: row.user_email,
+            userDisplayName: row.user_display_name,
+            eventType: row.event_type,
+            authMethod: row.auth_method,
+            ipAddress: row.ip_address,
+            browserName: row.browser_name,
+            operatingSystem: row.operating_system,
+            deviceType: row.device_type,
+            createdAt: row.created_at,
+        })),
+        totalCount,
+        page: input.page,
+        pageSize: input.pageSize,
+        totalPages: Math.max(1, Math.ceil(totalCount / input.pageSize)),
     };
 }
 
@@ -438,6 +672,25 @@ export async function replaceAccessControlRolePermissions(
         target_role_code: roleCode,
         requested_permission_codes: permissionCodes,
     });
+
+    throwRpcError(result.error);
+}
+
+export async function createAccessControlPermission(
+    input: CreateAccessControlPermissionInput,
+): Promise<void> {
+    const supabase = createAccessControlServerClient();
+
+    const result = await supabase.rpc(
+        'create_access_control_permission',
+        {
+            input_code: input.code,
+            input_description: input.description,
+            input_group_code: input.groupCode,
+            input_group_label: input.groupLabel,
+            input_group_sort_order: input.groupSortOrder ?? null,
+        },
+    );
 
     throwRpcError(result.error);
 }

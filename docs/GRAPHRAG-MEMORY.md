@@ -1,6 +1,6 @@
 # GraphRAG Memory — The Ant Adventures CRM
 
-> Snapshot: 2026-08-02 · phạm vi: mã nguồn đang có trong repository, không bao gồm `node_modules` hay `.next`. Bao gồm module Access Control đã commit ở `0345007`.
+> Snapshot: 2026-08-07 · phạm vi: mã nguồn đang có trong repository, không bao gồm `node_modules` hay `.next`. Bao gồm trạng thái Access Control role động, cache SWR, i18n EN/VI và đối chiếu permission-sidebar trên Supabase local.
 >
 > Mục đích: đây là memory map để truy vết nhanh **chức năng → file → dữ liệu → luồng chạy**. Các sơ đồ là các cạnh có hướng; tên trong dấu backtick là node có thể tìm bằng `rg`.
 
@@ -12,7 +12,7 @@
 | Dữ liệu CRM | `lib/store.ts`, `lib/types.ts` | `components/StoreProvider.tsx` → `lib/db/hydrate.ts` / `lib/db/sync-push.ts` → `lib/db/supabase.ts` |
 | Supabase/schema & RLS | `supabase/schema.sql`, `supabase/migrations/20260730042242_02_migrations.sql`, `docs/DATABASE.md` | table → mapper trong `lib/db/mappers.ts` → `lib/db/supabase.ts`; RLS chuyển tiếp ở `supabase/rls-authenticated.sql` |
 | Đăng nhập/session | `app/api/auth/login/route.ts` | `lib/auth/*`, `lib/env.ts`, `middleware.ts` |
-| Quyền và Access Control | `lib/auth/permissions.ts` | `PermissionsProvider` → `/api/auth/permissions` → `current_permission_codes()`; `/access-control` → `components/access-control/*` → `/api/access-control/*` → RPC Supabase |
+| Quyền và Access Control | `lib/auth/permissions.ts` | `app/(crm)/layout.tsx` → `getInitialPermissionCodesForCRMLayout()` → `current_permission_codes()` → `PermissionsProvider`; `/access-control` → `components/access-control/*` → `/api/access-control/*` → RPC Supabase |
 | Sales đến booking | `components/pages/Sales.tsx` | `lib/customers/*`, `lib/sales/*`, `components/pages/Bookings.tsx` |
 | Thiết kế tour/proposal | `components/pages/TourDesign.tsx` | `components/tour-design/*` → `lib/tour-design/*` / `lib/proposals/*` |
 | Bảng giá/XLSX | `components/pages/Pricing*.tsx` | `components/pricing/*` → `lib/pricing/*` → bảng `pricing_*` |
@@ -233,16 +233,16 @@ Implemented session bridge: `middleware.ts` calls `updateSession` from `lib/supa
 ```mermaid
 sequenceDiagram
   participant B as Browser
+  participant L as CRM server layout
   participant PP as PermissionsProvider
-  participant PA as /api/auth/permissions
   participant RPC as current_permission_codes()
   participant AC as /access-control + API
   participant DB as Access Control RPC
 
-  B->>PP: CRM mount after login
-  PP->>PA: GET permission codes once
-  PA->>RPC: use current session cookie
-  RPC-->>PP: permission codes, e.g. users.manage or *
+  B->>L: navigate to protected CRM route with session cookie
+  L->>RPC: getInitialPermissionCodesForCRMLayout()
+  RPC-->>L: permission codes, e.g. users.manage or *
+  L-->>PP: initialPermissionCodes prop
   PP->>AC: PermissionGate checks PAGE_READ_PERMISSION
   alt Has users.manage or *
     AC->>DB: manage users/roles/audit through protected API
@@ -251,7 +251,9 @@ sequenceDiagram
   end
 ```
 
-`PermissionsProvider` caches permission codes in React Context for the current CRM session; `hasPermission()` accepts either the requested code or the Super Admin wildcard `*`. This cache improves UI responsiveness only. Every Access Control API and its database RPC perform their own `users.manage` check.
+`PermissionsProvider` initializes a React `Set` from server data, so Sidebar and `PermissionGate` do not wait for a browser permission request after login. `hasPermission()` accepts either the requested code or wildcard `*`; both `admin` and `super_admin` currently have that wildcard. `loadPermissions()` still exists only for an explicit retry/refresh.
+
+This Context is memory for the current React tree, not a persistent cache. Every Access Control API and its database RPC perform their own `users.manage` check.
 
 ### Hydrate and synchronization
 
@@ -339,8 +341,9 @@ flowchart LR
 | `GET,PUT /api/system/*` | debug panel | debug token except debug-log POST | diagnostics/log buffer |
 | `POST /api/weather/refresh` | weather page or cron | authenticated user or cron secret | service-role cache + Open-Meteo |
 | `GET /api/weather/weekly` | weather page | no explicit guard | service-role cache |
-| `GET,PATCH /api/access-control` | role and permission tab | `users.manage` at API and RPC | `lib/access-control/server.ts` + authorization RPC |
-| `GET,POST,PATCH,DELETE /api/access-control/users` | user directory | `users.manage` at API and RPC; create additionally uses server-only Admin API | Auth, `profiles`, `user_roles`, audit RPC |
+| `GET,PATCH /api/access-control` | role/permission metadata and assign a role to a user | `users.manage` at API and RPC | `list_access_control_roles`, `list_access_control_permissions`, `set_user_role`; legacy employee-permission PATCH remains but current UI does not call it |
+| `GET,POST,PATCH /api/access-control/users` | paged user directory and account create/edit/status | `users.manage` at API and RPC; create additionally uses server-only Admin API | Auth, `profiles`, `user_roles`, audit RPC |
+| `GET,POST,PATCH /api/access-control/staff-roles` | dynamic staff roles and their permissions | `users.manage` at API and RPC | dynamic role create/update/permission RPCs |
 | `GET /api/access-control/audit-logs` | audit log tab | `users.manage` at API and RPC | paginated audit-log RPC |
 
 ## 7. Data graph and sensitivity groups
@@ -359,85 +362,165 @@ flowchart TB
 
 Schema relationships live in `docs/DATABASE.md` and `supabase/schema.sql`; the CLI baseline is `supabase/migrations/20260730042242_02_migrations.sql`. Fresh schema/migration sources still create `dev_allow_all` policies. The tracked `supabase/rls-authenticated.sql` is a manual transition run after Auth login works: it replaces those policies with shared `authenticated_access` policies. It blocks anonymous direct access but does **not** implement the role/ownership model below; whether it has been applied to a remote project must be checked separately.
 
-## 8. RBAC implementation — delivered 2026-08-02
+## 8. RBAC implementation — verified 2026-08-05
 
 ### Current role model
 
-RBAC now uses roles as a convenient business grouping and permission codes as the enforcement primitive. A role is not checked by page/API code directly, except where the management UI must constrain valid role names.
+RBAC uses permission codes as the enforcement primitive. A user has one role; a role has many permission codes. Application code checks a permission such as `sales.write`, not a business role name such as `sale`.
 
-| Role | Effective permission model | Access Control capability |
+| Role type | Database state | Access Control behavior |
 |---|---|---|
-| `super_admin` | wildcard `*` | Can open `/access-control` and manage users, roles, permissions and audit logs. The wildcard is view-only in the role UI. |
-| `admin` | permissions assigned through `role_permissions` | Can use the CRM functions granted to the role; cannot receive `users.manage` through the UI/RPC. |
-| `employee` | permissions assigned through `role_permissions` | Can use the CRM functions granted to the role; cannot receive `users.manage` through the UI/RPC. |
+| `super_admin` | system role, wildcard `*` | Technical full-access role. It is excluded from the paged user list, staff-role list, filters and assignment UI. Historical audit values may still render its label. |
+| `admin` | system role, wildcard `*` | Full business access, including `users.manage`. It is not editable through role-permission checkboxes. |
+| `employee`, `sale`, `hr`, future roles | non-system roles in `roles` | Normal staff roles. Their permission list is editable once and shared by all users assigned to that role. Inactive roles remain visible for old assignments but cannot be assigned to new users. |
 
-`users.manage` is the sole permission required for Access Control. The migration removes it from `admin`/`employee`, hides it from the editable permission list, and rejects attempts to add `users.manage` or `*` to either role.
+`users.manage` is the sole permission required to open and operate Access Control. In the current local data, Admin and Super Admin obtain it through wildcard `*`.
+
+### Current sidebar-to-permission binding
+
+The current system has **two separate mappings**. They are consistent for the existing menu, but they are not automatically linked by a database foreign key:
+
+1. `public.permissions.group_code` groups checkboxes in **Role & Permissions**. `permission_groups` supplies the group label/order. For example, `catalogue.read` is displayed in the `catalogue` group.
+2. `lib/auth/permissions.ts` owns `PAGE_READ_PERMISSION`, a handwritten `PageSlug -> permission code` map. `Sidebar` and `PermissionGate` use this map to decide whether a user can see/open a page.
+
+```mermaid
+flowchart LR
+  DB[permissions.group_code] --> RP[Role & Permissions checkbox groups]
+  MAP[PAGE_READ_PERMISSION in TypeScript] --> SB[Sidebar visibility]
+  MAP --> PG[PermissionGate for direct URL]
+  CODES[current_permission_codes] --> SB
+  CODES --> PG
+```
+
+Current page bindings are:
+
+| Sidebar feature(s) | Required page-read permission | Current granularity |
+|---|---|---|
+| Dashboard | `dashboard.read` | one feature |
+| Daily Planner + Sales Pipeline | `sales.read` | grouped |
+| Clients | `customers.read` | one feature |
+| B2B Agents | `agents.read` | one feature |
+| Tour Design | `tour_design.read` | one feature |
+| Tour Products + Photo Gallery + Attraction Schedule | `catalogue.read` | grouped |
+| Pricing, Essentials + Accommodation & Cruises | `pricing.read` | grouped |
+| Weather Guide | `weather.read` | one feature |
+| Bookings + Contracts + Suppliers + Guides + Post-tour | `operations.read` | grouped |
+| Finance + Tax | `finance.read` | grouped |
+| Salary + Human Resources | `hr.read` | grouped |
+| About + Culture + Regulations | `company.read` | grouped |
+| AI Requirements + Dev Notes | `devnotes.read` | grouped |
+| Team Chat | `teamchat.read` | one feature |
+| Access Control | `users.manage` | system-management exception |
+
+`*.write` codes do not decide sidebar visibility. The sidebar/page gate checks only `*.read`; a write code has effect only where that feature's UI action and server API/RPC explicitly check it. At the snapshot date, general CRM CRUD is not yet uniformly protected by feature-level `*.write` checks.
+
+### Agreed RBAC target — one sidebar feature, `read` + `write`
+
+The agreed direction is to make each navigable sidebar leaf a feature. Each feature will own exactly two ordinary business permissions:
+
+```text
+<feature>.read  = user can see the menu and open the page
+<feature>.write = user can create/update/delete within that feature
+```
+
+Examples: `bookings.read` + `bookings.write`, `contracts.read` + `contracts.write`, `gallery.read` + `gallery.write`. Pricing subpages will be separate features (`pricing`, `pricing_essentials`, `pricing_accommodation`) rather than one broad Pricing permission. The wildcard `*` remains for Admin/Super Admin. Access Control will keep stricter API/RPC protections during transition; `users.manage` must not be removed until its protected routes and database RPCs have been migrated and tested.
+
+Implementation plan, not yet applied:
+
+1. Add `page_slug` and `is_navigation_feature` to `permission_groups`; seed one group per sidebar leaf.
+2. Seed each navigation group with its `read` and `write` permission, then grant equivalent new permissions to existing roles before changing page checks, so no user loses access during migration.
+3. Replace grouped entries such as `catalogue.*` and `operations.*` in `PAGE_READ_PERMISSION` with per-feature codes; expose `readPermissionForPage()` and `writePermissionForPage()` helpers for Sidebar, `PermissionGate` and feature actions.
+4. Make Role & Permissions show each sidebar feature as a two-checkbox card. Stop normal UI creation of arbitrary permission groups that have no menu/function mapping.
+5. Add UI and API/RPC checks for every feature write command, then retire legacy `*.export`, `*.refresh` and grouped permission codes only after compatibility verification.
 
 ### Permission data and enforcement graph
 
 ```mermaid
 flowchart LR
-  USER[auth.users id] --> PROFILE[profiles]
+  AUTH[auth.users] --> PROFILE[profiles]
   PROFILE --> UR[user_roles: one role per user]
   UR --> ROLE[roles]
   ROLE --> RP[role_permissions]
   RP --> PERM[permissions]
-  PERM --> RPC[current_permission_codes]
-  RPC --> UI[PermissionsProvider + PermissionGate]
-  RPC --> API[checkPermissionForRequest]
-  API --> DBRPC[Access Control RPC]
+  UR --> CODES[current_permission_codes]
+  RP --> CODES
+  CODES --> LAYOUT[CRM server layout]
+  LAYOUT --> UI[PermissionsProvider + PermissionGate]
+  CODES --> API[checkPermissionForRequest]
+  API --> DBRPC[protected Access Control RPC]
   DBRPC --> AUDIT[access_control_audit_logs]
 ```
 
-The same permission is checked in three places:
+The permission is checked in three places:
 
-1. **UI:** `PermissionsProvider` loads only permission codes and `PermissionGate` prevents the `/access-control` page from mounting for users without `users.manage`.
-2. **Next.js API:** every `/api/access-control/*` route calls `checkPermissionForRequest('users.manage')`; a direct browser request cannot bypass this.
-3. **Database RPC:** each sensitive RPC calls `public.has_permission('users.manage')`; this protects against an API mistake or a direct RPC request.
+1. **UI:** `PermissionGate` maps `/access-control` to `users.manage`, preventing the page component from mounting for users without it.
+2. **Next.js API:** every Access Control route checks `checkPermissionForRequest('users.manage')` before reading or writing.
+3. **Database RPC:** the sensitive RPC verifies `public.has_permission('users.manage')` again.
 
-The first layer is for navigation and user experience. The API and database layers are the actual authorization boundaries.
+The UI layer is for navigation and experience. API and RPC checks are the authorization boundaries for this module.
 
-### Access Control UI and APIs
+### Access Control load and SWR cache
 
-| Feature | Main UI node | Route | Server/database operation |
+`app/(crm)/layout.tsx` gets the initial permission codes on the server and passes them to `PermissionsProvider`. It avoids the older browser-first `/api/auth/permissions` request during normal CRM entry.
+
+The Access Control UI uses the default SWR cache in the JavaScript memory of the current browser tab. There is no custom `SWRConfig`, Redis cache, cookie or localStorage store for role/permission data. Browser reload, closing the tab or logout clears this cache. API responses intentionally use `Cache-Control: no-store`; SWR handles short-lived deduplication.
+
+| SWR key | Data | Important options |
+|---|---|---|
+| `access-control/roles-permissions` | base roles plus permission catalogue | 60-second deduplication; no revalidation on focus |
+| `access-control/staff-roles` | Employee, Sale, HR and future staff roles | 60-second deduplication; shared by User Directory and Role & quyền |
+| `['access-control/users', keyword, role, status, page, pageSize]` | one filtered, paged user list | 15-second deduplication; keeps previous table while the next result loads |
+| `['access-control/audit-logs', page, pageSize]` | one audit-log page | 30-second deduplication; created only after the Audit tab is first opened |
+
+After successful user or role writes, the relevant SWR `mutate()` reloads its displayed data. `useRefreshAccessControlAuditLogs()` revalidates only audit-log pages already present in SWR cache; it does not reload the entire CRM or create an audit request before the tab has been opened.
+
+### Access Control UI, API and response contracts
+
+| Feature | Main UI node | Request | Response / database operation |
 |---|---|---|---|
-| View users, search, role/status filters and summary | `UserDirectory.tsx` | `GET /api/access-control/users` | `list_access_control_users_page`, `get_access_control_user_summary` |
-| Create user | `UserCreateDrawer.tsx` | `POST /api/access-control/users` | Create `auth.users` with service role; trigger creates profile; RPC sets profile and role; rollback Auth user on partial failure |
-| Change a user role | `UserAccessDrawer.tsx` | `PATCH /api/access-control` | `set_user_role` |
-| Edit display name | `UserEditDrawer.tsx` | `PATCH /api/access-control/users` | `update_access_control_user_profile` |
-| Activate/deactivate or soft-delete a user | `UserActionsMenu.tsx` | `PATCH`/`DELETE /api/access-control/users` | lifecycle RPCs; rejected for self-targeting and the last Super Admin |
-| Configure Admin/Employee permissions | `RolesPermissionsTab.tsx` | `PATCH /api/access-control` | `replace_role_permissions` |
-| Read change history | `AuditLogsTab.tsx` | `GET /api/access-control/audit-logs` | `list_access_control_audit_logs` |
+| Load permission catalogue | `AccessControlPage.tsx` | `GET /api/access-control` | `{ ok, roles, permissions }`; `list_access_control_roles`, `list_access_control_permissions` |
+| List dynamic staff roles | `RolesPermissionsTab.tsx`, `UserDirectory.tsx` | `GET /api/access-control/staff-roles` | `{ ok, roles }`; each role has code, label, active state, permission codes and assigned-user count |
+| View/filter paged users | `UserDirectory.tsx` | `GET /api/access-control/users?page=&pageSize=&q=&role=&status=` | `{ ok, items, totalCount, page, pageSize, totalPages }`; no user-summary RPC is called by the current UI |
+| Create user | `UserCreateDrawer.tsx` | `POST /api/access-control/users` | Service-role creates `auth.users`; trigger creates `profiles`; RPC updates name and sets initial role; partial failure rolls back the new Auth user |
+| Change a user role | `UserAccessDrawer.tsx` | `PATCH /api/access-control` with `set_user_role` | `set_user_role`; updates `user_roles` and writes `user_role_changed` audit |
+| Edit name / activate / deactivate | `UserEditDrawer.tsx`, `UserActionsMenu.tsx` | `PATCH /api/access-control/users` | profile and lifecycle RPCs, with audit actions |
+| Create/edit/deactivate staff role | `StaffRoleCreateDrawer.tsx`, `StaffRoleEditDrawer.tsx` | `POST` / `PATCH /api/access-control/staff-roles` | dynamic role RPCs write `roles` and audit `staff_role_created` or `staff_role_updated` |
+| Save role checkboxes | `RolesPermissionsTab.tsx` | `PATCH /api/access-control/staff-roles` with `replace_role_permissions` | `replace_access_control_staff_role_permissions`; replaces rows in `role_permissions` and writes `staff_role_permissions_replaced` |
+| Read history | `AuditLogsTab.tsx` | `GET /api/access-control/audit-logs?page=&pageSize=` | protected `list_access_control_audit_logs` with before/after JSON |
 
-The browser accesses these routes through `components/access-control/access-control-api.ts`; it does not call Supabase directly for management operations. `lib/access-control/server.ts` makes RPC calls with the current user's cookies, so PostgreSQL sees the correct `auth.uid()`. The only service-role module is `lib/auth/access-control-admin.ts`, used solely to create/rollback an Auth user on the server.
+The browser calls only `components/access-control/access-control-api.ts`; it does not call Supabase directly for management operations. `lib/access-control/server.ts` builds a Supabase client with the current user's cookies, so PostgreSQL receives the correct `auth.uid()`. The only service-role module is `lib/auth/access-control-admin.ts`, used solely for creating and rolling back a new Auth user.
 
-### Versioned migrations for the delivered module
+When a user creates a new account, the audit trail is currently produced by `user_profile_updated` and `user_role_changed`; there is no distinct `user_created` action yet.
+
+### Versioned migrations for the current module
 
 | Migration | Responsibility |
 |---|---|
-| `20260802010226_add_super_admin_role.sql` | Seeds `super_admin`, assigns wildcard `*`, removes `users.manage` from Admin. |
-| `20260802014552_add_access_control_rpcs.sql` | Adds audit table, role/permission/user management RPC baseline and one-role-per-user constraint. |
-| `20260802070833_protect_access_control_system_permissions.sql` | Protects `users.manage` and prevents wildcard/system permission assignment to Admin/Employee. |
-| `20260802123339_add_access_control_user_pagination.sql` | Adds server-side user listing, filters and role statistics. |
-| `20260802131905_add_access_control_audit_list.sql` | Adds protected, paginated audit-log read RPC. |
-| `20260802141248_add_access_control_user_lifecycle.sql` | Adds soft-delete state and excludes deleted users from permission codes, normal listings and statistics. |
-| `20260802142349_add_access_control_user_write_rpcs.sql` | Adds update profile, activate/deactivate, soft-delete/restore RPCs and lifecycle audit actions. |
-
-`supabase/snippets/gan_quyen_super_admin.sql` is a controlled manual bootstrap snippet to assign the first Super Admin after its Auth/profile records exist. It must not be used as an application runtime path.
+| `20260730074120_rbac_foundation.sql` | Creates initial RBAC tables, `current_permission_codes()` and the Auth-user → profile trigger. |
+| `20260802014552_add_access_control_rpcs.sql` | Adds Access Control RPC baseline, audit table and one-role-per-user model. |
+| `20260802131905_add_access_control_audit_list.sql` | Adds protected, paged audit-log read RPC. |
+| `20260802142349_add_access_control_user_write_rpcs.sql` | Adds profile/status lifecycle RPCs and audit actions. |
+| `20260804031112_make_admin_full_access_keep_super.sql` | Makes Admin a full-access system role alongside Super Admin. |
+| `20260804033108_hide_super_admin_from_access_control.sql` | Excludes Super Admin from normal Access Control user-management UI/data. |
+| `20260804050915_*`, `20260804052028_*`, `20260804052335_*` | Historical job-position model migrations. They remain in history only. |
+| `20260804064249_make_employee_roles_dynamic.sql` | Adds dynamic staff-role RPCs and audit actions. |
+| `20260804131007_make_employee_a_manageable_staff_role.sql` | Makes Employee a normal manageable staff role. |
+| `20260804133056_support_dynamic_roles_in_user_directory.sql` | Supports dynamic role labels, filters and assignments in the user directory. |
+| `20260804154323_retire_legacy_job_positions.sql` | Removes the empty job-position tables/RPCs and ensures effective permissions only derive from user role permissions. |
 
 ### Audit trail
 
-The `access_control_audit_logs` table records the actor, target, before/after values and time. The current UI maps these actions to Vietnamese labels: `user_role_changed`, `role_permissions_replaced`, `user_profile_updated`, `user_activated`, `user_deactivated`, `user_soft_deleted`, and `user_restored`. The table is read via the protected RPC rather than directly from the browser.
+`access_control_audit_logs` stores actor, optional target user, before value, after value and time. The UI maps database actions to Vietnamese labels. Current actions include `user_role_changed`, `user_profile_updated`, `user_activated`, `user_deactivated`, `user_soft_deleted`, `user_restored`, `staff_role_created`, `staff_role_updated` and `staff_role_permissions_replaced`.
 
 ### Deliberately not yet enforced by this module
 
-- General CRM business tables do **not** yet have role/row-scoped RLS based on these permissions. This work only protects Access Control itself and page-level navigation already wired to permission codes.
-- Photo upload/delete, weather refresh, and PDF exports retain their existing guards. PDF exports intentionally require only an authenticated session so both Admin and Employee can export; they are not restricted by a separate export permission.
-- The user directory hides soft-deleted users in its normal list. A restore RPC exists, but there is no dedicated deleted-user/restore screen yet.
+- General CRM business tables do **not** yet have role/row-scoped RLS based on these permission codes. This module protects Access Control and page-level navigation already wired to `PAGE_READ_PERMISSION`.
+- Employee and Admin can both continue using permitted CRM operations such as PDF export according to existing module guards; this module does not broadly lock write actions for Employee.
+- The old `PATCH /api/access-control` branch `replace_role_permissions` and its database RPC remain for compatibility, but the current UI saves staff-role permissions through `/api/access-control/staff-roles`. Remove the legacy branch only after confirming no external consumer uses it.
 
 ### Future extension direction
 
-When the business requires more roles, add a role and assign existing permission codes first. Add new permission codes only when a genuinely new action must be distinguished. For record-specific scope, introduce ownership/assignment fields and enforce them with RLS after replacing full-table mirror synchronization with record-level server commands. Candidate future roles include sales, operations, finance, HR, content editor and viewer; they are not currently seeded roles.
+Create a shared staff role first, then assign feature-level `read`/`write` permissions to it. Add a new permission pair only when a new sidebar feature is introduced; add it through a migration plus the navigation map, not only through the Access Control UI. For record-specific scope, add ownership/assignment fields and enforce them with RLS after replacing full-table mirror synchronization with record-level server commands.
 
 ## 9. Known integrity and delivery constraints
 
@@ -454,9 +537,9 @@ When the business requires more roles, add a role and assign existing permission
 
 ## 10. Verification status
 
-- Static source review: refreshed for the Access Control routes, UI, server services, migrations and audit test added in commit `0345007`.
-- `npx supabase migration list --local`: local and remote histories must match through `20260802142349`; use this command after migration changes rather than `db:status`, which requires a linked hosted Supabase project.
-- `npm run typecheck`: passed when Access Control was completed.
+- Static source/database review: refreshed for Access Control routes, UI, server services, SWR cache keys, structured API errors, EN/VI labels, migrations and local database state on 2026-08-07.
+- `npx supabase migration list --local`: local and remote histories matched through `20260804154323_retire_legacy_job_positions`; use this command after local migration changes rather than `db:status`, which requires a linked hosted Supabase project.
+- `npm run typecheck` and `npm run lint`: passed on 2026-08-05.
 - `npm test`: 275 of 277 tests passed in the latest full run. The two failures are `ENOENT` reads for the ignored Essentials and Accommodation XLSX workbooks; no test assertion failed.
 - A production build is not claimed for this snapshot: running `next build` concurrently with `next dev` corrupted generated `.next` vendor chunks locally. The cache was moved aside and `next dev` restarted successfully; stop the dev server before the next production-build verification.
 - This documentation update changes `docs/GRAPHRAG-MEMORY.md`; no application logic, configuration or database schema was changed by the documentation refresh itself.

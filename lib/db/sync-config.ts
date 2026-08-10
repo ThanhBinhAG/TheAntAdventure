@@ -61,7 +61,9 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
     'photo_folders',
     'comms',
   ],
-  products: ['products', 'product_pricing'],
+  // Catalogue pages use the paginated server API. The full data set is loaded
+  // only when a user opens a detail drawer or enters Manage mode.
+  products: [],
   /** attractions deferred — Gallery lazy-loads for ?attraction= filter / delete unlink */
   gallery: ['photos', 'photo_folders'],
   pricing: ['products', 'product_pricing'],

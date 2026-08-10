@@ -20,7 +20,6 @@ import {
 import {
   buildDestinationWeatherDetail,
   fetchDestinationForecastFromApi,
-  fetchWeeklyForecastFromApi,
 } from './open-meteo';
 import type { DestinationWeatherDetail, RefreshResult, WeeklyWeatherResponse } from './types';
 import { WEATHER_DESTINATIONS } from './coordinates';

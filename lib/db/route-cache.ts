@@ -94,8 +94,9 @@ export function resolveRouteCacheTables(
 export function pickRouteSnapshot(
   backup: BackupData,
   tables: readonly SyncArrayTable[],
-  _includeMessages = false
+  includeMessages = false
 ): Partial<BackupData> {
+  void includeMessages;
   const partial: Partial<BackupData> = {};
   const eligible = tablesEligibleForRouteCache(tables);
   for (const table of eligible) {

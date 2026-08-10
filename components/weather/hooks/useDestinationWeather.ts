@@ -49,12 +49,26 @@ export function useDestinationWeather(
   options?: { enabled?: boolean }
 ) {
   const enabled = options?.enabled !== false && Boolean(id);
+  const activeId = enabled && id ? id : null;
+
   const [data, setData] = useState<DestinationWeatherDetail | null>(() =>
-    id ? readClientWeatherCache(id) : null
+    activeId ? readClientWeatherCache(activeId) : null
   );
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() =>
+    Boolean(activeId && !readClientWeatherCache(activeId))
+  );
   const [error, setError] = useState<string | null>(null);
+  const [trackedId, setTrackedId] = useState(activeId);
   const mounted = useRef(true);
+
+  // Adjust state when destination id / enabled flips (React “adjusting state when props change”).
+  if (activeId !== trackedId) {
+    setTrackedId(activeId);
+    const cached = activeId ? readClientWeatherCache(activeId) : null;
+    setData(cached);
+    setLoading(Boolean(activeId && !cached));
+    setError(null);
+  }
 
   useEffect(() => {
     mounted.current = true;
@@ -104,24 +118,33 @@ export function useDestinationWeather(
     [id]
   );
 
+  // Network fetch only — loading/reset already applied during render when id changes.
   useEffect(() => {
-    if (!enabled || !id) {
-      setData(null);
-      setLoading(false);
-      setError(null);
-      return;
-    }
+    if (!activeId) return;
+    if (readClientWeatherCache(activeId)) return;
 
-    const cached = readClientWeatherCache(id);
-    if (cached) {
-      setData(cached);
-      setLoading(false);
-      setError(null);
-      return;
-    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const detail = await fetchDestinationWeather(activeId, false);
+        if (!cancelled && mounted.current) {
+          setData(detail);
+          setLoading(false);
+          setError(null);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!cancelled && mounted.current) {
+          setError(message);
+          setLoading(false);
+        }
+      }
+    })();
 
-    void load(false);
-  }, [enabled, id, load]);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId]);
 
   return {
     data,

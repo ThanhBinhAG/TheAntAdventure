@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NAV_SECTIONS, type NavItem } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
@@ -38,14 +38,10 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
   const tourDrafts = useStore((s) => s.tourDrafts) as TourDraft[];
   const messages = useStore((s) => s.messages);
   /** undefined = unknown; null = default SVG; string = custom Storage URL */
-  const [logoUrl, setLogoUrl] = useState<string | null | undefined>(undefined);
+  const [logoUrl, setLogoUrl] = useState<string | null | undefined>(() =>
+    typeof window === 'undefined' ? undefined : getCachedCompanyLogoUrl()
+  );
   const [logoEditorOpen, setLogoEditorOpen] = useState(false);
-
-  // Sync hydrate from localStorage before paint (avoids SSR mismatch + default SVG flash).
-  useLayoutEffect(() => {
-    const cached = getCachedCompanyLogoUrl();
-    if (cached !== undefined) setLogoUrl(cached);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;

@@ -12,7 +12,7 @@ import TourExperiencesStep from '@/components/tour-design/TourExperiencesStep';
 import PricingStep from '@/components/tour-design/PricingStep';
 import ProposalExportStep from '@/components/tour-design/ProposalExportStep';
 import type { OverridePatch } from '@/components/tour-design/SelectedExperiencesPanel';
-import { TOUR_PACKAGES, type TourPackage } from '@/lib/seeds/tourPackages';
+import type { TourPackage } from '@/lib/seeds/tourPackages';
 import { customerToBrief } from '@/lib/customers/customer-to-brief';
 import { isExperiencesBlocked } from '@/lib/tour-design/tour-design-gate';
 import {

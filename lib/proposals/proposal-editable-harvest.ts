@@ -78,7 +78,8 @@ function applyField(m: MutableTemplate, path: string, value: string): void {
 }
 
 /** Harvest only template `data-proposal-field` nodes (tour narrative is not editable). */
-export function harvestOverridesFromRoot(root: ParentNode, _baseDoc: ProposalDoc): ProposalTemplateOverrides {
+export function harvestOverridesFromRoot(root: ParentNode, baseDoc: ProposalDoc): ProposalTemplateOverrides {
+  void baseDoc;
   const m = createMutable();
   root.querySelectorAll('[data-proposal-field]').forEach((node) => {
     const el = node as HTMLElement;

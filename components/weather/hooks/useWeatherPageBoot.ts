@@ -79,6 +79,7 @@ export function useWeatherPageBoot() {
       if (mounted.current) {
         setDestinations(boot.destinations);
         setLoading(false);
+        setError(null);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -89,9 +90,29 @@ export function useWeatherPageBoot() {
     }
   }, []);
 
+  // Initial boot: loading already true — only setState after await (no sync setState in effect).
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const boot = await fetchWeatherPageBoot();
+        if (!cancelled && mounted.current) {
+          setDestinations(boot.destinations);
+          setLoading(false);
+          setError(null);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!cancelled && mounted.current) {
+          setError(message);
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const create = useCallback(
     async (input: ProvinceFormInput) => {

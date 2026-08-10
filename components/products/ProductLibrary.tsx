@@ -94,10 +94,6 @@ export default function ProductLibrary({
     pricingStatus: pricingStatus || undefined,
   });
 
-  useEffect(() => {
-    setPage(1);
-  }, [search, region, duration, category, destFilter, pricingStatus, pageSize]);
-
   const items = productPage?.items ?? [];
   const total = productPage?.totalCount ?? 0;
   const currentPage = productPage?.page ?? page;

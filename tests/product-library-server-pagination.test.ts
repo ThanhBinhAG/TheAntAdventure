@@ -14,4 +14,5 @@ test('Product Library renders catalogue pages returned by the server', () => {
     assert.match(source, /productPage\?\.facets/);
     assert.doesNotMatch(source, /usePagination\(/);
     assert.doesNotMatch(source, /paginatedItems/);
+    assert.doesNotMatch(source, /useEffect\(\(\) => \{\s*setPage\(1\)/);
 });

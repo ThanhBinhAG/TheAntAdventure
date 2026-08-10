@@ -22,7 +22,6 @@ type ShellMode = 'catalog' | 'modules' | 'manage';
 export default function Products() {
   const { canWrite } = usePagePermission('products');
   const products = useStore((s) => s.products);
-  const productPricing = useStore((s) => s.productPricing);
   const addProduct = useStore((s) => s.addProduct);
   const updateProduct = useStore((s) => s.updateProduct);
   const deleteProduct = useStore((s) => s.deleteProduct);
@@ -215,6 +214,14 @@ export default function Products() {
 
   const showLibrary = viewTab === 'library' || (pickMode && returnTab === 'library');
   const showModules = viewTab === 'modules' || (pickMode && returnTab === 'modules');
+  const libraryPaginationKey = JSON.stringify([
+    libSearch,
+    region,
+    duration,
+    category,
+    destFilter,
+    pricingStatus,
+  ]);
 
   const drawerProduct = formOpen ? draftPreview : detailProduct;
   const drawerOpen = formOpen ? Boolean(draftPreview) : Boolean(detailProductCode);
@@ -338,6 +345,7 @@ export default function Products() {
 
       {showLibrary && (
         <ProductLibrary
+          key={libraryPaginationKey}
           search={libSearch}
           onSearchChange={setLibSearch}
           region={region}
@@ -359,6 +367,7 @@ export default function Products() {
 
       {showModules && (
         <ModulesView
+          key={modSearch}
           search={modSearch}
           pickMode={pickMode && !formOpen}
           onPickProduct={openFormForProduct}

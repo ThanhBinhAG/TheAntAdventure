@@ -37,13 +37,11 @@ export default function ModulesView({
   const { data: productPage, error, isLoading, retry } = useProductPage({
     page, pageSize: pageSize as ProductPageSize, view: 'modules', q: search || undefined,
   });
-  useEffect(() => { setPage(1); }, [search, pageSize]);
-  const items = productPage?.items ?? [];
   const total = productPage?.totalCount ?? 0;
   const currentPage = productPage?.page ?? page;
   const totalPages = productPage?.totalPages ?? 1;
   const pageGrouped = useMemo(
-    () => groupModulesProductPage(items), [items]
+    () => groupModulesProductPage(productPage?.items ?? []), [productPage?.items]
   );
 
   useEffect(() => {

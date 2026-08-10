@@ -5,7 +5,7 @@
 
 import 'server-only';
 
-import { Agent, fetch as undiciFetch } from 'undici';
+import { Agent, fetch as undiciFetch, type RequestInit as UndiciRequestInit } from 'undici';
 import { shouldUseInsecureTlsForUrl } from '@/lib/supabase/tls-config';
 
 let insecureAgent: Agent | null = null;
@@ -25,6 +25,42 @@ function getInsecureAgent(): Agent {
   return insecureAgent;
 }
 
+/**
+ * Build undici init from global fetch args.
+ * Always call undici with a URL string — DOM `Request` is not assignable to undici's
+ * `RequestInfo` (undici `Request` requires `duplex`).
+ */
+function toUndiciInit(input: RequestInfo | URL, init?: RequestInit): UndiciRequestInit {
+  const fromInit = { ...(init as UndiciRequestInit | undefined) };
+
+  if (typeof input === 'string' || input instanceof URL) {
+    return fromInit;
+  }
+
+  const req = input as globalThis.Request;
+  const method = fromInit.method ?? req.method;
+  const headers = fromInit.headers ?? req.headers;
+  const body =
+    fromInit.body !== undefined
+      ? fromInit.body
+      : method === 'GET' || method === 'HEAD'
+        ? undefined
+        : (req.body as UndiciRequestInit['body']);
+
+  const next: UndiciRequestInit = {
+    ...fromInit,
+    method,
+    headers,
+    body,
+  };
+
+  if (body != null && next.duplex == null) {
+    next.duplex = 'half';
+  }
+
+  return next;
+}
+
 /** Fetch that skips TLS verify for company Supabase HTTPS hosts (Node runtime only). */
 export function getSupabaseFetch(): typeof fetch {
   const customFetch: typeof fetch = (input, init) => {
@@ -32,8 +68,8 @@ export function getSupabaseFetch(): typeof fetch {
     if (!shouldUseInsecureTlsForUrl(url)) {
       return fetch(input, init);
     }
-    return undiciFetch(input as string | URL | Request, {
-      ...(init as object),
+    return undiciFetch(url, {
+      ...toUndiciInit(input as RequestInfo | URL, init),
       dispatcher: getInsecureAgent(),
     }) as unknown as Promise<Response>;
   };

@@ -24,6 +24,7 @@ import {
     getSupabaseServiceRoleKey,
     getSupabaseUrl,
 } from '@/lib/env';
+import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 /** Lỗi riêng để API trả HTTP status phù hợp. */
 export class AccessControlAuthAdminError extends Error {
@@ -46,6 +47,7 @@ function getAccessControlAdminClient(): SupabaseClient | null {
     }
 
     return createClient(url, serviceRoleKey, {
+        ...getSupabaseGlobalFetchOptions(),
         auth: {
             persistSession: false,
             autoRefreshToken: false,

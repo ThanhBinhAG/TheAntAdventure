@@ -6,6 +6,7 @@ import {
   isBreakGlassSessionValid,
 } from '@/lib/auth/break-glass';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 export type AuthContext = {
   authenticated: boolean;
@@ -44,6 +45,7 @@ export async function getAuthContext(): Promise<AuthContext> {
   }
 
   const supabase = createServerClient(url, key, {
+    ...getSupabaseGlobalFetchOptions(),
     cookies: {
       getAll() {
         return cookieStore.getAll();

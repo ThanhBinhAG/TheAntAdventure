@@ -1,21 +1,108 @@
 import 'server-only';
-import { WEATHER_DESTINATIONS } from './coordinates';
 import {
-  ensureDestinationsSeeded,
   getLastSuccessfulFetchWithin,
   getTodayVnDate,
-  isCacheStale,
+  invalidateDestinationCache,
+  isDestinationCacheStale,
   logWeatherFetch,
   prunePastForecastDates,
+  readDestinationDetailCache,
   readWeeklyCache,
+  upsertCurrentCache,
   upsertWeeklyCache,
 } from './cache';
-import { fetchWeeklyForecastFromApi } from './open-meteo';
-import type { RefreshResult, WeeklyWeatherResponse } from './types';
+import {
+  ensureDestinationsSeeded,
+  getDestinationById,
+  listFeaturedDestinations,
+  metaToCoord,
+} from './destinations';
+import {
+  buildDestinationWeatherDetail,
+  fetchDestinationForecastFromApi,
+  fetchWeeklyForecastFromApi,
+} from './open-meteo';
+import type { DestinationWeatherDetail, RefreshResult, WeeklyWeatherResponse } from './types';
+import { WEATHER_DESTINATIONS } from './coordinates';
 
 const RATE_LIMIT_MINUTES = 5;
 
-export async function refreshWeeklyForecast(options?: {
+export async function fetchAndCacheDestination(
+  destinationId: string,
+  options?: { force?: boolean }
+): Promise<DestinationWeatherDetail> {
+  const meta = await getDestinationById(destinationId);
+  if (!meta || !meta.active) {
+    throw new Error(`Destination "${destinationId}" not found.`);
+  }
+
+  if (!options?.force) {
+    const cached = await readDestinationDetailCache(destinationId, {
+      id: meta.id,
+      name: meta.name,
+      region: meta.region,
+      emoji: meta.emoji,
+      description: meta.description,
+      coverPhotoId: meta.coverPhotoId,
+      coverUrl: meta.coverUrl,
+    });
+    if (cached) return cached;
+  } else {
+    await invalidateDestinationCache(destinationId);
+  }
+
+  const parsed = await fetchDestinationForecastFromApi(metaToCoord(meta));
+  await upsertWeeklyCache(parsed.rows);
+  await upsertCurrentCache(
+    destinationId,
+    { current: parsed.current, days: parsed.days },
+    parsed.fetchedAt,
+    parsed.expiresAt
+  );
+  await prunePastForecastDates(getTodayVnDate());
+
+  return buildDestinationWeatherDetail(
+    {
+      id: meta.id,
+      name: meta.name,
+      region: meta.region,
+      emoji: meta.emoji,
+      description: meta.description,
+      coverPhotoId: meta.coverPhotoId,
+      coverUrl: meta.coverUrl,
+    },
+    parsed
+  );
+}
+
+export async function getDestinationWeather(
+  destinationId: string,
+  options?: { force?: boolean }
+): Promise<{ detail: DestinationWeatherDetail; fromCache: boolean }> {
+  const meta = await getDestinationById(destinationId);
+  if (!meta || !meta.active) {
+    throw new Error(`Destination "${destinationId}" not found.`);
+  }
+
+  if (!options?.force) {
+    const cached = await readDestinationDetailCache(destinationId, {
+      id: meta.id,
+      name: meta.name,
+      region: meta.region,
+      emoji: meta.emoji,
+      description: meta.description,
+      coverPhotoId: meta.coverPhotoId,
+      coverUrl: meta.coverUrl,
+    });
+    if (cached) return { detail: cached, fromCache: true };
+  }
+
+  const detail = await fetchAndCacheDestination(destinationId, { force: options?.force });
+  return { detail, fromCache: false };
+}
+
+/** Warm featured destinations only (cron / manual refresh). */
+export async function refreshFeaturedForecast(options?: {
   force?: boolean;
 }): Promise<RefreshResult> {
   const start = Date.now();
@@ -23,21 +110,45 @@ export async function refreshWeeklyForecast(options?: {
 
   try {
     await ensureDestinationsSeeded();
+    const featured = await listFeaturedDestinations();
+    const targets = featured.length
+      ? featured
+      : WEATHER_DESTINATIONS.filter((d) =>
+          (['hanoi', 'saigon'] as string[]).includes(d.id)
+        ).map((d) => ({
+          id: d.id,
+          name: d.name,
+          region: d.region,
+          emoji: d.emoji,
+          latitude: d.latitude,
+          longitude: d.longitude,
+          elevationM: d.elevationM ?? null,
+          sortOrder: d.sortOrder,
+          description: null,
+          notes: null,
+          coverPhotoId: null,
+          coverUrl: null,
+          coverThumbUrl: null,
+          isFeatured: true,
+          active: true,
+        }));
 
     if (!force) {
-      const stale = await isCacheStale();
-      if (!stale) {
+      const allFresh = await Promise.all(
+        targets.map(async (d) => !(await isDestinationCacheStale(d.id)))
+      );
+      if (allFresh.every(Boolean)) {
         await logWeatherFetch({
           status: 'skipped',
-          destinationsCount: WEATHER_DESTINATIONS.length,
+          destinationsCount: targets.length,
           durationMs: Date.now() - start,
-          errorMessage: 'Cache still fresh',
+          errorMessage: 'Featured cache still fresh',
         });
         return {
           ok: true,
           skipped: true,
-          reason: 'Cache still fresh',
-          destinationsCount: WEATHER_DESTINATIONS.length,
+          reason: 'Featured cache still fresh',
+          destinationsCount: targets.length,
           durationMs: Date.now() - start,
         };
       }
@@ -48,60 +159,63 @@ export async function refreshWeeklyForecast(options?: {
           ok: true,
           skipped: true,
           reason: 'Rate limited — wait 5 minutes between refreshes',
-          destinationsCount: WEATHER_DESTINATIONS.length,
+          destinationsCount: targets.length,
           durationMs: Date.now() - start,
         };
       }
     }
 
-    const rows = await fetchWeeklyForecastFromApi(WEATHER_DESTINATIONS);
-    if (!rows.length) {
-      throw new Error('Open-Meteo returned no forecast rows');
+    let rowsUpserted = 0;
+    let fetchedAt: string | undefined;
+
+    for (const dest of targets) {
+      const detail = await fetchAndCacheDestination(dest.id, { force: true });
+      rowsUpserted += detail.days.length;
+      fetchedAt = detail.fetchedAt;
     }
 
-    const upserted = await upsertWeeklyCache(rows);
-    await prunePastForecastDates(getTodayVnDate());
-    const fetchedAt = rows[0]?.fetched_at ?? new Date().toISOString();
     const durationMs = Date.now() - start;
-
     await logWeatherFetch({
       status: 'ok',
-      destinationsCount: WEATHER_DESTINATIONS.length,
+      destinationsCount: targets.length,
       durationMs,
     });
 
     return {
       ok: true,
-      destinationsCount: WEATHER_DESTINATIONS.length,
-      rowsUpserted: upserted,
+      destinationsCount: targets.length,
+      rowsUpserted,
       fetchedAt,
       durationMs,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const durationMs = Date.now() - start;
-
     await logWeatherFetch({
       status: 'error',
-      destinationsCount: WEATHER_DESTINATIONS.length,
+      destinationsCount: 0,
       durationMs,
       errorMessage: message,
     });
-
     return { ok: false, error: message, durationMs };
   }
+}
+
+/** @deprecated Prefer refreshFeaturedForecast — kept for legacy weekly batch. */
+export async function refreshWeeklyForecast(options?: {
+  force?: boolean;
+}): Promise<RefreshResult> {
+  return refreshFeaturedForecast(options);
 }
 
 export type WeeklyForecastResult = {
   payload: WeeklyWeatherResponse;
   refreshError?: string;
-  /** True when cache had rows but is past TTL — client should soft-refresh in background. */
   needsBackgroundRefresh?: boolean;
 };
 
 /**
- * Cache-first weekly read. Never blocks on Open-Meteo when any rows exist
- * (fresh or stale). Cold empty cache is the only path that awaits a refresh.
+ * @deprecated Weekly batch read — use GET /api/weather/destination instead.
  */
 export async function getWeeklyForecastWithRefresh(
   region?: string | null
@@ -115,7 +229,7 @@ export async function getWeeklyForecastWithRefresh(
     };
   }
 
-  const result = await refreshWeeklyForecast({ force: false });
+  const result = await refreshFeaturedForecast({ force: false });
   if (result.ok && !result.skipped) {
     const refreshed = await readWeeklyCache(region);
     return { payload: refreshed };

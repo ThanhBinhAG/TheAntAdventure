@@ -2,9 +2,6 @@ import type { TourBrief } from '../tour-design/tour-design-types';
 
 export type ProposalVariant = 'b2c' | 'b2b';
 
-/** Detailed Program photo layout: Material-style sidebar (default) or inline horizontal grid. */
-export type ProposalDetailedProgramLayout = 'sidebar' | 'inline';
-
 export interface ProposalConsultant {
   name: string;
   email: string;
@@ -136,8 +133,6 @@ export interface ProposalDoc {
   hotelRatesOptionB: ProposalHotelRate[];
   specialNotes: string;
   logoUrl: string;
-  /** Default `sidebar` matches Material samples; `inline` keeps the horizontal photo grid. */
-  detailedProgramLayout: ProposalDetailedProgramLayout;
   /** Editor overrides for cover booking table values (keyed by row label). */
   bookingFields?: Record<string, string>;
   /** Editor overrides for Tour Overview table rows. */
@@ -169,7 +164,6 @@ export interface AssembleProposalInput {
   productPricing?: import('../types').ProductPricing[];
   galleryPhotos?: import('../tour-design/tour-design-types').GalleryPhoto[];
   hotelsCatalog?: import('../types').Hotel[];
-  detailedProgramLayout?: ProposalDetailedProgramLayout;
   /** Per-product draft edits (desc / date / clientNote) from Step 2. */
   experienceOverrides?: Record<string, import('../types').ExperienceOverride>;
 }

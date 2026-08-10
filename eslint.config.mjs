@@ -14,4 +14,11 @@ export default defineConfig([
     "next-env.d.ts",
     "supabase/.temp/**",
   ]),
+
+  // Forked Sharp workers are plain CommonJS (no bundler, no @/ aliases), so require() is
+  // the only way for them to load modules.
+  {
+    files: ["**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
 ]);

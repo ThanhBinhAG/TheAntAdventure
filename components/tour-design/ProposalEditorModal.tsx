@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   applyProposalContentOverrides,
-  hasProposalContentOverrides,
-  snapshotFromDoc,
-  type ProposalContentOverrides,
+  hasProposalTemplateOverrides,
+  snapshotTemplateFromDoc,
+  type ProposalTemplateOverrides,
 } from '@/lib/proposals/proposal-content-overrides';
 import { harvestOverridesFromRoot } from '@/lib/proposals/proposal-editable-harvest';
 import { buildProposalEditableHTML } from '@/lib/proposals/proposal-html';
@@ -14,15 +14,15 @@ import type { ProposalDoc } from '@/lib/proposals/proposal-types';
 interface Props {
   open: boolean;
   doc: ProposalDoc;
-  overrides: ProposalContentOverrides;
+  overrides: ProposalTemplateOverrides;
   origin?: string;
-  onSave: (overrides: ProposalContentOverrides) => void;
+  onSave: (overrides: ProposalTemplateOverrides) => void;
   onClose: () => void;
 }
 
 export default function ProposalEditorModal({ open, doc, overrides, origin = '', onSave, onClose }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const draftRef = useRef<ProposalContentOverrides>({});
+  const draftRef = useRef<ProposalTemplateOverrides>({});
   const [richActive, setRichActive] = useState(false);
   const [resetRevision, setResetRevision] = useState(0);
   const [previousOpen, setPreviousOpen] = useState(open);
@@ -33,7 +33,7 @@ export default function ProposalEditorModal({ open, doc, overrides, origin = '',
   }
 
   const initialDoc = useMemo(
-    () => applyProposalContentOverrides(doc, hasProposalContentOverrides(overrides) ? overrides : null),
+    () => applyProposalContentOverrides(doc, hasProposalTemplateOverrides(overrides) ? overrides : null),
     [doc, overrides]
   );
 
@@ -44,7 +44,9 @@ export default function ProposalEditorModal({ open, doc, overrides, origin = '',
 
   useEffect(() => {
     if (open) {
-      draftRef.current = hasProposalContentOverrides(overrides) ? { ...overrides } : snapshotFromDoc(doc);
+      draftRef.current = hasProposalTemplateOverrides(overrides)
+        ? { ...overrides }
+        : snapshotTemplateFromDoc(doc);
     }
   }, [open, doc, overrides]);
 
@@ -116,7 +118,7 @@ export default function ProposalEditorModal({ open, doc, overrides, origin = '',
   }, [open, resetRevision, harvestFromIframe]);
 
   function handleResetAll() {
-    draftRef.current = snapshotFromDoc(doc);
+    draftRef.current = snapshotTemplateFromDoc(doc);
     setResetRevision((revision) => revision + 1);
   }
 
@@ -132,10 +134,23 @@ export default function ProposalEditorModal({ open, doc, overrides, origin = '',
     <div className="modal-overlay open" onClick={onClose}>
       <div className="modal proposal-editor-modal proposal-doc-editor-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green">
-          <span>Edit Proposal — click text to change</span>
+          <span>Edit Template — commercial &amp; legal copy</span>
           <button type="button" className="modal-close-btn" onClick={onClose}>
             ✕
           </button>
+        </div>
+
+        <div
+          style={{
+            padding: '8px 14px',
+            fontSize: 12,
+            color: 'var(--m)',
+            background: 'var(--amb-l, #FFF8E7)',
+            borderBottom: '1px solid var(--b)',
+          }}
+        >
+          Tour title, itinerary, and booking details come from Steps 1–4 and stay locked. Edit highlighted
+          fields only: tagline, inclusions/exclusions, pricing footnotes, and legal terms.
         </div>
 
         <div className="proposal-doc-toolbar">
@@ -190,7 +205,7 @@ export default function ProposalEditorModal({ open, doc, overrides, origin = '',
           </button>
           {!richActive && (
             <span style={{ fontSize: 11, color: 'var(--m)', marginLeft: 8 }}>
-              Select text in narrative fields for formatting
+              Select text in template fields for formatting
             </span>
           )}
         </div>
@@ -199,7 +214,7 @@ export default function ProposalEditorModal({ open, doc, overrides, origin = '',
           <iframe
             key={resetRevision}
             ref={iframeRef}
-            title="Proposal document editor"
+            title="Proposal template editor"
             srcDoc={srcDoc}
             className="proposal-doc-iframe"
           />
@@ -207,7 +222,7 @@ export default function ProposalEditorModal({ open, doc, overrides, origin = '',
 
         <div className="proposal-editor-footer">
           <button type="button" className="btn btn-s" onClick={handleResetAll}>
-            Reset all
+            Reset template
           </button>
           <div style={{ flex: 1 }} />
           <button type="button" className="btn btn-s" onClick={onClose}>

@@ -1,26 +1,35 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import { clearBreakGlassCookie } from '@/lib/auth/break-glass';
+import { clearSupabaseAuthCookies } from '@/lib/auth/cookie-hygiene';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true });
+  const cookieHeader = request.headers.get('cookie');
+
   clearBreakGlassCookie(response);
+  // Explicitly expire every sb-*-auth-token(.N) before/after signOut so nginx
+  // never keeps receiving stale chunk cookies after logout.
+  clearSupabaseAuthCookies(response, cookieHeader);
 
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();
   if (url && key) {
     const supabase = createServerClient(url, key, {
+      ...getSupabaseGlobalFetchOptions(),
       cookies: {
         getAll() {
-          return request.headers
-            .get('cookie')
-            ?.split(';')
-            .map((c) => {
-              const [name, ...rest] = c.trim().split('=');
-              return { name, value: rest.join('=') };
-            })
-            .filter((c) => c.name) ?? [];
+          return (
+            cookieHeader
+              ?.split(';')
+              .map((c) => {
+                const [name, ...rest] = c.trim().split('=');
+                return { name, value: rest.join('=') };
+              })
+              .filter((c) => c.name) ?? []
+          );
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
@@ -30,6 +39,8 @@ export async function POST(request: Request) {
       },
     });
     await supabase.auth.signOut();
+    // signOut may Set-Cookie empty values; re-clear any leftover chunks by name.
+    clearSupabaseAuthCookies(response, cookieHeader);
   }
 
   return response;

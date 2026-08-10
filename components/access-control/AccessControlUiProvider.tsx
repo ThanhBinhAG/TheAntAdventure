@@ -39,9 +39,8 @@ export default function AccessControlUiProvider({
                     colorTextSecondary: '#6B7F74',
                     colorBorder: '#E2E8E4',
 
-                    // Dùng font có sẵn của CRM.
-                    fontFamily:
-                        'var(--font-dm-sans), "DM Sans", system-ui, sans-serif',
+                    // Dùng font có sẵn của CRM (globals.css local stack — no next/font download).
+                    fontFamily: '"DM Sans", system-ui, sans-serif',
 
                     borderRadius: 8,
                     controlHeight: 34,

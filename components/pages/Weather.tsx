@@ -1,75 +1,63 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import WeatherWeeklyGrid from '@/components/weather/WeatherWeeklyGrid';
-import WeatherLegend from '@/components/weather/WeatherLegend';
-import WeatherRegionChips from '@/components/weather/WeatherRegionChips';
-import WeatherSeasonalPanel from '@/components/weather/WeatherSeasonalPanel';
-import WeatherRegionPanel from '@/components/weather/WeatherRegionPanel';
-import WeatherBestTimePanel from '@/components/weather/WeatherBestTimePanel';
-import WeatherRatingEditModal from '@/components/weather/WeatherRatingEditModal';
-import { DEFAULT_WEATHER, getDefaultWeatherRow } from '@/lib/seeds/weather';
-import { WEATHER_DESTINATIONS } from '@/lib/weather/coordinates';
-import { matchesFoldedQuery } from '@/lib/gallery/fold-search';
-import type { WeatherData } from '@/components/weather/WeatherSeasonalPanel';
-
-type WeatherTab = 'week' | 'grid' | 'region' | 'month';
-
-const STORAGE_KEY = 'ant_weather_v3';
-
-function getStoredWeatherData(): WeatherData {
-  if (typeof window === 'undefined') return { ...DEFAULT_WEATHER };
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as WeatherData) : { ...DEFAULT_WEATHER };
-  } catch {
-    return { ...DEFAULT_WEATHER };
-  }
-}
-
-const TABS: { id: WeatherTab; label: string }[] = [
-  { id: 'week', label: 'This Week' },
-  { id: 'grid', label: 'Seasonal' },
-  { id: 'region', label: 'By Region' },
-  { id: 'month', label: 'Best Time' },
-];
+import FeaturedWeatherRow from '@/components/weather/week/FeaturedWeatherRow';
+import WeatherDetailModal from '@/components/weather/week/WeatherDetailModal';
+import ProvinceCardGrid from '@/components/weather/destinations/ProvinceCardGrid';
+import AddProvinceModal from '@/components/weather/destinations/AddProvinceModal';
+import EditProvinceModal from '@/components/weather/destinations/EditProvinceModal';
+import FeaturedSlotsModal from '@/components/weather/destinations/FeaturedSlotsModal';
+import { useWeatherPageBoot } from '@/components/weather/hooks/useWeatherPageBoot';
+import { clearClientWeatherCache } from '@/lib/weather/client-cache';
+import { toast } from '@/lib/toast';
 
 export default function Weather() {
-  const [tab, setTab] = useState<WeatherTab>('week');
-  const [regionF, setRegionF] = useState('all');
-  const [query, setQuery] = useState('');
-  const [weatherData, setWeatherData] = useState<WeatherData>(getStoredWeatherData);
-  const [editCell, setEditCell] = useState<{ destId: string; monthIdx: number; code: string } | null>(
-    null
+  const {
+    destinations,
+    featured,
+    explore,
+    loading,
+    error,
+    create,
+    update,
+    remove,
+    setFeatured,
+    reload,
+  } = useWeatherPageBoot();
+
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [featuredOpen, setFeaturedOpen] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const detailMeta = useMemo(
+    () => destinations.find((d) => d.id === detailId) ?? null,
+    [destinations, detailId]
   );
-  const [savedFlash, setSavedFlash] = useState(false);
-
-  const dests = useMemo(
-    () =>
-      WEATHER_DESTINATIONS.filter((d) => {
-        if (regionF !== 'all' && d.region !== regionF) return false;
-        if (!query.trim()) return true;
-        return matchesFoldedQuery(`${d.name} ${d.id} ${d.region}`, query);
-      }),
-    [regionF, query]
+  const editMeta = useMemo(
+    () => destinations.find((d) => d.id === editId) ?? null,
+    [destinations, editId]
   );
 
-  function setCell(destId: string, monthIdx: number, code: string) {
-    setWeatherData((prev) => {
-      const row = [...(prev[destId] || getDefaultWeatherRow(destId))];
-      row[monthIdx] = code;
-      return { ...prev, [destId]: row };
-    });
-    setEditCell(null);
-  }
-
-  function saveAll() {
+  async function handleRefreshAll() {
+    setRefreshing(true);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(weatherData));
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 2000);
-    } catch {
-      /* ignore */
+      clearClientWeatherCache();
+      const res = await fetch('/api/weather/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Refresh failed');
+      setRefreshToken((n) => n + 1);
+      toast.success('Đã làm mới thời tiết nổi bật.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Không thể làm mới.');
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -78,99 +66,108 @@ export default function Weather() {
       <header className="wg-page-hd">
         <div>
           <h1 className="wg-page-title">Weather Guide</h1>
-          <p className="wg-page-sub">Live weekly forecasts and seasonal planning for Vietnam destinations</p>
+          <p className="wg-page-sub">
+            Thời tiết điểm đến Việt Nam — ưu tiên Hà Nội &amp; Sài Gòn, khám phá nơi khác khi cần.
+          </p>
+        </div>
+        <div className="wg-page-actions">
+          <button type="button" className="btn btn-s btn-sm" onClick={() => setFeaturedOpen(true)}>
+            Chỉnh 2 điểm nổi bật
+          </button>
+          <button
+            type="button"
+            className="btn btn-s btn-sm"
+            onClick={() => void handleRefreshAll()}
+            disabled={refreshing}
+          >
+            {refreshing ? 'Đang làm mới…' : 'Làm mới cache'}
+          </button>
         </div>
       </header>
 
-      <div className="wg-chrome">
-        <div className="wg-tabs" role="tablist">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              className={`wg-tab${tab === t.id ? ' on' : ''}`}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        <label className="wg-search">
-          <span className="wg-search-icon" aria-hidden>
-            ⌕
-          </span>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search destinations…"
-            aria-label="Search destination"
-            autoComplete="off"
-          />
-          {query && (
-            <button
-              type="button"
-              className="wg-search-clear"
-              onClick={() => setQuery('')}
-              aria-label="Clear search"
-            >
-              ×
-            </button>
-          )}
-        </label>
-
-        {(tab === 'week' || tab === 'grid' || tab === 'region') && (
-          <WeatherRegionChips value={regionF} onChange={setRegionF} />
-        )}
-
-        {tab !== 'week' && (
-          <button className="btn btn-p btn-sm" type="button" onClick={saveAll}>
-            {savedFlash ? 'Saved' : 'Save'}
+      {error ? (
+        <div className="wg-error">
+          {error}{' '}
+          <button type="button" className="btn btn-s btn-sm" onClick={() => void reload()}>
+            Thử lại
           </button>
-        )}
-      </div>
+        </div>
+      ) : null}
 
-      <div className="wg-meta-row">
-        <WeatherLegend showBestBy={tab === 'grid' || tab === 'month'} compact />
-      </div>
-
-      {tab === 'week' && <WeatherWeeklyGrid region={regionF} query={query} />}
-
-      {tab === 'grid' && (
-        <WeatherSeasonalPanel
-          destinations={dests}
-          weatherData={weatherData}
-          query={query}
-          onClearQuery={() => setQuery('')}
-          onEditCell={(destId, monthIdx, code) => setEditCell({ destId, monthIdx, code })}
+      <section className="wg-section" aria-labelledby="wg-featured-heading">
+        <div className="wg-section-hd">
+          <h2 id="wg-featured-heading" className="wg-section-heading">
+            Điểm đến nổi bật
+          </h2>
+        </div>
+        <FeaturedWeatherRow
+          destinations={featured}
+          loading={loading}
+          onOpenDetail={setDetailId}
+          onEdit={setEditId}
+          refreshToken={refreshToken}
         />
-      )}
+      </section>
 
-      {tab === 'region' && (
-        <WeatherRegionPanel
-          destinations={dests}
-          weatherData={weatherData}
-          query={query}
-          onClearQuery={() => setQuery('')}
+      <section className="wg-section" aria-labelledby="wg-explore-heading">
+        <div className="wg-section-hd">
+          <h2 id="wg-explore-heading" className="wg-section-heading">
+            Khám phá những nơi khác
+          </h2>
+          <p className="wg-section-sub">Nhấn thẻ để xem thời tiết (chỉ gọi API khi cần).</p>
+        </div>
+        <ProvinceCardGrid
+          destinations={explore}
+          loading={loading}
+          onSelect={setDetailId}
+          onEdit={setEditId}
         />
-      )}
+        <div className="wg-add-row">
+          <button type="button" className="btn btn-p" onClick={() => setAddOpen(true)}>
+            + Thêm tỉnh thành mới
+          </button>
+        </div>
+      </section>
 
-      {tab === 'month' && (
-        <WeatherBestTimePanel query={query} onClearQuery={() => setQuery('')} />
-      )}
+      <WeatherDetailModal
+        open={Boolean(detailId)}
+        destinationId={detailId}
+        meta={detailMeta}
+        onClose={() => setDetailId(null)}
+      />
 
-      {editCell && (
-        <WeatherRatingEditModal
-          destId={editCell.destId}
-          monthIdx={editCell.monthIdx}
-          initialCode={editCell.code}
-          onCancel={() => setEditCell(null)}
-          onSave={(code) => setCell(editCell.destId, editCell.monthIdx, code)}
-        />
-      )}
+      <AddProvinceModal
+        open={addOpen}
+        featuredCount={featured.length}
+        onClose={() => setAddOpen(false)}
+        onSave={async (input) => {
+          await create(input);
+        }}
+      />
+
+      <EditProvinceModal
+        open={Boolean(editId)}
+        destination={editMeta}
+        featuredCount={featured.length}
+        onClose={() => setEditId(null)}
+        onSave={async (id, patch) => {
+          await update(id, patch);
+        }}
+        onDelete={async (id) => {
+          await remove(id);
+        }}
+      />
+
+      <FeaturedSlotsModal
+        open={featuredOpen}
+        destinations={destinations}
+        featuredIds={featured.map((d) => d.id)}
+        onClose={() => setFeaturedOpen(false)}
+        onSave={async (ids) => {
+          await setFeatured(ids);
+          setRefreshToken((n) => n + 1);
+        }}
+      />
     </div>
   );
 }

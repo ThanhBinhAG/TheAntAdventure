@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { isRefreshAuthorized } from '@/lib/weather/auth';
 import { isWeatherCacheConfigured } from '@/lib/weather/cache';
-import { refreshWeeklyForecast } from '@/lib/weather/refresh';
+import { refreshFeaturedForecast } from '@/lib/weather/refresh';
 
+/** Warm featured destinations only (cron / manual). */
 export async function POST(request: Request) {
   if (!isWeatherCacheConfigured()) {
     return NextResponse.json(
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     /* empty body ok */
   }
 
-  const result = await refreshWeeklyForecast({ force });
+  const result = await refreshFeaturedForecast({ force });
   const status = result.ok ? 200 : 500;
   return NextResponse.json(result, { status });
 }

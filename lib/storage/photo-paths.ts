@@ -44,7 +44,24 @@ export function guideAvatarPath(guideId: string): string {
   return `guides/${guideId}/avatar.webp`;
 }
 
-/** Fixed path for CRM company logo (sidebar avatar). */
-export function companyLogoPath(): string {
-  return 'branding/logo.webp';
+/** Legacy fixed path (pre-versioned uploads). */
+export const LEGACY_COMPANY_LOGO_PATH = 'branding/logo.webp';
+
+/** Versioned CRM company logo path: `branding/logo-{version}.webp`. */
+export function companyLogoPath(version: string): string {
+  return `branding/logo-${sanitizePathSegment(version)}.webp`;
+}
+
+/** Extract Storage object path from a public logo URL (strips query string). */
+export function companyLogoObjectPathFromUrl(logoUrl: string | null | undefined): string | null {
+  if (!logoUrl) return null;
+  const bare = logoUrl.split('?')[0] ?? '';
+  const marker = `/${PHOTOS_BUCKET}/`;
+  const idx = bare.indexOf(marker);
+  if (idx >= 0) {
+    const path = bare.slice(idx + marker.length);
+    return path.startsWith('branding/') ? path : null;
+  }
+  const match = bare.match(/branding\/logo[^/]*\.webp$/i);
+  return match?.[0] ?? null;
 }

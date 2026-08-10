@@ -871,9 +871,21 @@ create table if not exists weather_destinations (
   elevation_m     int,
   sort_order      int         default 0,
   active          boolean     default true,
+  description     text,
+  notes           text,
+  cover_photo_id  text        references photos(id) on delete set null,
+  is_featured     boolean     not null default false,
   created_at      timestamptz default now(),
   updated_at      timestamptz default now()
 );
+
+create index if not exists idx_weather_dest_featured
+  on weather_destinations (is_featured)
+  where active = true;
+
+create index if not exists idx_weather_dest_cover
+  on weather_destinations (cover_photo_id)
+  where cover_photo_id is not null;
 
 create table if not exists weather_forecast_cache (
   id              bigserial primary key,
@@ -899,10 +911,18 @@ create table if not exists weather_fetch_log (
   error_message       text
 );
 
+create table if not exists weather_current_cache (
+  destination_id text primary key references weather_destinations(id) on delete cascade,
+  payload        jsonb        not null,
+  fetched_at     timestamptz  not null,
+  expires_at     timestamptz  not null
+);
+
 create index if not exists idx_weather_cache_dest on weather_forecast_cache(destination_id);
 create index if not exists idx_weather_cache_date on weather_forecast_cache(forecast_date);
 create index if not exists idx_weather_cache_expires on weather_forecast_cache(expires_at);
 create index if not exists idx_weather_fetch_log_at on weather_fetch_log(fetched_at desc);
+create index if not exists idx_weather_current_expires on weather_current_cache(expires_at);
 
 -- ============================================================
 --  MODULE 21 · PRICING CATALOGS (Essentials + Accommodation)

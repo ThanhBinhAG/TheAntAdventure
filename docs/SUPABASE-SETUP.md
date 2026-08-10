@@ -246,7 +246,7 @@ https://your-domain.com/system/debug
 Nhập `SYSTEM_DEBUG_TOKEN` trên form (token được gửi qua header `X-Debug-Token`, không dùng query string để tránh rò rỉ Referer/log).
 
 Trang hiển thị:
-- Check env, proxy headers (nginx), Supabase Auth/REST reachability từ **phía server**
+- Check env, proxy headers (nginx), **Cookie header size**, Supabase Auth/REST reachability từ **phía server**
 - Recent logs (middleware, auth, diagnostics)
 - Hướng dẫn lệnh SSH
 
@@ -269,15 +269,25 @@ curl -vI https://your-domain.com 2>&1 | head -40
 curl -sI "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/health"
 ```
 
-Nginx cần có:
+Nginx cần có (app listen `:3006`):
 
 ```nginx
+client_max_body_size 20m;
+large_client_header_buffers 4 16k;
+proxy_read_timeout 300s;
+proxy_send_timeout 300s;
 proxy_set_header Host $host;
 proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 proxy_pass http://127.0.0.1:3006;
 ```
 
+Ghi chú:
+
+- **`large_client_header_buffers`** — tránh 400/502 khi Cookie header phình (Supabase auth JWT chunked `sb-*-auth-token.0/.1` + `bg_session`). `localStorage` / `sessionStorage` **không** gửi lên nginx.
+- **`proxy_read_timeout` / `proxy_send_timeout`** — gallery `complete` (Sharp) và PDF export có thể >60s; timeout ngắn → 502/504 dù app vẫn chạy.
+- **`client_max_body_size`** — gallery chunk hiện **512 KB**; 20m để dư cho logo/multipart và PDF JSON body.
+- 502 sau PDF/upload dài thường là **timeout hoặc OOM container** (`mem_limit`), không phải “tràn cache” trình duyệt.
 ### Bước 5 — Tắt debug sau khi fix
 
 ```env
@@ -318,17 +328,59 @@ If Tour Product photos vanish on refresh with `new row violates row-level securi
 | Library thumbnail | `gallery/{photoId}/thumb.webp` |
 | Guide avatar | `guides/{guideId}/avatar.webp` |
 
-Bucket: **`photos`** (public). Max **input** upload: **50 MB** (hard ceiling). After Sharp compression, stored WebP variants are typically well under the bucket’s **5 MB** file-size limit.
+Bucket: **`photos`** (public). Users may pick JPEG/PNG/WebP of **any size** (including multi‑hundred MB / ~1 GB) — there is no hard per-file byte reject. The client always uploads the original via **chunked upload** (`init` → `chunk` × N → `complete`, 512 KB chunks streamed to temp disk). On `complete`, a **forked Sharp child** ([`lib/image-pipeline/sharp-worker.cjs`](../lib/image-pipeline/sharp-worker.cjs), disk→disk, `VIPS_DISC_THRESHOLD=8m`, concurrency **1**) builds display ≤1280px + thumb ≤400px WebP, isolated from the Next.js process. The assembled original is deleted from disk immediately after Sharp succeeds, before Storage upload. A per-user hourly quota (`lib/storage/gallery-upload-rate-limit.ts`) guards against abuse instead of a hard size cap. Stored objects are typically well under the bucket’s **5 MB** file-size limit (only display + thumb WebP — originals are never kept).
 
 ### Upload via app
 
-Gallery → **Upload photos** sends the file to `POST /api/photos/upload`. The server uses **Sharp** to create WebP thumb (≤400px) + display (≤1280px) — including inputs larger than 10 MB up to the 50 MB ceiling — then uploads both to Storage and upserts the `photos` row (+ `photo_tags`).
+Gallery → **Upload photos** → [`uploadPhotoViaApi`](../lib/gallery/photo-api.ts) → `init` / `chunk` / `complete` (server Sharp). Uploads run one-at-a-time in the Gallery UI. If the app sits behind nginx (or similar), set `client_max_body_size` to at least **~2 MB** (chunks are 512 KB; leave headroom for multipart framing). Prefer the full proxy snippet in **Bước 4 — Checklist SSL nginx** (`proxy_read_timeout 300s`, `large_client_header_buffers 4 16k`).
 
 Tour Products attach photos via **Photo Library picker** → `product_photos` (not ownership on the photo row).
 
 Guides → edit form → **Avatar photo** still uploads client-side to `guides/{guideId}/avatar.webp`.
 
 Legacy owner-grouped paths (`gallery/tours/…`, `gallery/attractions/…`, `gallery/loose/…`) remain readable via stored `url` / `storage_path`; new uploads use the flat layout.
+
+### Dev machine memory (WSL) — why uploads can kill the VM
+
+**Image processing is not the memory problem.** Measured peak RSS of the forked Sharp worker, disk→disk with `VIPS_DISC_THRESHOLD=8m`:
+
+| Input | Peak RSS | Time |
+|-------|----------|------|
+| JPEG 10000×10000 (100 MP, 29 MB) | ~105 MB | ~1 s |
+| PNG 8000×8000 (64 MP, **178 MB** file) | ~106 MB | ~2.7 s |
+
+libvips streams and shrinks on load, so peak RSS is flat regardless of input size or format. A 100 MB upload costs the API roughly **105 MB and a couple of seconds** — it does not scale with the file.
+
+What actually kills the VM is total machine capacity. Real `oom-kill` events on a 7.4 GB WSL2 VM showed `global_oom` killing **`next-server` at 2.5–2.8 GB** — the dev server itself, never a Sharp worker. Measured on the same machine:
+
+| Process | RSS |
+|---------|-----|
+| `npm run dev` (Next 14 dev server) | ~1 GB after one route, **2.5–2.8 GB with the app compiled** |
+| local Supabase CLI stack (`supabase_*` containers) | **~2.4 GB** (`supabase_analytics`/logflare alone ~600 MB) |
+| Cursor / VS Code server | ~700 MB |
+| `npx eslint .` | ~860 MB |
+| `npx tsc --noEmit` | ~535 MB |
+| `npm test` | ~185 MB |
+
+Dev server + Supabase stack + editor alone is ~5.6 GB of 7.4 GB. Any spike — a route compiling on first request, a lint run — pushes it over, and the kernel kills the largest process, which can take the whole VM down.
+
+**Check this first.** `npx supabase start` leaves ~2.4 GB of containers running even when `.env.local` points at a remote Supabase, in which case the app never touches them. This stack has been torn down on the current dev machine; if you bring it back, expect to re-pull ~8.4 GB of images and to lose the RAM headroom below:
+
+```bash
+docker ps --format '{{.Names}}'   # supabase_*_TheAntAdventure listening on 54321-54327?
+grep SUPABASE_URL .env.local      # pointing somewhere else entirely?
+npx supabase stop                 # frees ~2.4 GB if you are not using the local stack
+```
+
+Then raise the ceiling in `%UserProfile%\.wslconfig` on Windows and run `wsl --shutdown`:
+
+```ini
+[wsl2]
+memory=12GB
+swap=8GB
+```
+
+Two guards are in place: `npm run dev` pins `--max-old-space-size=2048` so V8 collects aggressively and fails with a contained JS heap error rather than growing until the kernel picks a victim (raise it if compiles start failing), and the Docker `app` service sets `mem_limit: 2g` so a container is capped instead of the host.
 
 ### Manual upload via Supabase Dashboard
 

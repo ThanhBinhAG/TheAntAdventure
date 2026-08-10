@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { NAV_SECTIONS, type NavItem } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
@@ -14,6 +14,10 @@ import { PAGE_READ_PERMISSION } from '@/lib/auth/permissions';
 import { usePermissions } from '@/components/PermissionsProvider';
 import CompanyLogoEditor from '@/components/sidebar/CompanyLogoEditor';
 import StorageImage from '@/components/gallery/StorageImage';
+import {
+  fetchCompanyLogoUrlClient,
+  getCachedCompanyLogoUrl,
+} from '@/lib/storage/company-logo-client';
 
 const DEFAULT_LOGO = '/Logo-3.svg';
 
@@ -33,20 +37,21 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
   const leads = useStore((s) => s.leads) as Lead[];
   const tourDrafts = useStore((s) => s.tourDrafts) as TourDraft[];
   const messages = useStore((s) => s.messages);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  /** undefined = unknown; null = default SVG; string = custom Storage URL */
+  const [logoUrl, setLogoUrl] = useState<string | null | undefined>(undefined);
   const [logoEditorOpen, setLogoEditorOpen] = useState(false);
+
+  // Sync hydrate from localStorage before paint (avoids SSR mismatch + default SVG flash).
+  useLayoutEffect(() => {
+    const cached = getCachedCompanyLogoUrl();
+    if (cached !== undefined) setLogoUrl(cached);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/branding/logo');
-        const body = (await res.json()) as { ok?: boolean; logoUrl?: string | null };
-        if (!cancelled && body.ok) setLogoUrl(body.logoUrl ?? null);
-      } catch {
-        /* keep default */
-      }
-    })();
+    void fetchCompanyLogoUrlClient().then((url) => {
+      if (!cancelled) setLogoUrl(url);
+    });
     return () => {
       cancelled = true;
     };
@@ -121,8 +126,8 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
   }, [messages]);
 
   const canEditLogo = can('company.read');
-  const displayLogo = logoUrl || DEFAULT_LOGO;
-  const isCustomLogo = Boolean(logoUrl);
+  const isPendingLogo = logoUrl === undefined;
+  const isCustomLogo = typeof logoUrl === 'string' && logoUrl.length > 0;
 
   return (
     <>
@@ -141,16 +146,20 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
               {pinned ? '📌' : '📍'}
             </button>
           </div>
-          <div className={`sb-logo-avatar${isCustomLogo ? ' sb-logo-avatar--custom' : ''}`}>
-            <div className="sb-logo-avatar-img">
-              {isCustomLogo ? (
+          <div
+            className={`sb-logo-avatar${isCustomLogo ? ' sb-logo-avatar--custom' : ''}${isPendingLogo ? ' sb-logo-avatar--pending' : ''}`}
+          >
+            <div className="sb-logo-avatar-img" aria-busy={isPendingLogo || undefined}>
+              {isPendingLogo ? null : isCustomLogo ? (
                 <StorageImage
-                  src={displayLogo}
+                  src={logoUrl}
                   alt="The Ant Adventures"
                   width={112}
                   height={112}
                   className="sb-logo-custom"
                   style={{ objectFit: 'cover', width: 112, height: 112 }}
+                  loading="eager"
+                  unoptimized
                 />
               ) : (
                 <Image
@@ -251,7 +260,7 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
       <CompanyLogoEditor
         open={logoEditorOpen}
         onClose={() => setLogoEditorOpen(false)}
-        onSaved={(url) => setLogoUrl(url)}
+        onSaved={setLogoUrl}
       />
     </>
   );

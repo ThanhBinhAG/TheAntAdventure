@@ -1,0 +1,14 @@
+/** Re-export gallery limits — single source remains `lib/storage/photo-limits.ts`. */
+export {
+  ALLOWED_IMAGE_MIME,
+  GALLERY_CHUNK_BYTES,
+  GALLERY_DISPLAY_MAX_EDGE,
+  GALLERY_DISPLAY_QUALITY,
+  GALLERY_MAX_CONCURRENT_SHARP_WORKERS,
+  GALLERY_SERVER_MAX_INPUT_PIXELS,
+  GALLERY_SHARP_WORKER_TIMEOUT_MS,
+  GALLERY_THUMB_MAX_EDGE,
+  GALLERY_THUMB_QUALITY,
+  GALLERY_UPLOAD_SESSION_TTL_MS,
+  type AllowedImageMime,
+} from '@/lib/storage/photo-limits';

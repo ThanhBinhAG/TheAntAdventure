@@ -131,7 +131,11 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
           <div className="login-subtitle">CRM — Đăng nhập</div>
         </div>
 
-        <form className="login-form" onSubmit={handleSubmit}>
+        <form
+          className={`login-form${loading ? ' is-busy' : ''}`}
+          onSubmit={handleSubmit}
+          aria-busy={loading}
+        >
           <label className="login-label" htmlFor="login-identity">
             Email
           </label>
@@ -141,6 +145,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
             inputMode="text"
             autoComplete="username"
             required
+            disabled={loading}
             value={identity}
             onChange={(e) => setIdentity(e.target.value)}
             placeholder="email@example.com"
@@ -154,6 +159,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
             type="password"
             autoComplete="current-password"
             required
+            disabled={loading}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
@@ -166,11 +172,23 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
           {error && <div className="login-error">{error}</div>}
 
           <button
-            className="btn btn-p login-submit"
+            className={`btn btn-p login-submit${loading ? ' is-loading' : ''}`}
             type="submit"
             disabled={loading || (captchaRequired && !captchaToken)}
+            aria-live="polite"
           >
-            {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
+            {loading ? (
+              <>
+                <span className="login-spinner" aria-hidden="true">
+                  <span className="dot" />
+                  <span className="dot" />
+                  <span className="dot" />
+                </span>
+                Đang đăng nhập…
+              </>
+            ) : (
+              'Đăng nhập'
+            )}
           </button>
         </form>
 

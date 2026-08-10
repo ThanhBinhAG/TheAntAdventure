@@ -5,6 +5,8 @@ import { toast } from '@/lib/toast';
 import { confirmDialog } from '@/lib/confirm';
 
 const LS_KEY = 'ant-ai-requirements';
+/** Cap each text field so localStorage cannot grow unbounded from paste. */
+const AI_FIELD_MAX_CHARS = 20_000;
 
 type AIForm = {
   rules: string;
@@ -15,6 +17,22 @@ type AIForm = {
   extra: string;
   lastSaved: string | null;
 };
+
+function clampAiField(val: string): string {
+  return val.length > AI_FIELD_MAX_CHARS ? val.slice(0, AI_FIELD_MAX_CHARS) : val;
+}
+
+function clampAiForm(form: AIForm): AIForm {
+  return {
+    rules: clampAiField(form.rules ?? ''),
+    suppliers: clampAiField(form.suppliers ?? ''),
+    pricing: clampAiField(form.pricing ?? ''),
+    design: clampAiField(form.design ?? ''),
+    voice: clampAiField(form.voice ?? ''),
+    extra: clampAiField(form.extra ?? ''),
+    lastSaved: form.lastSaved ?? null,
+  };
+}
 
 const TEMPLATES: Record<string, Partial<AIForm>> = {
   standard: {
@@ -61,7 +79,8 @@ function getSavedForm(): AIForm {
   if (typeof window === 'undefined') return EMPTY;
   try {
     const raw = localStorage.getItem(LS_KEY);
-    return raw ? JSON.parse(raw) : EMPTY;
+    if (!raw) return EMPTY;
+    return clampAiForm({ ...EMPTY, ...(JSON.parse(raw) as Partial<AIForm>) });
   } catch {
     return EMPTY;
   }
@@ -75,14 +94,25 @@ export default function AI() {
   const [form, setForm] = useState<AIForm>(getSavedForm);
   const [saved, setSaved] = useState(false);
 
-  const set = (key: keyof AIForm, val: string) => setForm((f) => ({ ...f, [key]: val }));
+  const set = (key: keyof AIForm, val: string) =>
+    setForm((f) => ({
+      ...f,
+      [key]: typeof val === 'string' ? clampAiField(val) : val,
+    }));
 
   const save = () => {
-    const next = { ...form, lastSaved: new Date().toLocaleString('en-GB') };
-    localStorage.setItem(LS_KEY, JSON.stringify(next));
-    setForm(next);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    const next = clampAiForm({
+      ...form,
+      lastSaved: new Date().toLocaleString('en-GB'),
+    });
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(next));
+      setForm(next);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      toast.error('Could not save — browser storage is full. Clear some site data and retry.');
+    }
   };
 
   const clearAll = async () => {

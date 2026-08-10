@@ -4,7 +4,9 @@
 Server endpoints for gallery photo upload and delete (Supabase Storage + DB links).
 
 ## Contents
-- Upload / delete route handlers
+- `upload/init|chunk|complete/` — chunked upload → Sharp child → WebP variants → Storage
+- `delete/route.ts` — remove Storage objects + DB row
 
 ## Boundaries
-- Path/variant logic: `lib/storage`. Gallery UX helpers: `lib/gallery`.
+- Session + Sharp: `lib/image-pipeline`. Persist: `lib/storage/upload-gallery-photo-server.ts`.
+- Per-user hourly quota on `init` (`lib/storage/gallery-upload-rate-limit.ts`).

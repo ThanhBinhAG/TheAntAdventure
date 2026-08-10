@@ -330,25 +330,6 @@ describe('proposal-assembler', () => {
     assert.match(html, /<title><\/title>/);
   });
 
-  it('inline layout keeps horizontal photo grid', () => {
-    const doc = assembleProposalDoc({
-      brief,
-      clientType: 'b2c',
-      customerName: 'Guest',
-      outlineRows: [],
-      products: [],
-      selectedCodes: [],
-      selectedPackageId: 'PKG-01',
-      markupPct: 30,
-      detailedProgramLayout: 'inline',
-      galleryPhotos: SAMPLE_GALLERY,
-    });
-    assert.equal(doc.detailedProgramLayout, 'inline');
-    const html = buildProposalHTML(doc, 'https://example.com');
-    assert.match(html, /grid-template-columns:repeat/);
-    assert.doesNotMatch(html, /background:#E8F5EE/);
-  });
-
   it('applies experienceOverrides desc, date, and clientNote on product path', () => {
     const product = {
       code: 'EXP-TEST',

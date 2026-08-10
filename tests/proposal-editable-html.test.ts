@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { harvestOverridesFromRoot } from '../lib/proposals/proposal-editable-harvest';
 import { assembleProposalDoc } from '../lib/proposals/proposal-assembler';
 import { buildProposalEditableHTML, buildProposalHTML } from '../lib/proposals/proposal-html';
+import { isTemplateEditPath } from '../lib/proposals/proposal-content-overrides';
 import { DEFAULT_TOUR_BRIEF } from '../lib/tour-design/tour-design-types';
 
 const brief = {
@@ -51,11 +52,26 @@ function mockRoot(fields: HTMLElement[]): ParentNode {
 }
 
 describe('proposal-editable-html', () => {
-  it('buildProposalEditableHTML includes contenteditable tourTitle field', () => {
+  it('buildProposalEditableHTML marks template fields only', () => {
     const html = buildProposalEditableHTML(baseDoc());
-    assert.match(html, /data-proposal-field="tourTitle"/);
+    assert.match(html, /data-proposal-field="tagline"/);
+    assert.match(html, /data-proposal-field="inclusions\.0"/);
     assert.match(html, /contenteditable="true"/);
     assert.match(html, /proposal-doc-page/);
+    assert.doesNotMatch(html, /data-proposal-field="tourTitle"/);
+    assert.doesNotMatch(html, /data-proposal-field="days\./);
+    assert.doesNotMatch(html, /data-proposal-field="overviewRows\./);
+    assert.doesNotMatch(html, /data-proposal-field="pricingText\.packageLabel"/);
+  });
+
+  it('isTemplateEditPath allows commercial fields and rejects tour narrative', () => {
+    assert.equal(isTemplateEditPath('tagline'), true);
+    assert.equal(isTemplateEditPath('inclusions.0'), true);
+    assert.equal(isTemplateEditPath('legalText.paymentTerms'), true);
+    assert.equal(isTemplateEditPath('bookingFields.Payment%20Terms'), true);
+    assert.equal(isTemplateEditPath('tourTitle'), false);
+    assert.equal(isTemplateEditPath('days.1.body'), false);
+    assert.equal(isTemplateEditPath('bookingFields.Quote%20Ref.'), false);
   });
 
   it('buildProposalHTML export has no contenteditable', () => {
@@ -64,29 +80,32 @@ describe('proposal-editable-html', () => {
     assert.doesNotMatch(html, /data-proposal-field/i);
   });
 
-  it('harvestOverridesFromRoot reads tourTitle and rich tagline', () => {
+  it('harvestOverridesFromRoot reads template tagline and ignores tourTitle', () => {
     const doc = baseDoc();
     const harvested = harvestOverridesFromRoot(
       mockRoot([
         mockField('tourTitle', 'Custom Journey Title'),
         mockField('tagline', 'A <b>bold</b> tagline<script>x</script>', true),
+        mockField('days.1.body', 'Should be ignored', true),
       ]),
       doc
     );
-    assert.equal(harvested.tourTitle, 'Custom Journey Title');
+    assert.equal('tourTitle' in harvested, false);
     assert.match(harvested.tagline ?? '', /<b>bold<\/b>/);
     assert.doesNotMatch(harvested.tagline ?? '', /<script/i);
+    assert.equal('days' in harvested, false);
   });
 
-  it('harvestOverridesFromRoot reads day body by dayNumber', () => {
+  it('harvestOverridesFromRoot reads inclusions and legal text', () => {
     const doc = baseDoc();
-    const dayNumber = doc.days[0]?.dayNumber ?? 1;
     const harvested = harvestOverridesFromRoot(
-      mockRoot([mockField(`days.${dayNumber}.body`, 'Updated day narrative', true)]),
+      mockRoot([
+        mockField('inclusions.0', 'Private guide', true),
+        mockField('legalText.paymentTerms', 'Custom payment terms', true),
+      ]),
       doc
     );
-    const day = harvested.days?.find((d) => d.dayNumber === dayNumber);
-    assert.ok(day);
-    assert.equal(day!.body, 'Updated day narrative');
+    assert.equal(harvested.inclusions?.[0], 'Private guide');
+    assert.equal(harvested.legalText?.paymentTerms, 'Custom payment terms');
   });
 });

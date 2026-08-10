@@ -8,8 +8,12 @@ import {
   isSupabaseReadOnly,
   isUseSupabaseEnabled,
 } from '@/lib/env';
+import { getSupabaseFetch, getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { isSupabaseTlsInsecureEnabled } from '@/lib/supabase/tls-config';
 import { maskSecret } from './debug-config';
 import { debugLog } from './debug-logger';
+import { isExpectedUnauthenticatedSessionError } from './session-diag';
+import { estimateCookieHeaderBytes } from '@/lib/auth/cookie-hygiene';
 
 export type DiagnosticCheck = {
   name: string;
@@ -26,14 +30,56 @@ export type DiagnosticsReport = {
   summary: { passed: number; failed: number; total: number };
 };
 
+function serializeFetchError(e: unknown): {
+  message: string;
+  causeMessage?: string;
+  causeCode?: string;
+  causeErrno?: string | number;
+} {
+  const err = e instanceof Error ? e : new Error(String(e));
+  const cause = err.cause;
+  if (!cause || typeof cause !== 'object') {
+    return { message: err.message };
+  }
+  const c = cause as Record<string, unknown>;
+  return {
+    message: err.message,
+    causeMessage: cause instanceof Error ? cause.message : c.message != null ? String(c.message) : undefined,
+    causeCode: c.code != null ? String(c.code) : undefined,
+    causeErrno: (c.errno as string | number | undefined) ?? undefined,
+  };
+}
+
+function connectivityHint(serialized: ReturnType<typeof serializeFetchError>): string {
+  const blob = `${serialized.message} ${serialized.causeMessage ?? ''} ${serialized.causeCode ?? ''}`;
+  if (/ssl|tls|cert|handshake|UNABLE_TO_VERIFY|DEPTH_ZERO_SELF_SIGNED|ERR_TLS|certificate/i.test(blob)) {
+    return 'Lỗi SSL/TLS khi server gọi Supabase — bật SUPABASE_TLS_INSECURE hoặc cài CA tin cậy trên server';
+  }
+  if (/ECONNREFUSED|ECONNRESET/i.test(blob)) {
+    return 'Kết nối bị từ chối — kiểm tra host/port Supabase và firewall outbound';
+  }
+  if (/ENOTFOUND|EAI_AGAIN|getaddrinfo/i.test(blob)) {
+    return 'DNS không resolve được host Supabase — kiểm tra DNS trên server';
+  }
+  return 'Server không reach được Supabase — kiểm tra DNS, firewall, URL, TLS';
+}
+
 async function timedFetch(
   label: string,
   url: string,
   init?: RequestInit
-): Promise<{ ok: boolean; latencyMs: number; status?: number; error?: string; body?: string }> {
+): Promise<{
+  ok: boolean;
+  latencyMs: number;
+  status?: number;
+  error?: string;
+  body?: string;
+  errorDetails?: ReturnType<typeof serializeFetchError>;
+}> {
   const start = Date.now();
+  const doFetch = getSupabaseFetch();
   try {
-    const res = await fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
+    const res = await doFetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
     const latencyMs = Date.now() - start;
     let body = '';
     try {
@@ -44,9 +90,12 @@ async function timedFetch(
     return { ok: res.ok, latencyMs, status: res.status, body };
   } catch (e) {
     const latencyMs = Date.now() - start;
-    const msg = e instanceof Error ? e.message : String(e);
-    debugLog('diagnostics', `${label} fetch failed`, { level: 'error', meta: { error: msg } });
-    return { ok: false, latencyMs, error: msg };
+    const errorDetails = serializeFetchError(e);
+    debugLog('diagnostics', `${label} fetch failed`, {
+      level: 'error',
+      meta: { error: errorDetails.message, ...errorDetails, url },
+    });
+    return { ok: false, latencyMs, error: errorDetails.message, errorDetails };
   }
 }
 
@@ -80,6 +129,7 @@ function checkEnv(): DiagnosticCheck {
       useSupabase: isUseSupabaseEnabled(),
       remoteData: isRemoteDataEnabled(),
       readOnly: isSupabaseReadOnly(),
+      tlsInsecure: isSupabaseTlsInsecureEnabled(),
       captchaConfigured: Boolean(getAuthCaptchaSiteKey()),
       nodeEnv: process.env.NODE_ENV ?? 'unknown',
       appVersion: process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown',
@@ -123,25 +173,33 @@ async function checkSupabaseAuthHealth(): Promise<DiagnosticCheck> {
     };
   }
 
-  const result = await timedFetch('auth-health', `${url.replace(/\/$/, '')}/auth/v1/health`, {
-    method: 'GET',
-  });
+  const target = `${url.replace(/\/$/, '')}/auth/v1/health`;
+  let targetHost = '(invalid)';
+  try {
+    targetHost = new URL(target).host;
+  } catch {
+    /* ignore */
+  }
 
-  const sslLike =
-    result.error &&
-    /ssl|tls|cert|handshake|UNABLE_TO_VERIFY|DEPTH_ZERO_SELF_SIGNED|ERR_SSL/i.test(result.error);
+  const result = await timedFetch('auth-health', target, { method: 'GET' });
 
   return {
     name: 'Supabase Auth reachability',
     ok: result.ok && !result.error,
     latencyMs: result.latencyMs,
     error: result.error ?? (result.ok ? undefined : `HTTP ${result.status}`),
-    hint: sslLike
-      ? 'Lỗi SSL/TLS khi server gọi ra Supabase — kiểm tra firewall outbound hoặc cert trên server'
+    hint: result.errorDetails
+      ? connectivityHint(result.errorDetails)
       : result.error
         ? 'Server không reach được Supabase Auth — kiểm tra DNS, firewall, URL'
         : undefined,
-    details: { status: result.status, bodyPreview: result.body?.slice(0, 100) },
+    details: {
+      targetHost,
+      targetPath: '/auth/v1/health',
+      status: result.status,
+      bodyPreview: result.body?.slice(0, 100),
+      ...(result.errorDetails ?? {}),
+    },
   };
 }
 
@@ -157,6 +215,13 @@ async function checkSupabaseRest(): Promise<DiagnosticCheck> {
   }
 
   const restUrl = `${url.replace(/\/$/, '')}/rest/v1/customers?select=id&limit=1`;
+  let targetHost = '(invalid)';
+  try {
+    targetHost = new URL(restUrl).host;
+  } catch {
+    /* ignore */
+  }
+
   const result = await timedFetch('rest-customers', restUrl, {
     method: 'GET',
     headers: {
@@ -174,10 +239,65 @@ async function checkSupabaseRest(): Promise<DiagnosticCheck> {
     error: result.error ?? (result.ok || rlsBlocked ? undefined : `HTTP ${result.status}`),
     hint: rlsBlocked
       ? 'Kết nối OK nhưng bị RLS/auth chặn (expected nếu chưa login) — không phải lỗi SSL'
-      : result.error
-        ? 'Không gọi được Supabase REST API từ server'
+      : result.errorDetails
+        ? connectivityHint(result.errorDetails)
+        : result.error
+          ? 'Không gọi được Supabase REST API từ server'
+          : undefined,
+    details: {
+      targetHost,
+      targetPath: '/rest/v1/customers',
+      status: result.status,
+      rlsOrAuthBlock: rlsBlocked,
+      ...(result.errorDetails ?? {}),
+    },
+  };
+}
+
+function isMissingSessionError(message: string): boolean {
+  return isExpectedUnauthenticatedSessionError(message);
+}
+
+export { isExpectedUnauthenticatedSessionError } from './session-diag';
+
+async function checkCookieHeaderSize(): Promise<DiagnosticCheck> {
+  const h = await headers();
+  const cookieHeader = h.get('cookie');
+  const { bytes, cookieCount, authChunkCount, hasBreakGlass } =
+    estimateCookieHeaderBytes(cookieHeader);
+
+  // Default nginx large_client_header_buffers is often 4×8k; warn before that.
+  const WARN_BYTES = 6 * 1024;
+  const FAIL_BYTES = 12 * 1024;
+  const ok = bytes < FAIL_BYTES;
+  const issues: string[] = [];
+  if (bytes >= FAIL_BYTES) {
+    issues.push(
+      `Cookie header ~${bytes} bytes — có thể gây 400/502 với nginx large_client_header_buffers`
+    );
+  } else if (bytes >= WARN_BYTES) {
+    issues.push(`Cookie header ~${bytes} bytes — gần ngưỡng buffer nginx`);
+  }
+
+  return {
+    name: 'Cookie header size',
+    ok,
+    error: !ok ? issues.join('; ') : undefined,
+    hint:
+      issues.length || authChunkCount > 2
+        ? [
+            ...issues,
+            'Logout/login lại để dọn sb-*-auth-token chunks; trên nginx tăng large_client_header_buffers (vd. 4 16k). localStorage/sessionStorage không gửi lên proxy.',
+          ].join(' ')
         : undefined,
-    details: { status: result.status, rlsOrAuthBlock: rlsBlocked },
+    details: {
+      bytes,
+      cookieCount,
+      authChunkCount,
+      hasBreakGlass,
+      warnBytes: WARN_BYTES,
+      failBytes: FAIL_BYTES,
+    },
   };
 }
 
@@ -196,6 +316,7 @@ async function checkSession(): Promise<DiagnosticCheck> {
   try {
     const cookieStore = await cookies();
     const supabase = createServerClient(url, key, {
+      ...getSupabaseGlobalFetchOptions(),
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -210,24 +331,37 @@ async function checkSession(): Promise<DiagnosticCheck> {
     const latencyMs = Date.now() - start;
 
     if (error) {
+      if (isMissingSessionError(error.message)) {
+        return {
+          name: 'Auth session',
+          ok: true,
+          latencyMs,
+          hint: 'Chưa đăng nhập — bình thường trên trang debug',
+          details: { hasUser: false, expectedWithoutLogin: true },
+        };
+      }
+
+      const networkLike = /fetch failed|failed to fetch|network|ssl|tls|certificate/i.test(error.message);
       return {
         name: 'Auth session',
         ok: false,
         latencyMs,
         error: error.message,
-        hint: 'Chưa có session hợp lệ hoặc cookie hết hạn',
+        hint: networkLike
+          ? 'Không gọi được Auth để kiểm tra session — xem Auth reachability'
+          : 'Session không hợp lệ hoặc cookie hết hạn',
         details: { hasUser: false },
       };
     }
 
     return {
       name: 'Auth session',
-      ok: Boolean(data.user),
+      ok: true,
       latencyMs,
-      error: data.user ? undefined : 'Không có user trong session',
-      hint: data.user ? undefined : 'Bình thường nếu chưa đăng nhập',
+      hint: data.user ? undefined : 'Chưa đăng nhập — bình thường trên trang debug',
       details: {
         hasUser: Boolean(data.user),
+        expectedWithoutLogin: !data.user,
         userId: data.user?.id ? maskSecret(data.user.id, 8, 4) : null,
         email: data.user?.email ?? null,
       },
@@ -248,6 +382,7 @@ export async function runDiagnostics(): Promise<DiagnosticsReport> {
   const checks: DiagnosticCheck[] = [
     checkEnv(),
     await checkProxyHeaders(),
+    await checkCookieHeaderSize(),
     await checkSupabaseAuthHealth(),
     await checkSupabaseRest(),
     await checkSession(),

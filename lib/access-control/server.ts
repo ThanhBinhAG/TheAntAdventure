@@ -16,6 +16,7 @@ import 'server-only';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 /** Hai role nghiệp vụ hiện có trong CRM. */
 export type ManagedRoleCode =
@@ -169,6 +170,7 @@ function createAccessControlServerClient() {
     const cookieStore = cookies();
 
     return createServerClient(url, key, {
+        ...getSupabaseGlobalFetchOptions(),
         cookies: {
             getAll() {
                 return cookieStore.getAll();

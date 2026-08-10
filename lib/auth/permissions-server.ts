@@ -13,6 +13,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getAuthContext } from '@/lib/auth/session';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 import {
   hasPermission,
   type PermissionCode,
@@ -45,6 +46,7 @@ async function readPermissionCodesFromSupabase(): Promise<PermissionCode[]> {
   const cookieStore = cookies();
 
   const supabase = createServerClient(url, key, {
+    ...getSupabaseGlobalFetchOptions(),
     cookies: {
       getAll() {
         return cookieStore.getAll();

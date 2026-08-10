@@ -824,7 +824,6 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
     logoUrl = '/Logo-3.svg',
     galleryPhotos = [],
     hotelsCatalog = [],
-    detailedProgramLayout = 'sidebar',
     experienceOverrides = {},
   } = input;
 
@@ -929,6 +928,5 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
     hotelRatesOptionB,
     specialNotes: buildSpecialNotes(brief, specialNotesOverride),
     logoUrl,
-    detailedProgramLayout: detailedProgramLayout === 'inline' ? 'inline' : 'sidebar',
   };
 }

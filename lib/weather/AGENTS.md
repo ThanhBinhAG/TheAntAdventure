@@ -1,20 +1,21 @@
 # lib/weather/ — Agent overview
 
 ## Role
-Open-Meteo fetch, Supabase cache, ratings, destination catalog, and weather-specific auth/admin helpers.
+Open-Meteo fetch, Supabase cache, ratings, destination catalog CRUD, and weather auth/admin helpers.
 
 ## Contents
-- `coordinates.ts` — **SSOT** `WEATHER_DESTINATIONS` + `FEATURED_WEEKLY_IDS` (Hanoi/Saigon)
-- `open-meteo.ts` — batch forecast + parallel fallback (`mapPool`)
-- `refresh.ts` — refresh orchestration; cache-first weekly read
-- `cache.ts`, `rating.ts`, `auth.ts`, `supabase-admin.ts`, `types.ts`
+- `coordinates.ts` — seed catalog + `FEATURED_WEEKLY_IDS` (Hanoi/Saigon) + region types
+- `destinations.ts` — **runtime SSOT** list/CRUD; `ensureDestinationsSeeded` memoized batch upsert
+- `boot.ts` — page boot: catalog + featured forecasts only
+- `open-meteo.ts` — batch weekly + **single-destination** current/daily (+ UV)
+- `refresh.ts` — per-destination cache-first fetch; cron warms featured only
+- `cache.ts` — forecast + `weather_current_cache` helpers
+- `client-cache.ts` — browser localStorage per destination (TTL on read/write prune, max 8 keys)
+- `rating.ts`, `auth.ts`, `supabase-admin.ts`, `types.ts`
 
 ## Adding a destination
-1. Add one row to `WEATHER_DESTINATIONS` (id, name, region, emoji, lat, lon, sortOrder).
-2. Add `DEFAULT_WEATHER[id]` + `TEMP_RANGES[id]` in `lib/seeds/weather.ts` (UI falls back to all-G / no temps if missing).
-3. Optionally `BEST_BY[id]` for Best Time; optionally add id to `FEATURED_WEEKLY_IDS`.
-4. Next `POST /api/weather/refresh` (or cron) upserts DB + forecast cache.
+Prefer UI **Thêm tỉnh thành** (writes DB). Or seed via `coordinates.ts` then refresh; covers/descriptions set in UI.
 
 ## Boundaries
-- UI: `components/weather`. APIs: `app/api/weather`. Prefer global `lib/auth` for non-weather auth.
-- Do not duplicate destination lists in seeds — `DESTINATIONS` there is derived from this catalog.
+- UI: `components/weather`. APIs: `app/api/weather`.
+- Page load: `getWeatherPageBoot` (catalog + max-2 featured weather). Explore weather stays lazy per id.

@@ -232,7 +232,7 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
             ← Back
           </button>
           <button className="btn btn-p" type="button" onClick={onNext} disabled={!selectedProducts.length}>
-            Next: AI Export →
+            Next: Export →
           </button>
         </div>
       </div>

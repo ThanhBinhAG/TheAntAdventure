@@ -123,7 +123,8 @@ describe('route boot tables', () => {
   });
 
   it('gallery and finance declare expected boot tables', () => {
-    assert.ok(tablesForPage('gallery').includes('photos'));
+    assert.deepEqual(tablesForPage('gallery').sort(), ['photo_folders', 'photos']);
+    assert.equal(tablesForPage('gallery').includes('attractions'), false);
     assert.ok(tablesForPage('finance').includes('finance'));
     assert.ok(tablesForPage('tourdesign').includes('products'));
     assert.deepEqual(PAGE_HYDRATE_TABLES, {});

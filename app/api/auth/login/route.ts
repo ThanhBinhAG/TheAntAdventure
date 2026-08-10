@@ -13,6 +13,7 @@ import {
   recordLoginFailure,
 } from '@/lib/auth/rate-limit';
 import { getSupabaseAnonKey, getSupabaseUrl, isBreakGlassConfigured } from '@/lib/env';
+import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 type LoginBody = {
   identity?: string;
@@ -22,6 +23,28 @@ type LoginBody = {
 
 function fail(status: number, error: string, headers?: HeadersInit) {
   return NextResponse.json({ ok: false, error }, { status, headers });
+}
+
+function isNetworkOrTlsAuthError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('fetch failed') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('network') ||
+    lower.includes('ssl') ||
+    lower.includes('tls') ||
+    lower.includes('certificate') ||
+    lower.includes('econnrefused') ||
+    lower.includes('enotfound')
+  );
+}
+
+function authConnectivityMessage(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes('econnrefused') || lower.includes('127.0.0.1') || lower.includes('localhost')) {
+    return 'Không kết nối được Supabase (ECONNREFUSED). Nếu đang dùng local: chạy npx supabase start. Nếu deploy: kiểm tra URL không còn trỏ 127.0.0.1.';
+  }
+  return 'Không kết nối được Supabase Auth — kiểm tra mạng, firewall, hoặc chứng chỉ TLS trên server.';
 }
 
 export async function POST(request: Request) {
@@ -77,6 +100,7 @@ export async function POST(request: Request) {
 
   const response = NextResponse.json({ ok: true, mode: 'supabase' });
   const supabase = createServerClient(url, key, {
+    ...getSupabaseGlobalFetchOptions(),
     cookies: {
       getAll() {
         return request.headers
@@ -105,6 +129,9 @@ export async function POST(request: Request) {
   if (error) {
     recordLoginFailure(ip);
     const lower = error.message.toLowerCase();
+    if (isNetworkOrTlsAuthError(error.message)) {
+      return fail(503, authConnectivityMessage(error.message));
+    }
     let message = error.message || 'Đăng nhập thất bại.';
     if (lower.includes('invalid login credentials')) {
       message = 'Tài khoản hoặc mật khẩu không đúng.';

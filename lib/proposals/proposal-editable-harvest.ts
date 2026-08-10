@@ -1,6 +1,10 @@
-import type { ProposalContentOverrides, ProposalDayOverride } from './proposal-content-overrides';
+import {
+  isTemplateEditPath,
+  toProposalTemplateOverrides,
+  type ProposalTemplateOverrides,
+} from './proposal-content-overrides';
 import { proposalRichHtml } from './proposal-rich-text';
-import type { ProposalDoc, ProposalOverviewRow } from './proposal-types';
+import type { ProposalDoc } from './proposal-types';
 
 function fieldValue(el: HTMLElement): string {
   const isRich = el.getAttribute('data-rich') === '1';
@@ -12,26 +16,18 @@ function fieldValue(el: HTMLElement): string {
   return (el.textContent ?? '').trim();
 }
 
-type MutableOverrides = {
-  tourTitle?: string;
+type MutableTemplate = {
   tagline?: string;
-  specialNotes?: string;
   bookingFields: Record<string, string>;
-  overviewRows: ProposalOverviewRow[];
-  itineraryGlance: Array<{ dayNumber: number; destination?: string; theme?: string; hotel?: string }>;
-  days: Map<number, ProposalDayOverride>;
   inclusions: string[];
   exclusions: string[];
-  pricingText: NonNullable<ProposalContentOverrides['pricingText']>;
-  legalText: NonNullable<ProposalContentOverrides['legalText']>;
+  pricingText: NonNullable<ProposalTemplateOverrides['pricingText']>;
+  legalText: NonNullable<ProposalTemplateOverrides['legalText']>;
 };
 
-function createMutable(): MutableOverrides {
+function createMutable(): MutableTemplate {
   return {
     bookingFields: {},
-    overviewRows: [],
-    itineraryGlance: [],
-    days: new Map(),
     inclusions: [],
     exclusions: [],
     pricingText: {},
@@ -39,83 +35,17 @@ function createMutable(): MutableOverrides {
   };
 }
 
-function ensureDay(m: MutableOverrides, dayNumber: number): ProposalDayOverride {
-  let d = m.days.get(dayNumber);
-  if (!d) {
-    d = { dayNumber };
-    m.days.set(dayNumber, d);
-  }
-  return d;
-}
+function applyField(m: MutableTemplate, path: string, value: string): void {
+  if (!isTemplateEditPath(path)) return;
 
-function applyField(m: MutableOverrides, path: string, value: string, baseDoc: ProposalDoc): void {
-  if (path === 'tourTitle') {
-    m.tourTitle = value;
-    return;
-  }
   if (path === 'tagline') {
     m.tagline = value;
-    return;
-  }
-  if (path === 'specialNotes') {
-    m.specialNotes = value;
     return;
   }
 
   const booking = path.match(/^bookingFields\.(.+)$/);
   if (booking) {
     m.bookingFields[decodeURIComponent(booking[1]!)] = value;
-    return;
-  }
-
-  const overview = path.match(/^overviewRows\.(\d+)\.(label|optionA|optionB)$/);
-  if (overview) {
-    const idx = Number(overview[1]);
-    const key = overview[2] as 'label' | 'optionA' | 'optionB';
-    while (m.overviewRows.length <= idx) {
-      const base = baseDoc.overviewRows?.[m.overviewRows.length];
-      m.overviewRows.push({
-        label: base?.label ?? '',
-        optionA: base?.optionA ?? '',
-        optionB: base?.optionB ?? '',
-      });
-    }
-    m.overviewRows[idx]![key] = value;
-    return;
-  }
-
-  const glance = path.match(/^itineraryGlance\.(\d+)\.(destination|theme|hotel)$/);
-  if (glance) {
-    const idx = Number(glance[1]);
-    const key = glance[2] as 'destination' | 'theme' | 'hotel';
-    while (m.itineraryGlance.length <= idx) {
-      const base = baseDoc.itineraryGlance[m.itineraryGlance.length];
-      m.itineraryGlance.push({ dayNumber: base?.dayNumber ?? m.itineraryGlance.length + 1 });
-    }
-    m.itineraryGlance[idx]![key] = value;
-    if (!m.itineraryGlance[idx]!.dayNumber) {
-      m.itineraryGlance[idx]!.dayNumber = baseDoc.itineraryGlance[idx]?.dayNumber ?? idx + 1;
-    }
-    return;
-  }
-
-  const seg = path.match(/^days\.(\d+)\.segments\.(\d+)\.(title|body)$/);
-  if (seg) {
-    const dayNumber = Number(seg[1]);
-    const segIdx = Number(seg[2]);
-    const key = seg[3] as 'title' | 'body';
-    const day = ensureDay(m, dayNumber);
-    if (!day.segments) day.segments = [];
-    while (day.segments.length <= segIdx) day.segments.push({});
-    day.segments[segIdx]![key] = value;
-    return;
-  }
-
-  const dayField = path.match(/^days\.(\d+)\.(title|body|hotel|meals)$/);
-  if (dayField) {
-    const dayNumber = Number(dayField[1]);
-    const key = dayField[2] as 'title' | 'body' | 'hotel' | 'meals';
-    ensureDay(m, dayNumber)[key] = value;
     return;
   }
 
@@ -135,7 +65,7 @@ function applyField(m: MutableOverrides, path: string, value: string, baseDoc: P
     return;
   }
 
-  const pricing = path.match(/^pricingText\.(packageLabel|b2bGroundDesc|b2bFlightsDesc|footnote)$/);
+  const pricing = path.match(/^pricingText\.(b2bGroundDesc|b2bFlightsDesc|footnote)$/);
   if (pricing) {
     m.pricingText[pricing[1] as keyof typeof m.pricingText] = value;
     return;
@@ -147,26 +77,22 @@ function applyField(m: MutableOverrides, path: string, value: string, baseDoc: P
   }
 }
 
-export function harvestOverridesFromRoot(root: ParentNode, baseDoc: ProposalDoc): ProposalContentOverrides {
+/** Harvest only template `data-proposal-field` nodes (tour narrative is not editable). */
+export function harvestOverridesFromRoot(root: ParentNode, _baseDoc: ProposalDoc): ProposalTemplateOverrides {
   const m = createMutable();
   root.querySelectorAll('[data-proposal-field]').forEach((node) => {
     const el = node as HTMLElement;
     const path = el.getAttribute('data-proposal-field');
     if (!path) return;
-    applyField(m, path, fieldValue(el), baseDoc);
+    applyField(m, path, fieldValue(el));
   });
 
-  const overrides: ProposalContentOverrides = {};
-  if (m.tourTitle != null) overrides.tourTitle = m.tourTitle;
+  const overrides: ProposalTemplateOverrides = {};
   if (m.tagline != null) overrides.tagline = m.tagline;
-  if (m.specialNotes != null) overrides.specialNotes = m.specialNotes;
   if (Object.keys(m.bookingFields).length) overrides.bookingFields = m.bookingFields;
-  if (m.overviewRows.length) overrides.overviewRows = m.overviewRows;
-  if (m.itineraryGlance.length) overrides.itineraryGlance = m.itineraryGlance;
-  if (m.days.size) overrides.days = [...m.days.values()];
   if (m.inclusions.length) overrides.inclusions = m.inclusions;
   if (m.exclusions.length) overrides.exclusions = m.exclusions;
   if (Object.keys(m.pricingText).length) overrides.pricingText = m.pricingText;
   if (Object.keys(m.legalText).length) overrides.legalText = m.legalText;
-  return overrides;
+  return toProposalTemplateOverrides(overrides);
 }

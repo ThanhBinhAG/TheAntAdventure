@@ -3,10 +3,6 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fmt } from '@/lib/constants';
-import { nextLeadId } from '@/lib/customers/customer-onboarding';
-import { formatLeadTravelMonth } from '@/lib/sales/sales-lead-utils';
-import { REG_LABELS } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
@@ -17,7 +13,6 @@ import PricingStep from '@/components/tour-design/PricingStep';
 import ProposalExportStep from '@/components/tour-design/ProposalExportStep';
 import type { OverridePatch } from '@/components/tour-design/SelectedExperiencesPanel';
 import { TOUR_PACKAGES, type TourPackage } from '@/lib/seeds/tourPackages';
-import { getPackageSellPerPax } from '@/lib/proposals/proposal-assembler';
 import { customerToBrief } from '@/lib/customers/customer-to-brief';
 import { isExperiencesBlocked } from '@/lib/tour-design/tour-design-gate';
 import {
@@ -38,15 +33,17 @@ import {
   buildTourDraft,
   createOutlineDay,
   resolveExperienceOverrides,
+  resolveProposalExportState,
+  type ProposalHotelRatesPersist,
   tourDraftIdForLead,
 } from '@/lib/tour-design/tour-draft-utils';
 import { outlineDocFromRows, printOutline } from '@/lib/outline/outline-html';
 import { getCustomerName } from '@/lib/core/crm-utils';
+import type { ProposalTemplateOverrides } from '@/lib/proposals/proposal-content-overrides';
 import type { ExperienceOverride, OutlineStatus, Product, TourOutlineDay } from '@/lib/types';
-import { paxToTierN, sumSellForProducts } from '@/lib/tour-design/tour-pricing';
 import { toast } from '@/lib/toast';
 
-const STEPS = ['Client Brief', 'Outline', 'Tour Experiences', 'Pricing', 'AI Export'] as const;
+const STEPS = ['Client Brief', 'Outline', 'Tour Experiences', 'Pricing', 'Export'] as const;
 
 export default function TourDesign() {
   const searchParams = useSearchParams();
@@ -75,6 +72,9 @@ export default function TourDesign() {
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
   const [experienceOverrides, setExperienceOverrides] = useState<Record<string, ExperienceOverride>>({});
+  const [proposalTemplateOverrides, setProposalTemplateOverrides] = useState<ProposalTemplateOverrides>({});
+  const [proposalSpecialNotes, setProposalSpecialNotes] = useState('');
+  const [proposalHotelRates, setProposalHotelRates] = useState<ProposalHotelRatesPersist | null>(null);
   const [outlineStatus, setOutlineStatus] = useState<OutlineStatus>('draft');
   const [outlineNotes, setOutlineNotes] = useState('');
   const [outlineSentAt, setOutlineSentAt] = useState<string | undefined>();
@@ -120,6 +120,9 @@ export default function TourDesign() {
         selectedCodes?: string[];
         selectedPackageId?: string | null;
         experienceOverrides?: Record<string, ExperienceOverride>;
+        proposalTemplateOverrides?: ProposalTemplateOverrides;
+        proposalSpecialNotes?: string;
+        proposalHotelRates?: ProposalHotelRatesPersist | null;
         markupPct?: number;
         clientType?: 'b2c' | 'b2b';
       },
@@ -128,6 +131,10 @@ export default function TourDesign() {
       const lid = overrideLeadId ?? leadId;
       if (!lid || !custId) return;
       const rows = patch?.outlineRows ?? outlineRows;
+      const templateOverrides = patch?.proposalTemplateOverrides ?? proposalTemplateOverrides;
+      const specialNotes = patch?.proposalSpecialNotes ?? proposalSpecialNotes;
+      const hotelRates =
+        patch?.proposalHotelRates !== undefined ? patch.proposalHotelRates : proposalHotelRates;
       const draft = buildTourDraft({
         leadId: lid,
         custId,
@@ -140,6 +147,11 @@ export default function TourDesign() {
         selectedCodes: patch?.selectedCodes ?? selectedCodes,
         selectedPackageId: patch?.selectedPackageId ?? selectedPackageId,
         experienceOverrides: patch?.experienceOverrides ?? experienceOverrides,
+        proposalExport: {
+          templateOverrides,
+          specialNotes,
+          hotelRates: hotelRates ?? undefined,
+        },
         markupPct: patch?.markupPct ?? markupPct,
         clientType: patch?.clientType ?? clientType,
         currentStep: patch?.step ?? step,
@@ -160,6 +172,9 @@ export default function TourDesign() {
       selectedCodes,
       selectedPackageId,
       experienceOverrides,
+      proposalTemplateOverrides,
+      proposalSpecialNotes,
+      proposalHotelRates,
       markupPct,
       clientType,
       step,
@@ -192,6 +207,10 @@ export default function TourDesign() {
         setSelectedCodes(draft.selectedCodes ?? []);
         setSelectedPackageId(draft.selectedPackageId ?? null);
         setExperienceOverrides(resolveExperienceOverrides(draft));
+        const proposalExport = resolveProposalExportState(draft);
+        setProposalTemplateOverrides(proposalExport.templateOverrides ?? {});
+        setProposalSpecialNotes(proposalExport.specialNotes ?? '');
+        setProposalHotelRates(proposalExport.hotelRates ?? null);
         setMarkupPct(draft.markupPct ?? 30);
         setClientType(draft.clientType ?? c?.clientType ?? 'b2c');
         const nextStep = urlStep ?? draft.currentStep ?? 0;
@@ -209,6 +228,9 @@ export default function TourDesign() {
         setOutlineRevision(0);
         setStep(urlStep ?? 0);
         setExperienceOverrides({});
+        setProposalTemplateOverrides({});
+        setProposalSpecialNotes('');
+        setProposalHotelRates(null);
       }
     },
     [customers, tourDrafts, tourOutlineDays, updateLead]
@@ -260,6 +282,9 @@ export default function TourDesign() {
     selectedCodes,
     selectedPackageId,
     experienceOverrides,
+    proposalTemplateOverrides,
+    proposalSpecialNotes,
+    proposalHotelRates,
     markupPct,
     clientType,
     step,
@@ -384,6 +409,11 @@ export default function TourDesign() {
         selectedCodes,
         selectedPackageId,
         experienceOverrides,
+        proposalExport: {
+          templateOverrides: proposalTemplateOverrides,
+          specialNotes: proposalSpecialNotes,
+          hotelRates: proposalHotelRates ?? undefined,
+        },
         markupPct,
         clientType,
         currentStep: step,
@@ -424,55 +454,14 @@ export default function TourDesign() {
     );
   }
 
-  function saveAsLead() {
-    const cust = custId || customers.find((c) => c.name === brief.clientName)?.id || '';
-    if (!cust) {
-      toast.warning('Please select a customer before saving to the Sales Pipeline.');
-      return;
-    }
-
-    const tierN = paxToTierN(brief.pax);
-    let sellTotal = sumSellForProducts(selectedCodes, tierN, markupPct) * brief.pax;
-    if (!sellTotal && selectedPackageId) {
-      sellTotal = getPackageSellPerPax(selectedPackageId, brief.pax, brief.travelMonth) * brief.pax;
-    }
-    const customer = customers.find((c) => c.id === cust);
-    const pkgName = selectedPackageId ? TOUR_PACKAGES.find((p) => p.id === selectedPackageId)?.name : null;
-    const leadData = {
-      tour:
-        pkgName ||
-        `${brief.duration} ${REG_LABELS[brief.region as keyof typeof REG_LABELS] || brief.region} — ${selectedProducts.length} modules`,
-      pax: brief.pax,
-      value: sellTotal || 0,
-      month: formatLeadTravelMonth(brief.travelMonth, brief.startDate),
-      stage: 'Designing' as const,
-      owner: brief.salesperson || 'Tai Pham',
-      probability: 25,
-      clientType,
-      needsTourDesign: false,
-      agentId: customer?.agentId,
-    };
-
-    if (leadId) {
-      updateLead(leadId, leadData);
-    } else {
-      const id = nextLeadId(leads);
-      addLead({
-        id,
-        custId: cust,
-        ...leadData,
-      });
-    }
-
-    persistDraft({ step });
-    toast.success(`✓ Saved to Sales Pipeline!\n\nClient: ${brief.clientName || custName || 'New'}\nEst. Value: $${fmt(sellTotal)}`);
-  }
-
   function resetDesign() {
     setBrief({ ...DEFAULT_TOUR_BRIEF });
     setSelectedCodes([]);
     setSelectedPackageId(null);
     setExperienceOverrides({});
+    setProposalTemplateOverrides({});
+    setProposalSpecialNotes('');
+    setProposalHotelRates(null);
     setCustId('');
     setLeadId('');
     setClientType('b2c');
@@ -754,7 +743,12 @@ export default function TourDesign() {
           leadId={leadId || undefined}
           galleryPhotos={photos}
           hotelsCatalog={hotels}
-          onSavePipeline={saveAsLead}
+          templateOverrides={proposalTemplateOverrides}
+          specialNotes={proposalSpecialNotes}
+          hotelRates={proposalHotelRates}
+          onTemplateOverridesChange={setProposalTemplateOverrides}
+          onSpecialNotesChange={setProposalSpecialNotes}
+          onHotelRatesChange={setProposalHotelRates}
           onReset={resetDesign}
           onBack={() => goToStep(3)}
         />

@@ -62,13 +62,16 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
     'comms',
   ],
   products: ['products', 'product_pricing'],
-  gallery: ['photos', 'photo_folders', 'attractions'],
+  /** attractions deferred — Gallery lazy-loads for ?attraction= filter / delete unlink */
+  gallery: ['photos', 'photo_folders'],
   pricing: ['products', 'product_pricing'],
   bookings: ['bookings', 'customers'],
   contracts: ['contracts', 'bookings'],
   suppliers: ['hotels', 'transport', 'restaurants', 'cruises', 'suppliers'],
   guides: ['guides'],
   attractions: ['attractions', 'photos', 'photo_folders'],
+  /** Covers come from destinations API; no gallery hydrate on this route. */
+  weather: [],
   posttour: ['feedback'],
   finance: ['finance', 'accounts_receivable', 'accounts_payable'],
   tax: ['tax_reports'],

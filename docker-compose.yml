@@ -34,4 +34,8 @@ services:
       NODE_ENV: production
       PORT: 3006
       HOSTNAME: 0.0.0.0
+    # Caps the app at 2 GB so a runaway request is killed inside the container instead of
+    # letting the kernel pick a victim host-wide. Measured peak for image processing is
+    # ~130 MB (Sharp runs in a short-lived child worker), so this is generous headroom.
+    mem_limit: 2g
     restart: unless-stopped

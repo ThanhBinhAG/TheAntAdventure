@@ -1,0 +1,10 @@
+create or replace function public.list_product_modules_page(p_page_number integer, p_page_size integer, p_search_text text default null)
+returns jsonb language plpgsql stable security invoker set search_path = public as $$
+declare result jsonb;
+begin
+ if p_page_number < 1 or p_page_size not in (12,24,48,96) then raise exception 'Yêu cầu phân trang không hợp lệ' using errcode='22023'; end if;
+ with filtered as (select p.*, case p.region when 'north' then 1 when 'central' then 2 when 'south' then 3 end rr, case when lower(p.duration) like '%half%' or lower(p.duration) like '%evening%' then 1 when lower(p.duration) like '%full day%' then 2 when lower(p.duration) like '%2 day%' or lower(p.duration) like '%2d1n%' then 3 when lower(p.duration) like '%3 day%' or lower(p.duration) like '%3d2n%' then 4 when lower(p.duration) like '%4 day%' or lower(p.duration) like '%4d3n%' then 5 end dr from public.products p where p.region in ('north','central','south') and lower(coalesce(p.duration,'')) not like '%service%' and (nullif(trim(p_search_text),'') is null or p.name ilike '%'||p_search_text||'%' or p.code ilike '%'||p_search_text||'%' or p.description ilike '%'||p_search_text||'%')), meta as (select count(*)::integer total from filtered), info as (select total,greatest(1,ceil(total::numeric/p_page_size)::integer) pages from meta), pi as (select total,pages,least(p_page_number,pages) page from info), paged as (select f.* from filtered f cross join pi order by rr,dr,code limit p_page_size offset (select (page-1)*p_page_size from pi)) select jsonb_build_object('items',(select coalesce(jsonb_agg((to_jsonb(paged)-'rr'-'dr') order by rr,dr,code),'[]'::jsonb) from paged),'page',page,'pageSize',p_page_size,'totalCount',total,'totalPages',pages,'hasPreviousPage',page>1,'hasNextPage',page<pages) into result from pi;
+ return result;
+end; $$;
+revoke all on function public.list_product_modules_page(integer,integer,text) from public;
+grant execute on function public.list_product_modules_page(integer,integer,text) to authenticated;

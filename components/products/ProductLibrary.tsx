@@ -5,16 +5,12 @@ import Link from 'next/link';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
 import ProductCard from '@/components/products/ProductCard';
-import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
-import { deriveCategoriesFromProducts } from '@/lib/products/product-form';
-import {
-  matchesPricingStatusFilter,
-  pricingStatus as getPricingStatus,
-  type PricingStatus,
-  type PricingStatusFilter,
-} from '@/lib/products/product-pricing-helpers';
-import type { Product, ProductPricing } from '@/lib/types';
+import { useProductPage } from '@/hooks/useProductPage';
+import type { ProductPageSize } from '@/lib/products/product-list-input';
+import { PRODUCT_CATEGORIES } from '@/lib/products/product-form';
+import type { PricingStatusFilter } from '@/lib/products/product-pricing-helpers';
+import type { Product } from '@/lib/types';
 
 const DURATION_OPTIONS = [
   'Half Day',
@@ -42,8 +38,6 @@ const PRICING_OPTIONS: { value: PricingStatusFilter; label: string }[] = [
 ];
 
 interface ProductLibraryProps {
-  products: Product[];
-  productPricing: ProductPricing[];
   search: string;
   onSearchChange: (q: string) => void;
   region: string;
@@ -63,8 +57,6 @@ interface ProductLibraryProps {
 }
 
 export default function ProductLibrary({
-  products,
-  productPricing,
   search,
   onSearchChange,
   region,
@@ -83,100 +75,41 @@ export default function ProductLibrary({
   onShownCountChange,
 }: ProductLibraryProps) {
   const [facetOpen, setFacetOpen] = useState(false);
-  const categories = useMemo(() => deriveCategoriesFromProducts(products), [products]);
   const { pageSize, setPageSize } = usePageSize();
+  const [page, setPage] = useState(1);
+  const {
+    data: productPage,
+    error: productPageError,
+    isLoading: isProductPageLoading,
+    retry: retryProductPage,
+  } = useProductPage({
+    page,
+    pageSize: pageSize as ProductPageSize,
+    view: 'catalog',
+    q: search || undefined,
+    region: region || undefined,
+    duration: duration || undefined,
+    category: category || undefined,
+    destination: destFilter || undefined,
+    pricingStatus: pricingStatus || undefined,
+  });
 
-  const pricingByCode = useMemo(
-    () => new Map(productPricing.map((row) => [row.productCode, row])),
-    [productPricing]
-  );
-
-  const filtered = useMemo(() => {
-    return products.filter((p) => {
-      const q = search.toLowerCase();
-      if (region && p.region !== region) return false;
-      if (duration && p.dur !== duration) return false;
-      if (category && !p.cat.toLowerCase().includes(category.toLowerCase())) return false;
-      if (destFilter && p.dest !== destFilter) return false;
-      if (!matchesPricingStatusFilter(p.code, pricingByCode, pricingStatus)) return false;
-      if (
-        q &&
-        !p.name.toLowerCase().includes(q) &&
-        !p.desc.toLowerCase().includes(q) &&
-        !p.code.toLowerCase().includes(q) &&
-        !p.dest.toLowerCase().includes(q)
-      )
-        return false;
-      return true;
-    });
-  }, [products, search, region, duration, category, destFilter, pricingStatus, pricingByCode]);
-
-  const pagination = usePagination(filtered, pageSize, [
-    search,
-    region,
-    duration,
-    category,
-    destFilter,
-    pricingStatus,
-    pageSize,
-  ]);
+  const items = productPage?.items ?? [];
+  const total = productPage?.totalCount ?? 0;
+  const currentPage = productPage?.page ?? page;
+  const totalPages = productPage?.totalPages ?? 1;
+  const rangeStart = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(currentPage * pageSize, total);
+  const categories = productPage?.facets?.categories ?? PRODUCT_CATEGORIES;
+  const destCounts = productPage?.facets?.destinations ?? {};
+  const destList = Object.keys(destCounts).sort((a, b) => a.localeCompare(b));
+  const destTotal = Object.values(destCounts).reduce((n, count) => n + count, 0);
+  const pricingCounts = productPage?.facets?.pricingPulse ?? { complete: 0, incomplete: 0, missing: 0 };
+  const pricingPulse = { ...pricingCounts, total: pricingCounts.complete + pricingCounts.incomplete + pricingCounts.missing };
 
   useEffect(() => {
-    onShownCountChange?.(filtered.length);
-  }, [filtered.length, onShownCountChange]);
-
-  /** Destination counts from products matching all filters except dest (so sidebar stays useful). */
-  const destCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    products.forEach((p) => {
-      const q = search.toLowerCase();
-      if (region && p.region !== region) return;
-      if (duration && p.dur !== duration) return;
-      if (category && !p.cat.toLowerCase().includes(category.toLowerCase())) return;
-      if (!matchesPricingStatusFilter(p.code, pricingByCode, pricingStatus)) return;
-      if (
-        q &&
-        !p.name.toLowerCase().includes(q) &&
-        !p.desc.toLowerCase().includes(q) &&
-        !p.code.toLowerCase().includes(q) &&
-        !p.dest.toLowerCase().includes(q)
-      )
-        return;
-      const key = p.dest || 'Other';
-      map[key] = (map[key] || 0) + 1;
-    });
-    return map;
-  }, [products, search, region, duration, category, pricingStatus, pricingByCode]);
-
-  const destList = useMemo(
-    () => Object.keys(destCounts).sort((a, b) => a.localeCompare(b)),
-    [destCounts]
-  );
-
-  const destTotal = useMemo(() => Object.values(destCounts).reduce((n, c) => n + c, 0), [destCounts]);
-
-  /** Pricing health for products matching filters except pricing status (so pulse stays actionable). */
-  const pricingPulse = useMemo(() => {
-    const tallies: Record<PricingStatus, number> = { complete: 0, incomplete: 0, missing: 0 };
-    products.forEach((p) => {
-      const q = search.toLowerCase();
-      if (region && p.region !== region) return;
-      if (duration && p.dur !== duration) return;
-      if (category && !p.cat.toLowerCase().includes(category.toLowerCase())) return;
-      if (destFilter && p.dest !== destFilter) return;
-      if (
-        q &&
-        !p.name.toLowerCase().includes(q) &&
-        !p.desc.toLowerCase().includes(q) &&
-        !p.code.toLowerCase().includes(q) &&
-        !p.dest.toLowerCase().includes(q)
-      )
-        return;
-      tallies[getPricingStatus(pricingByCode.get(p.code))] += 1;
-    });
-    const total = tallies.complete + tallies.incomplete + tallies.missing;
-    return { ...tallies, total };
-  }, [products, search, region, duration, category, destFilter, pricingByCode]);
+    onShownCountChange?.(total);
+  }, [total, onShownCountChange]);
 
   const hasFilters = !!(search || region || duration || category || destFilter || pricingStatus);
 
@@ -361,7 +294,7 @@ export default function ProductLibrary({
 
       <div className="tp-facet-foot">
         <span className="tp-facet-foot-stat">
-          {filtered.length} match{filtered.length === 1 ? '' : 'es'}
+          {total} match{total === 1 ? '' : 'es'}
         </span>
         {hasFilters ? (
           <button type="button" className="tp-facet-foot-clear" onClick={clearFilters}>
@@ -401,7 +334,18 @@ export default function ProductLibrary({
             </div>
           )}
 
-          {filtered.length === 0 ? (
+          {productPageError ? (
+            <div className="crm-empty-state crm-empty-state--flush">
+              <p>Không thể tải danh sách product.</p>
+              <button type="button" className="btn btn-s btn-sm" onClick={retryProductPage}>
+                Thử lại
+              </button>
+            </div>
+          ) : isProductPageLoading && !productPage ? (
+            <div className="crm-empty-state crm-empty-state--flush">
+              <p>Đang tải products…</p>
+            </div>
+          ) : total === 0 ? (
             <EmptyState
               className="crm-empty-state--flush"
               size="compact"
@@ -419,7 +363,7 @@ export default function ProductLibrary({
           ) : (
             <>
               <div className="tp-grid">
-                {pagination.paginatedItems.map((p) => (
+                {items.map((p) => (
                   <ProductCard
                     key={p.code}
                     product={p}
@@ -429,7 +373,19 @@ export default function ProductLibrary({
                   />
                 ))}
               </div>
-              <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
+              <PaginationBar
+                page={currentPage}
+                setPage={setPage}
+                totalPages={totalPages}
+                total={total}
+                pageSize={pageSize}
+                rangeStart={rangeStart}
+                rangeEnd={rangeEnd}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setPage(1);
+                }}
+              />
             </>
           )}
         </div>

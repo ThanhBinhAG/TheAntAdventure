@@ -7,7 +7,7 @@ import PortfolioImportModal from '@/components/products/PortfolioImportModal';
 import ProductDetailDrawer from '@/components/products/ProductDetailDrawer';
 import ProductEditPanel from '@/components/products/ProductEditPanel';
 import ProductLibrary from '@/components/products/ProductLibrary';
-import { pushTablesToSupabase } from '@/lib/db/hydrate';
+import { ensureTablesLoaded, pushTablesToSupabase } from '@/lib/db/hydrate';
 import { isRemoteDataEnabled, isSupabaseReadOnly } from '@/lib/env';
 import { validateProductCodeInput } from '@/lib/products/product-code';
 import type { PricingStatusFilter } from '@/lib/products/product-pricing-helpers';
@@ -22,7 +22,6 @@ type ShellMode = 'catalog' | 'modules' | 'manage';
 export default function Products() {
   const { canWrite } = usePagePermission('products');
   const products = useStore((s) => s.products);
-  const productPricing = useStore((s) => s.productPricing);
   const addProduct = useStore((s) => s.addProduct);
   const updateProduct = useStore((s) => s.updateProduct);
   const deleteProduct = useStore((s) => s.deleteProduct);
@@ -49,6 +48,7 @@ export default function Products() {
   const [importOpen, setImportOpen] = useState(false);
   const [draftPreview, setDraftPreview] = useState<Product | null>(null);
   const [productSaveBusy, setProductSaveBusy] = useState(false);
+  const [catalogueLoading, setCatalogueLoading] = useState(false);
 
   const detailProduct = useMemo(
     () => (detailProductCode ? products.find((p) => p.code === detailProductCode) ?? null : null),
@@ -74,12 +74,28 @@ export default function Products() {
     setDetailProductCode(null);
   };
 
+  const loadCatalogueForInteraction = useCallback(async () => {
+    setCatalogueLoading(true);
+    try {
+      await ensureTablesLoaded(['products', 'product_pricing']);
+      return true;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể tải catalogue product.');
+      return false;
+    } finally {
+      setCatalogueLoading(false);
+    }
+  }, []);
+
   const setShellMode = (mode: ShellMode) => {
     if (formOpen) closeForm();
     if (mode === 'manage') {
-      setReturnTab(viewTab);
-      setPickMode(true);
-      setDetailProductCode(null);
+      void (async () => {
+        if (!(await loadCatalogueForInteraction())) return;
+        setReturnTab(viewTab);
+        setPickMode(true);
+        setDetailProductCode(null);
+      })();
       return;
     }
     setPickMode(false);
@@ -181,7 +197,10 @@ export default function Products() {
 
   const openDetail = (code: string) => {
     if (pickMode || formOpen) return;
-    setDetailProductCode(code);
+    void (async () => {
+      if (!(await loadCatalogueForInteraction())) return;
+      setDetailProductCode(code);
+    })();
   };
 
   const handleDrawerClose = () => {
@@ -195,6 +214,14 @@ export default function Products() {
 
   const showLibrary = viewTab === 'library' || (pickMode && returnTab === 'library');
   const showModules = viewTab === 'modules' || (pickMode && returnTab === 'modules');
+  const libraryPaginationKey = JSON.stringify([
+    libSearch,
+    region,
+    duration,
+    category,
+    destFilter,
+    pricingStatus,
+  ]);
 
   const drawerProduct = formOpen ? draftPreview : detailProduct;
   const drawerOpen = formOpen ? Boolean(draftPreview) : Boolean(detailProductCode);
@@ -227,6 +254,7 @@ export default function Products() {
             aria-selected={shellMode === 'manage'}
             className={`tp-seg-btn${shellMode === 'manage' ? ' on' : ''}`}
             onClick={() => setShellMode('manage')}
+            disabled={catalogueLoading}
           >
             Manage
           </button>
@@ -317,8 +345,7 @@ export default function Products() {
 
       {showLibrary && (
         <ProductLibrary
-          products={products}
-          productPricing={productPricing}
+          key={libraryPaginationKey}
           search={libSearch}
           onSearchChange={setLibSearch}
           region={region}
@@ -340,7 +367,7 @@ export default function Products() {
 
       {showModules && (
         <ModulesView
-          products={products}
+          key={modSearch}
           search={modSearch}
           pickMode={pickMode && !formOpen}
           onPickProduct={openFormForProduct}

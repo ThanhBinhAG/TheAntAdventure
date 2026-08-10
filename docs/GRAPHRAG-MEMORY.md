@@ -311,12 +311,14 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  G[Gallery UI] --> PU[/api/photos/upload]
+  G[Gallery UI] --> Init[/api/photos/upload/init]
+  Init --> Chunk[/api/photos/upload/chunk]
+  Chunk --> Complete[/api/photos/upload/complete]
+  Complete --> Pipe[lib/image-pipeline + upload-gallery-photo-server]
   G --> PD[/api/photos/delete]
-  PU --> PS[lib/storage/upload-gallery-photo-server]
-  PD --> PS
-  PS --> ST[Supabase Storage photos bucket]
-  PS --> PT[photos + photo_tags]
+  PD --> Pipe
+  Pipe --> ST[Supabase Storage photos bucket]
+  Pipe --> PT[photos + photo_tags]
 
   W[Weather UI] --> WR[/api/weather/refresh]
   WR --> WA[lib/weather/auth]
@@ -334,7 +336,7 @@ flowchart LR
 | `POST /api/auth/logout` | Topbar | no explicit route check | Supabase Auth |
 | `GET,POST /api/auth/users` | recovery/admin use | `requireBreakGlass` | service-role Auth admin |
 | `GET /api/health` | external monitor | public by design | Supabase Auth health |
-| `POST /api/photos/upload`, `/delete` | gallery | authenticated only | Storage + `photos` tables |
+| `POST /api/photos/upload/init`, `/chunk`, `/complete`, `/delete` | gallery (chunked → Sharp → Storage) | authenticated only | Storage + `photos` tables |
 | `POST /api/pricing/export`, `/api/proposals/export` | pricing/tour-design | authenticated only; no role/permission export check | Puppeteer/Chromium PDF |
 | `GET,PUT /api/system/*` | debug panel | debug token except debug-log POST | diagnostics/log buffer |
 | `POST /api/weather/refresh` | weather page or cron | authenticated user or cron secret | service-role cache + Open-Meteo |

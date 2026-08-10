@@ -15,6 +15,7 @@ import 'server-only';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 type AuthLoginEventRow = {
     id: number | string;
@@ -231,6 +232,7 @@ function createAccessControlServerClient() {
     const cookieStore = cookies();
 
     return createServerClient(url, key, {
+        ...getSupabaseGlobalFetchOptions(),
         cookies: {
             getAll() {
                 return cookieStore.getAll();

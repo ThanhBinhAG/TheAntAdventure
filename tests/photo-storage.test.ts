@@ -12,13 +12,16 @@ import {
 } from '../lib/gallery/gallery-helpers';
 import { isNextImageOptimizable } from '../lib/gallery/storage-image-src';
 import {
+  companyLogoObjectPathFromUrl,
+  companyLogoPath,
   galleryDeleteCandidatePaths,
   galleryDisplayPath,
   galleryStoragePaths,
   galleryThumbPath,
+  LEGACY_COMPANY_LOGO_PATH,
   thumbPathFromDisplayPath,
 } from '../lib/storage/photo-paths';
-import { galleryImageFileSchema } from '../lib/storage/photo-variants';
+import { avatarImageFileSchema } from '../lib/storage/photo-variants';
 import { resolvePackageDayPhotos, resolveProductPhotos } from '../lib/gallery/tour-photos';
 import type { Product } from '../lib/types';
 
@@ -47,6 +50,18 @@ describe('photo-paths', () => {
       thumbPathFromDisplayPath('gallery/tours/AA-NV-HAN-HD-01/PH-001/display.webp'),
       'gallery/tours/AA-NV-HAN-HD-01/PH-001/thumb.webp'
     );
+  });
+
+  it('builds versioned company logo paths', () => {
+    assert.equal(companyLogoPath('1710000000000'), 'branding/logo-1710000000000.webp');
+    assert.equal(LEGACY_COMPANY_LOGO_PATH, 'branding/logo.webp');
+    assert.equal(
+      companyLogoObjectPathFromUrl(
+        'https://sb.example.com/storage/v1/object/public/photos/branding/logo-171.webp?v=171'
+      ),
+      'branding/logo-171.webp'
+    );
+    assert.equal(companyLogoObjectPathFromUrl(null), null);
   });
 });
 
@@ -193,21 +208,27 @@ describe('storage-image-src', () => {
   });
 });
 
-describe('galleryImageFileSchema', () => {
-  function fakeImageFile(size: number): File {
-    const file = new File([new Uint8Array(8)], 'shot.jpg', { type: 'image/jpeg' });
+describe('avatarImageFileSchema', () => {
+  function fakeImageFile(size: number, type = 'image/jpeg'): File {
+    const file = new File([new Uint8Array(8)], 'shot.jpg', { type });
     Object.defineProperty(file, 'size', { value: size });
     return file;
   }
 
-  it('accepts files under the 50 MB ceiling', () => {
+  it('accepts a normal avatar pick', () => {
     const ok = fakeImageFile(11 * 1024 * 1024);
-    assert.equal(galleryImageFileSchema.parse(ok), ok);
+    assert.equal(avatarImageFileSchema.parse(ok), ok);
   });
 
-  it('rejects oversized files', () => {
-    const big = fakeImageFile(51 * 1024 * 1024);
-    assert.throws(() => galleryImageFileSchema.parse(big));
+  // Avatars are the one upload that keeps a size cap; the gallery path has none.
+  it('rejects an avatar over the 20 MB cap', () => {
+    const big = fakeImageFile(21 * 1024 * 1024);
+    assert.throws(() => avatarImageFileSchema.parse(big), /20 MB or smaller/);
+  });
+
+  it('rejects a MIME type outside the allowlist', () => {
+    const gif = fakeImageFile(1024, 'image/gif');
+    assert.throws(() => avatarImageFileSchema.parse(gif), /JPEG, PNG, and WebP/);
   });
 });
 

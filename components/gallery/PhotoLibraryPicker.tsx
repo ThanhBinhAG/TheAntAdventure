@@ -19,12 +19,14 @@ import { photoMatchesSearchQuery } from '@/lib/gallery/fold-search';
 import { nextFeaturedAfterLink, nextSelectionAfterLinkToggle } from '@/lib/gallery/photo-link-selection';
 import {
   childFolders,
+  countPhotosInFolder,
   ensureUnsortedFolder,
   folderBreadcrumb,
   UNSORTED_FOLDER_ID,
   type PhotoFolder,
 } from '@/lib/gallery/photo-folders';
 import StorageImage from '@/components/gallery/StorageImage';
+import GalleryFolderGrid from '@/components/gallery/GalleryFolderGrid';
 import EmptyState from '@/components/EmptyState';
 
 type PhotoApply = { linkedPhotoIds: string[]; photoIds: string[] };
@@ -198,7 +200,7 @@ export default function PhotoLibraryPicker({
   const [region, setRegion] = useState('all');
   const [q, setQ] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [folderId, setFolderId] = useState<string | null>(UNSORTED_FOLDER_ID);
+  const [folderId, setFolderId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -211,7 +213,7 @@ export default function PhotoLibraryPicker({
     if (!isInline) {
       setRegion('all');
       setQ('');
-      setFolderId(UNSORTED_FOLDER_ID);
+      setFolderId(null);
     }
   }
 
@@ -232,14 +234,25 @@ export default function PhotoLibraryPicker({
 
   const breadcrumb = useMemo(() => folderBreadcrumb(folders, folderId), [folders, folderId]);
   const subfolders = useMemo(() => childFolders(folders, folderId), [folders, folderId]);
+  const rootFolders = useMemo(() => childFolders(folders, null), [folders]);
+  const atRoot = folderId === null;
+
+  const photoCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const f of folders) {
+      counts[f.id] = countPhotosInFolder(photos, f.id);
+    }
+    return counts;
+  }, [folders, photos]);
 
   const filtered = useMemo(() => {
+    if (atRoot) return [];
     return photos.filter((p) => {
       if (folderId && (p.folderId || UNSORTED_FOLDER_ID) !== folderId) return false;
       if (region !== 'all' && p.region !== region) return false;
       return photoMatchesSearchQuery(p, q);
     });
-  }, [photos, region, q, folderId]);
+  }, [photos, region, q, folderId, atRoot]);
 
   const byId = useMemo(() => new Map(photos.map((p) => [p.id, p])), [photos]);
 
@@ -342,112 +355,117 @@ export default function PhotoLibraryPicker({
             </span>
           ))}
         </nav>
-        {subfolders.length > 0 && (
-          <div className="phlib-picker-folders">
-            {subfolders.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                className="phlib-picker-folder-chip"
-                onClick={() => setFolderId(f.id)}
-              >
-                {f.name}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
-      <div className="phlib-picker-toolbar">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder='Search tags… e.g. "Can Tho" or CanTho'
-          className="phlib-search"
-        />
-        <div className="phlib-region-tabs">
-          {PHOTO_LIBRARY_REGIONS.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              className={`phlib-region-tab${region === r.id ? ' on' : ''}`}
-              onClick={() => setRegion(r.id)}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-        <div className="phlib-picker-count">
-          {isSingle
-            ? `${filtered.length} shown · click a photo to select`
-            : `${linked.length} linked · ${featured.length}/${maxFeatured} featured · ${filtered.length} shown`}
-        </div>
-      </div>
-
-      {folderId === null ? (
-        <div className="phlib-picker-folders" style={{ padding: '8px 0 12px' }}>
-          {childFolders(folders, null).map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              className="phlib-picker-folder-chip"
-              onClick={() => setFolderId(f.id)}
-            >
-              {f.name}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className={`phlib-picker-grid${isInline ? ' phlib-picker-grid--inline' : ''}`}>
-          {filtered.map((p) =>
-            isSingle ? (
-              <button
-                key={p.id}
-                type="button"
-                className="phlib-picker-card phlib-picker-card--pick"
-                onClick={() => onPick?.(p)}
-              >
-                <span className="phlib-picker-thumb">
-                  {photoThumbUrl(p) || p.url ? (
-                    <StorageImage
-                      src={photoThumbUrl(p) || p.url}
-                      alt={p.caption}
-                      fill
-                      className="phlib-img"
-                      sizes="160px"
-                    />
-                  ) : (
-                    <span className="phlib-missing">No image</span>
-                  )}
-                </span>
-                <span className="phlib-picker-meta">
-                  <span className="phlib-picker-caption" title={p.caption}>
-                    {p.caption || p.id}
-                  </span>
-                </span>
-              </button>
-            ) : (
-              <DraggablePhotoCard
-                key={p.id}
-                photo={p}
-                isLinked={linked.includes(p.id)}
-                isFeatured={featured.includes(p.id)}
-                onToggleLink={() => toggleLink(p.id)}
-                onToggleFeatured={() => toggleFeatured(p.id)}
-                featuredFull={featured.length >= maxFeatured}
-              />
-            )
-          )}
-          {!filtered.length && (
+      {atRoot ? (
+        <div className="phlib-picker-root">
+          <p className="phlib-picker-hint">
+            {rootFolders.length} folder{rootFolders.length === 1 ? '' : 's'} · open one to browse photos
+          </p>
+          {rootFolders.length ? (
+            <GalleryFolderGrid
+              folders={rootFolders}
+              photoCounts={photoCounts}
+              onOpen={(id) => setFolderId(id)}
+            />
+          ) : (
             <EmptyState
               className="crm-empty-state--flush crm-empty-state--inline"
               size="compact"
               variant="photos"
-              title="No photos in this folder"
-              description="Try another folder or clear the search."
+              title="No folders yet"
+              description="Create folders in the Photo Gallery first."
             />
           )}
         </div>
+      ) : (
+        <>
+          {subfolders.length > 0 && (
+            <div className="phlib-picker-subfolders">
+              <p className="phlib-picker-hint">Subfolders</p>
+              <GalleryFolderGrid
+                folders={subfolders}
+                photoCounts={photoCounts}
+                onOpen={(id) => setFolderId(id)}
+              />
+            </div>
+          )}
+          <div className="phlib-picker-toolbar">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder='Search tags… e.g. "Can Tho" or CanTho'
+              className="phlib-search"
+            />
+            <div className="phlib-region-tabs">
+              {PHOTO_LIBRARY_REGIONS.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  className={`phlib-region-tab${region === r.id ? ' on' : ''}`}
+                  onClick={() => setRegion(r.id)}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <div className="phlib-picker-count">
+              {isSingle
+                ? `${filtered.length} shown · click a photo to select`
+                : `${linked.length} linked · ${featured.length}/${maxFeatured} featured · ${filtered.length} shown`}
+            </div>
+          </div>
+          <div className={`phlib-picker-grid${isInline ? ' phlib-picker-grid--inline' : ''}`}>
+            {filtered.map((p) =>
+              isSingle ? (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="phlib-picker-card phlib-picker-card--pick"
+                  onClick={() => onPick?.(p)}
+                >
+                  <span className="phlib-picker-thumb">
+                    {photoThumbUrl(p) || p.url ? (
+                      <StorageImage
+                        src={photoThumbUrl(p) || p.url}
+                        alt={p.caption}
+                        fill
+                        className="phlib-img"
+                        sizes="160px"
+                      />
+                    ) : (
+                      <span className="phlib-missing">No image</span>
+                    )}
+                  </span>
+                  <span className="phlib-picker-meta">
+                    <span className="phlib-picker-caption" title={p.caption}>
+                      {p.caption || p.id}
+                    </span>
+                  </span>
+                </button>
+              ) : (
+                <DraggablePhotoCard
+                  key={p.id}
+                  photo={p}
+                  isLinked={linked.includes(p.id)}
+                  isFeatured={featured.includes(p.id)}
+                  onToggleLink={() => toggleLink(p.id)}
+                  onToggleFeatured={() => toggleFeatured(p.id)}
+                  featuredFull={featured.length >= maxFeatured}
+                />
+              )
+            )}
+            {!filtered.length && (
+              <EmptyState
+                className="crm-empty-state--flush crm-empty-state--inline"
+                size="compact"
+                variant="photos"
+                title="No photos in this folder"
+                description="Try another folder or clear the search."
+              />
+            )}
+          </div>
+        </>
       )}
     </>
   );
@@ -456,22 +474,24 @@ export default function PhotoLibraryPicker({
     <div className="phlib-picker-single">{folderBar}</div>
   ) : (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="phlib-picker-slots">
-        <SlotDrop
-          id="featured-0"
-          label="Featured 1"
-          photo={featuredSlots[0]}
-          onClear={() => clearFeaturedAt(0)}
-        />
-        <SlotDrop
-          id="featured-1"
-          label="Featured 2"
-          photo={featuredSlots[1]}
-          onClear={() => clearFeaturedAt(1)}
-        />
+      <div className="phlib-picker-body">
+        <div className="phlib-picker-slots">
+          <SlotDrop
+            id="featured-0"
+            label="Featured 1"
+            photo={featuredSlots[0]}
+            onClear={() => clearFeaturedAt(0)}
+          />
+          <SlotDrop
+            id="featured-1"
+            label="Featured 2"
+            photo={featuredSlots[1]}
+            onClear={() => clearFeaturedAt(1)}
+          />
+        </div>
+        <LinkedDrop photos={linkedPhotos} onUnlink={unlink} />
+        {folderBar}
       </div>
-      <LinkedDrop photos={linkedPhotos} onUnlink={unlink} />
-      {folderBar}
       <DragOverlay>
         {activeThumb ? (
           <div className="phlib-drag-overlay">
@@ -499,7 +519,9 @@ export default function PhotoLibraryPicker({
             <div className="phlib-modal-title">{title}</div>
             <div className="phlib-modal-sub">
               {isSingle
-                ? 'Browse folders and click a photo'
+                ? atRoot
+                  ? 'Open a folder, then click a photo'
+                  : 'Click a photo to select'
                 : `${linked.length} linked · ${featured.length}/${maxFeatured} featured · drag onto slots`}
             </div>
           </div>

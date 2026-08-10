@@ -19,6 +19,7 @@ Every meaningful code/docs folder has an `AGENTS.md` describing **what that fold
 | [`components/`](components/AGENTS.md) | React UI — page shells, domain widgets, chrome |
 | [`lib/`](lib/AGENTS.md) | Domain logic, store helpers, Supabase sync, seeds |
 | [`hooks/`](hooks/AGENTS.md) | Shared React hooks |
+| [`env/`](env/AGENTS.md) | Committed company Supabase defaults + startup sanitize |
 | [`docs/`](docs/AGENTS.md) | Tracked product docs (schema, setup) |
 | [`scripts/`](scripts/AGENTS.md) | Ops shell helpers (weather cron, PDF deps) |
 | [`supabase/`](supabase/AGENTS.md) | PostgreSQL schema, seeds, migrations |

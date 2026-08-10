@@ -3,6 +3,7 @@ import {
   defaultBookingFields,
   defaultLegalText,
   defaultOverviewRows,
+  isTemplateEditPath,
 } from './proposal-content-overrides';
 import { proposalRichHtml } from './proposal-rich-text';
 import type { ProposalDoc } from './proposal-types';
@@ -28,7 +29,7 @@ const ROW_GREEN = '#ECF6F0';
 const ROW_GREEN_ALT = '#D5E9D9';
 const ROW_BLUE = '#E7ECF5';
 
-/** When true, narrative/table value cells are wrapped for in-document editing. */
+/** When true, template commercial fields are wrapped for in-document editing. */
 let EDITABLE = false;
 
 function esc(s: string): string {
@@ -39,9 +40,9 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** Wrap content for in-doc editing; no-op when building export HTML. */
+/** Wrap template fields for in-doc editing; tour narrative stays plain even in edit mode. */
 function editField(path: string, inner: string, opts?: { rich?: boolean; tag?: 'span' | 'div' }): string {
-  if (!EDITABLE) return inner;
+  if (!EDITABLE || !isTemplateEditPath(path)) return inner;
   const rich = opts?.rich;
   const tag = opts?.tag ?? (rich ? 'div' : 'span');
   const mode = rich ? 'data-rich="1"' : 'data-plain="1"';
@@ -243,22 +244,7 @@ function buildDayMeta(d: import('./proposal-types').ProposalDayDetail): string {
       <div style="font-size:11px;color:#1a2e23"><b style="color:${BRAND_DARK}">Meals:</b> ${editField(`days.${dn}.meals`, esc(d.meals))}</div>`;
 }
 
-function buildSegmentPhotoInline(urls: string[]): string {
-  if (!urls.length) return '';
-  const images = urls
-    .map(
-      (url) =>
-        `<img src="${esc(url)}" alt="" style="width:100%;height:140px;object-fit:cover;border-radius:4px;display:block" />`
-    )
-    .join('');
-  return `<div style="display:grid;grid-template-columns:repeat(${urls.length},1fr);gap:8px;margin:10px 0 4px">${images}</div>`;
-}
-
-function buildDayPhotoInline(d: import('./proposal-types').ProposalDayDetail): string {
-  return buildSegmentPhotoInline((d.imageUrls || []).slice(0, 2));
-}
-
-function buildDayContentBody(d: import('./proposal-types').ProposalDayDetail, layout: 'sidebar' | 'inline'): string {
+function buildDayContentBody(d: import('./proposal-types').ProposalDayDetail): string {
   const dn = d.dayNumber;
   if (d.segments?.length) {
     return d.segments
@@ -266,37 +252,24 @@ function buildDayContentBody(d: import('./proposal-types').ProposalDayDetail, la
         const title = `<div style="font-weight:600;font-size:12px;margin-bottom:6px;color:${BRAND_DARK}">${editField(`days.${dn}.segments.${i}.title`, esc(seg.title))}</div>`;
         const body = `<div style="font-size:11.5px;line-height:1.65;color:#1a2e23">${editField(`days.${dn}.segments.${i}.body`, proposalRichHtml(seg.body), { rich: true })}</div>`;
         const gap = i > 0 ? 'margin-top:14px;' : '';
-        const photos =
-          layout === 'inline' ? buildSegmentPhotoInline((seg.imageUrls || []).slice(0, 2)) : '';
-        return `<div style="${gap}">${title}${body}${photos}</div>`;
+        return `<div style="${gap}">${title}${body}</div>`;
       })
       .join('');
   }
 
   const title = `<div style="font-weight:600;font-size:12px;margin-bottom:8px;color:${BRAND_DARK}">${editField(`days.${dn}.title`, esc(d.title))}</div>`;
   const body = `<div style="font-size:11.5px;line-height:1.65;color:#1a2e23">${editField(`days.${dn}.body`, proposalRichHtml(d.body), { rich: true })}</div>`;
-  const photos = layout === 'inline' ? buildDayPhotoInline(d) : '';
-  return `${title}${body}${photos}`;
+  return `${title}${body}`;
 }
 
 function buildDetailedProgram(doc: ProposalDoc): string {
   if (!doc.days.length) return '';
-  const layout = doc.detailedProgramLayout === 'inline' ? 'inline' : 'sidebar';
 
   const blocks = doc.days
     .map((d) => {
       const header = `<div style="font-weight:700;font-size:13px;color:${BRAND_DARK};margin-bottom:6px">DAY ${d.dayNumber} | ${esc(d.dateLabel)} | ${esc(d.destination)}</div>`;
-      const content = buildDayContentBody(d, layout);
+      const content = buildDayContentBody(d);
       const meta = buildDayMeta(d);
-
-      if (layout === 'inline') {
-        return `
-    <div class="proposal-day proposal-day--inline" style="margin-bottom:14px;border:1px solid ${BORDER};border-radius:4px;padding:14px 14px 12px;background:#fff">
-      ${header}
-      ${content}
-      ${meta}
-    </div>`;
-      }
 
       if (d.segments?.length) {
         const segmentRows = d.segments.map((seg, si) => buildSegmentSidebarRow(seg, d.dayNumber, si)).join('');
@@ -572,8 +545,7 @@ function buildProposalDocumentHTML(doc: ProposalDoc, origin: string, editableMod
   table { border-collapse: collapse; }
   .proposal-day--segments { break-inside: auto; page-break-inside: auto; }
   .proposal-segment-row,
-  .proposal-day-single-row,
-  .proposal-day--inline { break-inside: avoid; page-break-inside: avoid; }
+  .proposal-day-single-row { break-inside: avoid; page-break-inside: avoid; }
   .proposal-day-meta { break-before: avoid; page-break-before: avoid; }
   .proposal-day-header-row { break-after: avoid; page-break-after: avoid; }
   ${editorStyles}

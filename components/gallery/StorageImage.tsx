@@ -15,6 +15,8 @@ type Props = {
   style?: CSSProperties;
   loading?: 'lazy' | 'eager';
   sizes?: string;
+  /** Bypass Next.js image optimizer (e.g. company branding — avoids stale /_next/image cache). */
+  unoptimized?: boolean;
 };
 
 /**
@@ -32,6 +34,7 @@ export default function StorageImage({
   style,
   loading = 'lazy',
   sizes,
+  unoptimized = false,
 }: Props) {
   const [shownSrc, setShownSrc] = useState(src);
 
@@ -65,7 +68,7 @@ export default function StorageImage({
   // No src → hide (do not clear shownSrc in an effect; that trips set-state-in-effect).
   if (!src || !shownSrc) return null;
 
-  const useNext = isNextImageOptimizable(shownSrc);
+  const useNext = !unoptimized && isNextImageOptimizable(shownSrc);
 
   const fillClass = className?.includes('gallery-img-contain')
     ? className

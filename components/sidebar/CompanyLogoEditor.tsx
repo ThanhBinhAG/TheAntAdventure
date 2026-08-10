@@ -8,6 +8,10 @@ import { blobUrlFromRemote, getCroppedImageBlob } from '@/lib/gallery/crop-image
 import { photoDisplayUrl } from '@/lib/gallery/gallery-helpers';
 import { useStore } from '@/hooks/useStore';
 import CompanyLogoGalleryPicker from '@/components/sidebar/CompanyLogoGalleryPicker';
+import {
+  clearCompanyLogoClient,
+  saveCompanyLogoClient,
+} from '@/lib/storage/company-logo-client';
 import { toast } from '@/lib/toast';
 
 type Step = 'pick' | 'crop';
@@ -74,15 +78,9 @@ export default function CompanyLogoEditor({ open, onClose, onSaved }: Props) {
     try {
       const blob = await getCroppedImageBlob(cropSrc, croppedAreaPixels, 512);
       const file = new File([blob], 'logo.webp', { type: 'image/webp' });
-      const form = new FormData();
-      form.append('file', file);
-      const res = await fetch('/api/branding/logo', { method: 'POST', body: form });
-      const body = (await res.json()) as { ok?: boolean; logoUrl?: string; error?: string };
-      if (!res.ok || !body.ok) {
-        throw new Error(body.error || 'Save failed');
-      }
+      const logoUrl = await saveCompanyLogoClient(file);
       toast.success('Company logo updated');
-      onSaved(body.logoUrl ?? null);
+      onSaved(logoUrl);
       handleClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Save failed');
@@ -93,11 +91,7 @@ export default function CompanyLogoEditor({ open, onClose, onSaved }: Props) {
   const handleResetDefault = async () => {
     setBusy(true);
     try {
-      const res = await fetch('/api/branding/logo', { method: 'DELETE' });
-      const body = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !body.ok) {
-        throw new Error(body.error || 'Reset failed');
-      }
+      await clearCompanyLogoClient();
       toast.success('Restored default logo');
       onSaved(null);
       handleClose();

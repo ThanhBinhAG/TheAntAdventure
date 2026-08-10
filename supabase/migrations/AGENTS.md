@@ -12,6 +12,8 @@ CLI migrations (`db:push`). Incremental SQL dated; do not paste bootstrap copies
 - `20260731125854_…operations_write.sql` — no-op (giữ version history)
 - `20260731130326_…operations_write.sql` — `employee` + `operations.write`
 - `20260802160347_add_photo_folders.sql` — `photo_folders` + `photos.folder_id` (Unsorted)
+- `20260805060000_add_photo_gallery_assets.sql` — `photo_gallery_assets`; bảng này đã bị migration sau drop, giữ file để không phá history
+- `20260805133000_drop_photo_gallery_assets.sql` — drop `photo_gallery_assets` (gộp về một pipeline ảnh trên bảng `photos`)
 
 ## Boundaries
 - Role helpers / gán user: `supabase/snippets/`.

@@ -5,6 +5,7 @@ Tour Design wizard UI (brief → experiences → outline → pricing → proposa
 
 ## Contents
 - Step components: ClientBrief, TourExperiences, Outline*, Pricing, Proposal*
+- `ProposalEditorModal` — template-only commercial/legal edit (not tour narrative)
 - Panels: PackagePreview, SelectedExperiences, PhotoStack, GuestProfile
 
 ## Boundaries

@@ -1,7 +1,9 @@
+import { getSupabaseUrl } from '@/lib/env';
+
 /** Hosts allowed for next/image — keep in sync with next.config.js remotePatterns */
 
 function supabaseUrlHost(): URL | null {
-  const raw = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim();
+  const raw = getSupabaseUrl();
   if (!raw) return null;
   try {
     return new URL(raw);

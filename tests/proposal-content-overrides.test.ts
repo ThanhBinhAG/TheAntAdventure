@@ -4,6 +4,9 @@ import {
   applyProposalContentOverrides,
   defaultOverviewRows,
   hasProposalContentOverrides,
+  hasProposalTemplateOverrides,
+  snapshotTemplateFromDoc,
+  toProposalTemplateOverrides,
 } from '../lib/proposals/proposal-content-overrides';
 import { buildProposalHTML } from '../lib/proposals/proposal-html';
 import { assembleProposalDoc } from '../lib/proposals/proposal-assembler';
@@ -36,7 +39,7 @@ function baseDoc() {
 }
 
 describe('proposal-content-overrides', () => {
-  it('merges tourTitle and day body by dayNumber', () => {
+  it('merges tourTitle and day body by dayNumber (legacy apply path)', () => {
     const doc = baseDoc();
     const dayNumber = doc.days[0]?.dayNumber ?? 1;
     const merged = applyProposalContentOverrides(doc, {
@@ -72,6 +75,38 @@ describe('proposal-content-overrides', () => {
   it('hasProposalContentOverrides detects non-empty overrides', () => {
     assert.equal(hasProposalContentOverrides({}), false);
     assert.equal(hasProposalContentOverrides({ tourTitle: 'X' }), true);
+  });
+
+  it('toProposalTemplateOverrides strips tour-specific keys', () => {
+    const trimmed = toProposalTemplateOverrides({
+      tourTitle: 'X',
+      tagline: 'Y',
+      days: [{ dayNumber: 1, body: 'nope' }],
+      inclusions: ['A'],
+      pricingText: { packageLabel: 'Pkg', footnote: 'Note' },
+      bookingFields: { 'Quote Ref.': 'TAD', 'Payment Terms': 'Custom' },
+    });
+    assert.equal(trimmed.tagline, 'Y');
+    assert.deepEqual(trimmed.inclusions, ['A']);
+    assert.equal(trimmed.pricingText?.footnote, 'Note');
+    assert.equal(trimmed.pricingText && 'packageLabel' in trimmed.pricingText, false);
+    assert.equal(trimmed.bookingFields?.['Payment Terms'], 'Custom');
+    assert.equal(trimmed.bookingFields?.['Quote Ref.'], undefined);
+    assert.equal((trimmed as { tourTitle?: string }).tourTitle, undefined);
+  });
+
+  it('snapshotTemplateFromDoc only includes template fields', () => {
+    const snap = snapshotTemplateFromDoc(baseDoc());
+    assert.ok(snap.tagline);
+    assert.ok(snap.inclusions?.length);
+    assert.ok(snap.legalText?.paymentTerms);
+    assert.equal((snap as { tourTitle?: string }).tourTitle, undefined);
+    assert.equal((snap as { days?: unknown }).days, undefined);
+  });
+
+  it('hasProposalTemplateOverrides ignores tour-only patches', () => {
+    assert.equal(hasProposalTemplateOverrides({ tourTitle: 'X' }), false);
+    assert.equal(hasProposalTemplateOverrides({ tagline: 'Y' }), true);
   });
 
   it('preserves layout classes when overrides applied', () => {

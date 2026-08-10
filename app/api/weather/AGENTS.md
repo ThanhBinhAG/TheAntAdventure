@@ -1,11 +1,18 @@
 # app/api/weather/ — Agent overview
 
 ## Role
-Weather weekly cache read and refresh endpoints (Open-Meteo).
+Weather destination catalog CRUD and lazy per-destination Open-Meteo forecasts.
 
 ## Contents
-- `weekly/route.ts` — cache-first GET (no Open-Meteo block when rows exist)
-- `refresh/route.ts` — manual / cron POST refresh
+- `boot/route.ts` — GET page boot (`destinations` + `featuredWeather`)
+- `destinations/route.ts` — GET list / POST create
+- `destinations/[id]/route.ts` — PATCH update / DELETE soft-deactivate
+- `destinations/featured/route.ts` — PUT set max-2 featured ids
+- `destination/route.ts` — GET cache-first single destination (current + 7-day)
+- `destination/refresh/route.ts` — POST force refresh one destination
+- `refresh/route.ts` — POST warm featured destinations (cron)
+- `weekly/route.ts` — deprecated (410)
 
 ## Boundaries
-- Fetch/cache/rating logic: `lib/weather`.
+- Fetch/cache/rating/CRUD logic: `lib/weather`.
+- Page paint uses `boot/`; explore/detail still `destination/?id=`.

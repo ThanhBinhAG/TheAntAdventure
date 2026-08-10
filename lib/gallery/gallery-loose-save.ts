@@ -25,7 +25,7 @@ export type SaveLoosePhotosBatchResult = {
   records: GalleryPhoto[];
 };
 
-/** Upload multiple library photos via Sharp API; optionally link to an attraction. */
+/** Upload multiple library photos via chunked API (server Sharp); optionally link to an attraction. */
 export async function saveNewLoosePhotosBatch(
   items: LoosePhotoBatchItem[],
   data: { region: string; tags: string[]; folderId?: string },

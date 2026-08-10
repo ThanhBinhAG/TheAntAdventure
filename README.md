@@ -14,11 +14,11 @@ Open [http://localhost:3006](http://localhost:3006) → redirects to `/dashboard
 
 ## Docker (production package)
 
-Requires Docker + Compose. Uses Next.js `output: 'standalone'` ([`Dockerfile`](Dockerfile)).
+Requires Docker + Compose. Uses Next.js `output: 'standalone'` ([`Dockerfile`](Dockerfile)). GitLab CI on `main` runs [`scripts/docker-with-env.sh`](scripts/docker-with-env.sh) (`print` → `build` → `deploy`) on runner tag `vm06-deploy-ant-admin`.
 
-Env file (auto):
+Env file (auto via `docker-with-env.sh`):
 1. `ENV_FILE` if set
-2. `/mnt/fdata/sharing/.env.local` (or `env.local`) on the deploy VM
+2. `$MNT_FDATA/sharing/.env.local` (or `env.local`) — CI sets `MNT_FDATA=/mnt/fdata/the_ant_adventures_crm`
 3. `./.env.local` for local WSL/dev
 
 ```bash
@@ -27,7 +27,14 @@ npm run docker:down
 # override: ENV_FILE=/path/to/.env.local npm run docker:up
 ```
 
-`NEXT_PUBLIC_*` are baked in at **image build** time. Server secrets come from the same env file at **runtime**.
+`NEXT_PUBLIC_*` are baked in at **image build** time. Server secrets come from the same env file at **runtime**. App data URL must be company self-host (`https://sb.mitelai.com:9001`) — never `127.0.0.1` on the VM.
+
+### Checklist when Docker CI / deploy rights are ready
+
+1. Confirm `$MNT_FDATA/sharing/.env.local` has company Supabase URL + keys (not localhost).
+2. Push `main` → GitLab job `docker` builds and deploys; or run `npm run docker:up` on the VM.
+3. Stop any leftover `npm run dev` on the host so it does not fight port **3006**.
+4. Run `npm run docker:status` (or the CI `status` step) and open the demo URL / login.
 
 ## Environment variables
 
@@ -37,8 +44,9 @@ Edit **`.env.local`** (gitignored). Template: [`.env.example`](.env.example)
 |----------|----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | When using Supabase | Project URL (Settings → API) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | When using Supabase | Anon/public key |
-| `NEXT_PUBLIC_USE_SUPABASE` | No | `false` = local only, `true` = Supabase |
+| `NEXT_PUBLIC_USE_SUPABASE` | No | `true` = use Supabase (company self-host) |
 | `NEXT_PUBLIC_SUPABASE_AUTO_SYNC` | No | `true` = auto-push edits to Supabase |
+| `NEXT_PUBLIC_SUPABASE_READ_ONLY` | No | `true` = hydrate only (safe on shared DB) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional | Server/scripts only — never expose in client |
 
 After changing `.env.local`, restart: `npm run dev`.

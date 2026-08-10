@@ -13,12 +13,16 @@ import {
 } from '@dnd-kit/core';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/hooks/useStore';
-import { pushTablesToSupabase } from '@/lib/db/hydrate';
+import {
+  ensureTablesLoaded,
+  persistRouteCacheFromStore,
+  pushTablesToSupabase,
+} from '@/lib/db/hydrate';
+import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import { PHOTO_LIBRARY_REGIONS } from '@/lib/gallery/gallery-tags';
 import {
   formatBytes,
-  nextPhotoId,
   photoDisplayUrl,
   photoSizeLabel,
   photoThumbUrl,
@@ -63,6 +67,41 @@ const REGION_COLORS: Record<string, string> = {
   people: '#6B21A8',
   services: '#555',
 };
+
+/** One Sharp/upload at a time to avoid RAM spikes on heavy originals. */
+const GALLERY_UPLOAD_CONCURRENCY = 1;
+const GALLERY_DELETE_CONCURRENCY = 3;
+
+function syncGalleryRouteCache() {
+  persistRouteCacheFromStore('gallery');
+}
+
+async function mapWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<void>
+): Promise<void> {
+  let cursor = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      await worker(items[index]!, index);
+    }
+  });
+  await Promise.all(workers);
+}
+
+function allocatePhotoIds(existing: GalleryPhoto[], count: number): string[] {
+  let max = existing.reduce((n, p) => {
+    const num = parseInt(p.id.replace(/^PH-/, ''), 10);
+    return Number.isFinite(num) ? Math.max(n, num) : n;
+  }, 0);
+  return Array.from({ length: count }, () => {
+    max += 1;
+    return `PH-${String(max).padStart(3, '0')}`;
+  });
+}
 
 function DraggablePhotoCard({
   photo,
@@ -149,6 +188,7 @@ export default function Gallery() {
   const [editing, setEditing] = useState<GalleryPhotoRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [lightbox, setLightbox] = useState<GalleryPhoto | null>(null);
   const [dismissedPhotoFilter, setDismissedPhotoFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -166,6 +206,12 @@ export default function Gallery() {
       useStore.setState({ photoFolders: folders });
     }
   }, [rawFolders.length, folders]);
+
+  /** Attractions are not in gallery boot — load only when filtering by attraction. */
+  useEffect(() => {
+    if (!attractionFilter) return;
+    void ensureTablesLoaded(['attractions']);
+  }, [attractionFilter]);
 
   const filteredPhotoLightbox =
     photoFilter && dismissedPhotoFilter !== photoFilter
@@ -249,10 +295,17 @@ export default function Gallery() {
     setError(null);
   }
 
-  async function persistFolders(next: PhotoFolder[]) {
+  async function persistFolders(next: PhotoFolder[], previous: PhotoFolder[]) {
     useStore.setState({ photoFolders: next });
-    const result = await pushTablesToSupabase(['photo_folders'], false);
-    if (!result.ok) throw new Error(result.error ?? 'Failed to save folders');
+    syncGalleryRouteCache();
+    void withoutAutoSyncAsync(async () => {
+      const result = await pushTablesToSupabase(['photo_folders'], false);
+      if (!result.ok) {
+        useStore.setState({ photoFolders: previous });
+        syncGalleryRouteCache();
+        toast.error(result.error ?? 'Failed to save folders');
+      }
+    });
   }
 
   async function handleNewFolder() {
@@ -261,23 +314,21 @@ export default function Gallery() {
 
   async function submitFolderName(name: string) {
     if (!folderNameModal) return;
-    setSaving(true);
     setError(null);
+    const previous = folders;
     try {
       if (folderNameModal.mode === 'create') {
         const { folders: next } = createFolder(folders, name, currentFolderId);
-        await persistFolders(next);
+        await persistFolders(next, previous);
         toast.success('Folder created.');
       } else {
-        await persistFolders(renameFolder(folders, folderNameModal.folder.id, name));
+        await persistFolders(renameFolder(folders, folderNameModal.folder.id, name), previous);
         toast.success('Folder renamed.');
       }
       setFolderNameModal(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save folder');
       toast.error(e instanceof Error ? e.message : 'Could not save folder');
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -293,15 +344,13 @@ export default function Gallery() {
     }
     const ok = await confirmDialog(`Delete folder “${folder.name}”?`, { title: 'Delete folder' });
     if (!ok) return;
-    setSaving(true);
+    const previous = folders;
     try {
-      await persistFolders(folders.filter((f) => f.id !== folder.id));
+      await persistFolders(folders.filter((f) => f.id !== folder.id), previous);
       if (currentFolderId === folder.id) goRoot();
       toast.success('Folder deleted.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not delete folder');
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -313,6 +362,7 @@ export default function Gallery() {
     setModalMode('add');
     setEditing(null);
     setSaveStatus('');
+    setUploadProgress(null);
     setError(null);
     setModalOpen(true);
   }
@@ -321,6 +371,7 @@ export default function Gallery() {
     setModalMode('edit');
     setEditing(p);
     setSaveStatus('');
+    setUploadProgress(null);
     setError(null);
     setModalOpen(true);
   }
@@ -328,32 +379,72 @@ export default function Gallery() {
   async function handleSave(data: GalleryPhotoSavePayload, id?: string) {
     setSaving(true);
     setError(null);
+    setUploadProgress(null);
     try {
       if (modalMode === 'add') {
         const files = data.files?.length ? data.files : data.file ? [data.file] : [];
         if (!files.length) throw new Error('Add at least one image.');
         const folderId = currentFolderId || UNSORTED_FOLDER_ID;
-        let current = useStore.getState().photos as GalleryPhoto[];
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i]!;
-          setSaveStatus(`Uploading ${i + 1} of ${files.length}…`);
-          const photoId = nextPhotoId(current);
+        const current = useStore.getState().photos as GalleryPhoto[];
+        const photoIds = allocatePhotoIds(current, files.length);
+        const completed: GalleryPhoto[] = [];
+        const failures: string[] = [];
+        let finished = 0;
+
+        await mapWithConcurrency(files, GALLERY_UPLOAD_CONCURRENCY, async (file, i) => {
           const caption =
             files.length === 1
               ? data.caption || file.name.replace(/\.[^.]+$/, '')
               : i === 0 && data.caption
                 ? data.caption
                 : file.name.replace(/\.[^.]+$/, '');
-          const record = await uploadPhotoViaApi(file, {
-            photoId,
-            caption,
-            region: data.region,
-            tags: data.tags,
-            folderId,
+          try {
+            const record = await uploadPhotoViaApi(file, {
+              photoId: photoIds[i]!,
+              caption,
+              region: data.region,
+              tags: data.tags,
+              folderId,
+              onStatus: (status) => {
+                setSaveStatus(
+                  files.length > 1
+                    ? `${status} (${finished + 1}/${files.length})…`
+                    : status
+                );
+              },
+              onProgress: ({ ratio }) => {
+                setUploadProgress(Math.round(ratio * 100));
+              },
+            });
+            completed.push(record);
+          } catch (err) {
+            const msg =
+              err instanceof Error && err.message.trim()
+                ? err.message
+                : typeof err === 'string' && err.trim()
+                  ? err
+                  : 'Upload failed';
+            failures.push(`${file.name}: ${msg}`);
+          } finally {
+            finished += 1;
+            setUploadProgress(null);
+            setSaveStatus(`Uploaded ${finished} of ${files.length}…`);
+          }
+        });
+
+        if (completed.length) {
+          await withoutAutoSyncAsync(async () => {
+            useStore.setState({ photos: [...current, ...completed] });
           });
-          current = [...current, record];
-          useStore.setState({ photos: current });
+          toast.success(`Uploaded ${completed.length}/${files.length} image(s).`);
         }
+        if (failures.length) {
+          toast.error(`Failed ${failures.length} file(s). First error: ${failures[0]}`);
+        }
+        if (!completed.length) {
+          throw new Error(failures[0] ?? 'Upload failed');
+        }
+        syncGalleryRouteCache();
       } else if (id && editing) {
         let record: GalleryPhoto = {
           ...editing,
@@ -369,30 +460,65 @@ export default function Gallery() {
             region: data.region,
             tags: data.tags,
             folderId: editing.folderId || currentFolderId || UNSORTED_FOLDER_ID,
+            onStatus: setSaveStatus,
+            onProgress: ({ ratio }) => {
+              setUploadProgress(Math.round(ratio * 100));
+            },
+          });
+          await withoutAutoSyncAsync(async () => {
+            const next = (useStore.getState().photos as GalleryPhoto[]).map((p) =>
+              p.id === id ? record : p
+            );
+            useStore.setState({ photos: next });
           });
         } else {
           setSaveStatus('Saving metadata…');
-          const next = (useStore.getState().photos as GalleryPhoto[]).map((p) =>
-            p.id === id ? record : p
-          );
-          useStore.setState({ photos: next });
-          const result = await pushTablesToSupabase(['photos'], false);
-          if (!result.ok) throw new Error(result.error ?? 'Failed to save metadata');
+          await withoutAutoSyncAsync(async () => {
+            const next = (useStore.getState().photos as GalleryPhoto[]).map((p) =>
+              p.id === id ? record : p
+            );
+            useStore.setState({ photos: next });
+            const result = await pushTablesToSupabase(['photos'], false);
+            if (!result.ok) throw new Error(result.error ?? 'Failed to save metadata');
+          });
         }
-        if (data.replaceImage && data.file) {
-          const next = (useStore.getState().photos as GalleryPhoto[]).map((p) =>
-            p.id === id ? record : p
-          );
-          useStore.setState({ photos: next });
-        }
+        syncGalleryRouteCache();
       }
       setModalOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
       setSaveStatus('');
+      setUploadProgress(null);
     } finally {
       setSaving(false);
+      setUploadProgress(null);
     }
+  }
+
+  function photoLinkedInCatalogue(photoId: string): boolean {
+    const state = useStore.getState();
+    const inAttractions = state.attractions.some(
+      (a) => (a.photoIds ?? []).includes(photoId) || (a.linkedPhotoIds ?? []).includes(photoId)
+    );
+    const inProducts = state.products.some(
+      (p) => (p.photoIds ?? []).includes(photoId) || (p.linkedPhotoIds ?? []).includes(photoId)
+    );
+    return inAttractions || inProducts;
+  }
+
+  function photosLinkedInCatalogue(photoIds: Set<string>): boolean {
+    const state = useStore.getState();
+    const inAttractions = state.attractions.some(
+      (a) =>
+        (a.photoIds ?? []).some((id) => photoIds.has(id)) ||
+        (a.linkedPhotoIds ?? []).some((id) => photoIds.has(id))
+    );
+    const inProducts = state.products.some(
+      (p) =>
+        (p.photoIds ?? []).some((id) => photoIds.has(id)) ||
+        (p.linkedPhotoIds ?? []).some((id) => photoIds.has(id))
+    );
+    return inAttractions || inProducts;
   }
 
   async function handleDelete(id: string) {
@@ -402,21 +528,27 @@ export default function Gallery() {
     setError(null);
     try {
       setSaveStatus('Deleting…');
+      await ensureTablesLoaded(['attractions', 'products']);
+      const needsCataloguePush = photoLinkedInCatalogue(id);
       await deletePhotoViaApi(id, photo.storagePath);
-      useStore.setState({
-        photos: (useStore.getState().photos as GalleryPhoto[]).filter((p) => p.id !== id),
-        attractions: useStore.getState().attractions.map((a) => ({
-          ...a,
-          photoIds: (a.photoIds ?? []).filter((x) => x !== id),
-          linkedPhotoIds: (a.linkedPhotoIds ?? []).filter((x) => x !== id),
-        })),
-        products: useStore.getState().products.map((p) => ({
-          ...p,
-          photoIds: (p.photoIds ?? []).filter((x) => x !== id),
-          linkedPhotoIds: (p.linkedPhotoIds ?? []).filter((x) => x !== id),
-        })),
+      await withoutAutoSyncAsync(async () => {
+        useStore.setState({
+          photos: (useStore.getState().photos as GalleryPhoto[]).filter((p) => p.id !== id),
+          attractions: useStore.getState().attractions.map((a) => ({
+            ...a,
+            photoIds: (a.photoIds ?? []).filter((x) => x !== id),
+            linkedPhotoIds: (a.linkedPhotoIds ?? []).filter((x) => x !== id),
+          })),
+          products: useStore.getState().products.map((p) => ({
+            ...p,
+            photoIds: (p.photoIds ?? []).filter((x) => x !== id),
+            linkedPhotoIds: (p.linkedPhotoIds ?? []).filter((x) => x !== id),
+          })),
+        });
+        if (needsCataloguePush) {
+          await pushTablesToSupabase(['attractions', 'products'], false);
+        }
       });
-      await pushTablesToSupabase(['attractions', 'products'], false);
       setModalOpen(false);
       setDismissedPhotoFilter(photoFilter);
       setLightbox(null);
@@ -425,6 +557,7 @@ export default function Gallery() {
         next.delete(id);
         return next;
       });
+      syncGalleryRouteCache();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
@@ -442,28 +575,38 @@ export default function Gallery() {
     setSaving(true);
     setError(null);
     try {
-      for (const id of selected) {
-        const photo = photos.find((p) => p.id === id);
-        if (!photo) continue;
-        await deletePhotoViaApi(id, photo.storagePath);
-      }
-      const remove = selected;
-      useStore.setState({
-        photos: (useStore.getState().photos as GalleryPhoto[]).filter((p) => !remove.has(p.id)),
-        attractions: useStore.getState().attractions.map((a) => ({
-          ...a,
-          photoIds: (a.photoIds ?? []).filter((x) => !remove.has(x)),
-          linkedPhotoIds: (a.linkedPhotoIds ?? []).filter((x) => !remove.has(x)),
-        })),
-        products: useStore.getState().products.map((p) => ({
-          ...p,
-          photoIds: (p.photoIds ?? []).filter((x) => !remove.has(x)),
-          linkedPhotoIds: (p.linkedPhotoIds ?? []).filter((x) => !remove.has(x)),
-        })),
+      const remove = new Set(selected);
+      await ensureTablesLoaded(['attractions', 'products']);
+      const needsCataloguePush = photosLinkedInCatalogue(remove);
+      const toDelete = [...remove]
+        .map((id) => photos.find((p) => p.id === id))
+        .filter((p): p is GalleryPhoto => Boolean(p));
+
+      await mapWithConcurrency(toDelete, GALLERY_DELETE_CONCURRENCY, async (photo) => {
+        await deletePhotoViaApi(photo.id, photo.storagePath);
       });
-      await pushTablesToSupabase(['attractions', 'products'], false);
+
+      await withoutAutoSyncAsync(async () => {
+        useStore.setState({
+          photos: (useStore.getState().photos as GalleryPhoto[]).filter((p) => !remove.has(p.id)),
+          attractions: useStore.getState().attractions.map((a) => ({
+            ...a,
+            photoIds: (a.photoIds ?? []).filter((x) => !remove.has(x)),
+            linkedPhotoIds: (a.linkedPhotoIds ?? []).filter((x) => !remove.has(x)),
+          })),
+          products: useStore.getState().products.map((p) => ({
+            ...p,
+            photoIds: (p.photoIds ?? []).filter((x) => !remove.has(x)),
+            linkedPhotoIds: (p.linkedPhotoIds ?? []).filter((x) => !remove.has(x)),
+          })),
+        });
+        if (needsCataloguePush) {
+          await pushTablesToSupabase(['attractions', 'products'], false);
+        }
+      });
       setSelected(new Set());
       toast.success('Photos deleted.');
+      syncGalleryRouteCache();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Bulk delete failed');
       toast.error(e instanceof Error ? e.message : 'Bulk delete failed');
@@ -478,16 +621,19 @@ export default function Gallery() {
     setError(null);
     try {
       const idSet = new Set(photoIds);
-      useStore.setState({
-        photos: (useStore.getState().photos as GalleryPhoto[]).map((p) =>
-          idSet.has(p.id) ? { ...p, folderId } : p
-        ),
+      await withoutAutoSyncAsync(async () => {
+        useStore.setState({
+          photos: (useStore.getState().photos as GalleryPhoto[]).map((p) =>
+            idSet.has(p.id) ? { ...p, folderId } : p
+          ),
+        });
+        const result = await pushTablesToSupabase(['photos'], false);
+        if (!result.ok) throw new Error(result.error ?? 'Failed to move photos');
       });
-      const result = await pushTablesToSupabase(['photos'], false);
-      if (!result.ok) throw new Error(result.error ?? 'Failed to move photos');
       setSelected(new Set());
       setMoveOpen(false);
       toast.success(`Moved ${photoIds.length} photo(s).`);
+      syncGalleryRouteCache();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Move failed');
       toast.error(e instanceof Error ? e.message : 'Move failed');
@@ -566,7 +712,7 @@ export default function Gallery() {
   const title = atRoot ? 'Photo Library' : currentFolder?.name || 'Folder';
   const subtitle = atRoot
     ? 'Folders for tours & attractions'
-    : 'Upload here, or Move to… / drag onto a folder';
+    : 'Upload here, then Move or Delete selected photos';
   const totalPhotos = photos.length;
   const totalFolders = folders.length;
   const unsortedCount = photoCounts[UNSORTED_FOLDER_ID] ?? 0;
@@ -790,6 +936,7 @@ export default function Gallery() {
         initial={editing}
         saving={saving}
         saveStatus={saveStatus}
+        uploadProgress={uploadProgress}
         onClose={() => !saving && setModalOpen(false)}
         onSave={handleSave}
         onDelete={handleDelete}
@@ -859,6 +1006,20 @@ export default function Gallery() {
                   }}
                 >
                   Edit
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-s"
+                  onClick={async () => {
+                    const ok = await confirmDialog(
+                      `Delete photo “${activeLightbox.caption || activeLightbox.id}”?`,
+                      { title: 'Delete photo' }
+                    );
+                    if (!ok) return;
+                    await handleDelete(activeLightbox.id);
+                  }}
+                >
+                  Delete
                 </button>
                 <button
                   type="button"

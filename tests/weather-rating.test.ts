@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { toTravelRating } from '../lib/weather/rating';
-import { mapPool, parseOpenMeteoResponse } from '../lib/weather/open-meteo';
+import { mapPool, parseDestinationDetailResponse, parseOpenMeteoResponse } from '../lib/weather/open-meteo';
 
 describe('toTravelRating', () => {
   it('returns P for heavy rain', () => {
@@ -83,6 +83,30 @@ describe('parseOpenMeteoResponse', () => {
     const rows = parseOpenMeteoResponse(json, [hanoi, sapa], new Date('2026-07-03T00:00:00Z'));
     assert.equal(rows.length, 4);
     assert.equal(rows.filter((r) => r.destination_id === 'sapa').length, 2);
+  });
+});
+
+describe('parseDestinationDetailResponse', () => {
+  it('parses current + daily with UV', () => {
+    const json = {
+      current: {
+        temperature_2m: 29.4,
+        relative_humidity_2m: 72,
+        apparent_temperature: 33.1,
+        weather_code: 2,
+        wind_speed_10m: 11,
+      },
+      daily: {
+        ...sampleDaily,
+        uv_index_max: [8, 7],
+      },
+    };
+    const parsed = parseDestinationDetailResponse(json, hanoi, new Date('2026-07-03T00:00:00Z'));
+    assert.equal(parsed.current.tempC, 29.4);
+    assert.equal(parsed.current.humidity, 72);
+    assert.equal(parsed.days.length, 2);
+    assert.equal(parsed.days[0].uvIndexMax, 8);
+    assert.equal(parsed.rows.length, 2);
   });
 });
 

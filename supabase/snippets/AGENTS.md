@@ -7,6 +7,7 @@ SQL tay cho SQL Editor: gán / kiểm tra role RBAC. Không thay `migrations/` h
 - `add_employee.sql` — gán role `employee` (đổi email)
 - `add_sales_product_user.sql` — tạo/gán role `sales_product` (Sales & Product only)
 - `check_user_roles.sql` — liệt kê user / role / permission
+- `weather-destinations-redesign.sql` — weather cover columns + `weather_current_cache` (SQL Editor)
 
 ## Canonical bootstrap (không copy vào đây)
 Dùng file gốc ở `supabase/`:

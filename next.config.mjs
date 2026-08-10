@@ -1,4 +1,8 @@
 import { withSentryConfig } from '@sentry/nextjs';
+import { sanitizeSupabaseEnv } from './env/sanitize-supabase-env.mjs';
+
+// When .env.local still points at Docker Supabase, restore company production URL/keys.
+sanitizeSupabaseEnv();
 
 function buildImageRemotePatterns() {
   const patterns = [

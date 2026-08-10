@@ -14,4 +14,4 @@ Supabase hydrate, push, auto-sync, mappers, and timeouts.
 ## Boundaries
 - Browser client: `lib/supabase`. Do not put UI here.
 - Auto-sync / push must never write unhydrated tables (empty local arrays).
-- Route cache stores only hydrated tables — never persist full CRM in sessionStorage.
+- Route cache stores only `PAGE_BOOT_TABLES[lastSlug]` (minus photos/photo_folders) — never persist full CRM or messages in sessionStorage.

@@ -69,6 +69,8 @@ type Props = {
   onInfo?: (folder: PhotoFolder) => void;
   /** Enable drop targets for moving photos onto folders. */
   acceptPhotoDrop?: boolean;
+  /** Extra class on the grid (e.g. picker / move layouts). */
+  className?: string;
 };
 
 export default function GalleryFolderGrid({
@@ -79,10 +81,11 @@ export default function GalleryFolderGrid({
   onDelete,
   onInfo,
   acceptPhotoDrop = false,
+  className,
 }: Props) {
   if (!folders.length) return null;
   return (
-    <div className="phlib-folder-grid">
+    <div className={className ? `phlib-folder-grid ${className}` : 'phlib-folder-grid'}>
       {folders.map((f) => (
         <FolderTile
           key={f.id}

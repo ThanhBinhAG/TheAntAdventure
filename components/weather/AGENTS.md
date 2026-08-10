@@ -1,21 +1,15 @@
 # components/weather/ — Agent overview
 
 ## Role
-Weather Guide UI for all four tabs: live weekly forecasts, seasonal ratings, region compare, best-time calendar.
+Weather Guide UI: featured destination cards, explore grid, add/edit destinations, lazy weather detail.
 
 ## Contents
-- `WeatherWeeklyGrid.tsx` — This Week: Hanoi/Saigon featured + compact cards; click expands 7-day from cache
-- `WeatherWeeklySkeleton.tsx` — featured + compact skeleton
-- `WeatherSeasonalPanel.tsx` — year heat strips grouped by region (editable)
-- `WeatherRegionPanel.tsx` — North/Central/South compare panels
-- `WeatherBestTimePanel.tsx` — 12-month peak destination calendar
-- `WeatherRatingEditModal.tsx` — E/G/F/P month editor
-- `WeatherLegend.tsx`, `WeatherRegionChips.tsx` — chrome
-- `weatherClientCache.ts` — sessionStorage weekly payload
-- `weatherUiHelpers.ts` — comfort score, day labels, glyphs
+- `week/` — featured cards + skeleton + detail modal
+- `destinations/` — explore tiles + grid skeleton + add/edit modals
+- `hooks/` — `useWeatherPageBoot`, `useDestinationWeather`, `useProvinceList` (alias)
+- `icons/` — WMO SVG glyphs
+- `weatherLabels.ts` — VN labels / day formatting
 
 ## Boundaries
-- Destination catalog SSOT: `WEATHER_DESTINATIONS` in `lib/weather/coordinates` (not a second list in seeds).
-- Seasonal maps: `lib/seeds/weather` (`DEFAULT_WEATHER`, `TEMP_RANGES`, `BEST_BY`).
-- Open-Meteo/cache/rating: `lib/weather`. APIs: `app/api/weather`.
-- Page shell: `components/pages/Weather.tsx`.
+- Catalog + forecast APIs: `app/api/weather`. Domain: `lib/weather`.
+- Page shell: `components/pages/Weather.tsx`. No seasonal/region/best-time tabs.

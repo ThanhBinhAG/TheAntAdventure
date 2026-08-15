@@ -1,4 +1,5 @@
 import { isRemoteDataEnabled, isSupabaseReadOnly } from '../env';
+import { invalidateProductFacetsFromClient } from '../products/product-facets-client';
 import { appLog } from '../system/app-logger';
 import { db } from './supabase';
 
@@ -9,6 +10,7 @@ export async function deleteProductFromRemote(code: string): Promise<void> {
   try {
     await db.product_pricing.deleteRemote(code);
     await db.products.deleteRemote(code);
+    await invalidateProductFacetsFromClient();
   } catch (e) {
     appLog('remote-delete', 'Failed to delete product from Supabase', {
       level: 'warn',
@@ -24,6 +26,7 @@ export async function deleteProductPricingFromRemote(productCode: string): Promi
 
   try {
     await db.product_pricing.deleteRemote(productCode);
+    await invalidateProductFacetsFromClient();
   } catch (e) {
     appLog('remote-delete', 'Failed to delete product_pricing from Supabase', {
       level: 'warn',

@@ -48,14 +48,22 @@ describe('auth env helpers — break-glass', () => {
 });
 
 describe('login rate limit', () => {
-  it('blocks after max failures in window', () => {
+  it('blocks after max failures in window', async () => {
     const key = `test-ip-${Date.now()}-${Math.random()}`;
-    assert.equal(checkLoginRateLimit(key).ok, true);
-    for (let i = 0; i < 10; i++) recordLoginFailure(key);
-    const blocked = checkLoginRateLimit(key);
-    assert.equal(blocked.ok, false);
-    if (!blocked.ok) assert.ok(blocked.retryAfterSec >= 1);
-    clearLoginFailures(key);
-    assert.equal(checkLoginRateLimit(key).ok, true);
+    const originalRedisUrl = process.env.REDIS_URL;
+    delete process.env.REDIS_URL;
+
+    try {
+      assert.equal((await checkLoginRateLimit(key)).ok, true);
+      for (let i = 0; i < 10; i++) await recordLoginFailure(key);
+      const blocked = await checkLoginRateLimit(key);
+      assert.equal(blocked.ok, false);
+      if (!blocked.ok) assert.ok(blocked.retryAfterSec >= 1);
+      await clearLoginFailures(key);
+      assert.equal((await checkLoginRateLimit(key)).ok, true);
+    } finally {
+      if (originalRedisUrl === undefined) delete process.env.REDIS_URL;
+      else process.env.REDIS_URL = originalRedisUrl;
+    }
   });
 });

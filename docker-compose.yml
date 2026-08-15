@@ -34,8 +34,35 @@ services:
       NODE_ENV: production
       PORT: 3006
       HOSTNAME: 0.0.0.0
-    # Caps the app at 2 GB so a runaway request is killed inside the container instead of
-    # letting the kernel pick a victim host-wide. Measured peak for image processing is
-    # ~130 MB (Sharp runs in a short-lived child worker), so this is generous headroom.
+      REDIS_URL: redis://redis:6379
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    # Caps the app at 2 GB ...
     mem_limit: 2g
     restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis-data:

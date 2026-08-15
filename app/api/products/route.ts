@@ -9,6 +9,8 @@ import {
     listProductFacets,
     ProductListError,
 } from '@/lib/products/product-list-server';
+import { invalidateProductFacetsCache } from '@/lib/redis/product-facets';
+
 
 export const dynamic = 'force-dynamic';
 
@@ -89,4 +91,19 @@ export async function GET(request: Request) {
             { status: 500 },
         );
     }
+}
+
+export async function POST() {
+    const permission = await checkPermissionForRequest('products.write');
+
+    if (!permission.allowed) {
+        return NextResponse.json(
+            { ok: false, error: 'Bạn không có quyền sửa product.' },
+            { status: permission.status },
+        );
+    }
+
+    await invalidateProductFacetsCache();
+
+    return NextResponse.json({ ok: true });
 }

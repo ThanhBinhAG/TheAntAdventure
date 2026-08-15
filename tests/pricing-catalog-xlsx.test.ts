@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { parseAccommodationWorkbook, splitPropertyCell } from '../lib/pricing/accommodation-xlsx';
 import { parseEssentialsWorkbook } from '../lib/pricing/essentials-xlsx';
@@ -50,7 +50,12 @@ test('splitPropertyCell() separates name, website and address', () => {
   assert.equal(bare.website, '');
 });
 
-test('Essentials workbook parses every sheet into the catalog', () => {
+test('Essentials workbook parses every sheet into the catalog', (context) => {
+  if (!existsSync(ESSENTIALS_FILE)) {
+    context.skip(`missing local fixture: ${ESSENTIALS_FILE}`);
+    return;
+  }
+
   const result = parseEssentialsWorkbook(readWorkbook(ESSENTIALS_FILE));
 
   assert.equal(result.sheets.length, 14);
@@ -90,7 +95,12 @@ test('Essentials workbook parses every sheet into the catalog', () => {
   assert.ok(result.warnings.some((w) => w.includes('formula errors')));
 });
 
-test('Accommodation workbook parses properties, rates and cruises', () => {
+test('Accommodation workbook parses properties, rates and cruises', (context) => {
+  if (!existsSync(ACCOMMODATION_FILE)) {
+    context.skip(`missing local fixture: ${ACCOMMODATION_FILE}`);
+    return;
+  }
+
   const result = parseAccommodationWorkbook(readWorkbook(ACCOMMODATION_FILE));
 
   assert.equal(result.sheets.length, 7);

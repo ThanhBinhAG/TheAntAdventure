@@ -9,6 +9,11 @@ import {
 } from '@/lib/storage/upload-company-logo';
 import { getPhotoStorageClient } from '@/lib/storage/upload-gallery-photo-server';
 import { ALLOWED_IMAGE_MIME } from '@/lib/storage/photo-limits';
+import {
+  getCachedCompanyLogo,
+  invalidateCompanyLogoCache,
+  setCachedCompanyLogo,
+} from '@/lib/redis/branding-logo';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +31,12 @@ export async function GET() {
     return json({ ok: false, error: 'Unauthorized' }, 401);
   }
 
+  const cachedLogo = await getCachedCompanyLogo();
+
+  if (cachedLogo !== undefined) {
+    return json({ ok: true, logoUrl: cachedLogo });
+  }
+
   const client = await getPhotoStorageClient();
   if (!client) {
     return json({ ok: true, logoUrl: null });
@@ -33,6 +44,8 @@ export async function GET() {
 
   try {
     const logoUrl = await fetchCompanyLogoUrl(client);
+    await setCachedCompanyLogo(logoUrl);
+
     return json({ ok: true, logoUrl });
   } catch {
     // Table may not exist until migration is applied.
@@ -77,6 +90,8 @@ export async function POST(request: Request) {
       .webp({ quality: 85 })
       .toBuffer();
     const logoUrl = await uploadCompanyLogo(client, webp);
+    await invalidateCompanyLogoCache();
+
     return json({ ok: true, logoUrl });
   } catch (e) {
     const raw = e instanceof Error ? e.message : 'Upload failed';
@@ -103,6 +118,8 @@ export async function DELETE() {
 
   try {
     await clearCompanyLogo(client);
+    await invalidateCompanyLogoCache();
+
     return json({ ok: true, logoUrl: null });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Reset failed';

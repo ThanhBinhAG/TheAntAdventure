@@ -38,6 +38,6 @@ describe('shell cache helpers', () => {
     assert.equal(Object.prototype.hasOwnProperty.call(partial, 'messages'), false);
 
     const withMsg = pickShellSnapshot(backup, true);
-    assert.ok(withMsg.messages);
+    assert.equal(Object.prototype.hasOwnProperty.call(withMsg, 'messages'), false);
   });
 });

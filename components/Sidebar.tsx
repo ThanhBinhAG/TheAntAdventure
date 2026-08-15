@@ -14,10 +14,7 @@ import { canReadPage, canWritePage } from '@/lib/auth/permissions';
 import { usePermissions } from '@/components/PermissionsProvider';
 import CompanyLogoEditor from '@/components/sidebar/CompanyLogoEditor';
 import StorageImage from '@/components/gallery/StorageImage';
-import {
-  fetchCompanyLogoUrlClient,
-  getCachedCompanyLogoUrl,
-} from '@/lib/storage/company-logo-client';
+import { fetchCompanyLogoUrlClient } from '@/lib/storage/company-logo-client';
 
 const DEFAULT_LOGO = '/Logo-3.svg';
 
@@ -38,9 +35,7 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
   const tourDrafts = useStore((s) => s.tourDrafts) as TourDraft[];
   const messages = useStore((s) => s.messages);
   /** undefined = unknown; null = default SVG; string = custom Storage URL */
-  const [logoUrl, setLogoUrl] = useState<string | null | undefined>(() =>
-    typeof window === 'undefined' ? undefined : getCachedCompanyLogoUrl()
-  );
+  const [logoUrl, setLogoUrl] = useState<string | null | undefined>(undefined);
   const [logoEditorOpen, setLogoEditorOpen] = useState(false);
 
   useEffect(() => {

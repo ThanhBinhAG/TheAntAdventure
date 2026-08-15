@@ -10,6 +10,7 @@ Supabase hydrate, push, auto-sync, mappers, and timeouts.
 - `sync-config.ts` — `PAGE_BOOT_TABLES`, `SIDEBAR_IDLE_TABLES`, push waves, store key map
 - `sync-lifecycle.ts` — phase + `hydratedTables` / messages flags (auto-sync only pushes hydrated)
 - `sync-push.ts`, `mappers.ts`, `auto-sync.ts`, `supabase.ts` (embedded selects), …
+  Successful product/pricing sync invalidates Product facet cache through the authenticated API.
 
 ## Boundaries
 - Browser client: `lib/supabase`. Do not put UI here.

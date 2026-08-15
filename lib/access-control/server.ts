@@ -16,6 +16,13 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { invalidatePermissionCache } from '@/lib/redis/permissions';
+import {
+    getCachedAccessControlStaffRoles,
+    invalidateAccessControlStaffRolesCache,
+    setCachedAccessControlStaffRoles,
+} from '@/lib/redis/access-control-staff-roles';
+
 
 type AuthLoginEventRow = {
     id: number | string;
@@ -295,6 +302,9 @@ export async function getAccessControlData() {
 export async function getAccessControlStaffRoles(): Promise<
     AccessControlStaffRole[]
 > {
+    const cached = await getCachedAccessControlStaffRoles();
+    if (cached !== undefined) return cached;
+
     const supabase = createAccessControlServerClient();
 
     const result = await supabase.rpc(
@@ -303,7 +313,7 @@ export async function getAccessControlStaffRoles(): Promise<
 
     throwRpcError(result.error);
 
-    return (
+    const roles = (
         (result.data ?? []) as AccessControlStaffRoleRow[]
     ).map((role) => ({
         role_code: role.role_code,
@@ -314,6 +324,9 @@ export async function getAccessControlStaffRoles(): Promise<
         permission_codes: role.permission_codes ?? [],
         assigned_user_count: toNumber(role.assigned_user_count),
     }));
+
+    await setCachedAccessControlStaffRoles(roles);
+    return roles;
 }
 
 /**
@@ -341,6 +354,7 @@ export async function createAccessControlStaffRole(input: {
     );
 
     throwRpcError(result.error);
+    await invalidateAccessControlStaffRolesCache();
 }
 
 /**
@@ -367,6 +381,7 @@ export async function updateAccessControlStaffRole(input: {
     );
 
     throwRpcError(result.error);
+    await invalidateAccessControlStaffRolesCache();
 }
 
 /**
@@ -386,6 +401,7 @@ export async function deleteAccessControlStaffRole(
     );
 
     throwRpcError(result.error);
+    await invalidateAccessControlStaffRolesCache();
 }
 
 /**
@@ -406,6 +422,8 @@ export async function replaceAccessControlStaffRolePermissions(
     );
 
     throwRpcError(result.error);
+    await invalidatePermissionCache();
+    await invalidateAccessControlStaffRolesCache();
 }
 
 /** Đổi role của một user. */
@@ -421,6 +439,8 @@ export async function setAccessControlUserRole(
     });
 
     throwRpcError(result.error);
+    await invalidatePermissionCache();
+    await invalidateAccessControlStaffRolesCache();
 }
 
 /** Sửa tên hiển thị của một user. */
@@ -457,6 +477,7 @@ export async function setAccessControlUserActive(
     );
 
     throwRpcError(result.error);
+    await invalidatePermissionCache();
 }
 
 /**
@@ -478,6 +499,7 @@ export async function restoreAccessControlUser(
     );
 
     throwRpcError(result.error);
+    await invalidatePermissionCache();
 }
 
 /**
@@ -674,6 +696,7 @@ export async function replaceAccessControlRolePermissions(
     });
 
     throwRpcError(result.error);
+    await invalidatePermissionCache();
 }
 
 export async function createAccessControlPermission(
@@ -693,4 +716,5 @@ export async function createAccessControlPermission(
     );
 
     throwRpcError(result.error);
+    await invalidatePermissionCache();
 }

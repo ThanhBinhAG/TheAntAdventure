@@ -10,6 +10,11 @@ import type {
     ProductListFacets,
     ProductPageResponse,
 } from './product-list-input';
+import {
+    getCachedProductFacets,
+    setCachedProductFacets,
+} from '@/lib/redis/product-facets';
+
 
 type ProductRow = Record<string, unknown>;
 type ProductListRpcResponse = ProductPageResponse<ProductRow>;
@@ -56,14 +61,14 @@ export async function listProductsPage(
             p_search_text: input.q ?? null,
         })
         : await supabase.rpc('list_products_page', {
-        p_page_number: input.page,
-        p_page_size: input.pageSize,
-        p_search_text: input.q ?? null,
-        p_filter_region: input.region ?? null,
-        p_filter_duration: input.duration ?? null,
-        p_filter_category: input.category ?? null,
-        p_filter_destination: input.destination ?? null,
-        p_filter_pricing_status: input.pricingStatus ?? null,
+            p_page_number: input.page,
+            p_page_size: input.pageSize,
+            p_search_text: input.q ?? null,
+            p_filter_region: input.region ?? null,
+            p_filter_duration: input.duration ?? null,
+            p_filter_category: input.category ?? null,
+            p_filter_destination: input.destination ?? null,
+            p_filter_pricing_status: input.pricingStatus ?? null,
         });
 
     if (result.error) throw new ProductListError(result.error.message);
@@ -90,6 +95,9 @@ export async function listProductsPage(
 export async function listProductFacets(
     input: ProductListQuery,
 ): Promise<ProductListFacets> {
+    const cached = await getCachedProductFacets(input);
+    if (cached) return cached;
+
     const supabase = createProductServerClient();
     const result = await supabase.rpc('list_product_facets', {
         p_search_text: input.q ?? null,
@@ -102,8 +110,20 @@ export async function listProductFacets(
 
     if (result.error) throw new ProductListError(result.error.message);
     const facets = result.data as ProductListFacets | null;
-    if (!facets || !Array.isArray(facets.categories) || !facets.destinations || !facets.pricingPulse) {
-        throw new ProductListError('RPC facet product trả dữ liệu không hợp lệ.');
+
+    if (
+        !facets ||
+        !Array.isArray(facets.categories) ||
+        !facets.destinations ||
+        !facets.pricingPulse
+    ) {
+        throw new ProductListError(
+            'RPC facet product trả dữ liệu không hợp lệ.',
+        );
     }
-    return facets;
+
+    const validFacets: ProductListFacets = facets;
+
+    await setCachedProductFacets(input, validFacets);
+    return validFacets;
 }

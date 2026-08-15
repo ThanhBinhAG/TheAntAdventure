@@ -73,7 +73,7 @@ async function recordSuccessfulLoginSafely(input: {
 
 export async function POST(request: Request) {
   const ip = getClientIp(request);
-  const rate = checkLoginRateLimit(ip);
+  const rate = await checkLoginRateLimit(ip);
   if (!rate.ok) {
     return fail(429, 'Quá nhiều lần đăng nhập thất bại. Thử lại sau.', {
       'Retry-After': String(rate.retryAfterSec),
@@ -90,13 +90,13 @@ export async function POST(request: Request) {
   const identity = (body.identity ?? '').trim();
   const password = body.password ?? '';
   if (!identity || !password) {
-    recordLoginFailure(ip);
+    await recordLoginFailure(ip);
     return fail(400, 'Vui lòng nhập tài khoản và mật khẩu.');
   }
 
   // Break-glass first (timing-safe compare); never log the username.
   if (isBreakGlassConfigured() && verifyBreakGlassCredentials(identity, password)) {
-    clearLoginFailures(ip);
+    await clearLoginFailures(ip);
     try {
       const { token, maxAge } = await mintBreakGlassSession();
       const response = NextResponse.json({ ok: true, mode: 'break_glass' });
@@ -117,13 +117,13 @@ export async function POST(request: Request) {
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();
   if (!url || !key) {
-    recordLoginFailure(ip);
+    await recordLoginFailure(ip);
     return fail(503, 'Supabase Auth chưa được cấu hình.');
   }
 
   // Normal users must use email.
   if (!identity.includes('@')) {
-    recordLoginFailure(ip);
+    await recordLoginFailure(ip);
     return fail(401, 'Tài khoản hoặc mật khẩu không đúng.');
   }
 
@@ -156,7 +156,7 @@ export async function POST(request: Request) {
   });
 
   if (error) {
-    recordLoginFailure(ip);
+    await recordLoginFailure(ip);
     const lower = error.message.toLowerCase();
     if (isNetworkOrTlsAuthError(error.message)) {
       return fail(503, authConnectivityMessage(error.message));
@@ -172,7 +172,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: message }, { status: 401 });
   }
 
-  clearLoginFailures(ip);
+  await clearLoginFailures(ip);
 
   if (data.user) {
     await recordSuccessfulLoginSafely({

@@ -15,6 +15,10 @@ import { getAuthContext } from '@/lib/auth/session';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 import {
+  getCachedPermissionCodes,
+  setCachedPermissionCodes,
+} from '@/lib/redis/permissions';
+import {
   hasPermission,
   type PermissionCode,
 } from '@/lib/auth/permissions';
@@ -68,6 +72,27 @@ async function readPermissionCodesFromSupabase(): Promise<PermissionCode[]> {
     .filter((code): code is PermissionCode => Boolean(code));
 }
 
+async function readPermissionCodesWithCache(
+  userId: string,
+): Promise<PermissionCode[]> {
+  const cached = await getCachedPermissionCodes(userId);
+
+  if (cached.permissionCodes !== undefined) {
+    return cached.permissionCodes;
+  }
+
+  const permissionCodes = await readPermissionCodesFromSupabase();
+
+  await setCachedPermissionCodes(
+    userId,
+    cached.version,
+    permissionCodes,
+  );
+
+  return permissionCodes;
+}
+
+
 /**
  * Dùng riêng cho app/(crm)/layout.tsx.
  *
@@ -109,7 +134,7 @@ export async function getCurrentPermissionCodesForRequest(): Promise<
 
   // API vẫn gọi auth.getUser() ở trên để phân biệt 401 và 403 chính xác.
   // Sau đó dùng chung hàm RPC để lấy danh sách quyền.
-  return readPermissionCodesFromSupabase();
+  return readPermissionCodesWithCache(auth.userId!);
 }
 
 /**

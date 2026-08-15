@@ -23,9 +23,18 @@ function isLocalSupabaseUrl(url: string): boolean {
   return /127\.0\.0\.1|localhost/i.test(url);
 }
 
+function isLocalSupabaseAllowed(): boolean {
+  const value = (process.env.NEXT_PUBLIC_ALLOW_LOCAL_SUPABASE ?? '').trim().toLowerCase();
+  return value === 'true' || value === '1' || value === 'yes';
+}
+
 function shouldUseProductionDefaults(): boolean {
   const envUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim();
-  return !envUrl || isLocalSupabaseUrl(envUrl);
+
+  return !envUrl || (
+    isLocalSupabaseUrl(envUrl) &&
+    !isLocalSupabaseAllowed()
+  );
 }
 
 function resolveSupabaseString(raw: string | undefined, fallback: string): string {

@@ -13,6 +13,7 @@ describe('supabase env resolve', () => {
     anon: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     service: process.env.SUPABASE_SERVICE_ROLE_KEY,
     appUrl: process.env.APP_URL,
+    allowLocal: process.env.NEXT_PUBLIC_ALLOW_LOCAL_SUPABASE,
   };
 
   afterEach(() => {
@@ -21,6 +22,7 @@ describe('supabase env resolve', () => {
       NEXT_PUBLIC_SUPABASE_ANON_KEY: original.anon,
       SUPABASE_SERVICE_ROLE_KEY: original.service,
       APP_URL: original.appUrl,
+      NEXT_PUBLIC_ALLOW_LOCAL_SUPABASE: original.allowLocal,
     })) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -57,5 +59,15 @@ describe('supabase env resolve', () => {
     process.env.APP_URL = 'http://localhost:3006';
 
     assert.equal(getAppUrl(), 'https://theantcrmdemo.mitelai.com/');
+  });
+  it('keeps localhost when local Supabase is explicitly allowed', () => {
+    process.env.NEXT_PUBLIC_ALLOW_LOCAL_SUPABASE = 'true';
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://127.0.0.1:54321';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'local-anon';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'local-service-role';
+
+    assert.equal(getSupabaseUrl(), 'http://127.0.0.1:54321');
+    assert.equal(getSupabaseAnonKey(), 'local-anon');
+    assert.equal(getSupabaseServiceRoleKey(), 'local-service-role');
   });
 });

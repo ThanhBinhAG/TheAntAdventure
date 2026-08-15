@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   const userId = auth.userId ?? auth.email ?? 'authenticated';
 
-  const rate = checkAndRecordGalleryUploadRateLimit(userId, parsed.data.totalBytes);
+  const rate = await checkAndRecordGalleryUploadRateLimit(userId, parsed.data.totalBytes);
   if (!rate.ok) {
     return NextResponse.json(
       { ok: false, error: 'Too many uploads. Please wait a bit and try again.' },

@@ -1,4 +1,5 @@
 import { isRemoteDataEnabled, isSupabaseReadOnly } from '../env';
+import { invalidateProductFacetsFromClient } from '../products/product-facets-client';
 import { useStore } from '../store';
 import type { BackupData } from '../types';
 import {
@@ -99,6 +100,10 @@ export async function pushTablesToSupabase(
 
     if (options.force && warnings.length === 0) {
       updateBaselineCounts(countBackupRows(backup));
+    }
+
+    if (target.includes('products') || target.includes('product_pricing')) {
+      await invalidateProductFacetsFromClient();
     }
 
     return { ok: true, counts: countBackupRows(backup), warnings: warnings.length ? warnings : undefined };

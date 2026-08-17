@@ -5,7 +5,7 @@ Client hooks for destination catalog CRUD and lazy weather fetch + localStorage 
 
 ## Contents
 - `useWeatherPageBoot.ts` — one boot fetch (catalog + featured); CRUD; seed localStorage
-- `useDestinationWeather.ts` — per-id forecast (24h localStorage, in-flight dedupe)
+- `useDestinationWeather.ts` — per-id forecast (24h localStorage, in-flight dedupe); `prefetchDestinationWeather` for hover intent
 - `useProvinceList.ts` — thin re-export of boot hook + `ProvinceFormInput`
 - `useResolvedCover.ts` — cover URL from API or gallery store
 

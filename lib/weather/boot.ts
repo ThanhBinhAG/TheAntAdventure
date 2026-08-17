@@ -23,7 +23,8 @@ export async function getWeatherPageBoot(): Promise<WeatherPageBoot> {
     await Promise.all(
       featured.map(async (d) => {
         try {
-          const { detail } = await getDestinationWeather(d.id, { force: false });
+          // Pass meta to skip getDestinationById N+1 (cover already on catalog rows).
+          const { detail } = await getDestinationWeather(d, { force: false });
           return detail;
         } catch {
           return null;

@@ -14,6 +14,10 @@ import { maskSecret } from './debug-config';
 import { debugLog } from './debug-logger';
 import { isExpectedUnauthenticatedSessionError } from './session-diag';
 import { estimateCookieHeaderBytes } from '@/lib/auth/cookie-hygiene';
+import {
+  getProcessMemoryMetrics,
+  HEAP_USED_RATIO_THRESHOLD,
+} from '@/lib/system/process-memory';
 
 export type DiagnosticCheck = {
   name: string;
@@ -97,6 +101,21 @@ async function timedFetch(
     });
     return { ok: false, latencyMs, error: errorDetails.message, errorDetails };
   }
+}
+
+function checkProcessMemory(): DiagnosticCheck {
+  const memory = getProcessMemoryMetrics();
+  return {
+    name: 'Process memory',
+    ok: !memory.pressure,
+    error: memory.pressure
+      ? `Heap used/limit ${memory.heapUsedRatio} ≥ ${HEAP_USED_RATIO_THRESHOLD}`
+      : undefined,
+    hint: memory.pressure
+      ? 'Heap gần limit — giảm concurrency PDF/uploads hoặc tăng NODE_OPTIONS --max-old-space-size (dưới Docker mem_limit)'
+      : undefined,
+    details: { ...memory, threshold: HEAP_USED_RATIO_THRESHOLD },
+  };
 }
 
 function checkEnv(): DiagnosticCheck {
@@ -381,6 +400,7 @@ export async function runDiagnostics(): Promise<DiagnosticsReport> {
 
   const checks: DiagnosticCheck[] = [
     checkEnv(),
+    checkProcessMemory(),
     await checkProxyHeaders(),
     await checkCookieHeaderSize(),
     await checkSupabaseAuthHealth(),

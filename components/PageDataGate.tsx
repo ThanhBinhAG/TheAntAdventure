@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import PageRouteLoading from '@/components/PageRouteLoading';
-import { ensurePageDataLoaded } from '@/lib/db/hydrate';
+import { cancelDelayedRevalidate, ensurePageDataLoaded } from '@/lib/db/hydrate';
 import type { PageSlug } from '@/lib/types';
 
 /**
- * Ensures route boot tables (+ sidebar idle) are loaded before rendering the page.
+ * Ensures route boot tables are loaded before rendering the page.
  * StoreProvider only marks hydration pending — fetch starts here per route.
  */
 export default function PageDataGate({
@@ -28,6 +28,7 @@ export default function PageDataGate({
 
   useEffect(() => {
     let cancelled = false;
+    cancelDelayedRevalidate();
 
     void (async () => {
       try {
@@ -48,6 +49,7 @@ export default function PageDataGate({
 
     return () => {
       cancelled = true;
+      cancelDelayedRevalidate();
     };
   }, [page]);
 

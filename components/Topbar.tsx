@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { PAGE_TITLES, QUICK_NAV_PAGES } from '@/lib/constants';
+import { localTodayIso } from '@/lib/core/date-utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
 import { useSupabasePanel } from '@/lib/context/SupabaseContext';
+import { isAutoSyncEnabled } from '@/lib/env';
 import { AiCopilotTrigger } from '@/components/AiCopilot';
 import type { PageSlug } from '@/lib/types';
 import { toast } from '@/lib/toast';
@@ -51,14 +53,21 @@ export default function Topbar({ onMenuToggle, showMenuToggle = false }: TopbarP
     supabase?.conn?.ok ? ' ok' : supabase?.conn ? ' fail' : supabase?.remoteEnabled ? '' : ' fail'
   }`;
 
+  const autoSyncOn = isAutoSyncEnabled();
+  const readOnly = Boolean(supabase?.readOnly);
+
   const syncStatusLine =
     (supabase?.remoteEnabled && supabase.autoSync?.status === 'synced' && supabase.autoSync.lastSyncedAt
       ? `Supabase saved: ${supabase.autoSync.lastSyncedAt} · `
       : supabase?.remoteEnabled && supabase.autoSync?.status === 'error'
         ? `Supabase save failed${supabase.autoSync.lastError ? `: ${supabase.autoSync.lastError}` : ''} · `
-        : supabase?.remoteEnabled
-          ? 'Auto-sync on · '
-          : '') + `Last backup: ${lastBackup || 'never'}`;
+        : supabase?.remoteEnabled && readOnly
+          ? 'Read-only · '
+          : supabase?.remoteEnabled && autoSyncOn
+            ? 'Auto-sync on · '
+            : supabase?.remoteEnabled
+              ? 'Auto-sync off · '
+              : '') + `Last backup: ${lastBackup || 'never'}`;
 
   const handleExport = () => {
     const data = exportBackup();
@@ -66,7 +75,7 @@ export default function Topbar({ onMenuToggle, showMenuToggle = false }: TopbarP
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ant-crm-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `ant-crm-backup-${localTodayIso()}.json`;
     a.click();
     URL.revokeObjectURL(url);
     const ts = new Date().toLocaleString("en-US");

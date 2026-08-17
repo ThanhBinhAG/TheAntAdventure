@@ -1,10 +1,11 @@
 # tests/ — Agent overview
 
 ## Role
-Unit tests for `lib/` domain logic (Vitest / `tsx --test`). Flat layout by domain topic.
+Tracked pointer only. Unit tests live in gitignored [`Personal/tests/`](../Personal/tests/) (`tsx --test`). Do not commit `*.test.ts` here or to GitLab.
 
 ## Contents
-- `*.test.ts` covering sales, products, tour-design, gallery, auth, weather, sync, …
+- This `AGENTS.md` — points agents at `Personal/tests/`
 
 ## Boundaries
 - Prefer testing `lib/` pure functions; avoid brittle UI snapshots unless needed.
+- `npm test` runs `Personal/tests` when present; no-ops if that folder is missing (clone without local archive).

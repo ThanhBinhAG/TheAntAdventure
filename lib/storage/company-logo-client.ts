@@ -58,7 +58,7 @@ function hydrateFromStorage(): void {
 }
 
 /**
- * Sync last-known logo for Sidebar first paint.
+ * Sync last-known logo for Sidebar first paint (`useSyncExternalStore`).
  * Hydrates from localStorage when memory is cold.
  */
 export function getCachedCompanyLogoUrl(): string | null | undefined {

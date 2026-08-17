@@ -1,0 +1,24 @@
+---
+description: Keep components/pages as thin shells; heavy UI lives in domain folders
+globs: components/pages/**
+alwaysApply: false
+---
+
+# Thin page shells
+
+`components/pages/*` are CRM slug shells only — not feature homes.
+
+## Required
+
+1. Page files re-export or render one domain root (like [`components/pages/AccessControl.tsx`](components/pages/AccessControl.tsx) → `components/access-control/`).
+2. Put `useState`, upload/sync handlers, modals, and list widgets in `components/<domain>/` (or existing sibling folders: `tour-design/`, `gallery/`, `products/`, …).
+3. Do **not** add heavy handlers or new multi-hundred-line JSX to a page file when extending a feature — extract first.
+
+## Soft target
+
+- New or refactored page shells: preferably under ~50 lines.
+- If a page file exceeds ~400 lines, split into the domain folder before adding features.
+
+## Canonical example
+
+Access Control: thin `pages/AccessControl.tsx` + widgets under `components/access-control/`.

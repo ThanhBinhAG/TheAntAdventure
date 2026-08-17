@@ -14,6 +14,7 @@ CLI migrations (`db:push`). Incremental SQL dated; do not paste bootstrap copies
 - `20260802160347_add_photo_folders.sql` — `photo_folders` + `photos.folder_id` (Unsorted)
 - `20260805060000_add_photo_gallery_assets.sql` — `photo_gallery_assets`; bảng này đã bị migration sau drop, giữ file để không phá history
 - `20260805133000_drop_photo_gallery_assets.sql` — drop `photo_gallery_assets` (gộp về một pipeline ảnh trên bảng `photos`)
+- `20260811062000_add_proposal_templates.sql` — `proposal_templates` (b2c/b2b company copy)
 
 ## Boundaries
 - Role helpers / gán user: `supabase/snippets/`.

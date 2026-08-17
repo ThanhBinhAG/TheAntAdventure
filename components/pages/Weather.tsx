@@ -1,15 +1,24 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import FeaturedWeatherRow from '@/components/weather/week/FeaturedWeatherRow';
-import WeatherDetailModal from '@/components/weather/week/WeatherDetailModal';
 import ProvinceCardGrid from '@/components/weather/destinations/ProvinceCardGrid';
-import AddProvinceModal from '@/components/weather/destinations/AddProvinceModal';
-import EditProvinceModal from '@/components/weather/destinations/EditProvinceModal';
-import FeaturedSlotsModal from '@/components/weather/destinations/FeaturedSlotsModal';
 import { useWeatherPageBoot } from '@/components/weather/hooks/useWeatherPageBoot';
-import { clearClientWeatherCache } from '@/lib/weather/client-cache';
 import { toast } from '@/lib/toast';
+
+const WeatherDetailModal = dynamic(() => import('@/components/weather/week/WeatherDetailModal'), {
+  ssr: false,
+});
+const AddProvinceModal = dynamic(() => import('@/components/weather/destinations/AddProvinceModal'), {
+  ssr: false,
+});
+const EditProvinceModal = dynamic(() => import('@/components/weather/destinations/EditProvinceModal'), {
+  ssr: false,
+});
+const FeaturedSlotsModal = dynamic(() => import('@/components/weather/destinations/FeaturedSlotsModal'), {
+  ssr: false,
+});
 
 export default function Weather() {
   const {
@@ -29,7 +38,7 @@ export default function Weather() {
   const [editId, setEditId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [featuredOpen, setFeaturedOpen] = useState(false);
-  const [refreshToken, setRefreshToken] = useState(0);
+  const [cacheVersion, setCacheVersion] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const detailMeta = useMemo(
@@ -44,7 +53,6 @@ export default function Weather() {
   async function handleRefreshAll() {
     setRefreshing(true);
     try {
-      clearClientWeatherCache();
       const res = await fetch('/api/weather/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,7 +60,8 @@ export default function Weather() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Refresh failed');
-      setRefreshToken((n) => n + 1);
+      await reload();
+      setCacheVersion((n) => n + 1);
       toast.success('Đã làm mới thời tiết nổi bật.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Không thể làm mới.');
@@ -105,7 +114,7 @@ export default function Weather() {
           loading={loading}
           onOpenDetail={setDetailId}
           onEdit={setEditId}
-          refreshToken={refreshToken}
+          cacheVersion={cacheVersion}
         />
       </section>
 
@@ -129,45 +138,53 @@ export default function Weather() {
         </div>
       </section>
 
-      <WeatherDetailModal
-        open={Boolean(detailId)}
-        destinationId={detailId}
-        meta={detailMeta}
-        onClose={() => setDetailId(null)}
-      />
+      {detailId ? (
+        <WeatherDetailModal
+          open
+          destinationId={detailId}
+          meta={detailMeta}
+          onClose={() => setDetailId(null)}
+        />
+      ) : null}
 
-      <AddProvinceModal
-        open={addOpen}
-        featuredCount={featured.length}
-        onClose={() => setAddOpen(false)}
-        onSave={async (input) => {
-          await create(input);
-        }}
-      />
+      {addOpen ? (
+        <AddProvinceModal
+          open
+          featuredCount={featured.length}
+          onClose={() => setAddOpen(false)}
+          onSave={async (input) => {
+            await create(input);
+          }}
+        />
+      ) : null}
 
-      <EditProvinceModal
-        open={Boolean(editId)}
-        destination={editMeta}
-        featuredCount={featured.length}
-        onClose={() => setEditId(null)}
-        onSave={async (id, patch) => {
-          await update(id, patch);
-        }}
-        onDelete={async (id) => {
-          await remove(id);
-        }}
-      />
+      {editId ? (
+        <EditProvinceModal
+          open
+          destination={editMeta}
+          featuredCount={featured.length}
+          onClose={() => setEditId(null)}
+          onSave={async (id, patch) => {
+            await update(id, patch);
+          }}
+          onDelete={async (id) => {
+            await remove(id);
+          }}
+        />
+      ) : null}
 
-      <FeaturedSlotsModal
-        open={featuredOpen}
-        destinations={destinations}
-        featuredIds={featured.map((d) => d.id)}
-        onClose={() => setFeaturedOpen(false)}
-        onSave={async (ids) => {
-          await setFeatured(ids);
-          setRefreshToken((n) => n + 1);
-        }}
-      />
+      {featuredOpen ? (
+        <FeaturedSlotsModal
+          open
+          destinations={destinations}
+          featuredIds={featured.map((d) => d.id)}
+          onClose={() => setFeaturedOpen(false)}
+          onSave={async (ids) => {
+            await setFeatured(ids);
+            setCacheVersion((n) => n + 1);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

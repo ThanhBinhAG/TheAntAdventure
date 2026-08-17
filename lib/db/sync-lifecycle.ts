@@ -52,6 +52,10 @@ export function subscribeHydration(listener: (state: HydrationState) => void) {
   };
 }
 
+/**
+ * Hard reset — clears hydrated flags (app start, full re-hydrate).
+ * Do not call on route navigation; use {@link markHydrationSoftPending}.
+ */
 export function markHydrationPending() {
   hydratedTables.clear();
   messagesHydrated = false;
@@ -59,6 +63,18 @@ export function markHydrationPending() {
     phase: 'pending',
     error: null,
     baselineCounts: {},
+    ...snapshotHydrated(),
+  });
+}
+
+/**
+ * Soft pending for route boot: sets phase=pending without wiping hydratedTables.
+ * Preserves cross-route cache so nav mid-boot does not force duplicate GETs / empty auto-sync.
+ */
+export function markHydrationSoftPending() {
+  setState({
+    phase: 'pending',
+    error: null,
     ...snapshotHydrated(),
   });
 }

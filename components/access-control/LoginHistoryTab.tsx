@@ -21,6 +21,7 @@ import {
     getAccessControlErrorMessage,
     type AuthLoginEvent,
 } from './access-control-api';
+import { formatAccessControlDateTime } from '@/lib/access-control/format-datetime';
 import { useLanguage } from '@/hooks/useLanguage';
 import { tac } from '@/lib/i18n/pages/access-control';
 import type { AppLanguage } from '@/lib/i18n/stages';
@@ -57,17 +58,6 @@ const EMPTY_FILTERS: FilterForm = {
     from: '',
     to: '',
 };
-
-function formatDateTime(value: string, language: AppLanguage): string {
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) return value;
-
-    return new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-US', {
-        dateStyle: 'short',
-        timeStyle: 'medium',
-    }).format(date);
-}
 
 function getUserName(
     event: AuthLoginEvent,
@@ -183,7 +173,7 @@ export default function LoginHistoryTab() {
             title: tac('time', language),
             dataIndex: 'createdAt',
             width: 170,
-            render: (value: string) => formatDateTime(value, language),
+            render: (value: string) => formatAccessControlDateTime(value, language),
         },
         {
             title: tac('user', language),
@@ -335,7 +325,7 @@ export default function LoginHistoryTab() {
                 <Alert
                     type="warning"
                     showIcon
-                    message={filterError}
+                    title={filterError}
                 />
             )}
 
@@ -343,7 +333,7 @@ export default function LoginHistoryTab() {
                 <Alert
                     type="error"
                     showIcon
-                    message={tac('loadLoginHistoryFailed', language)}
+                    title={tac('loadLoginHistoryFailed', language)}
                     description={errorMessage}
                     action={
                         <Button

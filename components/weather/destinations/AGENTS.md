@@ -11,5 +11,7 @@ Explore destination tiles and add/edit destination modals (gallery cover pick).
 - `FeaturedSlotsModal.tsx` — pick up to 2 featured destinations
 
 ## Boundaries
-- Catalog via `../hooks/useWeatherPageBoot` (page boot). Weather fetch only on card click → detail modal.
+- Catalog via `../hooks/useWeatherPageBoot` (page boot).
+- Covers: prefer `coverThumbUrl`, lazy `StorageImage` (no full CSS background).
+- Prefetch: 200ms hover-intent; immediate on keyboard focus; click still opens detail (in-flight dedupe).
 - Max 2 featured enforced in `lib/weather/destinations` + FeaturedSlotsModal.

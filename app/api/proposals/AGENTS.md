@@ -4,7 +4,8 @@
 Proposal document PDF export API.
 
 ## Contents
-- Export route handler
+- `export/` — proposal PDF export
+- `templates/` — company B2C/B2B commercial template GET/PUT
 
 ## Boundaries
-- Assembler/HTML/PDF live in `lib/proposals`.
+- Assembler/HTML/PDF live in `lib/proposals`. Template rows: `proposal_templates` (lazy; not page-boot).

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { NAV_SECTIONS, type NavItem } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
@@ -14,9 +14,20 @@ import { canReadPage, canWritePage } from '@/lib/auth/permissions';
 import { usePermissions } from '@/components/PermissionsProvider';
 import CompanyLogoEditor from '@/components/sidebar/CompanyLogoEditor';
 import StorageImage from '@/components/gallery/StorageImage';
-import { fetchCompanyLogoUrlClient } from '@/lib/storage/company-logo-client';
+import {
+  fetchCompanyLogoUrlClient,
+  getCachedCompanyLogoUrl,
+} from '@/lib/storage/company-logo-client';
 
 const DEFAULT_LOGO = '/Logo-3.svg';
+
+function subscribeCompanyLogoCache() {
+  return () => {};
+}
+
+function getServerCompanyLogoUrl(): undefined {
+  return undefined;
+}
 
 interface SidebarProps {
   open: boolean;
@@ -34,9 +45,20 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
   const leads = useStore((s) => s.leads) as Lead[];
   const tourDrafts = useStore((s) => s.tourDrafts) as TourDraft[];
   const messages = useStore((s) => s.messages);
-  /** undefined = unknown; null = default SVG; string = custom Storage URL */
+  /**
+   * undefined = unknown; null = default SVG; string = custom Storage URL.
+   * Server snapshot stays undefined so SSR HTML matches hydration.
+   * After hydrate, useSyncExternalStore reads the module/localStorage cache
+   * without a layout-effect setState.
+   */
+  const cachedLogoUrl = useSyncExternalStore(
+    subscribeCompanyLogoCache,
+    getCachedCompanyLogoUrl,
+    getServerCompanyLogoUrl
+  );
   const [logoUrl, setLogoUrl] = useState<string | null | undefined>(undefined);
   const [logoEditorOpen, setLogoEditorOpen] = useState(false);
+  const displayLogoUrl = logoUrl !== undefined ? logoUrl : cachedLogoUrl;
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +70,8 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
     };
   }, []);
 
+  // Badge counts: 0 until Planner / Tour Design / sales (etc.) hydrate those tables.
+  // No global sidebar prefetch on unrelated routes (e.g. Access Control).
   const activeTaskCount = useMemo(() => countActiveTasks(tasks), [tasks]);
   const pendingTourDesign = useMemo(
     () => countTourDesignAttention(leads, tourDrafts),
@@ -117,8 +141,8 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
   }, [messages]);
 
   const canEditLogo = canWritePage(permissionCodes, 'about');
-  const isPendingLogo = logoUrl === undefined;
-  const isCustomLogo = typeof logoUrl === 'string' && logoUrl.length > 0;
+  const isPendingLogo = displayLogoUrl === undefined;
+  const isCustomLogo = typeof displayLogoUrl === 'string' && displayLogoUrl.length > 0;
 
   return (
     <>
@@ -143,7 +167,7 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
             <div className="sb-logo-avatar-img" aria-busy={isPendingLogo || undefined}>
               {isPendingLogo ? null : isCustomLogo ? (
                 <StorageImage
-                  src={logoUrl}
+                  src={displayLogoUrl}
                   alt="The Ant Adventures"
                   width={112}
                   height={112}

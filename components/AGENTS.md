@@ -7,7 +7,8 @@ React UI: CRM chrome at root, page shells in `pages/`, and domain widgets in sib
 - Root: `Sidebar`, `Topbar`, `CRMShell`, `StoreProvider`, `PageDataGate`, `ToastHost`, `ConfirmHost`, `EmptyState` (shared empty lists), `AiCopilot*`, `AutoSyncListener`, `PaginationBar`, …
 - `sidebar/` — company logo editor (gallery pick + crop)
 - `pages/` — slug → page components for `(crm)/[page]`
-- `tour-design/` — Tour Design wizard steps (URL slug still `tourdesign`)
+- `tour-design/` — Tour Design wizard (`TourDesignPage` + steps; URL slug still `tourdesign`)
+- `sales/`, `bookings/`, `dashboard/` — page roots for Sales / Bookings / Dashboard
 - `pricing/`, `products/`, `suppliers/`, `attractions/`, `gallery/`, `customers/`
 - Thin domains: `agents/`, `guides/`, `planner/`, `weather/`, `auth/`, `system/`
 

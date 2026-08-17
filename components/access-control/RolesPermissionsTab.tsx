@@ -355,9 +355,9 @@ export default function RolesPermissionsTab() {
     }
 
     if (loadingPermissions) return <Skeleton active paragraph={{ rows: 12 }} />;
-    if (permissionsError) return <Alert type="error" showIcon message={tac('loadPermissionsFailed', language)} description={permissionsError} action={<Button size="small" onClick={() => void reloadPermissions()}>{tac('retry', language)}</Button>} />;
+    if (permissionsError) return <Alert type="error" showIcon title={tac('loadPermissionsFailed', language)} description={permissionsError} action={<Button size="small" onClick={() => void reloadPermissions()}>{tac('retry', language)}</Button>} />;
     if (loadingRoles) return <Skeleton active paragraph={{ rows: 8 }} />;
-    if (rolesError) return <Alert type="error" showIcon message={tac('loadRolesFailed', language)} description={getAccessControlErrorMessage(rolesError, language, 'retryMessage')} action={<Button size="small" onClick={() => void reloadRoles()}>{tac('retry', language)}</Button>} />;
+    if (rolesError) return <Alert type="error" showIcon title={tac('loadRolesFailed', language)} description={getAccessControlErrorMessage(rolesError, language, 'retryMessage')} action={<Button size="small" onClick={() => void reloadRoles()}>{tac('retry', language)}</Button>} />;
 
     return (
         <div className={styles.rolesWorkspace}>
@@ -444,7 +444,7 @@ export default function RolesPermissionsTab() {
                             onChange={(event) => setPermissionSearch(event.target.value)}
                         />
                         {!activeRole.is_active ? (
-                            <Alert type="warning" showIcon message={tac('roleDisabled', language)} description={tac('roleInactiveDescription', language)} />
+                            <Alert type="warning" showIcon title={tac('roleDisabled', language)} description={tac('roleInactiveDescription', language)} />
                         ) : (
                             <>
                                 <div className={styles.permissionGroups}>

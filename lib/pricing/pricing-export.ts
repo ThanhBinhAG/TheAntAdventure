@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { localTodayIso } from '../core/date-utils';
 import type { PricingTableRow } from '../products/product-pricing-helpers';
 import {
   ICO_KEYS,
@@ -51,7 +52,7 @@ export function buildPricingSheetData(
       'The Ant Adventures — Price List 2026',
       `Currency: ${currency}`,
       `Products: ${rows.length}`,
-      `Exported: ${new Date().toISOString().slice(0, 10)}`,
+      `Exported: ${localTodayIso()}`,
     ],
   ];
   if (options.filterSummary) {
@@ -90,7 +91,7 @@ export function buildPricingSheetData(
 }
 
 export function pricingExportFilename(currency: PlCurrency): string {
-  const date = new Date().toISOString().slice(0, 10);
+  const date = localTodayIso();
   return `TAA-PriceList-2026-${currency}-${date}.xlsx`;
 }
 

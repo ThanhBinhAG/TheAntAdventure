@@ -74,7 +74,7 @@ export default function UserEditDrawer({
         <Drawer
             title={tac('editUserInfo', language)}
             open={Boolean(user)}
-            width={480}
+            size={480}
             onClose={onClose}
             destroyOnHidden
         >

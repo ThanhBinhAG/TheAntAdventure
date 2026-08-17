@@ -101,6 +101,7 @@ erDiagram
 | 21 | Pricing → Essentials | `pricing_ess_products` | `pricing_ess_cost_lines`, `pricing_ess_services`, `pricing_ess_car_rates`, `pricing_ess_hotel_rates`, `pricing_ess_notes` |
 | 22 | Pricing → Accommodation & Cruises | `pricing_acc_properties` | `pricing_acc_room_rates`, `pricing_acc_cruise_rates` |
 | 23 | Pricing (chung cả 2 workbook) | `pricing_settings` | `pricing_catalog_imports` |
+| 24 | Proposal company templates | `proposal_templates` | singleton rows `b2c` / `b2b` (`fields` jsonb) |
 
 *Các trang About, Culture, Regulations, Weather, Attractions — nội d dung tĩnh, không cần bảng riêng (hoặc CMS sau).*
 

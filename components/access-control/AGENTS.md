@@ -4,6 +4,7 @@
 Giao diện Quản lý người dùng và phân quyền dành cho tài khoản có users.manage.
 
 ## Contents
+- `AccessControlUiProvider.tsx` — `AntdRegistry` + Ant Design `ConfigProvider` (scoped here, not root layout).
 - `UserDirectory.tsx` — danh sách user phân trang.
 - `UserAccessDrawer.tsx` — xem quyền hiệu lực và đổi role.
 - `RolesPermissionsTab.tsx` — cấu hình permission theo role.
@@ -19,3 +20,4 @@ Giao diện Quản lý người dùng và phân quyền dành cho tài khoản c
 ## Boundaries
 - Chỉ hiển thị và gọi API.
 - Không truy cập Supabase hoặc kiểm tra SQL trực tiếp.
+- Ant Design stays under this folder’s provider so `/login` and other CRM pages do not pull `@ant-design/nextjs-registry` from the root layout.

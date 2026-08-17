@@ -618,6 +618,17 @@ insert into company_branding (id, logo_url)
 values ('default', null)
 on conflict (id) do nothing;
 
+-- Shared proposal commercial/legal copy (one row per B2C/B2B). Empty fields = boilerplate.
+create table if not exists proposal_templates (
+  id          text primary key check (id in ('b2c', 'b2b')),
+  fields      jsonb not null default '{}'::jsonb,
+  updated_at  timestamptz not null default now()
+);
+
+insert into proposal_templates (id, fields)
+values ('b2c', '{}'::jsonb), ('b2b', '{}'::jsonb)
+on conflict (id) do nothing;
+
 create table if not exists photo_tags (
   photo_id        text not null references photos(id) on delete cascade,
   tag             text not null,
@@ -1154,7 +1165,7 @@ begin
     'staff','salary_records','tasks','contracts','feedback',
     'suppliers','supplier_tags','cruises','transport','restaurants',
     'photo_folders','photos','photo_tags','product_photos','attractions','attraction_photos','cal_events',
-    'company_branding',
+    'company_branding','proposal_templates',
     'chat_channels','chat_messages','chat_reactions','dev_notes',
     'weather_destinations','weather_forecast_cache','weather_fetch_log',
     'pricing_settings','pricing_ess_products','pricing_ess_cost_lines','pricing_ess_services',
@@ -1256,6 +1267,10 @@ create trigger trg_updated_at before update on dev_notes
 
 drop trigger if exists trg_updated_at on weather_destinations;
 create trigger trg_updated_at before update on weather_destinations
+  for each row execute procedure set_updated_at();
+
+drop trigger if exists trg_updated_at on proposal_templates;
+create trigger trg_updated_at before update on proposal_templates
   for each row execute procedure set_updated_at();
 
 -- ============================================================

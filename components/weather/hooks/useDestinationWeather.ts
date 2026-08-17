@@ -26,9 +26,10 @@ async function fetchDestinationWeather(
 
     const qs = new URLSearchParams({ id });
     if (force) qs.set('force', '1');
-    const res = await fetch(`/api/weather/destination?${qs.toString()}`, {
-      cache: 'no-store',
-    });
+    const res = await fetch(
+      `/api/weather/destination?${qs.toString()}`,
+      force ? { cache: 'no-store' } : undefined
+    );
     const json = await res.json();
     if (!res.ok) {
       throw new Error(json?.error || `Weather fetch failed (${res.status})`);
@@ -42,6 +43,14 @@ async function fetchDestinationWeather(
 
   inflight.set(cacheKey, promise);
   return promise;
+}
+
+/** Best-effort prefetch (hover/focus) — deduped via inflight map. */
+export function prefetchDestinationWeather(id: string): void {
+  if (readClientWeatherCache(id)) return;
+  void fetchDestinationWeather(id, false).catch(() => {
+    /* prefetch is best-effort */
+  });
 }
 
 export function useDestinationWeather(
@@ -146,11 +155,14 @@ export function useDestinationWeather(
     };
   }, [activeId]);
 
+  const refresh = useCallback(() => load(true), [load]);
+  const reload = useCallback(() => load(false), [load]);
+
   return {
     data,
     loading,
     error,
-    refresh: () => load(true),
-    reload: () => load(false),
+    refresh,
+    reload,
   };
 }

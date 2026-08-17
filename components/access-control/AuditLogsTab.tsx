@@ -30,6 +30,7 @@ import {
 import {
     getAccessControlAuditActionPresentation,
 } from '@/lib/access-control/audit-log-presentation';
+import { formatAccessControlDateTime } from '@/lib/access-control/format-datetime';
 import styles from './AccessControlPage.module.css';
 import {
     ACCESS_CONTROL_AUDIT_LOGS_KEY,
@@ -237,20 +238,6 @@ function getAuditSummary(log: AccessControlAuditLog, language: AppLanguage): str
         log.action,
         language,
     ).label;
-}
-
-/** Định dạng thời gian theo ngôn ngữ đang chọn. */
-function formatDateTime(value: string, language: AppLanguage): string {
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-US', {
-        dateStyle: 'short',
-        timeStyle: 'medium',
-    }).format(date);
 }
 
 /** Hiển thị chi tiết cũ/mới khi người dùng mở rộng một dòng log. */
@@ -462,7 +449,7 @@ export default function AuditLogsTab() {
             title: tac('time', language),
             dataIndex: 'createdAt',
             width: 170,
-            render: (value: string) => formatDateTime(value, language),
+            render: (value: string) => formatAccessControlDateTime(value, language),
         },
         {
             title: tac('activity', language),
@@ -527,7 +514,7 @@ export default function AuditLogsTab() {
                 <Alert
                     type="error"
                     showIcon
-                    message={tac('unableToLoadHistory', language)}
+                    title={tac('unableToLoadHistory', language)}
                     description={errorMessage}
                     action={
                         <Button

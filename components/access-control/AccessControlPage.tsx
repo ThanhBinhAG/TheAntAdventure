@@ -43,10 +43,7 @@ export default function AccessControlPage() {
     const [hasOpenedLoginHistory, setHasOpenedLoginHistory] =
         useState(false);
 
-    const {
-        data: superAdminStatus,
-        isValidating: validatingSuperAdminStatus,
-    } = useSWR(
+    const { data: superAdminStatus } = useSWR(
         'access-control/super-admin-status',
         fetchAccessControlSuperAdminStatus,
         {
@@ -58,10 +55,8 @@ export default function AccessControlPage() {
         },
     );
 
-    // Trong lúc API đang xác nhận, mặc định ẩn tab để Admin không thấy nhầm.
-    const canViewLoginHistory =
-        !validatingSuperAdminStatus &&
-        superAdminStatus?.isSuperAdmin === true;
+    // Gate theo data đã biết — không ẩn tab khi SWR đang revalidate (tránh churn Tabs).
+    const canViewLoginHistory = superAdminStatus?.isSuperAdmin === true;
 
     return (
         <AccessControlUiProvider>

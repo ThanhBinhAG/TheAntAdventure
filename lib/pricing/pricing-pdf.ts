@@ -6,6 +6,7 @@ import puppeteer from 'puppeteer-core';
 import { getAppUrl } from '@/lib/env';
 import { buildPricingHTML, type PricingHtmlMeta } from '@/lib/pricing/pricing-html';
 import type { PricingTableRow } from '@/lib/products/product-pricing-helpers';
+import { pdfBrowserGate } from '@/lib/system/pdf-concurrency';
 
 const LINUX_CHROME_CANDIDATES = [
   '/usr/bin/google-chrome-stable',
@@ -58,6 +59,10 @@ export interface PricingPdfInput {
 }
 
 export async function renderPricingPdf(input: PricingPdfInput): Promise<Buffer> {
+  return pdfBrowserGate.run(() => renderPricingPdfUngated(input));
+}
+
+async function renderPricingPdfUngated(input: PricingPdfInput): Promise<Buffer> {
   const origin = getAppUrl();
   const html = buildPricingHTML(input.rows, input.meta, origin);
 

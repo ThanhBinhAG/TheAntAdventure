@@ -275,7 +275,7 @@ sequenceDiagram
   SB-->>HY: rows
   HY->>Z: importBackup boot slice
   HY->>HL: mark ready plus hydratedTables
-  PG->>PG: scheduleSidebarIdleLoad tasks tour_drafts
+  PG->>PG: page paints (no global sidebar prefetch)
   Z-->>AS: subsequent state mutation
   AS->>AS: debounce 2.5 seconds
   AS->>DB: upsert only hydrated table(s)
@@ -284,7 +284,7 @@ sequenceDiagram
 
 Important implementation nodes:
 
-- `lib/db/sync-config.ts` maps 28 table names to `BackupData`/Zustand keys, declares `PAGE_BOOT_TABLES` (per-route boot), `SIDEBAR_IDLE_TABLES`, `PROFILE_LAZY_TABLES`, and FK-safe write waves.
+- `lib/db/sync-config.ts` maps 28 table names to `BackupData`/Zustand keys, declares `PAGE_BOOT_TABLES` (per-route boot), `PROFILE_LAZY_TABLES`, and FK-safe write waves. Sidebar Planner / Tour Design badges use already-hydrated store data (no idle global fetch).
 - `lib/db/route-cache.ts` — sessionStorage route snapshot (5 min TTL); background revalidate only after 60s or on tab visible.
 - `lib/db/mappers.ts` transforms domain models ↔ SQL rows.- `lib/db/sync-lifecycle.ts` tracks `hydratedTables` / messages; blocks automatic writes until boot ready; auto-sync must not push unhydrated tables.
 - `lib/db/sync-policy.ts` makes `products` and `product_pricing` upsert-only. Other synchronized tables skip orphan deletion when the local row count is below 90% of the hydrated baseline; `force` can bypass that guard for mirror tables.
@@ -338,6 +338,7 @@ flowchart LR
 | `GET /api/health` | external monitor | public by design | Supabase Auth health |
 | `POST /api/photos/upload/init`, `/chunk`, `/complete`, `/delete` | gallery (chunked → Sharp → Storage) | authenticated only | Storage + `photos` tables |
 | `POST /api/pricing/export`, `/api/proposals/export` | pricing/tour-design | authenticated only; no role/permission export check | Puppeteer/Chromium PDF |
+| `GET,PUT /api/proposals/templates` | Tour Design Step 5 Edit Template | authenticated only | `proposal_templates` (lazy; not page-boot) |
 | `GET,PUT /api/system/*` | debug panel | debug token except debug-log POST | diagnostics/log buffer |
 | `POST /api/weather/refresh` | weather page or cron | authenticated user or cron secret | service-role cache + Open-Meteo |
 | `GET /api/weather/weekly` | weather page | no explicit guard | service-role cache |

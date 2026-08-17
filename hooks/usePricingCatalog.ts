@@ -26,6 +26,26 @@ interface CatalogState<T> {
   setData: (updater: (previous: T) => T) => void;
 }
 
+type CatalogLoadResult<T> = { loaded: T; imported: CatalogImportRecord | null };
+
+/** Share in-flight catalog GETs across Strict Mode remounts. */
+const catalogLoadInflight = new Map<CatalogWorkbook, Promise<CatalogLoadResult<unknown>>>();
+
+function loadCatalogOnce<T>(
+  workbook: CatalogWorkbook,
+  loader: () => Promise<T>
+): Promise<CatalogLoadResult<T>> {
+  const existing = catalogLoadInflight.get(workbook);
+  if (existing) return existing as Promise<CatalogLoadResult<T>>;
+  const work = Promise.all([loader(), loadLatestImport(workbook)])
+    .then(([loaded, imported]) => ({ loaded, imported }))
+    .finally(() => {
+      catalogLoadInflight.delete(workbook);
+    });
+  catalogLoadInflight.set(workbook, work as Promise<CatalogLoadResult<unknown>>);
+  return work;
+}
+
 function useCatalog<T>(
   workbook: CatalogWorkbook,
   loader: () => Promise<T>,
@@ -47,7 +67,7 @@ function useCatalog<T>(
     setLoading(true);
     setError(null);
     try {
-      const [loaded, imported] = await Promise.all([loader(), loadLatestImport(workbook)]);
+      const { loaded, imported } = await loadCatalogOnce(workbook, loader);
       setDataState(loaded);
       setLastImport(imported);
     } catch (e) {

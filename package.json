@@ -3,12 +3,13 @@
   "version": "4.3.0",
   "private": true,
   "scripts": {
-    "dev": "NODE_OPTIONS=--max-old-space-size=2048 next dev -p 3006",
+    "dev": "NODE_OPTIONS=--max-old-space-size=3072 next dev -p 3006",
     "build": "next build",
+    "analyze": "ANALYZE=true next build",
     "start": "next start -p 3006",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test $(find tests -name '*.test.ts' | sort)",
+    "test": "tsx --test $(find Personal/tests -name '*.test.ts' 2>/dev/null | sort)",
     "db:link": "supabase link",
     "db:login": "supabase login",
     "db:migration:new": "supabase migration new",
@@ -55,6 +56,7 @@
     "zustand": "^4.4.0"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^14.2.35",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

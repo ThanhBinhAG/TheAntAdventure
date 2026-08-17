@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { fmt } from '@/lib/constants';
 import {
   ICO_EMOJIS,
   ICO_KEYS,
@@ -158,7 +159,7 @@ export default function PricingEditModal({
                         </div>
                         {n === 10 ? (
                           <div className="pricing-edit-group-total" title={`${openRate} × ${openPax}`}>
-                            × {openPax} = ${groupTotal.toLocaleString('en-US')}
+                            × {openPax} = ${fmt(groupTotal)}
                           </div>
                         ) : null}
                       </td>

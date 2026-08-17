@@ -23,7 +23,7 @@ Every meaningful code/docs folder has an `AGENTS.md` describing **what that fold
 | [`docs/`](docs/AGENTS.md) | Tracked product docs (schema, setup) |
 | [`scripts/`](scripts/AGENTS.md) | Ops shell helpers (weather cron, PDF deps) |
 | [`supabase/`](supabase/AGENTS.md) | PostgreSQL schema, seeds, migrations |
-| [`tests/`](tests/AGENTS.md) | Vitest / Node test suite |
+| [`tests/`](tests/AGENTS.md) | Pointer only — real tests in gitignored `Personal/tests/` |
 | [`Personal/`](Personal/AGENTS.md) | Gitignored local notes, changelog, legacy |
 | [`.cursor/`](.cursor/AGENTS.md) | Cursor rules for this repo |
 | [`Dockerfile`](Dockerfile) / [`docker-compose.yml`](docker-compose.yml) | Production image (standalone) + local/VM compose |

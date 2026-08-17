@@ -16,6 +16,7 @@ import {
   hydrateShellFromSupabase,
   isRemoteDataEnabled,
   pushSnapshotToSupabase,
+  quickSupabasePing,
   resetShellHydrateGuard,
   subscribeHydration,
   verifyLocalMatchesRemote,
@@ -33,16 +34,15 @@ import { toast } from '@/lib/toast';
 import { confirmDialog } from '@/lib/confirm';
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const remoteEnabled = isRemoteDataEnabled();
   const [remote, setRemote] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [conn, setConn] = useState<ConnectionStatus | null>(null);
   const [verify, setVerify] = useState<VerifyResult | null>(null);
-  const [checking, setChecking] = useState(false);
+  const [checking, setChecking] = useState(remoteEnabled);
   const [autoSync, setAutoSync] = useState<AutoSyncState>(getAutoSyncState);
   const [hydration, setHydration] = useState<HydrationState>(getHydrationState);
-
-  const remoteEnabled = isRemoteDataEnabled();
   const autoSyncOn = isAutoSyncEnabled();
   const readOnly = isSupabaseReadOnly();
 
@@ -76,6 +76,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const status = await checkSupabaseConnection();
     setConn(status);
     setChecking(false);
+  }, [remoteEnabled]);
+
+  // Lightweight boot ping so Topbar/panel show "Kết nối OK (Nms)" without waiting for Test connection.
+  // Full table counts stay on the Test connection button (healthCheck).
+  useEffect(() => {
+    if (!remoteEnabled) return;
+    let cancelled = false;
+    void (async () => {
+      const status = await quickSupabasePing();
+      if (cancelled) return;
+      setConn(status);
+      setChecking(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [remoteEnabled]);
 
   const runHydrate = useCallback(async () => {
@@ -232,6 +248,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                   {readOnly && (
                     <div style={{ marginTop: 4, opacity: 0.95 }} className="crm-status-fail">
                       Chế độ chỉ đọc — không ghi lên Supabase
+                    </div>
+                  )}
+                  {!autoSyncOn && !readOnly && (
+                    <div style={{ marginTop: 4, opacity: 0.95 }} className="crm-status-fail">
+                      Auto-sync tắt — chỉnh sửa chỉ ở RAM; bật NEXT_PUBLIC_SUPABASE_AUTO_SYNC=true
+                      hoặc dùng Push snapshot
                     </div>
                   )}
                   {autoSyncOn && !readOnly && (

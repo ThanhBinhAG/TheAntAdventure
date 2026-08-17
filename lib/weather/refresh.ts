@@ -21,82 +21,82 @@ import {
   buildDestinationWeatherDetail,
   fetchDestinationForecastFromApi,
 } from './open-meteo';
-import type { DestinationWeatherDetail, RefreshResult, WeeklyWeatherResponse } from './types';
+import type {
+  DestinationWeatherDetail,
+  RefreshResult,
+  WeatherDestinationMeta,
+  WeeklyWeatherResponse,
+} from './types';
 import { WEATHER_DESTINATIONS } from './coordinates';
 
 const RATE_LIMIT_MINUTES = 5;
 
+function destinationCacheMeta(meta: WeatherDestinationMeta) {
+  return {
+    id: meta.id,
+    name: meta.name,
+    region: meta.region,
+    emoji: meta.emoji,
+    description: meta.description,
+    coverPhotoId: meta.coverPhotoId,
+    coverUrl: meta.coverUrl,
+  };
+}
+
 export async function fetchAndCacheDestination(
-  destinationId: string,
+  destination: string | WeatherDestinationMeta,
   options?: { force?: boolean }
 ): Promise<DestinationWeatherDetail> {
-  const meta = await getDestinationById(destinationId);
+  const meta =
+    typeof destination === 'string' ? await getDestinationById(destination) : destination;
   if (!meta || !meta.active) {
-    throw new Error(`Destination "${destinationId}" not found.`);
+    const id = typeof destination === 'string' ? destination : destination.id;
+    throw new Error(`Destination "${id}" not found.`);
   }
 
+  const cacheMeta = destinationCacheMeta(meta);
+
   if (!options?.force) {
-    const cached = await readDestinationDetailCache(destinationId, {
-      id: meta.id,
-      name: meta.name,
-      region: meta.region,
-      emoji: meta.emoji,
-      description: meta.description,
-      coverPhotoId: meta.coverPhotoId,
-      coverUrl: meta.coverUrl,
-    });
+    const cached = await readDestinationDetailCache(meta.id, cacheMeta);
     if (cached) return cached;
   } else {
-    await invalidateDestinationCache(destinationId);
+    await invalidateDestinationCache(meta.id);
   }
 
   const parsed = await fetchDestinationForecastFromApi(metaToCoord(meta));
-  await upsertWeeklyCache(parsed.rows);
-  await upsertCurrentCache(
-    destinationId,
-    { current: parsed.current, days: parsed.days },
-    parsed.fetchedAt,
-    parsed.expiresAt
-  );
-  await prunePastForecastDates(getTodayVnDate());
+  await Promise.all([
+    upsertWeeklyCache(parsed.rows),
+    upsertCurrentCache(
+      meta.id,
+      { current: parsed.current, days: parsed.days },
+      parsed.fetchedAt,
+      parsed.expiresAt
+    ),
+  ]);
+  void prunePastForecastDates(getTodayVnDate());
 
-  return buildDestinationWeatherDetail(
-    {
-      id: meta.id,
-      name: meta.name,
-      region: meta.region,
-      emoji: meta.emoji,
-      description: meta.description,
-      coverPhotoId: meta.coverPhotoId,
-      coverUrl: meta.coverUrl,
-    },
-    parsed
-  );
+  return buildDestinationWeatherDetail(cacheMeta, parsed);
 }
 
 export async function getDestinationWeather(
-  destinationId: string,
+  destination: string | WeatherDestinationMeta,
   options?: { force?: boolean }
 ): Promise<{ detail: DestinationWeatherDetail; fromCache: boolean }> {
-  const meta = await getDestinationById(destinationId);
+  const meta =
+    typeof destination === 'string' ? await getDestinationById(destination) : destination;
   if (!meta || !meta.active) {
-    throw new Error(`Destination "${destinationId}" not found.`);
+    const id = typeof destination === 'string' ? destination : destination.id;
+    throw new Error(`Destination "${id}" not found.`);
   }
 
+  const cacheMeta = destinationCacheMeta(meta);
+
   if (!options?.force) {
-    const cached = await readDestinationDetailCache(destinationId, {
-      id: meta.id,
-      name: meta.name,
-      region: meta.region,
-      emoji: meta.emoji,
-      description: meta.description,
-      coverPhotoId: meta.coverPhotoId,
-      coverUrl: meta.coverUrl,
-    });
+    const cached = await readDestinationDetailCache(meta.id, cacheMeta);
     if (cached) return { detail: cached, fromCache: true };
   }
 
-  const detail = await fetchAndCacheDestination(destinationId, { force: options?.force });
+  const detail = await fetchAndCacheDestination(meta, { force: options?.force });
   return { detail, fromCache: false };
 }
 
@@ -168,7 +168,7 @@ export async function refreshFeaturedForecast(options?: {
     let fetchedAt: string | undefined;
 
     for (const dest of targets) {
-      const detail = await fetchAndCacheDestination(dest.id, { force: true });
+      const detail = await fetchAndCacheDestination(dest, { force: true });
       rowsUpserted += detail.days.length;
       fetchedAt = detail.fetchedAt;
     }

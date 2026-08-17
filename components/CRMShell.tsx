@@ -9,6 +9,7 @@ import { StoreProvider } from '@/components/StoreProvider';
 import { PermissionsProvider } from '@/components/PermissionsProvider';
 import ToastHost from '@/components/ToastHost';
 import ConfirmHost from '@/components/ConfirmHost';
+import type { PermissionCode } from '@/lib/auth/permissions';
 
 const PIN_KEY = 'crm.sidebarPinned';
 
@@ -41,7 +42,17 @@ function subscribePinned(onStoreChange: () => void) {
 /**
  * CRM chrome: store + permissions + sidebar/topbar + toast/confirm hosts.
  */
-export default function CRMShell({ children }: { children: React.ReactNode }) {
+type CRMShellProps = {
+  children: React.ReactNode;
+
+  // Quyền đã được lấy từ server trong app/(crm)/layout.tsx.
+  initialPermissionCodes: PermissionCode[];
+};
+
+export default function CRMShell({
+  children,
+  initialPermissionCodes,
+}: CRMShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const sidebarPinned = useSyncExternalStore(subscribePinned, readPinned, () => true);
 
@@ -68,7 +79,7 @@ export default function CRMShell({ children }: { children: React.ReactNode }) {
 
   return (
     <StoreProvider>
-      <PermissionsProvider>
+      <PermissionsProvider initialPermissionCodes={initialPermissionCodes}>
         <AiCopilotProvider>
           <div className={appClass}>
             <Sidebar

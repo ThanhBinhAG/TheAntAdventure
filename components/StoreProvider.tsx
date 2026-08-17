@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AutoSyncListener } from '@/components/AutoSyncListener';
-import { appLog } from '@/lib/system/app-logger';
 import {
   getAutoSyncState,
   subscribeAutoSync,
@@ -12,18 +11,20 @@ import {
   checkSupabaseConnection,
   clearLocalPersistedData,
   completeMigrationToSupabase,
+  ensureAllTablesLoaded,
   getHydrationState,
-  hydrateFromSupabase,
+  hydrateShellFromSupabase,
   isRemoteDataEnabled,
   pushSnapshotToSupabase,
   quickSupabasePing,
+  resetShellHydrateGuard,
   subscribeHydration,
   verifyLocalMatchesRemote,
   type ConnectionStatus,
   type HydrationState,
   type VerifyResult,
 } from '@/lib/db/hydrate';
-import { markHydrationFailed, updateBaselineCounts } from '@/lib/db/sync-lifecycle';
+import { markHydrationFailed, markHydrationPending, updateBaselineCounts } from '@/lib/db/sync-lifecycle';
 import { countBackupRows } from '@/lib/db/sync-config';
 import { isAutoSyncEnabled, isSupabaseReadOnly } from '@/lib/env';
 import { useStore } from '@/lib/store';
@@ -33,21 +34,30 @@ import { toast } from '@/lib/toast';
 import { confirmDialog } from '@/lib/confirm';
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const remoteEnabled = isRemoteDataEnabled();
   const [remote, setRemote] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [conn, setConn] = useState<ConnectionStatus | null>(null);
   const [verify, setVerify] = useState<VerifyResult | null>(null);
-  const [checking, setChecking] = useState(false);
+  const [checking, setChecking] = useState(remoteEnabled);
   const [autoSync, setAutoSync] = useState<AutoSyncState>(getAutoSyncState);
   const [hydration, setHydration] = useState<HydrationState>(getHydrationState);
-
-  const remoteEnabled = isRemoteDataEnabled();
   const autoSyncOn = isAutoSyncEnabled();
   const readOnly = isSupabaseReadOnly();
 
   useEffect(() => subscribeAutoSync(setAutoSync), []);
-  useEffect(() => subscribeHydration(setHydration), []);
+  useEffect(
+    () =>
+      subscribeHydration((state) => {
+        setHydration(state);
+        if (state.phase === 'ready') {
+          setRemote(true);
+          useStore.getState().rolloverIncompleteTasks();
+        }
+      }),
+    []
+  );
 
   useEffect(() => {
     clearLocalPersistedData();
@@ -55,6 +65,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       markHydrationFailed(
         'Supabase bắt buộc — bật NEXT_PUBLIC_USE_SUPABASE=true và cấu hình URL + anon key trong .env.local'
       );
+    } else {
+      markHydrationPending();
     }
   }, [remoteEnabled]);
 
@@ -66,49 +78,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setChecking(false);
   }, [remoteEnabled]);
 
-  const runHydrate = useCallback(async () => {
-    if (!remoteEnabled) return false;
-    const ok = await hydrateFromSupabase();
-    if (ok) useStore.getState().rolloverIncompleteTasks();
-    setRemote(ok);
-    const status = await quickSupabasePing();
-    setConn(status);
-    return ok;
-  }, [remoteEnabled]);
-
+  // Lightweight boot ping so Topbar/panel show "Kết nối OK (Nms)" without waiting for Test connection.
+  // Full table counts stay on the Test connection button (healthCheck).
   useEffect(() => {
+    if (!remoteEnabled) return;
     let cancelled = false;
-
-    async function initSupabase() {
-      if (!remoteEnabled) return;
-
-      try {
-        const ok = await hydrateFromSupabase();
-        if (cancelled) return;
-        if (ok) useStore.getState().rolloverIncompleteTasks();
-        setRemote(ok);
-
-        const status = await quickSupabasePing();
-        if (!cancelled) setConn(status);
-      } catch (e) {
-        appLog('store-provider', 'Supabase background init failed', { level: 'warn', error: e });
-        if (!cancelled) {
-          setConn({
-            ok: false,
-            latencyMs: 0,
-            tables: {},
-            error: e instanceof Error ? e.message : 'Connection failed',
-          });
-        }
-      }
-    }
-
-    initSupabase();
+    void (async () => {
+      const status = await quickSupabasePing();
+      if (cancelled) return;
+      setConn(status);
+      setChecking(false);
+    })();
     return () => {
       cancelled = true;
     };
   }, [remoteEnabled]);
 
+  const runHydrate = useCallback(async () => {
+    if (!remoteEnabled) return false;
+    resetShellHydrateGuard();
+    const ok = await hydrateShellFromSupabase();
+    if (ok) useStore.getState().rolloverIncompleteTasks();
+    setRemote(ok);
+    await runConnectionCheck();
+    return ok;
+  }, [remoteEnabled, runConnectionCheck]);
+
+  // Route-first boot: PageDataGate calls ensurePageBootLoaded per route — no global fetch here.
   async function handleSync(force = false) {
     if (force) {
       const backup = useStore.getState().exportBackup();
@@ -119,10 +115,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         .join('\n');
       const ok = await confirmDialog(
         'Push toàn bộ snapshot lên Supabase?\n\n' +
-          'Catalogue (products) chỉ upsert — không xóa orphan.\n' +
-          'Các bảng khác có thể mirror nếu bạn chọn force.\n\n' +
-          (summary || '(empty)') +
-          '\n\nTiếp tục?',
+        'Sẽ tải đủ mọi bảng chưa hydrate trước khi push.\n' +
+        'Catalogue (products) chỉ upsert — không xóa orphan.\n' +
+        'Các bảng khác có thể mirror nếu bạn chọn force.\n\n' +
+        (summary || '(empty)') +
+        '\n\nTiếp tục?',
         {
           title: 'Push to Supabase',
           confirmLabel: 'Push',
@@ -133,6 +130,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
 
     setSyncing(true);
+    // Full push must not wipe remote with empty unhydrated arrays.
+    await ensureAllTablesLoaded();
     const result = await pushSnapshotToSupabase({ force });
     setSyncing(false);
     if (result.ok) {
@@ -164,11 +163,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   async function handleCompleteMigration() {
     const ok = await confirmDialog(
       'Bước này sẽ:\n' +
-        '1. Push toàn bộ data local lên Supabase\n' +
-        '2. So sánh số dòng local vs remote\n' +
-        '3. Xóa cache localStorage (ant-crm-v43)\n' +
-        '4. Load lại từ Supabase\n\n' +
-        'Tiếp tục?',
+      '1. Push toàn bộ data local lên Supabase\n' +
+      '2. So sánh số dòng local vs remote\n' +
+      '3. Xóa cache localStorage (ant-crm-v43)\n' +
+      '4. Load lại từ Supabase\n\n' +
+      'Tiếp tục?',
       {
         title: 'Complete migration',
         confirmLabel: 'Migrate',
@@ -249,6 +248,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                   {readOnly && (
                     <div style={{ marginTop: 4, opacity: 0.95 }} className="crm-status-fail">
                       Chế độ chỉ đọc — không ghi lên Supabase
+                    </div>
+                  )}
+                  {!autoSyncOn && !readOnly && (
+                    <div style={{ marginTop: 4, opacity: 0.95 }} className="crm-status-fail">
+                      Auto-sync tắt — chỉnh sửa chỉ ở RAM; bật NEXT_PUBLIC_SUPABASE_AUTO_SYNC=true
+                      hoặc dùng Push snapshot
                     </div>
                   )}
                   {autoSyncOn && !readOnly && (

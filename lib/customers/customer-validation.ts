@@ -1,5 +1,7 @@
 /** Client form field validators (email, phone, travel start date). */
 
+import { localIsoDate } from '../core/date-utils';
+
 const EMAIL_RE =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 
@@ -28,15 +30,12 @@ export function sanitizePhoneInput(raw: string): string {
   return hasPlus ? `+${rest}` : rest;
 }
 
-/** Local calendar YYYY-MM-DD for today. */
+/** Business-day YYYY-MM-DD (ICT via date-utils). */
 export function todayIsoLocal(now = new Date()): string {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return localIsoDate(now);
 }
 
-/** True when isoDate is empty or calendar date ≥ today (local). */
+/** True when isoDate is empty or calendar date ≥ today (ICT). */
 export function isTravelDateNotPast(isoDate: string, now = new Date()): boolean {
   const t = isoDate.trim();
   if (!t) return true;

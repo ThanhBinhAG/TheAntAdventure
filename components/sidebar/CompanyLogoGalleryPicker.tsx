@@ -12,6 +12,7 @@ import {
   type PhotoFolder,
 } from '@/lib/gallery/photo-folders';
 import GalleryFolderBreadcrumb from '@/components/gallery/GalleryFolderBreadcrumb';
+import GalleryFolderGrid from '@/components/gallery/GalleryFolderGrid';
 import StorageImage from '@/components/gallery/StorageImage';
 import EmptyState from '@/components/EmptyState';
 
@@ -86,29 +87,12 @@ export default function CompanyLogoGalleryPicker({
             </p>
 
           {visibleFolders.length > 0 && (
-            <div className="phlib-folder-grid logo-gallery-folders">
-              {visibleFolders.map((f) => (
-                <article
-                  key={f.id}
-                  className={`phlib-folder-card${f.isSystem ? ' system' : ''}`}
-                >
-                  <button
-                    type="button"
-                    className="phlib-folder-open"
-                    onClick={() => setFolderId(f.id)}
-                  >
-                    <span
-                      className={`phlib-folder-icon${f.id === UNSORTED_FOLDER_ID ? ' inbox' : ''}`}
-                      aria-hidden
-                    />
-                    <span className="phlib-folder-name">{f.name}</span>
-                    <span className="phlib-folder-count">
-                      {photoCounts[f.id] ?? 0} photo{(photoCounts[f.id] ?? 0) === 1 ? '' : 's'}
-                    </span>
-                  </button>
-                </article>
-              ))}
-            </div>
+            <GalleryFolderGrid
+              className="logo-gallery-folders"
+              folders={visibleFolders}
+              photoCounts={photoCounts}
+              onOpen={(id) => setFolderId(id)}
+            />
           )}
 
           {atRoot && visibleFolders.length === 0 && (

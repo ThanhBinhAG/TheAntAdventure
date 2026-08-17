@@ -14,7 +14,6 @@ import {
     createContext,
     useCallback,
     useContext,
-    useEffect,
     useMemo,
     useState,
 } from 'react';
@@ -41,14 +40,21 @@ const PermissionsContext = createContext<PermissionsContextValue | null>(null);
  */
 export function PermissionsProvider({
     children,
+    initialPermissionCodes,
 }: {
     children: React.ReactNode;
+
+    // Danh sách quyền đã được server lấy trước khi render CRM.
+    initialPermissionCodes: PermissionCode[];
 }) {
-    // Mặc định an toàn: chưa tải xong thì chưa có quyền nào.
+    // Dùng dữ liệu server truyền xuống ngay từ lần render đầu.
+    // Nhờ vậy Sidebar và PermissionGate không phải chờ fetch ở browser.
     const [permissionCodes, setPermissionCodes] = useState<ReadonlySet<string>>(
-        () => new Set(),
+        () => new Set(initialPermissionCodes),
     );
-    const [loading, setLoading] = useState(true);
+
+    // Quyền đã có sẵn nên không cần hiện màn hình "Checking access permissions...".
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Lấy toàn bộ quyền của user hiện đang đăng nhập.
@@ -72,18 +78,6 @@ export function PermissionsProvider({
             setLoading(false);
         }
     }, []);
-
-    // Component vừa xuất hiện thì tải quyền lần đầu.
-    // queueMicrotask: tránh setState đồng bộ trong body của effect (react-hooks/set-state-in-effect).
-    useEffect(() => {
-        let cancelled = false;
-        queueMicrotask(() => {
-            if (!cancelled) void loadPermissions();
-        });
-        return () => {
-            cancelled = true;
-        };
-    }, [loadPermissions]);
 
     const value = useMemo<PermissionsContextValue>(
         () => ({

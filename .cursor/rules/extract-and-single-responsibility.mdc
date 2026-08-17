@@ -1,0 +1,24 @@
+---
+description: Extract oversized files/functions; reuse domain modules instead of copy-paste pipelines
+alwaysApply: true
+---
+
+# Extract and single responsibility
+
+Prefer readable modules over god files. Behavior-preserving extract first; do not rewrite while splitting.
+
+## When to extract
+
+1. File grows past ~400 lines, or a function clearly does more than one job → split before new feature work.
+2. Pure helpers → `lib/<domain>/`. UI state/handlers → hooks or components in the same domain folder.
+3. Mirror existing domain layout (`components/<domain>/`, `lib/<domain>/`) instead of dumping at repo root.
+
+## Do not copy-paste pipelines
+
+- Reuse existing sync/hydrate/upload modules (`lib/db/*`, `lib/gallery/*`, `lib/storage/*`, `lib/image-pipeline/*`).
+- Do **not** invent a fourth photo upload path or duplicate `getX`/`syncX` blocks — extend the shared helper.
+- When two paths look similar but differ on purpose (e.g. Gallery save vs `gallery-loose-save`), keep both and document; do not force-merge without an explicit product ask.
+
+## Safe refactor default
+
+Move code + re-export stable import paths. No API contract, store shape, or UX changes unless the user asks.

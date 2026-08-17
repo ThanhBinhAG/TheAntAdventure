@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getAuthContext } from '@/lib/auth/session';
+import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import { deleteGalleryPhotoFilesServer, getPhotoStorageClient } from '@/lib/storage/upload-gallery-photo-server';
 
 const bodySchema = z.object({
@@ -9,9 +9,12 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const auth = await getAuthContext();
-  if (!auth.authenticated) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  const perm = await checkPermissionForRequest('gallery.write');
+  if (!perm.allowed) {
+    return NextResponse.json(
+      { ok: false, error: perm.status === 401 ? 'Unauthorized' : 'Forbidden' },
+      { status: perm.status }
+    );
   }
 
   const client = await getPhotoStorageClient();

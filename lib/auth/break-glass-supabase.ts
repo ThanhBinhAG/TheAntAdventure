@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import type { NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAnonKey, getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 /** Fixed shadow Auth user so break-glass gets RLS `authenticated` access. Not used for privilege checks. */
 export const BREAK_GLASS_SHADOW_EMAIL = 'breakglass.internal@invalid';
@@ -13,6 +14,7 @@ function getAdminClient(): SupabaseClient | null {
   const key = getSupabaseServiceRoleKey();
   if (!url || !key) return null;
   return createClient(url, key, {
+    ...getSupabaseGlobalFetchOptions(),
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
@@ -71,6 +73,7 @@ export async function attachBreakGlassSupabaseSession(
   if (!tokenHash) return false;
 
   const supabase = createServerClient(url, anon, {
+    ...getSupabaseGlobalFetchOptions(),
     cookies: {
       getAll() {
         return request.headers

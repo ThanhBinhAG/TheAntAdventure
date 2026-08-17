@@ -1,0 +1,22 @@
+---
+description: Gallery / storage / image-pipeline ownership and upload API contract
+globs: lib/gallery/**,lib/storage/**,lib/image-pipeline/**,app/api/photos/**,components/gallery/**,components/pages/Gallery*
+alwaysApply: false
+---
+
+# Photo pipeline boundaries
+
+Three layers, one gallery upload story (guide avatar and company logo stay separate stacks):
+
+| Layer | Owns |
+|-------|------|
+| `lib/gallery/` + `components/gallery/` | Client UX, photo-api client, loose-save helpers |
+| `lib/image-pipeline/` | Chunk upload sessions, Sharp worker |
+| `lib/storage/` | Limits, paths, rate limit, server persist to Storage/DB |
+
+## Rules
+
+1. Route handlers under `app/api/photos/upload/{init,chunk,complete}` stay thin; call into `lib/*` only.
+2. Do **not** run Sharp or service-role Storage writes from page components.
+3. Do **not** change the init/chunk/complete JSON contract during structure refactors.
+4. Gallery page logic belongs in `components/gallery/`; `components/pages/Gallery*` is a thin shell only.

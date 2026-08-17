@@ -9,6 +9,7 @@ import {
   registerNewCustomer,
   type RegisterNewCustomerResult,
 } from '@/lib/customers/customer-onboarding';
+import { persistCustomerRowsNow } from '@/lib/db/auto-sync';
 import type { Customer } from '@/lib/types';
 
 export type CustomerSaveOutcome =
@@ -43,6 +44,7 @@ export function useRegisterCustomer() {
           existingBookings: existing.bookings,
         });
         updateCustomer(updated.id, updated);
+        void persistCustomerRowsNow({ customers: [updated] });
         return { ok: true, customer: updated };
       }
 
@@ -63,6 +65,12 @@ export function useRegisterCustomer() {
       addCustomer(result.customer);
       if (result.lead) addLead(result.lead);
       if (result.comm) addComm(result.comm);
+
+      void persistCustomerRowsNow({
+        customers: [result.customer],
+        leads: result.lead ? [result.lead] : undefined,
+        comms: result.comm ? [result.comm] : undefined,
+      });
 
       const parts = [`Customer ${result.customer.id} created.`];
       if (result.lead) parts.push(`Lead ${result.lead.id} (Inquiry) added.`);

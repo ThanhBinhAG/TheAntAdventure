@@ -618,6 +618,17 @@ insert into company_branding (id, logo_url)
 values ('default', null)
 on conflict (id) do nothing;
 
+-- Shared proposal commercial/legal copy (one row per B2C/B2B). Empty fields = boilerplate.
+create table if not exists proposal_templates (
+  id          text primary key check (id in ('b2c', 'b2b')),
+  fields      jsonb not null default '{}'::jsonb,
+  updated_at  timestamptz not null default now()
+);
+
+insert into proposal_templates (id, fields)
+values ('b2c', '{}'::jsonb), ('b2b', '{}'::jsonb)
+on conflict (id) do nothing;
+
 create table if not exists photo_tags (
   photo_id        text not null references photos(id) on delete cascade,
   tag             text not null,
@@ -632,6 +643,29 @@ create table if not exists product_photos (
   is_featured     boolean not null default false,
   primary key (product_code, photo_id)
 );
+
+-- Product catalogue server-pagination RPCs. Keep in sync with CLI migrations.
+create or replace function public.list_products_page(p_page_number integer, p_page_size integer, p_search_text text default null, p_filter_region text default null, p_filter_duration text default null, p_filter_category text default null, p_filter_destination text default null, p_filter_pricing_status text default null)
+returns jsonb language plpgsql stable security invoker set search_path = public as $$
+declare result jsonb;
+begin
+ if p_page_number < 1 or p_page_size not in (12,24,48,96) then raise exception 'Yêu cầu phân trang không hợp lệ' using errcode='22023'; end if;
+ with base as (select p.*,case when pp.product_code is null then 'missing' when greatest(coalesce(pp.p1,0),coalesce(pp.p2,0),coalesce(pp.p3,0),coalesce(pp.p4,0),coalesce(pp.p5,0),coalesce(pp.p6,0),coalesce(pp.p7,0),coalesce(pp.p8,0),coalesce(pp.p9,0),coalesce(pp.p10,0))>0 and greatest(coalesce(pp.c1,0),coalesce(pp.c2,0),coalesce(pp.c3,0),coalesce(pp.c4,0),coalesce(pp.c5,0),coalesce(pp.c6,0),coalesce(pp.c7,0),coalesce(pp.c8,0),coalesce(pp.c9,0),coalesce(pp.c10,0))>0 then 'complete' when greatest(coalesce(pp.std_cost,0),coalesce(pp.p1,0),coalesce(pp.p2,0),coalesce(pp.p3,0),coalesce(pp.p4,0),coalesce(pp.p5,0),coalesce(pp.p6,0),coalesce(pp.p7,0),coalesce(pp.p8,0),coalesce(pp.p9,0),coalesce(pp.p10,0),coalesce(pp.c1,0),coalesce(pp.c2,0),coalesce(pp.c3,0),coalesce(pp.c4,0),coalesce(pp.c5,0),coalesce(pp.c6,0),coalesce(pp.c7,0),coalesce(pp.c8,0),coalesce(pp.c9,0),coalesce(pp.c10,0))>0 then 'incomplete' else 'missing' end pricing_status from products p left join product_pricing pp on pp.product_code=p.code), filtered as (select * from base where (nullif(trim(p_search_text),'') is null or name ilike '%'||p_search_text||'%' or description ilike '%'||p_search_text||'%' or code ilike '%'||p_search_text||'%' or destination ilike '%'||p_search_text||'%') and (nullif(trim(p_filter_region),'') is null or region=p_filter_region) and (nullif(trim(p_filter_duration),'') is null or duration=p_filter_duration) and (nullif(trim(p_filter_category),'') is null or category ilike '%'||p_filter_category||'%') and (nullif(trim(p_filter_destination),'') is null or destination=p_filter_destination) and (nullif(trim(p_filter_pricing_status),'') is null or pricing_status=p_filter_pricing_status)), meta as (select count(*)::integer total from filtered), pi as (select total,greatest(1,ceil(total::numeric/p_page_size)::integer) pages from meta), paged as (select f.* from filtered f cross join pi order by code limit p_page_size offset (select (least(p_page_number,pages)-1)*p_page_size from pi)) select jsonb_build_object('items',(select coalesce(jsonb_agg(to_jsonb(paged) order by code),'[]'::jsonb) from paged),'page',(select least(p_page_number,pages) from pi),'pageSize',p_page_size,'totalCount',(select total from pi),'totalPages',(select pages from pi),'hasPreviousPage',(select least(p_page_number,pages)>1 from pi),'hasNextPage',(select least(p_page_number,pages)<pages from pi)) into result; return result;
+end; $$;
+revoke all on function public.list_products_page(integer,integer,text,text,text,text,text,text) from public;
+grant execute on function public.list_products_page(integer,integer,text,text,text,text,text,text) to authenticated;
+
+create or replace function public.list_product_modules_page(p_page_number integer,p_page_size integer,p_search_text text default null) returns jsonb language sql stable security invoker set search_path=public as $$
+ with f as (select p.*,case p.region when 'north' then 1 when 'central' then 2 when 'south' then 3 end rr from products p where p.region in ('north','central','south') and lower(coalesce(p.duration,'')) not like '%service%' and (nullif(trim(p_search_text),'') is null or p.name ilike '%'||p_search_text||'%' or p.code ilike '%'||p_search_text||'%' or p.description ilike '%'||p_search_text||'%')), m as (select count(*)::integer n from f), pi as (select n,greatest(1,ceil(n::numeric/p_page_size)::integer) pages from m), x as (select f.* from f cross join pi order by rr,code limit p_page_size offset (select (least(p_page_number,pages)-1)*p_page_size from pi)) select jsonb_build_object('items',(select coalesce(jsonb_agg((to_jsonb(x)-'rr') order by rr,code),'[]'::jsonb) from x),'page',(select least(p_page_number,pages) from pi),'pageSize',p_page_size,'totalCount',(select n from pi),'totalPages',(select pages from pi),'hasPreviousPage',(select least(p_page_number,pages)>1 from pi),'hasNextPage',(select least(p_page_number,pages)<pages from pi));
+$$;
+revoke all on function public.list_product_modules_page(integer,integer,text) from public;
+grant execute on function public.list_product_modules_page(integer,integer,text) to authenticated;
+
+create or replace function public.list_product_facets(p_search_text text default null,p_filter_region text default null,p_filter_duration text default null,p_filter_category text default null,p_filter_destination text default null,p_filter_pricing_status text default null) returns jsonb language sql stable security invoker set search_path=public as $$
+ with b as (select p.*,case when pp.product_code is null then 'missing' when greatest(coalesce(pp.p1,0),coalesce(pp.p2,0),coalesce(pp.p3,0),coalesce(pp.p4,0),coalesce(pp.p5,0),coalesce(pp.p6,0),coalesce(pp.p7,0),coalesce(pp.p8,0),coalesce(pp.p9,0),coalesce(pp.p10,0))>0 and greatest(coalesce(pp.c1,0),coalesce(pp.c2,0),coalesce(pp.c3,0),coalesce(pp.c4,0),coalesce(pp.c5,0),coalesce(pp.c6,0),coalesce(pp.c7,0),coalesce(pp.c8,0),coalesce(pp.c9,0),coalesce(pp.c10,0))>0 then 'complete' when greatest(coalesce(pp.std_cost,0),coalesce(pp.p1,0),coalesce(pp.p2,0),coalesce(pp.p3,0),coalesce(pp.p4,0),coalesce(pp.p5,0),coalesce(pp.p6,0),coalesce(pp.p7,0),coalesce(pp.p8,0),coalesce(pp.p9,0),coalesce(pp.p10,0),coalesce(pp.c1,0),coalesce(pp.c2,0),coalesce(pp.c3,0),coalesce(pp.c4,0),coalesce(pp.c5,0),coalesce(pp.c6,0),coalesce(pp.c7,0),coalesce(pp.c8,0),coalesce(pp.c9,0),coalesce(pp.c10,0))>0 then 'incomplete' else 'missing' end ps from products p left join product_pricing pp on pp.product_code=p.code), f as (select * from b where (nullif(trim(p_search_text),'') is null or name ilike '%'||p_search_text||'%' or description ilike '%'||p_search_text||'%' or code ilike '%'||p_search_text||'%' or destination ilike '%'||p_search_text||'%') and (nullif(trim(p_filter_region),'') is null or region=p_filter_region) and (nullif(trim(p_filter_duration),'') is null or duration=p_filter_duration) and (nullif(trim(p_filter_category),'') is null or category ilike '%'||p_filter_category||'%')), d as (select coalesce(destination,'Other') k,count(*)::integer n from f where nullif(trim(p_filter_pricing_status),'') is null or ps=p_filter_pricing_status group by coalesce(destination,'Other')), p as (select ps,count(*)::integer n from f where nullif(trim(p_filter_destination),'') is null or destination=p_filter_destination group by ps) select jsonb_build_object('categories',(select coalesce(jsonb_agg(category order by category),'[]'::jsonb) from (select distinct category from b where category<>'') c),'destinations',(select coalesce(jsonb_object_agg(k,n),'{}'::jsonb) from d),'pricingPulse',jsonb_build_object('complete',coalesce((select n from p where ps='complete'),0),'incomplete',coalesce((select n from p where ps='incomplete'),0),'missing',coalesce((select n from p where ps='missing'),0)));
+$$;
+revoke all on function public.list_product_facets(text,text,text,text,text,text) from public;
+grant execute on function public.list_product_facets(text,text,text,text,text,text) to authenticated;
 
 -- ============================================================
 --  MODULE 13b · ATTRACTION SCHEDULE
@@ -871,9 +905,21 @@ create table if not exists weather_destinations (
   elevation_m     int,
   sort_order      int         default 0,
   active          boolean     default true,
+  description     text,
+  notes           text,
+  cover_photo_id  text        references photos(id) on delete set null,
+  is_featured     boolean     not null default false,
   created_at      timestamptz default now(),
   updated_at      timestamptz default now()
 );
+
+create index if not exists idx_weather_dest_featured
+  on weather_destinations (is_featured)
+  where active = true;
+
+create index if not exists idx_weather_dest_cover
+  on weather_destinations (cover_photo_id)
+  where cover_photo_id is not null;
 
 create table if not exists weather_forecast_cache (
   id              bigserial primary key,
@@ -899,10 +945,18 @@ create table if not exists weather_fetch_log (
   error_message       text
 );
 
+create table if not exists weather_current_cache (
+  destination_id text primary key references weather_destinations(id) on delete cascade,
+  payload        jsonb        not null,
+  fetched_at     timestamptz  not null,
+  expires_at     timestamptz  not null
+);
+
 create index if not exists idx_weather_cache_dest on weather_forecast_cache(destination_id);
 create index if not exists idx_weather_cache_date on weather_forecast_cache(forecast_date);
 create index if not exists idx_weather_cache_expires on weather_forecast_cache(expires_at);
 create index if not exists idx_weather_fetch_log_at on weather_fetch_log(fetched_at desc);
+create index if not exists idx_weather_current_expires on weather_current_cache(expires_at);
 
 -- ============================================================
 --  MODULE 21 · PRICING CATALOGS (Essentials + Accommodation)
@@ -1111,7 +1165,7 @@ begin
     'staff','salary_records','tasks','contracts','feedback',
     'suppliers','supplier_tags','cruises','transport','restaurants',
     'photo_folders','photos','photo_tags','product_photos','attractions','attraction_photos','cal_events',
-    'company_branding',
+    'company_branding','proposal_templates',
     'chat_channels','chat_messages','chat_reactions','dev_notes',
     'weather_destinations','weather_forecast_cache','weather_fetch_log',
     'pricing_settings','pricing_ess_products','pricing_ess_cost_lines','pricing_ess_services',
@@ -1213,6 +1267,10 @@ create trigger trg_updated_at before update on dev_notes
 
 drop trigger if exists trg_updated_at on weather_destinations;
 create trigger trg_updated_at before update on weather_destinations
+  for each row execute procedure set_updated_at();
+
+drop trigger if exists trg_updated_at on proposal_templates;
+create trigger trg_updated_at before update on proposal_templates
   for each row execute procedure set_updated_at();
 
 -- ============================================================

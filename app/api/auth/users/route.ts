@@ -3,12 +3,14 @@ import { isBreakGlassShadowEmail } from '@/lib/auth/break-glass-supabase';
 import { requireBreakGlass } from '@/lib/auth/session';
 import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/env';
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 function getAdminClient() {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceRoleKey();
   if (!url || !key) return null;
   return createClient(url, key, {
+    ...getSupabaseGlobalFetchOptions(),
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }

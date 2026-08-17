@@ -1,4 +1,4 @@
-import type { BackupData } from '../types';
+import type { BackupData, PageSlug } from '../types';
 
 /** v5 relational tables synced from Zustand arrays */
 export const SYNC_ARRAY_TABLES = [
@@ -33,6 +33,123 @@ export const SYNC_ARRAY_TABLES = [
 ] as const;
 
 export type SyncArrayTable = (typeof SYNC_ARRAY_TABLES)[number];
+
+/** Customer profile modal — lazy on open. */
+export const PROFILE_LAZY_TABLES: readonly SyncArrayTable[] = ['comms', 'bookings'] as const;
+
+/**
+ * Tables fetched immediately when entering a CRM route (route-first boot).
+ * Omitted slugs load nothing until explicitly needed (e.g. pricing catalog APIs).
+ */
+export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[]>> = {
+  dashboard: ['customers', 'leads', 'bookings', 'agents', 'feedback'],
+  planner: ['tasks', 'cal_events'],
+  customers: ['customers', 'leads', 'feedback'],
+  agents: ['agents', 'customers', 'leads'],
+  sales: ['leads', 'customers', 'comms', 'tour_drafts', 'bookings'],
+  /** photos / photo_folders lazy on experiences (step 2) and proposal (step 4). */
+  tourdesign: [
+    'products',
+    'customers',
+    'leads',
+    'tour_drafts',
+    'tour_outline_days',
+    'hotels',
+    'comms',
+  ],
+  // Catalogue pages use the paginated server API. The full data set is loaded
+  // only when a user opens a detail drawer or enters Manage mode.
+  products: [],
+  /** attractions deferred — Gallery lazy-loads for ?attraction= filter / delete unlink */
+  gallery: ['photos', 'photo_folders'],
+  pricing: ['products', 'product_pricing'],
+  bookings: ['bookings', 'customers'],
+  contracts: ['contracts', 'bookings'],
+  suppliers: ['hotels', 'transport', 'restaurants', 'cruises', 'suppliers'],
+  guides: ['guides'],
+  attractions: ['attractions', 'photos', 'photo_folders'],
+  /** Covers come from destinations API; no gallery hydrate on this route. */
+  weather: [],
+  posttour: ['feedback'],
+  finance: ['finance', 'accounts_receivable', 'accounts_payable'],
+  tax: ['tax_reports'],
+  salary: ['staff'],
+  hr: ['staff'],
+  devnotes: ['dev_notes'],
+  teamchat: [],
+};
+
+/** @deprecated Use PAGE_BOOT_TABLES — kept for wave-1 full hydrate. */
+export const SHELL_HYDRATE_TABLES: readonly SyncArrayTable[] = [
+  'customers',
+  'leads',
+  'bookings',
+  'agents',
+  'feedback',
+  'tasks',
+  'tour_drafts',
+] as const;
+
+/** @deprecated Messages only on teamchat / manual load. */
+export const SHELL_HYDRATE_MESSAGES = false;
+
+/** Unique boot tables for a route. */
+export function bootTablesForPage(slug: PageSlug): SyncArrayTable[] {
+  const boot = PAGE_BOOT_TABLES[slug];
+  if (!boot?.length) return [];
+  return [...new Set(boot)];
+}
+
+/**
+ * Legacy extras — merged into PAGE_BOOT_TABLES; kept empty for compat.
+ * @deprecated Use PAGE_BOOT_TABLES only.
+ */
+export const PAGE_HYDRATE_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[]>> = {};
+
+/** @deprecated Use bootTablesForPage */
+export function tablesForPage(slug: PageSlug): SyncArrayTable[] {
+  return bootTablesForPage(slug);
+}
+
+/**
+ * Legacy full-hydrate wave order (ensureAllTablesLoaded / migration).
+ */
+export const SYNC_HYDRATE_WAVES: SyncArrayTable[][] = [
+  ['customers', 'leads', 'bookings', 'agents', 'feedback', 'tasks', 'tour_drafts'],
+  [
+    'comms',
+    'tour_outline_days',
+    'guides',
+    'products',
+    'product_pricing',
+    'finance',
+    'accounts_receivable',
+    'accounts_payable',
+    'tax_reports',
+    'staff',
+    'contracts',
+    'cal_events',
+    'dev_notes',
+    'cruises',
+    'transport',
+    'restaurants',
+    'hotels',
+    'suppliers',
+  ],
+  ['photo_folders', 'photos', 'attractions'],
+];
+
+/** True when hydrate waves partition SYNC_ARRAY_TABLES exactly once. */
+export function hydrateWavesCoverAllTables(): boolean {
+  const seen = new Set<string>();
+  for (const wave of SYNC_HYDRATE_WAVES) {
+    for (const table of wave) {
+      if (seen.has(table)) return false;
+      seen.add(table);
+    }
+  }
+  return seen.size === SYNC_ARRAY_TABLES.length && SYNC_ARRAY_TABLES.every((t) => seen.has(t));
+}
 
 /**
  * FK-safe push order. Tables in the same wave may run in parallel;
@@ -103,14 +220,21 @@ export const TABLE_TO_STORE_KEY: Record<SyncArrayTable, keyof BackupData> = {
 
 export const MESSAGES_TABLE = 'chat_messages' as const;
 
+/**
+ * Nested/child tables counted in health checks via PostgREST `countTable`
+ * (not exposed on `db[table]` — only parent SyncArrayTables are).
+ */
+export const HEALTH_CHILD_COUNT_TABLES = [
+  'booking_itinerary',
+  'booking_activities',
+  'hotel_rooms',
+  'attraction_photos',
+] as const;
+
 /** Tables included in health-check row counts */
 export const HEALTH_COUNT_TABLES = [
   ...SYNC_ARRAY_TABLES,
-  'booking_itinerary',
-  'booking_activities',
-  'tour_outline_days',
-  'hotel_rooms',
-  'attraction_photos',
+  ...HEALTH_CHILD_COUNT_TABLES,
   MESSAGES_TABLE,
 ] as const;
 

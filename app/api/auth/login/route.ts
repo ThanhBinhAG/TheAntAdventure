@@ -12,7 +12,10 @@ import {
   getClientIp,
   recordLoginFailure,
 } from '@/lib/auth/rate-limit';
+import { getLoginClientMetadata } from '@/lib/auth/login-history';
+import { recordSuccessfulLogin } from '@/lib/auth/login-history-store';
 import { getSupabaseAnonKey, getSupabaseUrl, isBreakGlassConfigured } from '@/lib/env';
+import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 type LoginBody = {
   identity?: string;
@@ -24,9 +27,53 @@ function fail(status: number, error: string, headers?: HeadersInit) {
   return NextResponse.json({ ok: false, error }, { status, headers });
 }
 
+function isNetworkOrTlsAuthError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('fetch failed') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('network') ||
+    lower.includes('ssl') ||
+    lower.includes('tls') ||
+    lower.includes('certificate') ||
+    lower.includes('econnrefused') ||
+    lower.includes('enotfound')
+  );
+}
+
+function authConnectivityMessage(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes('econnrefused') || lower.includes('127.0.0.1') || lower.includes('localhost')) {
+    return 'Không kết nối được Supabase (ECONNREFUSED). Nếu đang dùng local: chạy npx supabase start. Nếu deploy: kiểm tra URL không còn trỏ 127.0.0.1.';
+  }
+  return 'Không kết nối được Supabase Auth — kiểm tra mạng, firewall, hoặc chứng chỉ TLS trên server.';
+}
+
+/**
+ * Audit không được làm thất bại đăng nhập.
+ *
+ * Không log IP, User-Agent hoặc lỗi database ra browser/server console để
+ * tránh vô tình lộ dữ liệu truy vết của người dùng.
+ */
+async function recordSuccessfulLoginSafely(input: {
+  userId: string | null;
+  authMethod: 'password' | 'break_glass';
+  request: Request;
+}): Promise<void> {
+  try {
+    await recordSuccessfulLogin({
+      userId: input.userId,
+      authMethod: input.authMethod,
+      metadata: getLoginClientMetadata(input.request),
+    });
+  } catch {
+    console.error('Không thể ghi lịch sử đăng nhập.');
+  }
+}
+
 export async function POST(request: Request) {
   const ip = getClientIp(request);
-  const rate = checkLoginRateLimit(ip);
+  const rate = await checkLoginRateLimit(ip);
   if (!rate.ok) {
     return fail(429, 'Quá nhiều lần đăng nhập thất bại. Thử lại sau.', {
       'Retry-After': String(rate.retryAfterSec),
@@ -43,19 +90,24 @@ export async function POST(request: Request) {
   const identity = (body.identity ?? '').trim();
   const password = body.password ?? '';
   if (!identity || !password) {
-    recordLoginFailure(ip);
+    await recordLoginFailure(ip);
     return fail(400, 'Vui lòng nhập tài khoản và mật khẩu.');
   }
 
   // Break-glass first (timing-safe compare); never log the username.
   if (isBreakGlassConfigured() && verifyBreakGlassCredentials(identity, password)) {
-    clearLoginFailures(ip);
+    await clearLoginFailures(ip);
     try {
       const { token, maxAge } = await mintBreakGlassSession();
       const response = NextResponse.json({ ok: true, mode: 'break_glass' });
       setBreakGlassCookie(response, token, maxAge);
       // Best-effort Supabase session for RLS; bg_session alone still unlocks recovery APIs.
       await attachBreakGlassSupabaseSession(request, response);
+      await recordSuccessfulLoginSafely({
+        userId: null,
+        authMethod: 'break_glass',
+        request,
+      });
       return response;
     } catch {
       return fail(500, 'Break-glass session is not available.');
@@ -65,18 +117,19 @@ export async function POST(request: Request) {
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();
   if (!url || !key) {
-    recordLoginFailure(ip);
+    await recordLoginFailure(ip);
     return fail(503, 'Supabase Auth chưa được cấu hình.');
   }
 
   // Normal users must use email.
   if (!identity.includes('@')) {
-    recordLoginFailure(ip);
+    await recordLoginFailure(ip);
     return fail(401, 'Tài khoản hoặc mật khẩu không đúng.');
   }
 
   const response = NextResponse.json({ ok: true, mode: 'supabase' });
   const supabase = createServerClient(url, key, {
+    ...getSupabaseGlobalFetchOptions(),
     cookies: {
       getAll() {
         return request.headers
@@ -96,15 +149,18 @@ export async function POST(request: Request) {
     },
   });
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: identity,
     password,
     options: body.captchaToken ? { captchaToken: body.captchaToken } : undefined,
   });
 
   if (error) {
-    recordLoginFailure(ip);
+    await recordLoginFailure(ip);
     const lower = error.message.toLowerCase();
+    if (isNetworkOrTlsAuthError(error.message)) {
+      return fail(503, authConnectivityMessage(error.message));
+    }
     let message = error.message || 'Đăng nhập thất bại.';
     if (lower.includes('invalid login credentials')) {
       message = 'Tài khoản hoặc mật khẩu không đúng.';
@@ -116,6 +172,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: message }, { status: 401 });
   }
 
-  clearLoginFailures(ip);
+  await clearLoginFailures(ip);
+
+  if (data.user) {
+    await recordSuccessfulLoginSafely({
+      userId: data.user.id,
+      authMethod: 'password',
+      request,
+    });
+  }
+
   return response;
 }

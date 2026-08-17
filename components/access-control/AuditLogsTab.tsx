@@ -13,12 +13,8 @@
  * - API và database đã kiểm tra users.manage trước khi trả log.
  */
 
-import {
-    useCallback,
-    useEffect,
-    useState,
-} from 'react';
-import { ReloadOutlined } from '@ant-design/icons';
+import { useCallback, useState } from 'react';
+import useSWR from 'swr';
 import {
     Alert,
     Button,
@@ -28,13 +24,23 @@ import {
 import type { TableColumnsType } from 'antd';
 import {
     fetchAccessControlAuditLogs,
+    getAccessControlErrorMessage,
     type AccessControlAuditLog,
-    type AccessControlAuditLogsPage,
 } from './access-control-api';
 import {
     getAccessControlAuditActionPresentation,
 } from '@/lib/access-control/audit-log-presentation';
+import { formatAccessControlDateTime } from '@/lib/access-control/format-datetime';
 import styles from './AccessControlPage.module.css';
+import {
+    ACCESS_CONTROL_AUDIT_LOGS_KEY,
+} from './useRefreshAccessControlAuditLogs';
+import { useLanguage } from '@/hooks/useLanguage';
+import {
+    tac,
+    tacTemplate,
+} from '@/lib/i18n/pages/access-control';
+import type { AppLanguage } from '@/lib/i18n/stages';
 
 /** Lấy chuỗi từ JSON audit một cách an toàn. */
 function readString(
@@ -54,42 +60,153 @@ function readStringArray(
     );
 }
 
+/** Các action này thay đổi role, nên không có target user để hiển thị. */
+const STAFF_ROLE_ACTIONS = new Set([
+    'staff_role_created',
+    'staff_role_updated',
+    'staff_role_deleted',
+    'staff_role_permissions_replaced',
+]);
+
 /** Đổi mã role kỹ thuật thành nhãn dễ đọc trong lịch sử. */
-function getRoleLabel(roleCode: string | null): string {
+function getRoleLabel(
+    roleCode: string | null,
+    language: AppLanguage,
+): string {
+    if (!roleCode) return tac('noRoleAssigned', language);
+
     if (roleCode === 'super_admin') return 'Super Admin';
     if (roleCode === 'admin') return 'Admin';
-    if (roleCode === 'employee') return 'Nhân viên';
+    if (roleCode === 'employee') return tac('employeeRole', language);
 
-    return 'Chưa gán role';
+    // Role động (Sale, Điều hành...) được lưu bằng code riêng trong audit.
+    // Không có bảng role đi kèm log cũ, nên giữ code làm phương án dự phòng.
+    return roleCode;
+}
+
+/** Lấy tên role từ dữ liệu audit; log cũ không có label sẽ dùng role_code. */
+function getAuditRoleLabel(
+    log: AccessControlAuditLog,
+    language: AppLanguage,
+): string {
+    return (
+        readString(log.afterValue.label) ??
+        readString(log.beforeValue.label) ??
+        getRoleLabel(
+            readString(log.afterValue.role_code) ??
+            readString(log.beforeValue.role_code),
+            language,
+        )
+    );
 }
 
 /** Hiển thị tên hoặc email của user là đối tượng bị thay đổi. */
-function getUserTarget(log: AccessControlAuditLog): string {
+function getUserTarget(
+    log: AccessControlAuditLog,
+    language: AppLanguage,
+): string {
     return (
         log.targetDisplayName ??
         log.targetEmail ??
-        'Người dùng không còn tồn tại'
+        tac('deletedUser', language)
+    );
+}
+
+/** Permission không thuộc một user cụ thể, mà thuộc danh mục quyền. */
+function getPermissionCatalogTarget(language: AppLanguage): string {
+    return tac('permissionCatalog', language);
+}
+
+function getCreatedPermissionLabel(
+    log: AccessControlAuditLog,
+    language: AppLanguage,
+): string {
+    return (
+        readString(log.afterValue.permission_description) ??
+        readString(log.afterValue.permission_code) ??
+        tac('unknownFeature', language)
+    );
+}
+
+function getCreatedPermissionGroupLabel(
+    log: AccessControlAuditLog,
+    language: AppLanguage,
+): string {
+    return (
+        readString(log.afterValue.group_label) ??
+        readString(log.afterValue.group_code) ??
+        tac('unknownGroup', language)
     );
 }
 
 /** Lấy đối tượng thay đổi: user hoặc role tùy action audit. */
-function getAuditTarget(log: AccessControlAuditLog): string {
-    if (log.action === 'role_permissions_replaced') {
-        return `Role: ${getRoleLabel(
-            readString(log.afterValue.role_code),
-        )}`;
+function getAuditTarget(log: AccessControlAuditLog, language: AppLanguage): string {
+    if (log.action === 'permission_created') {
+        return getPermissionCatalogTarget(language);
+    }
+    if (
+        log.action === 'role_permissions_replaced' ||
+        STAFF_ROLE_ACTIONS.has(log.action)
+    ) {
+        return tacTemplate('roleTarget', language, {
+            role: getAuditRoleLabel(log, language),
+        });
     }
 
-    return getUserTarget(log);
+    return getUserTarget(log, language);
 }
 
 /** Tạo câu tóm tắt ngắn phù hợp với từng action audit. */
-function getAuditSummary(log: AccessControlAuditLog): string {
+function getAuditSummary(log: AccessControlAuditLog, language: AppLanguage): string {
+    if (log.action === 'permission_created') {
+        return tacTemplate('permissionAddedToGroup', language, {
+            permission: getCreatedPermissionLabel(log, language),
+            group: getCreatedPermissionGroupLabel(log, language),
+        });
+    }
+    if (log.action === 'staff_role_created') {
+        return tacTemplate('roleCreatedSummary', language, {
+            role: getAuditRoleLabel(log, language),
+        });
+    }
+
+    if (log.action === 'staff_role_updated') {
+        return log.afterValue.is_active === false
+            ? tacTemplate('roleDeactivatedSummary', language, {
+                role: getAuditRoleLabel(log, language),
+            })
+            : tacTemplate('roleUpdatedSummary', language, {
+                role: getAuditRoleLabel(log, language),
+            });
+    }
+
+    if (log.action === 'staff_role_deleted') {
+        return tacTemplate('roleDeletedSummary', language, {
+            role: getAuditRoleLabel(log, language),
+        });
+    }
+
+    if (log.action === 'staff_role_permissions_replaced') {
+        const oldCount = readStringArray(
+            log.beforeValue.permission_codes,
+        ).length;
+        const newCount = readStringArray(
+            log.afterValue.permission_codes,
+        ).length;
+
+        return tacTemplate('permissionCountChanged', language, {
+            oldCount,
+            newCount,
+        });
+    }
+
     if (log.action === 'user_role_changed') {
         return `${getRoleLabel(
             readString(log.beforeValue.role_code),
+            language,
         )} → ${getRoleLabel(
             readString(log.afterValue.role_code),
+            language,
         )}`;
     }
 
@@ -97,8 +214,10 @@ function getAuditSummary(log: AccessControlAuditLog): string {
         const oldName = readString(log.beforeValue.display_name);
         const newName = readString(log.afterValue.display_name);
 
-        return `${oldName ?? 'Chưa đặt tên'} → ${newName ?? 'Chưa đặt tên'
-            }`;
+        return tacTemplate('displayNameChanged', language, {
+            oldName: oldName ?? tac('unnamedUser', language),
+            newName: newName ?? tac('unnamedUser', language),
+        });
     }
 
     if (log.action === 'role_permissions_replaced') {
@@ -109,33 +228,25 @@ function getAuditSummary(log: AccessControlAuditLog): string {
             log.afterValue.permission_codes,
         ).length;
 
-        return `${oldCount} quyền → ${newCount} quyền`;
+        return tacTemplate('permissionCountChanged', language, {
+            oldCount,
+            newCount,
+        });
     }
 
     return getAccessControlAuditActionPresentation(
         log.action,
+        language,
     ).label;
-}
-
-/** Định dạng thời gian theo ngôn ngữ Việt Nam. */
-function formatDateTime(value: string): string {
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return new Intl.DateTimeFormat('vi-VN', {
-        dateStyle: 'short',
-        timeStyle: 'medium',
-    }).format(date);
 }
 
 /** Hiển thị chi tiết cũ/mới khi người dùng mở rộng một dòng log. */
 function AuditLogDetails({
     log,
+    language,
 }: {
     log: AccessControlAuditLog;
+    language: AppLanguage;
 }) {
     const oldRole = readString(log.beforeValue.role_code);
     const newRole = readString(log.afterValue.role_code);
@@ -155,15 +266,52 @@ function AuditLogDetails({
         (code) => !newPermissions.includes(code),
     );
 
+    const isPermissionReplacement =
+        log.action === 'role_permissions_replaced' ||
+        log.action === 'staff_role_permissions_replaced';
+
+    if (log.action === 'permission_created') {
+        const permissionCode = readString(
+            log.afterValue.permission_code,
+        );
+
+        return (
+            <div className={styles.auditDetails}>
+                <span>
+                    {tac('feature', language)}:{' '}
+                    <strong>
+                        {getCreatedPermissionLabel(log, language)}
+                    </strong>
+                </span>
+
+                <span>
+                    {tac('featureGroup', language)}:{' '}
+                    <strong>
+                        {getCreatedPermissionGroupLabel(log, language)}
+                    </strong>
+                </span>
+
+                {permissionCode && (
+                    <span>
+                        {tac('internalPermissionCode', language)}:{' '}
+                        <code>{permissionCode}</code>
+                    </span>
+                )}
+            </div>
+        );
+    }
+
     if (log.action === 'user_role_changed') {
         return (
             <div className={styles.auditDetails}>
                 <span>
-                    Role cũ: <strong>{oldRole ?? 'Chưa gán role'}</strong>
+                    {tac('oldRole', language)}:{' '}
+                    <strong>{getRoleLabel(oldRole, language)}</strong>
                 </span>
 
                 <span>
-                    Role mới: <strong>{newRole ?? 'Chưa gán role'}</strong>
+                    {tac('newRole', language)}:{' '}
+                    <strong>{getRoleLabel(newRole, language)}</strong>
                 </span>
             </div>
         );
@@ -173,25 +321,25 @@ function AuditLogDetails({
         return (
             <div className={styles.auditDetails}>
                 <span>
-                    Tên cũ:{' '}
+                    {tac('oldName', language)}:{' '}
                     <strong>
                         {readString(log.beforeValue.display_name) ??
-                            'Chưa đặt tên'}
+                            tac('unnamedUser', language)}
                     </strong>
                 </span>
 
                 <span>
-                    Tên mới:{' '}
+                    {tac('newName', language)}:{' '}
                     <strong>
                         {readString(log.afterValue.display_name) ??
-                            'Chưa đặt tên'}
+                            tac('unnamedUser', language)}
                     </strong>
                 </span>
             </div>
         );
     }
 
-    if (log.action !== 'role_permissions_replaced') {
+    if (!isPermissionReplacement) {
         const roleCode = readString(log.afterValue.role_code);
 
         return (
@@ -199,13 +347,14 @@ function AuditLogDetails({
                 <span>
                     {getAccessControlAuditActionPresentation(
                         log.action,
+                        language,
                     ).label}
                 </span>
 
                 {roleCode && (
                     <span>
-                        Role tại thời điểm thao tác:{' '}
-                        <strong>{getRoleLabel(roleCode)}</strong>
+                        {tac('roleAtAction', language)}:{' '}
+                        <strong>{getRoleLabel(roleCode, language)}</strong>
                     </span>
                 )}
             </div>
@@ -215,33 +364,31 @@ function AuditLogDetails({
     return (
         <div className={styles.auditDetails}>
             <span>
-                Role được cập nhật:{' '}
-                <strong>
-                    {readString(log.afterValue.role_code) ?? 'Không xác định'}
-                </strong>
+                {tac('updatedRole', language)}:{' '}
+                <strong>{getAuditRoleLabel(log, language)}</strong>
             </span>
 
             <div>
-                <strong>Quyền được thêm:</strong>
+                <strong>{tac('addedPermissions', language)}:</strong>
 
                 <div className={styles.auditCodeList}>
                     {addedPermissions.length > 0
                         ? addedPermissions.map((code) => (
                             <code key={code}>{code}</code>
                         ))
-                        : 'Không có'}
+                        : tac('none', language)}
                 </div>
             </div>
 
             <div>
-                <strong>Quyền bị bỏ:</strong>
+                <strong>{tac('removedPermissions', language)}:</strong>
 
                 <div className={styles.auditCodeList}>
                     {removedPermissions.length > 0
                         ? removedPermissions.map((code) => (
                             <code key={code}>{code}</code>
                         ))
-                        : 'Không có'}
+                        : tac('none', language)}
                 </div>
             </div>
         </div>
@@ -249,82 +396,88 @@ function AuditLogDetails({
 }
 
 export default function AuditLogsTab() {
-    const [data, setData] =
-        useState<AccessControlAuditLogsPage | null>(null);
+    const { language } = useLanguage();
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] =
-        useState<string | null>(null);
 
-    /** Tải một trang log từ API. */
-    const loadLogs = useCallback(async () => {
-        setLoading(true);
-        setError(null);
+    /**
+     * Cache RAM cho từng trang lịch sử.
+     *
+     * Ví dụ: trang 1 và trang 2 có cache riêng.
+     * Khi quay lại trang vừa xem, SWR có thể dùng dữ liệu đã tải.
+     */
+    const auditLogsQueryKey = [
+        ACCESS_CONTROL_AUDIT_LOGS_KEY,
+        page,
+        pageSize,
+    ] as const;
 
-        try {
-            const nextData = await fetchAccessControlAuditLogs({
-                page,
-                pageSize,
-            });
+    const {
+        data,
+        error,
+        isLoading,
+        mutate: reloadLogs,
+    } = useSWR(
+        auditLogsQueryKey,
+        () => fetchAccessControlAuditLogs({ page, pageSize }),
+        {
+            // Audit log ít thay đổi hơn danh sách user.
+            dedupingInterval: 30_000,
+            keepPreviousData: true,
+            revalidateOnFocus: false,
+            focusThrottleInterval: 30_000,
+            revalidateOnReconnect: true,
+        },
+    );
 
-            setData(nextData);
-        } catch (error) {
-            setError(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể tải lịch sử phân quyền.',
-            );
-        } finally {
-            setLoading(false);
-        }
-    }, [page, pageSize]);
+    /** Chỉ dùng khi API lỗi để người dùng yêu cầu tải lại trang log hiện tại. */
+    const refreshLogs = useCallback(async (): Promise<void> => {
+        await reloadLogs();
+    }, [reloadLogs]);
 
-    useEffect(() => {
-        let cancelled = false;
-
-        // Chạy sau khi effect hoàn tất để không setState đồng bộ trong effect.
-        void Promise.resolve().then(() => {
-            if (!cancelled) {
-                return loadLogs();
-            }
-
-            return undefined;
-        });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [loadLogs]);
+    const errorMessage =
+        error
+            ? getAccessControlErrorMessage(
+                error,
+                language,
+                'loadAuditLogsFailed',
+            )
+            : null;
 
     const columns: TableColumnsType<AccessControlAuditLog> = [
         {
-            title: 'Thời gian',
+            title: tac('time', language),
             dataIndex: 'createdAt',
             width: 170,
-            render: (value: string) => formatDateTime(value),
+            render: (value: string) => formatAccessControlDateTime(value, language),
         },
         {
-            title: 'Thao tác',
+            title: tac('activity', language),
             dataIndex: 'action',
             width: 180,
             render: (value: string) => (
                 <Tag
-                    color={getAccessControlAuditActionPresentation(value).color}
+                    color={getAccessControlAuditActionPresentation(
+                        value,
+                        language,
+                    ).color}
                 >
-                    {getAccessControlAuditActionPresentation(value).label}
+                    {getAccessControlAuditActionPresentation(
+                        value,
+                        language,
+                    ).label}
                 </Tag>
             ),
         },
         {
-            title: 'Người thực hiện',
+            title: tac('actor', language),
             key: 'actor',
             render: (_value: unknown, log) => (
                 <div>
                     <strong>
                         {log.actorDisplayName ??
                             log.actorEmail ??
-                            'Không xác định'}
+                            tac('unknown', language)}
                     </strong>
 
                     {log.actorDisplayName && log.actorEmail && (
@@ -336,14 +489,14 @@ export default function AuditLogsTab() {
             ),
         },
         {
-            title: 'Đối tượng',
+            title: tac('target', language),
             key: 'target',
-            render: (_value: unknown, log) => getAuditTarget(log),
+            render: (_value: unknown, log) => getAuditTarget(log, language),
         },
         {
-            title: 'Tóm tắt',
+            title: tac('summary', language),
             key: 'summary',
-            render: (_value: unknown, log) => getAuditSummary(log),
+            render: (_value: unknown, log) => getAuditSummary(log, language),
         },
     ];
 
@@ -352,32 +505,23 @@ export default function AuditLogsTab() {
             <header className={styles.auditHeader}>
                 <div>
                     <h2 className={styles.sectionTitle}>
-                        Danh sách lịch sử thay đổi
+                        {tac('changeHistoryList', language)}
                     </h2>
-
                 </div>
-
-                <Button
-                    icon={<ReloadOutlined />}
-                    loading={loading}
-                    onClick={() => void loadLogs()}
-                >
-                    Tải lại
-                </Button>
             </header>
 
-            {error && (
+            {errorMessage && (
                 <Alert
                     type="error"
                     showIcon
-                    message="Không thể tải lịch sử"
-                    description={error}
+                    title={tac('unableToLoadHistory', language)}
+                    description={errorMessage}
                     action={
                         <Button
                             size="small"
-                            onClick={() => void loadLogs()}
+                            onClick={() => void refreshLogs()}
                         >
-                            Thử lại
+                            {tac('retry', language)}
                         </Button>
                     }
                 />
@@ -387,14 +531,14 @@ export default function AuditLogsTab() {
                 rowKey="id"
                 columns={columns}
                 dataSource={data?.items ?? []}
-                loading={loading}
+                loading={isLoading}
                 scroll={{ x: 900 }}
                 locale={{
-                    emptyText: 'Chưa có thay đổi phân quyền nào.',
+                    emptyText: tac('noChangesYet', language),
                 }}
                 expandable={{
                     expandedRowRender: (log) => (
-                        <AuditLogDetails log={log} />
+                        <AuditLogDetails log={log} language={language} />
                     ),
                     rowExpandable: () => true,
                 }}

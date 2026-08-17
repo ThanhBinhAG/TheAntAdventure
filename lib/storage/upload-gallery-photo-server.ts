@@ -3,13 +3,18 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getSupabaseAnonKey, getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { pickGalleryProfile } from '@/lib/image-pipeline/profiles';
+import {
+  processGalleryAssetFromPath,
+  type GalleryProcessedAsset,
+} from '@/lib/image-pipeline/process';
 import {
   galleryDeleteCandidatePaths,
   galleryDisplayPath,
   galleryThumbPath,
   PHOTOS_BUCKET,
 } from '@/lib/storage/photo-paths';
-import { processImageVariantsSharp } from '@/lib/storage/photo-variants-sharp';
 import { appLog } from '@/lib/system/app-logger';
 
 export type GalleryUploadResult = {
@@ -24,6 +29,7 @@ function getServiceClient(): SupabaseClient | null {
   const key = getSupabaseServiceRoleKey();
   if (!url || !key) return null;
   return createClient(url, key, {
+    ...getSupabaseGlobalFetchOptions(),
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
@@ -39,6 +45,7 @@ export async function getPhotoStorageClient(): Promise<SupabaseClient | null> {
 
   const cookieStore = cookies();
   return createServerClient(url, key, {
+    ...getSupabaseGlobalFetchOptions(),
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -55,6 +62,9 @@ function publicUrl(client: SupabaseClient, path: string): string {
   return data.publicUrl;
 }
 
+/** Safe to cache for a year: URLs carry `?v=displayBytes` (see `withPhotoCacheBust`). */
+const GALLERY_ASSET_CACHE_CONTROL = '31536000';
+
 async function uploadBuffer(
   client: SupabaseClient,
   path: string,
@@ -63,25 +73,26 @@ async function uploadBuffer(
   const { error } = await client.storage.from(PHOTOS_BUCKET).upload(path, buffer, {
     contentType: 'image/webp',
     upsert: true,
+    cacheControl: GALLERY_ASSET_CACHE_CONTROL,
   });
   if (error) throw new Error(error.message);
 }
 
-export async function uploadGalleryPhotoServer(
+async function uploadVariants(
   client: SupabaseClient,
   photoId: string,
-  input: Buffer,
-  mime: string
+  variants: { thumb: Buffer; display: Buffer; displayBytes: number }
 ): Promise<GalleryUploadResult> {
-  const { thumb, display, displayBytes } = await processImageVariantsSharp(input, mime);
   const displayPath = galleryDisplayPath(photoId);
   const thumbPath = galleryThumbPath(photoId);
 
-  await uploadBuffer(client, displayPath, display);
   try {
-    await uploadBuffer(client, thumbPath, thumb);
+    await Promise.all([
+      uploadBuffer(client, displayPath, variants.display),
+      uploadBuffer(client, thumbPath, variants.thumb),
+    ]);
   } catch (err) {
-    await client.storage.from(PHOTOS_BUCKET).remove([displayPath]);
+    await client.storage.from(PHOTOS_BUCKET).remove([displayPath, thumbPath]);
     throw err;
   }
 
@@ -89,7 +100,105 @@ export async function uploadGalleryPhotoServer(
     url: publicUrl(client, displayPath),
     thumbUrl: publicUrl(client, thumbPath),
     storagePath: displayPath,
-    displayBytes,
+    displayBytes: variants.displayBytes,
+  };
+}
+
+export async function uploadGalleryPhotoFromProcessed(
+  client: SupabaseClient,
+  photoId: string,
+  processed: GalleryProcessedAsset
+): Promise<GalleryUploadResult> {
+  const display = processed.variants.find((v) => v.name === 'display');
+  const thumb = processed.variants.find((v) => v.name === 'thumb');
+  if (!display || !thumb) {
+    throw new Error('Image processing did not produce the required variants');
+  }
+
+  return uploadVariants(client, photoId, {
+    display: display.buffer,
+    thumb: thumb.buffer,
+    displayBytes: display.bytes,
+  });
+}
+
+/**
+ * Sharp runs in a forked child (native OOM stays isolated). Caller should delete the
+ * original file from disk before or after this returns if freeing disk early matters.
+ */
+export async function processGalleryPhotoFromPath(
+  filePath: string,
+  mime: string,
+  sourceBytes: number,
+  workDir?: string
+): Promise<GalleryProcessedAsset> {
+  const profile = pickGalleryProfile(sourceBytes);
+  return processGalleryAssetFromPath(filePath, mime, profile, { workDir });
+}
+
+export type GalleryPhotoRowPayload = {
+  photoId: string;
+  caption: string;
+  region: string;
+  tags: string[];
+  folderId: string;
+};
+
+export type GalleryPhotoApiRecord = {
+  id: string;
+  caption: string;
+  region: string;
+  tags: string[];
+  url: string;
+  thumbUrl: string;
+  storagePath: string;
+  displayBytes: number;
+  folderId: string;
+};
+
+/** Upsert photos + photo_tags after Storage variants are written. */
+export async function persistGalleryPhotoRow(
+  client: SupabaseClient,
+  meta: GalleryPhotoRowPayload,
+  uploaded: GalleryUploadResult
+): Promise<GalleryPhotoApiRecord> {
+  const row = {
+    id: meta.photoId,
+    caption: meta.caption,
+    region: meta.region,
+    url: uploaded.url,
+    thumb_url: uploaded.thumbUrl,
+    storage_path: uploaded.storagePath,
+    display_bytes: uploaded.displayBytes,
+    folder_id: meta.folderId,
+  };
+
+  const { error: upsertErr } = await client.from('photos').upsert(row, { onConflict: 'id' });
+  if (upsertErr) {
+    await client.storage
+      .from(PHOTOS_BUCKET)
+      .remove(galleryDeleteCandidatePaths(meta.photoId, uploaded.storagePath));
+    throw new Error(upsertErr.message);
+  }
+
+  await client.from('photo_tags').delete().eq('photo_id', meta.photoId);
+  if (meta.tags.length) {
+    const { error: tagErr } = await client.from('photo_tags').insert(
+      meta.tags.map((tag) => ({ photo_id: meta.photoId, tag }))
+    );
+    if (tagErr) throw new Error(tagErr.message);
+  }
+
+  return {
+    id: meta.photoId,
+    caption: meta.caption,
+    region: meta.region,
+    tags: meta.tags,
+    url: uploaded.url,
+    thumbUrl: uploaded.thumbUrl,
+    storagePath: uploaded.storagePath,
+    displayBytes: uploaded.displayBytes,
+    folderId: meta.folderId,
   };
 }
 

@@ -5,29 +5,58 @@ import { thumbPathFromDisplayPath } from '@/lib/storage/photo-paths';
 export function isStoragePhoto(p: GalleryPhoto): boolean {
   if (p.storagePath) return true;
   const url = p.url ?? '';
-  return url.includes('.supabase.co/storage/v1/object/public/');
+  return url.includes('.supabase.co/storage/v1/object/public/') || url.includes('/storage/v1/object/public/photos/');
+}
+
+/**
+ * Bust browser / next/image cache when Storage path is reused (upsert replace).
+ * Prefer `displayBytes` — it changes whenever Sharp rewrites the file.
+ */
+export function withPhotoCacheBust(url: string, version?: number | string | null): string {
+  if (!url || version == null || version === '') return url;
+  const v = String(version);
+  try {
+    const u = new URL(url);
+    u.searchParams.set('v', v);
+    return u.href;
+  } catch {
+    const bare = url.split('#')[0]?.split('?')[0] ?? url;
+    return `${bare}?v=${encodeURIComponent(v)}`;
+  }
+}
+
+function cacheBustPhotoUrl(url: string | undefined, p: GalleryPhoto): string | undefined {
+  if (!url) return undefined;
+  return withPhotoCacheBust(url, p.displayBytes ?? null);
 }
 
 export function photoDisplayUrl(p: GalleryPhoto): string | undefined {
-  if (isStoragePhoto(p) && p.url) return p.url;
-  return p.url || undefined;
+  const raw = p.url || undefined;
+  if (!raw) return undefined;
+  if (isStoragePhoto(p)) return cacheBustPhotoUrl(raw, p);
+  return raw;
 }
 
 export function photoThumbUrl(p: GalleryPhoto): string | undefined {
-  if (p.thumbUrl) return p.thumbUrl;
-  if (p.storagePath) {
+  let raw: string | undefined;
+  if (p.thumbUrl) {
+    raw = p.thumbUrl;
+  } else if (p.storagePath) {
     const thumbPath = thumbPathFromDisplayPath(p.storagePath);
     if (thumbPath && p.url) {
-      const idx = p.url.indexOf('/storage/v1/object/public/photos/');
+      const base = p.url.split('?')[0] ?? p.url;
+      const idx = base.indexOf('/storage/v1/object/public/photos/');
       if (idx >= 0) {
-        return `${p.url.slice(0, idx)}/storage/v1/object/public/photos/${thumbPath}`;
+        raw = `${base.slice(0, idx)}/storage/v1/object/public/photos/${thumbPath}`;
       }
     }
+  } else if (isStoragePhoto(p) && p.url) {
+    const base = p.url.split('?')[0] ?? p.url;
+    if (base.endsWith('/display.webp')) {
+      raw = `${base.slice(0, -'display.webp'.length)}thumb.webp`;
+    }
   }
-  if (isStoragePhoto(p) && p.url?.endsWith('/display.webp')) {
-    return `${p.url.slice(0, -'display.webp'.length)}thumb.webp`;
-  }
-  return undefined;
+  return cacheBustPhotoUrl(raw, p);
 }
 
 export type ProductPhotoSlots = {

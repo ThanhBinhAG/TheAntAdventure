@@ -11,7 +11,7 @@ function logAuthEvent(message: string, meta?: Record<string, unknown>, level: 'i
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ category: 'auth', message, level, meta }),
-  }).catch(() => {});
+  }).catch(() => { });
 }
 
 function authErrorMessage(message: string): string {
@@ -111,8 +111,9 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
       });
       const next = searchParams.get('next');
       const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+      // Chuyển người dùng đến trang CRM sau khi API login đã ghi session vào cookie.
+      // Không gọi router.refresh() vì có thể tạo thêm một lượt tải dữ liệu không cần thiết.
       router.push(safeNext);
-      router.refresh();
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Đăng nhập thất bại.';
       logAuthEvent('signIn exception', { error: raw }, 'error');
@@ -130,7 +131,11 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
           <div className="login-subtitle">CRM — Đăng nhập</div>
         </div>
 
-        <form className="login-form" onSubmit={handleSubmit}>
+        <form
+          className={`login-form${loading ? ' is-busy' : ''}`}
+          onSubmit={handleSubmit}
+          aria-busy={loading}
+        >
           <label className="login-label" htmlFor="login-identity">
             Email
           </label>
@@ -140,6 +145,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
             inputMode="text"
             autoComplete="username"
             required
+            disabled={loading}
             value={identity}
             onChange={(e) => setIdentity(e.target.value)}
             placeholder="email@example.com"
@@ -153,6 +159,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
             type="password"
             autoComplete="current-password"
             required
+            disabled={loading}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
@@ -165,11 +172,23 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
           {error && <div className="login-error">{error}</div>}
 
           <button
-            className="btn btn-p login-submit"
+            className={`btn btn-p login-submit${loading ? ' is-loading' : ''}`}
             type="submit"
             disabled={loading || (captchaRequired && !captchaToken)}
+            aria-live="polite"
           >
-            {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
+            {loading ? (
+              <>
+                <span className="login-spinner" aria-hidden="true">
+                  <span className="dot" />
+                  <span className="dot" />
+                  <span className="dot" />
+                </span>
+                Đang đăng nhập…
+              </>
+            ) : (
+              'Đăng nhập'
+            )}
           </button>
         </form>
 
@@ -178,7 +197,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
         {showDebugLink && (
           <p className="login-hint debug-login-link">
             Admin:{' '}
-            <Link href="/system/debug">System diagnostics</Link> 
+            <Link href="/system/debug">System diagnostics</Link>
           </p>
         )}
       </div>

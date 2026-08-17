@@ -1,7 +1,32 @@
 import type { TourBrief } from './tour-design-types';
 import type { ExperienceOverride, OutlineStatus, TourDraft, TourOutlineDay } from '../types';
+import {
+  hasProposalTemplateOverrides,
+  toProposalTemplateOverrides,
+  type ProposalTemplateOverrides,
+} from '../proposals/proposal-content-overrides';
+import type { ProposalHotelRate } from '../proposals/proposal-types';
+import { normalizeProposalLayoutId, type ProposalLayoutId } from '../proposals/proposal-layouts';
 
 export const EXPERIENCE_OVERRIDES_KEY = '__experienceOverrides';
+export const PROPOSAL_TEMPLATE_OVERRIDES_KEY = '__proposalTemplateOverrides';
+export const PROPOSAL_SPECIAL_NOTES_KEY = '__proposalSpecialNotes';
+export const PROPOSAL_HOTEL_RATES_KEY = '__proposalHotelRates';
+export const PROPOSAL_LAYOUT_ID_KEY = '__proposalLayoutId';
+
+export type ProposalHotelRatesPersist = {
+  optionA: ProposalHotelRate[];
+  optionB: ProposalHotelRate[];
+  /** Fingerprint of outline hotel seed when rates were saved; mismatch → use fresh seed. */
+  seedKey?: string;
+};
+
+export type ProposalExportPersistState = {
+  templateOverrides?: ProposalTemplateOverrides;
+  specialNotes?: string;
+  hotelRates?: ProposalHotelRatesPersist;
+  layoutId?: ProposalLayoutId;
+};
 
 export function getExperienceOverridesFromBriefJson(
   briefJson?: Record<string, unknown> | null
@@ -75,6 +100,117 @@ export function resolveExperienceOverrides(
     return { ...draft.experienceOverrides };
   }
   return getExperienceOverridesFromBriefJson(draft.briefJson);
+}
+
+function parseHotelRateRow(raw: unknown): ProposalHotelRate | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.id !== 'string' || typeof o.hotelName !== 'string') return null;
+  return {
+    id: o.id,
+    hotelName: o.hotelName,
+    location: typeof o.location === 'string' ? o.location : '',
+    stayFrom: typeof o.stayFrom === 'string' ? o.stayFrom : '',
+    stayTo: typeof o.stayTo === 'string' ? o.stayTo : '',
+    roomType: typeof o.roomType === 'string' ? o.roomType : '',
+    nights: typeof o.nights === 'number' && Number.isFinite(o.nights) ? o.nights : 0,
+    ratePerNight:
+      typeof o.ratePerNight === 'number' && Number.isFinite(o.ratePerNight) ? o.ratePerNight : 0,
+  };
+}
+
+export function getProposalTemplateOverridesFromBriefJson(
+  briefJson?: Record<string, unknown> | null
+): ProposalTemplateOverrides {
+  if (!briefJson) return {};
+  const raw = briefJson[PROPOSAL_TEMPLATE_OVERRIDES_KEY];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return toProposalTemplateOverrides(raw as ProposalTemplateOverrides);
+}
+
+export function getProposalSpecialNotesFromBriefJson(
+  briefJson?: Record<string, unknown> | null
+): string {
+  if (!briefJson) return '';
+  const raw = briefJson[PROPOSAL_SPECIAL_NOTES_KEY];
+  return typeof raw === 'string' ? raw : '';
+}
+
+export function getProposalLayoutIdFromBriefJson(
+  briefJson?: Record<string, unknown> | null
+): ProposalLayoutId {
+  if (!briefJson) return normalizeProposalLayoutId(undefined);
+  return normalizeProposalLayoutId(briefJson[PROPOSAL_LAYOUT_ID_KEY]);
+}
+
+export function getProposalHotelRatesFromBriefJson(
+  briefJson?: Record<string, unknown> | null
+): ProposalHotelRatesPersist | undefined {
+  if (!briefJson) return undefined;
+  const raw = briefJson[PROPOSAL_HOTEL_RATES_KEY];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const o = raw as Record<string, unknown>;
+  const optionA = Array.isArray(o.optionA)
+    ? o.optionA.map(parseHotelRateRow).filter(Boolean) as ProposalHotelRate[]
+    : [];
+  const optionB = Array.isArray(o.optionB)
+    ? o.optionB.map(parseHotelRateRow).filter(Boolean) as ProposalHotelRate[]
+    : [];
+  if (!optionA.length && !optionB.length) return undefined;
+  const seedKey = typeof o.seedKey === 'string' ? o.seedKey : undefined;
+  return { optionA, optionB, seedKey };
+}
+
+export function resolveProposalExportState(
+  draft?: TourDraft | null
+): ProposalExportPersistState {
+  if (!draft?.briefJson) return {};
+  return {
+    templateOverrides: getProposalTemplateOverridesFromBriefJson(draft.briefJson),
+    specialNotes: getProposalSpecialNotesFromBriefJson(draft.briefJson),
+    hotelRates: getProposalHotelRatesFromBriefJson(draft.briefJson),
+    layoutId: getProposalLayoutIdFromBriefJson(draft.briefJson),
+  };
+}
+
+export function mergeProposalExportStateIntoBriefJson(
+  brief: TourBrief | Record<string, unknown>,
+  state?: ProposalExportPersistState | null
+): Record<string, unknown> {
+  const base = { ...(brief as Record<string, unknown>) };
+  const template = toProposalTemplateOverrides(state?.templateOverrides);
+  if (hasProposalTemplateOverrides(template)) {
+    base[PROPOSAL_TEMPLATE_OVERRIDES_KEY] = template;
+  } else {
+    delete base[PROPOSAL_TEMPLATE_OVERRIDES_KEY];
+  }
+
+  const notes = state?.specialNotes?.trim() ?? '';
+  if (notes) {
+    base[PROPOSAL_SPECIAL_NOTES_KEY] = notes;
+  } else {
+    delete base[PROPOSAL_SPECIAL_NOTES_KEY];
+  }
+
+  const rates = state?.hotelRates;
+  if (rates && (rates.optionA.length || rates.optionB.length)) {
+    base[PROPOSAL_HOTEL_RATES_KEY] = {
+      optionA: rates.optionA,
+      optionB: rates.optionB,
+      ...(rates.seedKey ? { seedKey: rates.seedKey } : {}),
+    };
+  } else {
+    delete base[PROPOSAL_HOTEL_RATES_KEY];
+  }
+
+  const layoutId = normalizeProposalLayoutId(state?.layoutId);
+  if (layoutId !== 'classic') {
+    base[PROPOSAL_LAYOUT_ID_KEY] = layoutId;
+  } else {
+    delete base[PROPOSAL_LAYOUT_ID_KEY];
+  }
+
+  return base;
 }
 
 export function tourDraftIdForLead(leadId: string): string {
@@ -159,13 +295,16 @@ export function buildTourDraft(input: {
   clientType: 'b2c' | 'b2b';
   currentStep: number;
   experienceOverrides?: Record<string, ExperienceOverride>;
+  proposalExport?: ProposalExportPersistState;
 }): TourDraft {
   const experienceOverrides = input.experienceOverrides ?? {};
+  const withExperience = mergeExperienceOverridesIntoBriefJson(input.brief, experienceOverrides);
+  const briefJson = mergeProposalExportStateIntoBriefJson(withExperience, input.proposalExport);
   return {
     id: tourDraftIdForLead(input.leadId),
     leadId: input.leadId,
     custId: input.custId,
-    briefJson: mergeExperienceOverridesIntoBriefJson(input.brief, experienceOverrides),
+    briefJson,
     outlineStatus: input.outlineStatus,
     outlineNotes: input.outlineNotes,
     outlineSentAt: input.outlineSentAt,
@@ -184,5 +323,9 @@ export function briefFromDraft(draft?: TourDraft | null): Partial<TourBrief> | u
   if (!draft?.briefJson) return undefined;
   const brief = { ...draft.briefJson };
   delete brief[EXPERIENCE_OVERRIDES_KEY];
+  delete brief[PROPOSAL_TEMPLATE_OVERRIDES_KEY];
+  delete brief[PROPOSAL_SPECIAL_NOTES_KEY];
+  delete brief[PROPOSAL_HOTEL_RATES_KEY];
+  delete brief[PROPOSAL_LAYOUT_ID_KEY];
   return brief as unknown as Partial<TourBrief>;
 }

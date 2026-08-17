@@ -1,10 +1,16 @@
 import type { WeatherDestinationCoord } from './coordinates';
 import { toTravelRating } from './rating';
-import type { WeatherForecastCacheRow } from './types';
+import type {
+  DestinationCurrentWeather,
+  DestinationWeatherDetail,
+  TravelRating,
+  WeatherDayForecast,
+  WeatherForecastCacheRow,
+} from './types';
 
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
 const TIMEZONE = 'Asia/Ho_Chi_Minh';
-const CACHE_TTL_HOURS = 24;
+export const CACHE_TTL_HOURS = 24;
 /** Parallel per-destination fetches when batch parse fails. */
 const FALLBACK_CONCURRENCY = 5;
 
@@ -13,23 +19,39 @@ type OpenMeteoDaily = {
   temperature_2m_max: (number | null)[];
   temperature_2m_min: (number | null)[];
   precipitation_sum: (number | null)[];
-  weathercode: (number | null)[];
+  weathercode?: (number | null)[];
+  weather_code?: (number | null)[];
   windspeed_10m_max: (number | null)[];
+  uv_index_max?: (number | null)[];
+};
+
+type OpenMeteoCurrent = {
+  temperature_2m?: number | null;
+  relative_humidity_2m?: number | null;
+  apparent_temperature?: number | null;
+  weather_code?: number | null;
+  wind_speed_10m?: number | null;
 };
 
 type OpenMeteoLocation = {
   latitude?: number;
   longitude?: number;
   daily?: OpenMeteoDaily;
+  current?: OpenMeteoCurrent;
 };
 
 type OpenMeteoResponse = {
   latitude?: number;
   longitude?: number;
   daily?: OpenMeteoDaily;
+  current?: OpenMeteoCurrent;
   /** Multi-location batch responses use numeric string keys */
   [key: string]: unknown;
 };
+
+function dailyWeatherCodes(daily: OpenMeteoDaily): (number | null)[] {
+  return daily.weathercode ?? daily.weather_code ?? [];
+}
 
 function buildForecastUrl(destinations: WeatherDestinationCoord[]): string {
   const lats = destinations.map((d) => d.latitude).join(',');
@@ -51,6 +73,21 @@ function buildForecastUrl(destinations: WeatherDestinationCoord[]): string {
   return `${OPEN_METEO_URL}?${params.toString()}`;
 }
 
+function buildDetailUrl(dest: WeatherDestinationCoord): string {
+  const params = new URLSearchParams({
+    latitude: String(dest.latitude),
+    longitude: String(dest.longitude),
+    current:
+      'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m',
+    daily:
+      'temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode,windspeed_10m_max,uv_index_max',
+    timezone: TIMEZONE,
+    forecast_days: '7',
+  });
+  if (dest.elevationM != null) params.set('elevation', String(dest.elevationM));
+  return `${OPEN_METEO_URL}?${params.toString()}`;
+}
+
 function parseLocationDaily(
   dest: WeatherDestinationCoord,
   daily: OpenMeteoDaily,
@@ -58,12 +95,13 @@ function parseLocationDaily(
 ): WeatherForecastCacheRow[] {
   const expiresAt = new Date(fetchedAt.getTime() + CACHE_TTL_HOURS * 60 * 60 * 1000);
   const rows: WeatherForecastCacheRow[] = [];
+  const codes = dailyWeatherCodes(daily);
 
   for (let i = 0; i < daily.time.length; i++) {
     const tempMax = daily.temperature_2m_max[i] ?? 0;
     const tempMin = daily.temperature_2m_min[i] ?? tempMax;
     const precip = daily.precipitation_sum[i] ?? 0;
-    const code = daily.weathercode[i] ?? 0;
+    const code = codes[i] ?? 0;
     const wind = daily.windspeed_10m_max[i];
 
     rows.push({
@@ -83,6 +121,43 @@ function parseLocationDaily(
   return rows;
 }
 
+function parseDaysFromDaily(daily: OpenMeteoDaily): WeatherDayForecast[] {
+  const codes = dailyWeatherCodes(daily);
+  const days: WeatherDayForecast[] = [];
+
+  for (let i = 0; i < daily.time.length; i++) {
+    const tempMax = daily.temperature_2m_max[i] ?? 0;
+    const tempMin = daily.temperature_2m_min[i] ?? tempMax;
+    const precip = daily.precipitation_sum[i] ?? 0;
+    const code = codes[i] ?? 0;
+    const wind = daily.windspeed_10m_max[i];
+    const uv = daily.uv_index_max?.[i] ?? null;
+
+    days.push({
+      date: daily.time[i],
+      tempMin,
+      tempMax,
+      precipMm: precip,
+      windKmh: wind,
+      weatherCode: code,
+      rating: toTravelRating(code, precip, tempMax, tempMin),
+      uvIndexMax: uv,
+    });
+  }
+
+  return days;
+}
+
+function parseCurrent(current: OpenMeteoCurrent | undefined, fallbackCode: number): DestinationCurrentWeather {
+  return {
+    tempC: current?.temperature_2m ?? 0,
+    humidity: current?.relative_humidity_2m ?? null,
+    feelsLikeC: current?.apparent_temperature ?? null,
+    weatherCode: current?.weather_code ?? fallbackCode,
+    windKmh: current?.wind_speed_10m ?? null,
+  };
+}
+
 function isDaily(value: unknown): value is OpenMeteoDaily {
   if (!value || typeof value !== 'object') return false;
   const d = value as OpenMeteoDaily;
@@ -99,7 +174,14 @@ function extractLocations(json: unknown): OpenMeteoLocation[] {
   const obj = json as OpenMeteoResponse;
 
   if (isDaily(obj.daily)) {
-    return [{ daily: obj.daily, latitude: obj.latitude, longitude: obj.longitude }];
+    return [
+      {
+        daily: obj.daily,
+        current: obj.current,
+        latitude: obj.latitude,
+        longitude: obj.longitude,
+      },
+    ];
   }
 
   const numericKeys = Object.keys(obj)
@@ -132,6 +214,41 @@ export function parseOpenMeteoResponse(
   return rows;
 }
 
+export type ParsedDestinationDetail = {
+  rows: WeatherForecastCacheRow[];
+  current: DestinationCurrentWeather;
+  days: WeatherDayForecast[];
+  fetchedAt: string;
+  expiresAt: string;
+};
+
+/** Parse a single-location Open-Meteo payload that includes current + daily (+ UV). */
+export function parseDestinationDetailResponse(
+  json: unknown,
+  dest: WeatherDestinationCoord,
+  fetchedAt: Date = new Date()
+): ParsedDestinationDetail {
+  const locations = extractLocations(json);
+  const loc = locations[0];
+  if (!loc || !isDaily(loc.daily)) {
+    throw new Error(`Open-Meteo returned no daily forecast for ${dest.id}`);
+  }
+
+  const days = parseDaysFromDaily(loc.daily);
+  const rows = parseLocationDaily(dest, loc.daily, fetchedAt);
+  const current = parseCurrent(loc.current, days[0]?.weatherCode ?? 0);
+  const expiresAt = rows[0]?.expires_at
+    ?? new Date(fetchedAt.getTime() + CACHE_TTL_HOURS * 60 * 60 * 1000).toISOString();
+
+  return {
+    rows,
+    current,
+    days,
+    fetchedAt: fetchedAt.toISOString(),
+    expiresAt,
+  };
+}
+
 async function fetchOneDestination(
   dest: WeatherDestinationCoord,
   fetchedAt: Date
@@ -143,6 +260,20 @@ async function fetchOneDestination(
   }
   const json = await res.json();
   return parseOpenMeteoResponse(json, [dest], fetchedAt);
+}
+
+/** Fetch current + 7-day forecast for one destination. */
+export async function fetchDestinationForecastFromApi(
+  dest: WeatherDestinationCoord
+): Promise<ParsedDestinationDetail> {
+  const fetchedAt = new Date();
+  const url = buildDetailUrl(dest);
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) {
+    throw new Error(`Open-Meteo HTTP ${res.status} for ${dest.id}`);
+  }
+  const json = await res.json();
+  return parseDestinationDetailResponse(json, dest, fetchedAt);
 }
 
 /** Run async work over items with limited concurrency. */
@@ -193,3 +324,33 @@ export async function fetchWeeklyForecastFromApi(
   );
   return chunks.flat();
 }
+
+export function buildDestinationWeatherDetail(
+  dest: {
+    id: string;
+    name: string;
+    region: WeatherDestinationCoord['region'];
+    emoji?: string | null;
+    description?: string | null;
+    coverPhotoId?: string | null;
+    coverUrl?: string | null;
+  },
+  parsed: ParsedDestinationDetail
+): DestinationWeatherDetail {
+  return {
+    id: dest.id,
+    name: dest.name,
+    region: dest.region,
+    emoji: dest.emoji ?? null,
+    description: dest.description ?? null,
+    coverPhotoId: dest.coverPhotoId ?? null,
+    coverUrl: dest.coverUrl ?? null,
+    current: parsed.current,
+    days: parsed.days,
+    fetchedAt: parsed.fetchedAt,
+    expiresAt: parsed.expiresAt,
+  };
+}
+
+/** Re-export for callers that need rating typing. */
+export type { TravelRating };

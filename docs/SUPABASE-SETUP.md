@@ -109,29 +109,37 @@ The app protects against accidental bulk data loss:
 
 Panel ☁ shows hydrate status, blocked sync warnings, and **Push có xác nhận** for manual override.
 
-## 5b. Môi trường DEV vs PROD
+## 5b. Môi trường DEV (local) vs PROD (khách / remote)
 
-**Never run `npm run dev` against the production Supabase project** without safeguards.
+**Never run `npm run dev` against the customer/production Supabase** without safeguards. App connects to **one** DB at a time via env.
 
-| | DEV (local) | PROD (deploy) |
-|--|-------------|---------------|
-| Supabase project | Separate dev instance | Production instance |
-| `NEXT_PUBLIC_SUPABASE_AUTO_SYNC` | `false` recommended | `true` |
-| `NEXT_PUBLIC_SUPABASE_READ_ONLY` | `true` if you must share prod DB | `false` |
-| `reset-v5.sql` | Dev only | Never |
-| `import-v5-data.sql` | Dev for testing | Only with backup |
+| | Local (dev) | Remote (khách / demo) |
+|--|-------------|------------------------|
+| Env file | `.env.local` | Server env, or gitignored `.env.remote.local` backup |
+| Supabase | Docker via `npx supabase start` | Self-hosted / Cloud instance |
+| API URL | `http://127.0.0.1:54321` | e.g. `https://sb.example.com` |
+| Migration | `npm run db:push:local` | `npm run db:push` + `SUPABASE_DB_URL` |
+| Status | `npm run db:status:local` | `npm run db:status` |
+| `NEXT_PUBLIC_SUPABASE_AUTO_SYNC` | `false` recommended at first | `true` when ready |
+| `reset-v5.sql` / wipe | Dev only | Never on customer DB |
 
-### Setup dev project
+### Setup local (recommended daily workflow)
 
-1. Create a second Supabase project (or second self-hosted instance).
-2. Run `schema.sql` → `import-v5-data.sql` on dev only.
-3. Point `.env.local` at dev URL + anon key.
-4. Use `NEXT_PUBLIC_SUPABASE_AUTO_SYNC=false` or `READ_ONLY=true` while experimenting.
+1. `npx supabase start` (Docker required).
+2. Copy keys from `npx supabase status -o env` into `.env.local` (`API_URL`, `ANON_KEY`, `SERVICE_ROLE_KEY`, DB URL on port `54322`).
+3. Keep customer credentials in `.env.remote.local` (gitignored) — do **not** use them for day-to-day `npm run dev`.
+4. New schema: edit `supabase/migrations/` → `npm run db:push:local` → test → only then push remote.
+
+### Setup / push remote (customer)
+
+1. Put Postgres URL in env as `SUPABASE_DB_URL` (see §9a).
+2. Existing DB without CLI history: `npm run db:bootstrap` first.
+3. `npm run db:push` (never `--local`).
 
 ### Checklist before `npm run dev`
 
-- [ ] `.env.local` URL is the **dev** project (not production)
-- [ ] `AUTO_SYNC=false` or `READ_ONLY=true` when testing risky changes
+- [ ] `.env.local` URL is **local** (`127.0.0.1:54321`) or an explicit shared **dev** instance — not production
+- [ ] `AUTO_SYNC=false` or `READ_ONLY=true` when testing risky changes against a shared DB
 - [ ] Run **Verify counts** in ☁ panel after large imports
 
 ### Backup (production)
@@ -238,7 +246,7 @@ https://your-domain.com/system/debug
 Nhập `SYSTEM_DEBUG_TOKEN` trên form (token được gửi qua header `X-Debug-Token`, không dùng query string để tránh rò rỉ Referer/log).
 
 Trang hiển thị:
-- Check env, proxy headers (nginx), Supabase Auth/REST reachability từ **phía server**
+- Check env, proxy headers (nginx), **Cookie header size**, Supabase Auth/REST reachability từ **phía server**
 - Recent logs (middleware, auth, diagnostics)
 - Hướng dẫn lệnh SSH
 
@@ -261,15 +269,25 @@ curl -vI https://your-domain.com 2>&1 | head -40
 curl -sI "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/health"
 ```
 
-Nginx cần có:
+Nginx cần có (app listen `:3006`):
 
 ```nginx
+client_max_body_size 20m;
+large_client_header_buffers 4 16k;
+proxy_read_timeout 300s;
+proxy_send_timeout 300s;
 proxy_set_header Host $host;
 proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 proxy_pass http://127.0.0.1:3006;
 ```
 
+Ghi chú:
+
+- **`large_client_header_buffers`** — tránh 400/502 khi Cookie header phình (Supabase auth JWT chunked `sb-*-auth-token.0/.1` + `bg_session`). `localStorage` / `sessionStorage` **không** gửi lên nginx.
+- **`proxy_read_timeout` / `proxy_send_timeout`** — gallery `complete` (Sharp) và PDF export có thể >60s; timeout ngắn → 502/504 dù app vẫn chạy.
+- **`client_max_body_size`** — gallery chunk hiện **512 KB**; 20m để dư cho logo/multipart và PDF JSON body.
+- 502 sau PDF/upload dài thường là **timeout hoặc OOM container** (`mem_limit`), không phải “tràn cache” trình duyệt.
 ### Bước 5 — Tắt debug sau khi fix
 
 ```env
@@ -310,17 +328,59 @@ If Tour Product photos vanish on refresh with `new row violates row-level securi
 | Library thumbnail | `gallery/{photoId}/thumb.webp` |
 | Guide avatar | `guides/{guideId}/avatar.webp` |
 
-Bucket: **`photos`** (public). Max file size after Sharp compression: 5 MB (bucket limit).
+Bucket: **`photos`** (public). Users may pick JPEG/PNG/WebP of **any size** (including multi‑hundred MB / ~1 GB) — there is no hard per-file byte reject. The client always uploads the original via **chunked upload** (`init` → `chunk` × N → `complete`, 512 KB chunks streamed to temp disk). On `complete`, a **forked Sharp child** ([`lib/image-pipeline/sharp-worker.cjs`](../lib/image-pipeline/sharp-worker.cjs), disk→disk, `VIPS_DISC_THRESHOLD=8m`, concurrency **1**) builds display ≤1280px + thumb ≤400px WebP, isolated from the Next.js process. The assembled original is deleted from disk immediately after Sharp succeeds, before Storage upload. A per-user hourly quota (`lib/storage/gallery-upload-rate-limit.ts`) guards against abuse instead of a hard size cap. Stored objects are typically well under the bucket’s **5 MB** file-size limit (only display + thumb WebP — originals are never kept).
 
 ### Upload via app
 
-Gallery → **Upload photos** sends the file to `POST /api/photos/upload`. The server uses **Sharp** to create WebP thumb (≤400px) + display (≤1280px), uploads both to Storage, and upserts the `photos` row (+ `photo_tags`).
+Gallery → **Upload photos** → [`uploadPhotoViaApi`](../lib/gallery/photo-api.ts) → `init` / `chunk` / `complete` (server Sharp). Uploads run one-at-a-time in the Gallery UI. If the app sits behind nginx (or similar), set `client_max_body_size` to at least **~2 MB** (chunks are 512 KB; leave headroom for multipart framing). Prefer the full proxy snippet in **Bước 4 — Checklist SSL nginx** (`proxy_read_timeout 300s`, `large_client_header_buffers 4 16k`).
 
 Tour Products attach photos via **Photo Library picker** → `product_photos` (not ownership on the photo row).
 
 Guides → edit form → **Avatar photo** still uploads client-side to `guides/{guideId}/avatar.webp`.
 
 Legacy owner-grouped paths (`gallery/tours/…`, `gallery/attractions/…`, `gallery/loose/…`) remain readable via stored `url` / `storage_path`; new uploads use the flat layout.
+
+### Dev machine memory (WSL) — why uploads can kill the VM
+
+**Image processing is not the memory problem.** Measured peak RSS of the forked Sharp worker, disk→disk with `VIPS_DISC_THRESHOLD=8m`:
+
+| Input | Peak RSS | Time |
+|-------|----------|------|
+| JPEG 10000×10000 (100 MP, 29 MB) | ~105 MB | ~1 s |
+| PNG 8000×8000 (64 MP, **178 MB** file) | ~106 MB | ~2.7 s |
+
+libvips streams and shrinks on load, so peak RSS is flat regardless of input size or format. A 100 MB upload costs the API roughly **105 MB and a couple of seconds** — it does not scale with the file.
+
+What actually kills the VM is total machine capacity. Real `oom-kill` events on a 7.4 GB WSL2 VM showed `global_oom` killing **`next-server` at 2.5–2.8 GB** — the dev server itself, never a Sharp worker. Measured on the same machine:
+
+| Process | RSS |
+|---------|-----|
+| `npm run dev` (Next 14 dev server) | ~1 GB after one route, **2.5–2.8 GB with the app compiled** |
+| local Supabase CLI stack (`supabase_*` containers) | **~2.4 GB** (`supabase_analytics`/logflare alone ~600 MB) |
+| Cursor / VS Code server | ~700 MB |
+| `npx eslint .` | ~860 MB |
+| `npx tsc --noEmit` | ~535 MB |
+| `npm test` | ~185 MB |
+
+Dev server + Supabase stack + editor alone is ~5.6 GB of 7.4 GB. Any spike — a route compiling on first request, a lint run — pushes it over, and the kernel kills the largest process, which can take the whole VM down.
+
+**Check this first.** `npx supabase start` leaves ~2.4 GB of containers running even when `.env.local` points at a remote Supabase, in which case the app never touches them. This stack has been torn down on the current dev machine; if you bring it back, expect to re-pull ~8.4 GB of images and to lose the RAM headroom below:
+
+```bash
+docker ps --format '{{.Names}}'   # supabase_*_TheAntAdventure listening on 54321-54327?
+grep SUPABASE_URL .env.local      # pointing somewhere else entirely?
+npx supabase stop                 # frees ~2.4 GB if you are not using the local stack
+```
+
+Then raise the ceiling in `%UserProfile%\.wslconfig` on Windows and run `wsl --shutdown`:
+
+```ini
+[wsl2]
+memory=12GB
+swap=8GB
+```
+
+Two guards are in place: `npm run dev` pins `--max-old-space-size=2048` so V8 collects aggressively and fails with a contained JS heap error rather than growing until the kernel picks a victim (raise it if compiles start failing), and the Docker `app` service sets `mem_limit: 2g` so a container is capped instead of the host.
 
 ### Manual upload via Supabase Dashboard
 
@@ -337,7 +397,9 @@ Legacy owner-grouped paths (`gallery/tours/…`, `gallery/attractions/…`, `gal
 
 ## 9. Supabase CLI migrations
 
-Schema changes use the **Supabase CLI** (`supabase/migrations/`). Fresh empty DB: `npm run db:push` applies the single baseline (`20260101000000`). SQL Editor path still uses `schema.sql` (keep in sync with that baseline).
+Schema changes use the **Supabase CLI** (`supabase/migrations/`). On **local Docker**, `npx supabase start` applies pending migrations automatically. On **remote**, use `npm run db:push` with `SUPABASE_DB_URL`. SQL Editor path still uses `schema.sql` (keep in sync with migrations).
+
+**Do not** run `db push --local` and expect the customer remote to update — they are separate databases.
 
 ### 9a. One-time setup
 
@@ -345,7 +407,16 @@ Schema changes use the **Supabase CLI** (`supabase/migrations/`). Fresh empty DB
 npm install                    # installs supabase CLI (devDependency)
 ```
 
-**Self-hosted** (e.g. `sb.mitelai.com`) — set in `.env.local`:
+**Local Docker (dev)** — no cloud project required:
+
+```bash
+npx supabase start
+# Then put API/anon/service keys + SUPABASE_DB_URL (port 54322) into .env.local
+npm run db:push:local          # when you add new migrations later
+npm run db:status:local
+```
+
+**Self-hosted remote** (e.g. customer `sb.…`) — keep credentials in deploy env or `.env.remote.local`:
 
 ```env
 SUPABASE_DB_URL=postgresql://postgres:YOUR_PASSWORD@HOST:5432/postgres
@@ -362,12 +433,12 @@ npm run db:link -- --project-ref YOUR_PROJECT_REF
 
 ### 9b. Bootstrap existing database
 
-If the DB already has `schema.sql` applied (no `supabase_migrations.schema_migrations` history) — **do not** `db push` the baseline (tables already exist):
+If the **remote** DB already has `schema.sql` applied (no `supabase_migrations.schema_migrations` history) — **do not** `db push` the baseline (tables already exist):
 
 ```bash
-# Add SUPABASE_DB_URL to .env.local first
+# Add SUPABASE_DB_URL for the remote first
 npm run db:bootstrap           # marks 20260101000000 as applied
-npm run db:status              # local vs remote history
+npm run db:status              # file vs remote history
 ```
 
 Manual repair for a single version:
@@ -381,7 +452,9 @@ bash scripts/supabase-db.sh repair-applied 20260101000000
 ```bash
 npm run db:migration:new -- add_my_column
 # Edit supabase/migrations/<timestamp>_add_my_column.sql
-npm run db:push                # DEV — applies pending migrations
+npm run db:push:local          # apply on local Docker first
+# After verification:
+npm run db:push                # remote — needs SUPABASE_DB_URL
 ```
 
 Checklist per migration:
@@ -399,10 +472,12 @@ Checklist per migration:
 | `npm run db:login` | Supabase Cloud access token |
 | `npm run db:link` | Link CLI to cloud project ref |
 | `npm run db:migration:new -- name` | Create timestamped migration file |
-| `npm run db:push` | Apply pending migrations (`SUPABASE_DB_URL`) |
+| `npm run db:push:local` | Apply pending migrations to **local** Docker |
+| `npm run db:status:local` | List migrations on **local** Docker |
+| `npm run db:push` | Apply pending migrations to **remote** (`SUPABASE_DB_URL`) |
 | `npm run db:pull` | Pull remote schema into new migration |
-| `npm run db:status` | List migration history |
-| `npm run db:bootstrap` | Mark baseline `20260101000000` applied on existing DB |
+| `npm run db:status` | List migration history vs remote |
+| `npm run db:bootstrap` | Mark baseline `20260101000000` applied on existing remote DB |
 
 Helper: [`scripts/supabase-db.sh`](../scripts/supabase-db.sh)
 
@@ -414,7 +489,8 @@ Pre-CLI `migrate-*.sql` files were removed; history note: [`supabase/legacy/LEGA
 
 | Error | Fix |
 |-------|-----|
-| `relation "X" already exists` | Run `npm run db:bootstrap` on existing DB before first push |
-| `SUPABASE_DB_URL is not set` | Add Postgres URL to `.env.local` |
+| `relation "X" already exists` | Run `npm run db:bootstrap` on existing remote DB before first push |
+| `SUPABASE_DB_URL is not set` | Add Postgres URL for **remote** push, or use `db:push:local` for Docker |
 | `Cannot find project ref` | Use `db:push` with `SUPABASE_DB_URL`, or `db:link` for Cloud |
 | RLS blocks after new table | Update `rls-authenticated.sql` and re-run on remote |
+| Access Control API 500 after pull | Migrations not on that DB — local: `db:push:local`; remote: `db:push` |

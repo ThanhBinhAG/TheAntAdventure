@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { VALID_PAGES } from '@/lib/constants';
 import { PAGE_COMPONENTS } from '@/components/pages';
 import PageRouteLoading from '@/components/PageRouteLoading';
+import PageDataGate from '@/components/PageDataGate';
 import type { PageSlug } from '@/lib/types';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -22,7 +23,9 @@ export default function CRMPage({ params }: PageProps) {
   return (
     <Suspense fallback={<PageRouteLoading />}>
       <PermissionGate page={slug}>
-        <PageComponent />
+        <PageDataGate page={slug}>
+          <PageComponent />
+        </PageDataGate>
       </PermissionGate>
     </Suspense>
   );

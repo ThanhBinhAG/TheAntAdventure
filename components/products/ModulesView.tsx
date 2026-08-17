@@ -1,26 +1,23 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
-import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
-import { isSelectableProduct } from '@/lib/products/product-display';
+import { useProductPage } from '@/hooks/useProductPage';
+import type { ProductPageSize } from '@/lib/products/product-list-input';
 import { REG_COLORS_HEX, REG_LABELS } from '@/lib/core/page-helpers';
 import {
   DUR_LABELS,
   MODULE_DUR_KEYS,
   MODULE_REGIONS,
-  flattenModulesProducts,
   groupModulesProductPage,
-  groupProductsForModules,
   getModulePriceRange,
   type ModulesGrouped,
 } from '@/lib/products/product-modules';
 import type { Product } from '@/lib/types';
 
 interface ModulesViewProps {
-  products: Product[];
   search: string;
   pickMode?: boolean;
   onPickProduct?: (p: Product) => void;
@@ -29,7 +26,6 @@ interface ModulesViewProps {
 }
 
 export default function ModulesView({
-  products,
   search,
   pickMode = false,
   onPickProduct,
@@ -37,24 +33,26 @@ export default function ModulesView({
   onShownCountChange,
 }: ModulesViewProps) {
   const { pageSize, setPageSize } = usePageSize();
-  const activeProducts = useMemo(() => products.filter(isSelectableProduct), [products]);
-  const groupedAll = useMemo(() => groupProductsForModules(activeProducts, search), [activeProducts, search]);
-  const flatList = useMemo(() => flattenModulesProducts(groupedAll), [groupedAll]);
-  const pagination = usePagination(flatList, pageSize, [search, pageSize]);
+  const [page, setPage] = useState(1);
+  const { data: productPage, error, isLoading, retry } = useProductPage({
+    page, pageSize: pageSize as ProductPageSize, view: 'modules', q: search || undefined,
+  });
+  const total = productPage?.totalCount ?? 0;
+  const currentPage = productPage?.page ?? page;
+  const totalPages = productPage?.totalPages ?? 1;
   const pageGrouped = useMemo(
-    () => groupModulesProductPage(pagination.paginatedItems),
-    [pagination.paginatedItems]
+    () => groupModulesProductPage(productPage?.items ?? []), [productPage?.items]
   );
 
   useEffect(() => {
-    onShownCountChange?.(flatList.length);
-  }, [flatList.length, onShownCountChange]);
+    onShownCountChange?.(total);
+  }, [total, onShownCountChange]);
 
   return (
     <div className={`tp-modules${pickMode ? ' prod-pick-mode' : ''}`}>
       {pickMode && <div className="prod-pick-scrim" aria-hidden />}
       <div className="tp-modules-inner">
-        {flatList.length === 0 ? (
+        {error ? <button type="button" className="btn btn-s btn-sm" onClick={retry}>Thử lại</button> : isLoading && !productPage ? <p>Đang tải products…</p> : total === 0 ? (
           <EmptyState
             className="crm-empty-state--flush"
             size="compact"
@@ -76,7 +74,7 @@ export default function ModulesView({
                 />
               ))}
             </div>
-            <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
+            <PaginationBar page={currentPage} setPage={setPage} totalPages={totalPages} total={total} pageSize={pageSize} rangeStart={total === 0 ? 0 : (currentPage - 1) * pageSize + 1} rangeEnd={Math.min(currentPage * pageSize, total)} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
           </>
         )}
       </div>

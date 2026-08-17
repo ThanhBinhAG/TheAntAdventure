@@ -28,6 +28,8 @@ interface Props {
   defaultRegion?: string;
   saving?: boolean;
   saveStatus?: string;
+  /** Percent `0..100` while chunking; null hides the bar. */
+  uploadProgress?: number | null;
   onClose: () => void;
   onSave: (data: GalleryPhotoSavePayload, id?: string) => void | Promise<void>;
   onDelete?: (id: string) => void | Promise<void>;
@@ -69,6 +71,7 @@ export default function GalleryPhotoModal({
   defaultRegion = 'north',
   saving = false,
   saveStatus = '',
+  uploadProgress = null,
   onClose,
   onSave,
   onDelete,
@@ -146,7 +149,7 @@ export default function GalleryPhotoModal({
           <div>
             <div className="phlib-modal-title">{mode === 'edit' ? 'Edit photo' : 'Upload to library'}</div>
             <div className="phlib-modal-sub">
-              {mode === 'edit' ? initial?.id : 'Sharp compresses to WebP before storage'}
+              {mode === 'edit' ? initial?.id : 'Server Sharp resizes & compresses to WebP (any file size)'}
             </div>
           </div>
           <button type="button" className="modal-close-btn" onClick={onClose} disabled={saving}>
@@ -157,7 +160,7 @@ export default function GalleryPhotoModal({
         <form className="phlib-modal-bd" onSubmit={handleSubmit}>
           <div className="phlib-modal-layout">
             <div className="phlib-modal-col-media">
-              <ModalSection title="Image" hint={mode === 'add' ? 'JPEG, PNG, or WebP · max 10 MB each' : undefined}>
+              <ModalSection title="Image" hint={mode === 'add' ? 'JPEG, PNG, or WebP · large files upload in chunks; Sharp compresses in an isolated worker' : undefined}>
                 {mode === 'edit' && (
                   <label className="phlib-check-row">
                     <input
@@ -258,6 +261,17 @@ export default function GalleryPhotoModal({
           </div>
 
           {saveStatus && <p className="phlib-save-status">{saveStatus}</p>}
+          {saving && uploadProgress != null && (
+            <div
+              className="gallery-bulk-progress"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={uploadProgress}
+            >
+              <div className="gallery-bulk-progress-bar" style={{ width: `${uploadProgress}%` }} />
+            </div>
+          )}
 
           <div className="phlib-modal-ft">
             {mode === 'edit' && onDelete && initial && (

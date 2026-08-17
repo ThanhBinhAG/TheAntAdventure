@@ -35,6 +35,7 @@ import {
   PROPOSAL_DEFAULT_EXCLUSIONS,
   PROPOSAL_DEFAULT_INCLUSIONS,
 } from './proposal-boilerplate';
+import { mergeProposalTemplateLayers } from './proposal-company-template';
 
 const PEAK_MONTHS = new Set(['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar']);
 
@@ -439,6 +440,11 @@ function collectPhotosForProduct(
   return urls.slice(0, want);
 }
 
+/** Sidebar always shows at most two photos; CSS stretch fills leftover height. */
+export function daySidebarPhotoBudget(): number {
+  return 2;
+}
+
 export function attachDayImages(
   days: ProposalDayDetail[],
   products: Product[],
@@ -468,33 +474,34 @@ export function attachDayImages(
       return { ...day, segments, imageUrls };
     }
 
+    const want = daySidebarPhotoBudget();
     const urls: string[] = [];
     const matched = findProductsForDay(day, products);
 
     for (const p of matched) {
-      const photos = resolveProductPhotos(p, galleryPhotos, 2);
+      const photos = resolveProductPhotos(p, galleryPhotos, want);
       for (const ph of photos) {
         if (ph.url && !urls.includes(ph.url)) urls.push(ph.url);
-        if (urls.length >= 2) break;
+        if (urls.length >= want) break;
       }
-      if (urls.length >= 2) break;
+      if (urls.length >= want) break;
     }
 
-    if (urls.length < 2) {
+    if (urls.length < want) {
       const pkgPhotos = resolvePackageDayPhotos(
         day.title || day.destination,
         regionTag,
         day.hotel,
         galleryPhotos,
         day.dayNumber,
-        2 - urls.length
+        want - urls.length
       );
       for (const ph of pkgPhotos) {
         if (ph.url && !urls.includes(ph.url)) urls.push(ph.url);
       }
     }
 
-    return { ...day, imageUrls: urls.slice(0, 2) };
+    return { ...day, imageUrls: urls.slice(0, want) };
   });
 }
 
@@ -824,8 +831,8 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
     logoUrl = '/Logo-3.svg',
     galleryPhotos = [],
     hotelsCatalog = [],
-    detailedProgramLayout = 'sidebar',
     experienceOverrides = {},
+    companyTemplate,
   } = input;
 
   const variant: ProposalVariant = clientType === 'b2b' ? 'b2b' : 'b2c';
@@ -897,7 +904,7 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
       ? `${brief.pax} Passengers (${brief.adults} adults + ${brief.children} child${brief.children > 1 ? 'ren' : ''})`
       : `${brief.pax} Passenger${brief.pax > 1 ? 's' : ''}`;
 
-  return {
+  const doc = {
     variant,
     quoteRef: generateQuoteRef(leadId),
     preparedDate: formatDisplayDate(preparedDate),
@@ -929,6 +936,7 @@ export function assembleProposalDoc(input: AssembleProposalInput): ProposalDoc {
     hotelRatesOptionB,
     specialNotes: buildSpecialNotes(brief, specialNotesOverride),
     logoUrl,
-    detailedProgramLayout: detailedProgramLayout === 'inline' ? 'inline' : 'sidebar',
   };
+
+  return mergeProposalTemplateLayers(doc, companyTemplate);
 }

@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { ensureTablesLoaded } from '@/lib/db/hydrate';
+import { PROFILE_LAZY_TABLES } from '@/lib/db/sync-config';
 import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
 import { createInquiryLeadForCustomer } from '@/lib/customers/customer-onboarding';
 import { getClientLeads, getClientPipeline, getCustomerBookings } from '@/lib/core/crm-utils';
@@ -78,6 +80,10 @@ export default function CustomerProfileModal({
   const addComm = useStore((s) => s.addComm);
   const addLead = useStore((s) => s.addLead);
   const updateCustomer = useStore((s) => s.updateCustomer);
+
+  useEffect(() => {
+    void ensureTablesLoaded(PROFILE_LAZY_TABLES);
+  }, []);
 
   const [tab, setTab] = useState<Tab>(initialTab);
   const [showLostLeads, setShowLostLeads] = useState(false);

@@ -1,9 +1,7 @@
 import type { TourBrief } from '../tour-design/tour-design-types';
+import type { ProposalLayoutId } from './proposal-layouts';
 
 export type ProposalVariant = 'b2c' | 'b2b';
-
-/** Detailed Program photo layout: Material-style sidebar (default) or inline horizontal grid. */
-export type ProposalDetailedProgramLayout = 'sidebar' | 'inline';
 
 export interface ProposalConsultant {
   name: string;
@@ -108,6 +106,8 @@ export type ProposalPricing = ProposalB2CPricing | ProposalB2BPricing;
 
 export interface ProposalDoc {
   variant: ProposalVariant;
+  /** Built-in export layout; defaults to classic when omitted. */
+  layoutId?: ProposalLayoutId;
   quoteRef: string;
   preparedDate: string;
   validUntil: string;
@@ -136,8 +136,6 @@ export interface ProposalDoc {
   hotelRatesOptionB: ProposalHotelRate[];
   specialNotes: string;
   logoUrl: string;
-  /** Default `sidebar` matches Material samples; `inline` keeps the horizontal photo grid. */
-  detailedProgramLayout: ProposalDetailedProgramLayout;
   /** Editor overrides for cover booking table values (keyed by row label). */
   bookingFields?: Record<string, string>;
   /** Editor overrides for Tour Overview table rows. */
@@ -146,6 +144,8 @@ export interface ProposalDoc {
   pricingText?: ProposalPricingText;
   /** Editor overrides for B2C legal section prose (serialized blocks). */
   legalText?: ProposalLegalText;
+  /** Optional brand / table colors from the company or quote template. */
+  theme?: import('./proposal-theme').ProposalTemplateTheme;
 }
 
 export interface AssembleProposalInput {
@@ -169,7 +169,8 @@ export interface AssembleProposalInput {
   productPricing?: import('../types').ProductPricing[];
   galleryPhotos?: import('../tour-design/tour-design-types').GalleryPhoto[];
   hotelsCatalog?: import('../types').Hotel[];
-  detailedProgramLayout?: ProposalDetailedProgramLayout;
   /** Per-product draft edits (desc / date / clientNote) from Step 2. */
   experienceOverrides?: Record<string, import('../types').ExperienceOverride>;
+  /** Saved company template (empty = keep assembler/boilerplate defaults). */
+  companyTemplate?: import('./proposal-content-overrides').ProposalTemplateOverrides;
 }

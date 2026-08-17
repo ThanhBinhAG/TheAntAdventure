@@ -2,7 +2,8 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
     "tests/**/*.test.ts",
-    "sentry.*.config.ts"
+    "sentry.*.config.ts",
+    "lib/image-pipeline/sharp-worker.cjs"
   ],
   "project": [
     "**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",

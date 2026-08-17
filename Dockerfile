@@ -47,7 +47,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production \
     PORT=3006 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    NODE_OPTIONS=--max-old-space-size=1536
 
 # System libs for @sparticuz/chromium (proposal / pricing PDF export).
 RUN apt-get update \

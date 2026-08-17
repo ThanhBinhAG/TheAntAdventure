@@ -6,6 +6,7 @@ import puppeteer from 'puppeteer-core';
 import { getAppUrl } from '@/lib/env';
 import { buildProposalHTML } from '@/lib/proposals/proposal-html';
 import type { ProposalDoc } from '@/lib/proposals/proposal-types';
+import { pdfBrowserGate } from '@/lib/system/pdf-concurrency';
 
 const LINUX_CHROME_CANDIDATES = [
   '/usr/bin/google-chrome-stable',
@@ -53,6 +54,10 @@ function formatPdfLaunchError(err: unknown): string {
 }
 
 export async function renderProposalPdf(doc: ProposalDoc): Promise<Buffer> {
+  return pdfBrowserGate.run(() => renderProposalPdfUngated(doc));
+}
+
+async function renderProposalPdfUngated(doc: ProposalDoc): Promise<Buffer> {
   const origin = getAppUrl();
   const html = buildProposalHTML(doc, origin);
 

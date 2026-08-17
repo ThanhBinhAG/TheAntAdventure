@@ -3,19 +3,31 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { NAV_SECTIONS, type NavItem } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
 import { countActiveTasks } from '@/lib/planner/planner-task-utils';
 import { countTourDesignAttention } from '@/lib/tour-design/tour-design-leads';
 import type { Lead, PageSlug, Task, TourDraft } from '@/lib/types';
-import { PAGE_READ_PERMISSION } from '@/lib/auth/permissions';
+import { canReadPage, canWritePage } from '@/lib/auth/permissions';
 import { usePermissions } from '@/components/PermissionsProvider';
 import CompanyLogoEditor from '@/components/sidebar/CompanyLogoEditor';
 import StorageImage from '@/components/gallery/StorageImage';
+import {
+  fetchCompanyLogoUrlClient,
+  getCachedCompanyLogoUrl,
+} from '@/lib/storage/company-logo-client';
 
 const DEFAULT_LOGO = '/Logo-3.svg';
+
+function subscribeCompanyLogoCache() {
+  return () => {};
+}
+
+function getServerCompanyLogoUrl(): undefined {
+  return undefined;
+}
 
 interface SidebarProps {
   open: boolean;
@@ -27,31 +39,39 @@ interface SidebarProps {
 export default function Sidebar({ open, onClose, pinned, onPinnedChange }: SidebarProps) {
   const pathname = usePathname();
   const { language, t } = useLanguage();
-  const { can, loading, error } = usePermissions();
+  const { permissionCodes, loading, error } = usePermissions();
   const current = (pathname.split('/').pop() || 'dashboard') as PageSlug;
   const tasks = useStore((s) => s.tasks) as Task[];
   const leads = useStore((s) => s.leads) as Lead[];
   const tourDrafts = useStore((s) => s.tourDrafts) as TourDraft[];
   const messages = useStore((s) => s.messages);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  /**
+   * undefined = unknown; null = default SVG; string = custom Storage URL.
+   * Server snapshot stays undefined so SSR HTML matches hydration.
+   * After hydrate, useSyncExternalStore reads the module/localStorage cache
+   * without a layout-effect setState.
+   */
+  const cachedLogoUrl = useSyncExternalStore(
+    subscribeCompanyLogoCache,
+    getCachedCompanyLogoUrl,
+    getServerCompanyLogoUrl
+  );
+  const [logoUrl, setLogoUrl] = useState<string | null | undefined>(undefined);
   const [logoEditorOpen, setLogoEditorOpen] = useState(false);
+  const displayLogoUrl = logoUrl !== undefined ? logoUrl : cachedLogoUrl;
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/branding/logo');
-        const body = (await res.json()) as { ok?: boolean; logoUrl?: string | null };
-        if (!cancelled && body.ok) setLogoUrl(body.logoUrl ?? null);
-      } catch {
-        /* keep default */
-      }
-    })();
+    void fetchCompanyLogoUrlClient().then((url) => {
+      if (!cancelled) setLogoUrl(url);
+    });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  // Badge counts: 0 until Planner / Tour Design / sales (etc.) hydrate those tables.
+  // No global sidebar prefetch on unrelated routes (e.g. Access Control).
   const activeTaskCount = useMemo(() => countActiveTasks(tasks), [tasks]);
   const pendingTourDesign = useMemo(
     () => countTourDesignAttention(leads, tourDrafts),
@@ -69,7 +89,7 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
               // Menu nhóm: chỉ giữ các menu con được phép.
               if (item.children?.length) {
                 const children = item.children.filter((child) =>
-                  can(PAGE_READ_PERMISSION[child.page]),
+                  canReadPage(permissionCodes, child.page),
                 );
 
                 return children.length > 0
@@ -78,14 +98,14 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
               }
 
               // Menu đơn: giữ khi có quyền xem trang tương ứng.
-              return can(PAGE_READ_PERMISSION[item.page])
+              return canReadPage(permissionCodes, item.page)
                 ? item
                 : null;
             })
             .filter((item): item is NavItem => item !== null),
         }))
         .filter((section) => section.items.length > 0),
-    [can],
+    [permissionCodes],
   );
 
   const groupPages = useMemo(() => {
@@ -110,7 +130,9 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
     }
   }
 
+  // Unread badge: 0 until messages idle-load / Team Chat hydrate (not part of shell boot).
   const chatUnread = useMemo(() => {
+    if (!messages || typeof messages !== 'object') return 0;
     let count = 0;
     Object.values(messages).forEach((ch) => {
       count += Array.isArray(ch) ? ch.length : 0;
@@ -118,9 +140,9 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
     return count > 0 ? Math.min(count, 99) : 0;
   }, [messages]);
 
-  const canEditLogo = can('company.read');
-  const displayLogo = logoUrl || DEFAULT_LOGO;
-  const isCustomLogo = Boolean(logoUrl);
+  const canEditLogo = canWritePage(permissionCodes, 'about');
+  const isPendingLogo = displayLogoUrl === undefined;
+  const isCustomLogo = typeof displayLogoUrl === 'string' && displayLogoUrl.length > 0;
 
   return (
     <>
@@ -139,16 +161,20 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
               {pinned ? '📌' : '📍'}
             </button>
           </div>
-          <div className={`sb-logo-avatar${isCustomLogo ? ' sb-logo-avatar--custom' : ''}`}>
-            <div className="sb-logo-avatar-img">
-              {isCustomLogo ? (
+          <div
+            className={`sb-logo-avatar${isCustomLogo ? ' sb-logo-avatar--custom' : ''}${isPendingLogo ? ' sb-logo-avatar--pending' : ''}`}
+          >
+            <div className="sb-logo-avatar-img" aria-busy={isPendingLogo || undefined}>
+              {isPendingLogo ? null : isCustomLogo ? (
                 <StorageImage
-                  src={displayLogo}
+                  src={displayLogoUrl}
                   alt="The Ant Adventures"
                   width={112}
                   height={112}
                   className="sb-logo-custom"
                   style={{ objectFit: 'cover', width: 112, height: 112 }}
+                  loading="eager"
+                  unoptimized
                 />
               ) : (
                 <Image
@@ -249,7 +275,7 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
       <CompanyLogoEditor
         open={logoEditorOpen}
         onClose={() => setLogoEditorOpen(false)}
-        onSaved={(url) => setLogoUrl(url)}
+        onSaved={setLogoUrl}
       />
     </>
   );

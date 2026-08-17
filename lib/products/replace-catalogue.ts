@@ -9,6 +9,8 @@ import { draftToProduct, type PortfolioDraftProduct } from '@/lib/products/portf
 import { getSupabaseClient } from '@/lib/supabase';
 import { useStore } from '@/lib/store';
 import type { Product, ProductPricing } from '@/lib/types';
+import { invalidateProductFacetsFromClient } from './product-facets-client';
+
 
 export interface ReplaceCatalogueResult {
   ok: boolean;
@@ -67,6 +69,7 @@ export async function replaceCatalogueFromDrafts(
 
       useStore.getState().setProducts(products);
       useStore.getState().setProductPricing(pricingStubs);
+      await invalidateProductFacetsFromClient();
     });
 
     updateBaselineCounts(countBackupRows(useStore.getState().exportBackup()));

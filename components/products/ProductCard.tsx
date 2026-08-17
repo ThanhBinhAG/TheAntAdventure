@@ -32,7 +32,10 @@ export default function ProductCard({
   const pricingRow = useStore((s) => s.productPricing.find((r) => r.productCode === p.code));
   const [rbg, rfg] = REG_COLORS_HEX[p.region as keyof typeof REG_COLORS_HEX] || ['#f5f5f5', '#333'];
   const priceLabel = p.price || getLibPriceLabel(p.code, 2);
-  const pStatus = pricingStatus(pricingRow);
+  // The catalogue no longer hydrates all pricing rows at page boot. Do not
+  // label an unloaded row as "missing"; the accurate status is shown after
+  // the detail/Manage lazy load.
+  const pStatus = pricingRow ? pricingStatus(pricingRow) : null;
   const photoStatus = productPhotoSlotStatus(product);
 
   const heroUrl = useMemo(() => {
@@ -76,7 +79,14 @@ export default function ProductCard({
     >
       <div className="tp-card-media">
         {heroUrl ? (
-          <StorageImage src={heroUrl} alt={p.name} fill sizes="(max-width: 768px) 50vw, 220px" className="tp-card-img" />
+          <StorageImage
+            src={heroUrl}
+            alt={p.name}
+            fill
+            sizes="(max-width: 768px) 50vw, 220px"
+            className="tp-card-img"
+            unoptimized
+          />
         ) : (
           <div className="tp-card-media-placeholder" aria-hidden>
             <span className="tp-card-media-icon">🗺</span>
@@ -90,7 +100,7 @@ export default function ProductCard({
             {photoStatus.linked}/{photoStatus.needed}
           </span>
         )}
-        {pStatus !== 'complete' && (
+        {pStatus && pStatus !== 'complete' && (
           <span className={`tp-card-pricing-badge tp-card-pricing-badge--${pStatus}`} title="Pricing status">
             {pStatus === 'missing' ? 'No $' : 'Partial'}
           </span>

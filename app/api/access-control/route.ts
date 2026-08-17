@@ -3,7 +3,8 @@
  *
  * Chức năng:
  * - GET: trả users, roles và permissions cho giao diện.
- * - PATCH: đổi role user hoặc thay permission của admin/employee.
+ * - PATCH: đổi role user hoặc thay permission của role nhân viên.
+ * - POST: Super Admin tạo mục permission và nhóm permission mới.
  *
  * Bảo mật:
  * - Kiểm tra users.manage tại API.
@@ -12,43 +13,64 @@
  */
 
 import { NextResponse } from "next/server";
-import { z } from 'zod';
 import {
     AccessControlRpcError,
     getAccessControlData,
     replaceAccessControlRolePermissions,
     setAccessControlUserRole,
+    createAccessControlPermission,
 } from '@/lib/access-control/server';
+import {
+    createAccessControlPermissionBodySchema,
+} from '@/lib/access-control/permission-input';
+import {
+    accessControlRoleUpdateBodySchema,
+} from '@/lib/access-control/role-input';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
+import {
+    accessControlError,
+    accessControlPermissionError,
+} from '@/lib/access-control/api-error';
 
 export const dynamic = 'force-dynamic';
 
-/** Schema kiểm tra dữ liệu PATCH từ frontend. */
-const updateBodySchema = z.discriminatedUnion('action', [
-    z.object({
-        action: z.literal('set_user_role'),
-        userId: z.string().uuid('userId không hợp lệ.'),
-        roleCode: z.enum(['super_admin', 'admin', 'employee']),
-    }),
-    z.object({
-        action: z.literal('replace_role_permissions'),
-        roleCode: z.enum(['admin', 'employee']),
-        permissionCodes: z.array(z.string().min(1)).max(100),
-    }),
-]);
 
 /** Chuyển lỗi database thành HTTP response an toàn cho frontend. */
 function errorResponse(error: unknown) {
     if (error instanceof AccessControlRpcError) {
         if (error.code === '42501') {
             return NextResponse.json(
-                { ok: false, error: 'You are not authorized to perform this action.' },//Bạn không có quyền thực hiện thao tác này.
+                accessControlError('ACCESS_DENIED', error.message),
                 { status: 403 },
             );
         }
+
+        if (error.code === '22023') {
+            return NextResponse.json(
+                accessControlError(
+                    'INVALID_ACCESS_CONTROL_REQUEST',
+                    error.message,
+                ),
+                { status: 400 },
+            );
+        }
+
+        if (error.code === '23505') {
+            return NextResponse.json(
+                accessControlError(
+                    'PERMISSION_CODE_EXISTS',
+                    'Mã quyền này đã tồn tại.',
+                ),
+                { status: 409 },
+            );
+        }
     }
+
     return NextResponse.json(
-        { ok: false, error: 'Unable to process the authorization request.' },//Không thể xử lý yêu cầu phân quyền.
+        accessControlError(
+            'ACCESS_CONTROL_REQUEST_FAILED',
+            'Không thể xử lý yêu cầu phân quyền.',
+        ),
         { status: 500 },
     );
 }
@@ -59,7 +81,7 @@ export async function GET() {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
@@ -87,19 +109,19 @@ export async function PATCH(request: Request) {
 
     if (!permission.allowed) {
         return NextResponse.json(
-            { ok: false, error: 'Unauthorized' },
+            accessControlPermissionError(permission.status),
             { status: permission.status },
         );
     }
     const body = await request.json().catch(() => null);
-    const parsed = updateBodySchema.safeParse(body);
+    const parsed = accessControlRoleUpdateBodySchema.safeParse(body);
 
     if (!parsed.success) {
         return NextResponse.json(
-            {
-                ok: false,
-                error: 'Dữ liệu cập nhật không hợp lệ.',
-            },
+            accessControlError(
+                'INVALID_ACCESS_CONTROL_REQUEST',
+                'Dữ liệu cập nhật không hợp lệ.',
+            ),
             { status: 400 },
         );
     }
@@ -123,6 +145,35 @@ export async function PATCH(request: Request) {
     }
 }
 
+export async function POST(request: Request) {
+    // UI có thể bị sửa bằng DevTools, nên vẫn kiểm tra quyền ở API và RPC.
+    const permission = await checkPermissionForRequest('users.manage');
 
+    if (!permission.allowed) {
+        return NextResponse.json(
+            accessControlPermissionError(permission.status),
+            { status: permission.status },
+        );
+    }
 
+    const body = await request.json().catch(() => null);
+    const parsed = createAccessControlPermissionBodySchema.safeParse(body);
 
+    if (!parsed.success) {
+        return NextResponse.json(
+            accessControlError(
+                'INVALID_ACCESS_CONTROL_REQUEST',
+                'Dữ liệu chức năng không hợp lệ.',
+            ),
+            { status: 400 },
+        );
+    }
+
+    try {
+        await createAccessControlPermission(parsed.data);
+
+        return NextResponse.json({ ok: true }, { status: 201 });
+    } catch (error) {
+        return errorResponse(error);
+    }
+}

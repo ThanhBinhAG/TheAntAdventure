@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { formatBytes } from '@/lib/gallery/gallery-helpers';
+import { collectDroppedImageFiles, collectPickedImageFiles } from '@/lib/gallery/upload-intake';
 
 interface Props {
   label: string;
@@ -11,8 +12,10 @@ interface Props {
   file?: File | null;
   disabled?: boolean;
   onChange: (file: File | null) => void;
+  onFilesChange?: (files: File[], rejectedCount: number) => void;
   stacked?: boolean;
   slotNum?: 1 | 2;
+  multiple?: boolean;
 }
 
 export default function GalleryUploadZone({
@@ -23,17 +26,20 @@ export default function GalleryUploadZone({
   file,
   disabled = false,
   onChange,
+  onFilesChange,
   stacked = false,
   slotNum,
+  multiple = false,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
   function pick(files: FileList | null) {
-    const f = files?.[0];
-    if (!f) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) return;
-    onChange(f);
+    const result = collectPickedImageFiles(files);
+    if (onFilesChange) onFilesChange(result.accepted, result.rejectedCount);
+    const first = result.accepted[0];
+    if (!first) return;
+    onChange(first);
   }
 
   function clear(e: React.MouseEvent) {
@@ -53,10 +59,15 @@ export default function GalleryUploadZone({
         if (!disabled) setDragOver(true);
       }}
       onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
+      onDrop={async (e) => {
         e.preventDefault();
         setDragOver(false);
-        if (!disabled) pick(e.dataTransfer.files);
+        if (disabled) return;
+        const result = await collectDroppedImageFiles(e.dataTransfer);
+        if (onFilesChange) onFilesChange(result.accepted, result.rejectedCount);
+        const first = result.accepted[0];
+        if (!first) return;
+        onChange(first);
       }}
       role="button"
       tabIndex={0}
@@ -93,6 +104,7 @@ export default function GalleryUploadZone({
         ref={inputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
+        multiple={multiple}
         disabled={disabled}
         style={{ display: 'none' }}
         onChange={(e) => {

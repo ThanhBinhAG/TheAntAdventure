@@ -1,12 +1,20 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { getBreakGlassAuthFromRequest, setBreakGlassCookie } from '@/lib/auth/break-glass';
+import {
+  BG_SESSION_COOKIE,
+  getBreakGlassAuthFromRequest,
+  setBreakGlassCookie,
+} from '@/lib/auth/break-glass';
+import { isSupabaseAuthCookieName } from '@/lib/auth/cookie-hygiene';
 import {
   isDebugRoute,
   isSystemDebugEnabled,
   verifyDebugRequest,
 } from '@/lib/system/debug-config';
+import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
+import { isSupabaseTlsInsecureEnabled } from '@/lib/supabase/tls-config';
 import { debugLog } from '@/lib/system/debug-logger';
+import type { User } from '@supabase/supabase-js';
 
 function applyBreakGlassRefresh(
   response: NextResponse,
@@ -16,12 +24,39 @@ function applyBreakGlassRefresh(
   return response;
 }
 
+/** Edge-safe user resolve: avoid Auth network when TLS insecure (getSession from cookies). */
+async function resolveMiddlewareUser(
+  supabase: ReturnType<typeof createServerClient>,
+): Promise<{ user: User | null; errorMessage?: string }> {
+  if (isSupabaseTlsInsecureEnabled()) {
+    const { data, error } = await supabase.auth.getSession();
+    return { user: data.session?.user ?? null, errorMessage: error?.message };
+  }
+  const { data, error } = await supabase.auth.getUser();
+  return { user: data.user, errorMessage: error?.message };
+}
+
+function hasSessionCookieHint(request: NextRequest): boolean {
+  if (request.cookies.get(BG_SESSION_COOKIE)?.value) return true;
+  return request.cookies.getAll().some((c) => isSupabaseAuthCookieName(c.name));
+}
+
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isLoginPage = pathname === '/login';
 
   // Public liveness / readiness for nginx & uptime monitors.
   if (pathname === '/api/health') {
+    return NextResponse.next({ request });
+  }
+
+  // Gallery chunk uploads: skip Auth getUser() RTT per 512KB chunk. Route still
+  // enforces session via getAuthContext(). Keep full middleware for init/complete.
+  if (
+    request.method === 'POST' &&
+    pathname === '/api/photos/upload/chunk' &&
+    hasSessionCookieHint(request)
+  ) {
     return NextResponse.next({ request });
   }
 
@@ -59,8 +94,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   const bg = await getBreakGlassAuthFromRequest(request);
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
 
   if (bg.context) {
     if (isLoginPage) {
@@ -89,7 +124,7 @@ export async function updateSession(request: NextRequest) {
           },
         },
       });
-      await supabase.auth.getUser();
+      await resolveMiddlewareUser(supabase);
       return applyBreakGlassRefresh(supabaseResponse, bg.refresh);
     }
 
@@ -129,12 +164,12 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  const { user, errorMessage } = await resolveMiddlewareUser(supabase);
 
-  if (userError) {
-    debugLog('middleware', 'getUser failed', {
+  if (errorMessage) {
+    debugLog('middleware', 'session resolve failed', {
       level: 'error',
-      meta: { pathname, error: userError.message },
+      meta: { pathname, error: errorMessage },
     });
   }
 

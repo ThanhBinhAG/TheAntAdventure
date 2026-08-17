@@ -1,14 +1,57 @@
 /**
  * NEXT_PUBLIC_* must be read via static process.env.VAR references —
  * Next.js only inlines them for the browser bundle that way.
+ *
+ * Self-host only: if env still has localhost / empty Supabase URL, fall back
+ * to company defaults (also applied at startup via next.config.mjs →
+ * env/sanitize-supabase-env.mjs).
+ *
+ * PRODUCTION_DEFAULTS below mirrors env/company.defaults.env — keep in sync
+ * when rotating URL/keys. Prefer editing company.defaults.env first (sanitize
+ * source of truth); then update this mirror for runtime getters / browser.
  */
 
+const PRODUCTION_DEFAULTS = {
+  url: 'https://sb.mitelai.com:9001',
+  anonKey: 'sb_publishable_ZaiYXiw9LBetFyrpiP4R0Q_jDocbYJq',
+  serviceRoleKey:
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODEwODE1NDgsImV4cCI6MTkzODc2MTU0OH0.yDrGPG3eScuJe15GPVPZhoO3DXIRoQasPIerciT-Fmk',
+  appUrl: 'https://theantcrmdemo.mitelai.com/',
+};
+
+function isLocalSupabaseUrl(url: string): boolean {
+  return /127\.0\.0\.1|localhost/i.test(url);
+}
+
+function isLocalSupabaseAllowed(): boolean {
+  const value = (process.env.NEXT_PUBLIC_ALLOW_LOCAL_SUPABASE ?? '').trim().toLowerCase();
+  return value === 'true' || value === '1' || value === 'yes';
+}
+
+function shouldUseProductionDefaults(): boolean {
+  const envUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim();
+
+  return !envUrl || (
+    isLocalSupabaseUrl(envUrl) &&
+    !isLocalSupabaseAllowed()
+  );
+}
+
+function resolveSupabaseString(raw: string | undefined, fallback: string): string {
+  const trimmed = (raw ?? '').trim();
+  if (shouldUseProductionDefaults()) return fallback;
+  return trimmed || fallback;
+}
+
 export function getSupabaseUrl() {
-  return (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim();
+  return resolveSupabaseString(process.env.NEXT_PUBLIC_SUPABASE_URL, PRODUCTION_DEFAULTS.url);
 }
 
 export function getSupabaseAnonKey() {
-  return (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+  return resolveSupabaseString(
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    PRODUCTION_DEFAULTS.anonKey,
+  );
 }
 
 export function isUseSupabaseEnabled() {
@@ -47,7 +90,10 @@ export function isSupabaseReadOnly() {
 
 /** Server-only — never import from client components */
 export function getSupabaseServiceRoleKey() {
-  return (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim();
+  return resolveSupabaseString(
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    PRODUCTION_DEFAULTS.serviceRoleKey,
+  );
 }
 
 /** Server-only — protects POST /api/weather/refresh from crontab */
@@ -78,5 +124,10 @@ export function isBreakGlassConfigured() {
 
 /** Server-only — base URL for absolute asset links in PDF generation */
 export function getAppUrl() {
-  return (process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3006').trim();
+  const raw = (process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? '').trim();
+  // When forcing company Supabase from a leftover localhost URL, also fix APP_URL.
+  if (shouldUseProductionDefaults()) {
+    return PRODUCTION_DEFAULTS.appUrl;
+  }
+  return raw || 'http://localhost:3006';
 }

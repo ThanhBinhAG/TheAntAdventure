@@ -7,6 +7,11 @@ import type {
   ProposalPricingText,
 } from './proposal-types';
 import {
+  isCustomProposalTheme,
+  pickProposalTheme,
+  type ProposalTemplateTheme,
+} from './proposal-theme';
+import {
   PROPOSAL_AMENDMENT_POLICY,
   PROPOSAL_CANCELLATION_POLICY,
   PROPOSAL_IMPORTANT_NOTES,
@@ -22,6 +27,7 @@ export interface ProposalDayOverride {
   segments?: Array<{ title?: string; body?: string }>;
 }
 
+/** Full override shape (apply still accepts legacy tour fields). */
 export interface ProposalContentOverrides {
   tourTitle?: string;
   tagline?: string;
@@ -34,6 +40,97 @@ export interface ProposalContentOverrides {
   exclusions?: string[];
   pricingText?: Partial<ProposalPricingText>;
   legalText?: Partial<ProposalLegalText>;
+  theme?: ProposalTemplateTheme;
+}
+
+/** Commercial / legal template fields editable in Step 5. */
+export type ProposalTemplateOverrides = {
+  tagline?: string;
+  bookingFields?: Partial<Record<string, string>>;
+  inclusions?: string[];
+  exclusions?: string[];
+  pricingText?: Pick<ProposalPricingText, 'footnote' | 'b2bGroundDesc' | 'b2bFlightsDesc'>;
+  legalText?: Partial<ProposalLegalText>;
+  theme?: ProposalTemplateTheme;
+};
+
+export const TEMPLATE_BOOKING_FIELD_KEYS = ['Payment Terms', 'Commission', 'Valid Until'] as const;
+
+const TEMPLATE_PRICING_KEYS = ['footnote', 'b2bGroundDesc', 'b2bFlightsDesc'] as const;
+
+/** True when `data-proposal-field` path is part of the editable template surface. */
+export function isTemplateEditPath(path: string): boolean {
+  if (path === 'tagline') return true;
+  if (/^inclusions\.\d+$/.test(path)) return true;
+  if (/^exclusions\.\d+$/.test(path)) return true;
+  if (/^pricingText\.(footnote|b2bGroundDesc|b2bFlightsDesc)$/.test(path)) return true;
+  if (/^legalText\.(paymentTerms|cancellation|amendment|importantNotes)$/.test(path)) return true;
+  const booking = path.match(/^bookingFields\.(.+)$/);
+  if (booking) {
+    const label = decodeURIComponent(booking[1]!);
+    return (TEMPLATE_BOOKING_FIELD_KEYS as readonly string[]).includes(label);
+  }
+  return false;
+}
+
+function pickTemplateBookingFields(
+  fields?: Partial<Record<string, string>> | null
+): Partial<Record<string, string>> | undefined {
+  if (!fields) return undefined;
+  const out: Record<string, string> = {};
+  for (const key of TEMPLATE_BOOKING_FIELD_KEYS) {
+    const val = fields[key];
+    if (typeof val === 'string') out[key] = val;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function pickTemplatePricingText(
+  pricing?: Partial<ProposalPricingText> | null
+): ProposalTemplateOverrides['pricingText'] | undefined {
+  if (!pricing) return undefined;
+  const out: NonNullable<ProposalTemplateOverrides['pricingText']> = {};
+  for (const key of TEMPLATE_PRICING_KEYS) {
+    const val = pricing[key];
+    if (typeof val === 'string') out[key] = val;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Strip tour-specific / legacy keys down to the template subset. */
+export function toProposalTemplateOverrides(
+  overrides?: ProposalContentOverrides | ProposalTemplateOverrides | null
+): ProposalTemplateOverrides {
+  if (!overrides) return {};
+  const out: ProposalTemplateOverrides = {};
+  if (typeof overrides.tagline === 'string') out.tagline = overrides.tagline;
+  const booking = pickTemplateBookingFields(overrides.bookingFields);
+  if (booking) out.bookingFields = booking;
+  if (overrides.inclusions?.length) out.inclusions = [...overrides.inclusions];
+  if (overrides.exclusions?.length) out.exclusions = [...overrides.exclusions];
+  const pricing = pickTemplatePricingText(overrides.pricingText);
+  if (pricing) out.pricingText = pricing;
+  if (overrides.legalText && Object.keys(overrides.legalText).length) {
+    out.legalText = { ...overrides.legalText };
+  }
+  const theme = pickProposalTheme((overrides as ProposalTemplateOverrides).theme);
+  if (theme) out.theme = theme;
+  return out;
+}
+
+export function hasProposalTemplateOverrides(
+  overrides?: ProposalContentOverrides | ProposalTemplateOverrides | null
+): boolean {
+  const t = toProposalTemplateOverrides(overrides);
+  return !!(
+    t.tagline ||
+    (t.bookingFields && Object.keys(t.bookingFields).length) ||
+    (t.inclusions && t.inclusions.length) ||
+    (t.exclusions && t.exclusions.length) ||
+    (t.pricingText && Object.keys(t.pricingText).length) ||
+    (t.legalText && Object.keys(t.legalText).length) ||
+    isCustomProposalTheme(t.theme)
+  );
 }
 
 export function defaultOverviewRows(doc: ProposalDoc): ProposalOverviewRow[] {
@@ -127,81 +224,107 @@ function mergeGlanceRow(row: ProposalItineraryRow, patch?: Partial<ProposalItine
 
 export function applyProposalContentOverrides(
   doc: ProposalDoc,
-  overrides?: ProposalContentOverrides | null
+  overrides?: ProposalContentOverrides | ProposalTemplateOverrides | null
 ): ProposalDoc {
   if (!overrides || !hasProposalContentOverrides(overrides)) return doc;
 
-  const dayPatches = new Map((overrides.days ?? []).map((d) => [d.dayNumber, d]));
+  const full = overrides as ProposalContentOverrides;
+  const dayPatches = new Map((full.days ?? []).map((d) => [d.dayNumber, d]));
   const glancePatches = new Map(
-    (overrides.itineraryGlance ?? [])
+    (full.itineraryGlance ?? [])
       .filter((r) => r.dayNumber != null)
       .map((r) => [r.dayNumber as number, r])
   );
 
+  const templateBooking = pickTemplateBookingFields(full.bookingFields);
+  const templatePricing = pickTemplatePricingText(full.pricingText);
+  // Preserve legacy packageLabel if still present on a full override object.
+  const pricingMerge =
+    full.pricingText || templatePricing
+      ? {
+          ...(doc.pricingText ?? {}),
+          ...(templatePricing ?? {}),
+          ...(typeof full.pricingText?.packageLabel === 'string'
+            ? { packageLabel: full.pricingText.packageLabel }
+            : {}),
+        }
+      : doc.pricingText;
+
   return {
     ...doc,
-    tourTitle: overrides.tourTitle ?? doc.tourTitle,
-    tagline: overrides.tagline ?? doc.tagline,
-    specialNotes: overrides.specialNotes ?? doc.specialNotes,
-    bookingFields: overrides.bookingFields
-      ? ({ ...defaultBookingFields(doc), ...overrides.bookingFields } as Record<string, string>)
-      : doc.bookingFields,
-    overviewRows: overrides.overviewRows ?? doc.overviewRows,
+    tourTitle: full.tourTitle ?? doc.tourTitle,
+    tagline: full.tagline ?? doc.tagline,
+    specialNotes: full.specialNotes ?? doc.specialNotes,
+    bookingFields: templateBooking
+      ? ({ ...defaultBookingFields(doc), ...(doc.bookingFields ?? {}), ...templateBooking } as Record<
+          string,
+          string
+        >)
+      : full.bookingFields
+        ? ({ ...defaultBookingFields(doc), ...full.bookingFields } as Record<string, string>)
+        : doc.bookingFields,
+    overviewRows: full.overviewRows ?? doc.overviewRows,
     itineraryGlance: doc.itineraryGlance.map((row) =>
       mergeGlanceRow(row, glancePatches.get(row.dayNumber))
     ),
     days: doc.days.map((day) => mergeDay(day, dayPatches.get(day.dayNumber))),
-    inclusions: overrides.inclusions ?? doc.inclusions,
-    exclusions: overrides.exclusions ?? doc.exclusions,
-    pricingText: overrides.pricingText
-      ? { ...(doc.pricingText ?? {}), ...overrides.pricingText }
-      : doc.pricingText,
-    legalText: overrides.legalText ? { ...(doc.legalText ?? {}), ...overrides.legalText } : doc.legalText,
+    inclusions: full.inclusions ?? doc.inclusions,
+    exclusions: full.exclusions ?? doc.exclusions,
+    pricingText: pricingMerge,
+    legalText: full.legalText ? { ...(doc.legalText ?? {}), ...full.legalText } : doc.legalText,
+    theme: pickProposalTheme(full.theme)
+      ? { ...(doc.theme ?? {}), ...pickProposalTheme(full.theme) }
+      : doc.theme,
   };
 }
 
-export function hasProposalContentOverrides(overrides?: ProposalContentOverrides | null): boolean {
+export function hasProposalContentOverrides(
+  overrides?: ProposalContentOverrides | ProposalTemplateOverrides | null
+): boolean {
   if (!overrides) return false;
+  const full = overrides as ProposalContentOverrides;
   return !!(
-    overrides.tourTitle ||
-    overrides.tagline ||
-    overrides.specialNotes ||
-    (overrides.bookingFields && Object.keys(overrides.bookingFields).length) ||
-    (overrides.overviewRows && overrides.overviewRows.length) ||
-    (overrides.itineraryGlance && overrides.itineraryGlance.length) ||
-    (overrides.days && overrides.days.length) ||
-    (overrides.inclusions && overrides.inclusions.length) ||
-    (overrides.exclusions && overrides.exclusions.length) ||
-    (overrides.pricingText && Object.keys(overrides.pricingText).length) ||
-    (overrides.legalText && Object.keys(overrides.legalText).length)
+    full.tourTitle ||
+    full.tagline ||
+    full.specialNotes ||
+    (full.bookingFields && Object.keys(full.bookingFields).length) ||
+    (full.overviewRows && full.overviewRows.length) ||
+    (full.itineraryGlance && full.itineraryGlance.length) ||
+    (full.days && full.days.length) ||
+    (full.inclusions && full.inclusions.length) ||
+    (full.exclusions && full.exclusions.length) ||
+    (full.pricingText && Object.keys(full.pricingText).length) ||
+    (full.legalText && Object.keys(full.legalText).length) ||
+    isCustomProposalTheme(full.theme)
   );
 }
 
-/** Build a full override snapshot from current doc values (for editor initial state). */
-export function snapshotFromDoc(doc: ProposalDoc): ProposalContentOverrides {
-  return {
-    tourTitle: doc.tourTitle,
-    tagline: doc.tagline,
-    specialNotes: doc.specialNotes,
-    bookingFields: doc.bookingFields ?? defaultBookingFields(doc),
-    overviewRows: doc.overviewRows ?? defaultOverviewRows(doc),
-    itineraryGlance: doc.itineraryGlance.map((r) => ({ ...r })),
-    days: doc.days.map((d) => ({
-      dayNumber: d.dayNumber,
-      title: d.title,
-      body: d.body,
-      hotel: d.hotel,
-      meals: d.meals,
-      segments: d.segments?.map((s) => ({ title: s.title, body: s.body })),
-    })),
-    inclusions: [...doc.inclusions],
-    exclusions: [...doc.exclusions],
-    pricingText: doc.pricingText ? { ...doc.pricingText } : undefined,
-    legalText: doc.legalText ? { ...doc.legalText } : undefined,
-  };
+/** Template-only snapshot for editor Reset / initial draft. */
+export function snapshotFromDoc(doc: ProposalDoc): ProposalTemplateOverrides {
+  return snapshotTemplateFromDoc(doc);
 }
 
-function formatLegalKv(rows: Array<{ label?: string; detail?: string; notice?: string; charge?: string; title?: string; body?: string }>): string {
+export function snapshotTemplateFromDoc(doc: ProposalDoc): ProposalTemplateOverrides {
+  const booking = doc.bookingFields ?? defaultBookingFields(doc);
+  const bookingFields = pickTemplateBookingFields(booking);
+  const pricingText = pickTemplatePricingText(doc.pricingText);
+  const out: ProposalTemplateOverrides = {
+    tagline: doc.tagline,
+    inclusions: [...doc.inclusions],
+    exclusions: [...doc.exclusions],
+  };
+  if (bookingFields) out.bookingFields = bookingFields;
+  if (pricingText) out.pricingText = pricingText;
+  if (doc.legalText) out.legalText = { ...doc.legalText };
+  else out.legalText = defaultLegalText();
+  const theme = pickProposalTheme(doc.theme);
+  if (theme) out.theme = theme;
+  return out;
+}
+
+function formatLegalKv(
+  rows: Array<{ label?: string; detail?: string; notice?: string; charge?: string; title?: string; body?: string }>
+): string {
   return rows
     .map((r) => {
       const label = r.label ?? r.notice ?? r.title ?? '';
@@ -221,4 +344,22 @@ export function defaultLegalText(): ProposalLegalText {
     amendment: formatLegalKv(PROPOSAL_AMENDMENT_POLICY),
     importantNotes: formatLegalKv(PROPOSAL_IMPORTANT_NOTES),
   };
+}
+
+export function normalizeLegalCompare(value: string): string {
+  return value
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** True when the stored block is empty or still matches the boilerplate snapshot. */
+export function isUnchangedLegalText(
+  value: string | undefined,
+  key: keyof ProposalLegalText
+): boolean {
+  const fallback = defaultLegalText()[key] || '';
+  if (!value?.trim()) return true;
+  return normalizeLegalCompare(value) === normalizeLegalCompare(fallback);
 }

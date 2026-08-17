@@ -1,151 +1,131 @@
 'use client';
 
 /**
- * Trang Quản lý người dùng & phân quyền.
+ * Trang Quản lý người dùng và phân quyền.
  *
  * Chức năng:
- * - Lấy role và permission từ GET /api/access-control.
- * - Lấy danh sách user phân trang từ /api/access-control/users.
- * - Lấy lịch sử thay đổi từ /api/access-control/audit-logs.
- * - Gửi yêu cầu đổi role hoặc cập nhật permission.
+ * - Tab Người dùng chỉ tải users và role có thể gán.
+ * - Tab Role & quyền mới tải catalog permission khi được mở.
+ * - Tab Lịch sử chỉ tải audit log khi được mở.
+ *
+ * Mục đích:
+ * - Không tải dữ liệu chưa cần dùng khi mới vào Access Control.
+ * - Mỗi tab tự chịu trách nhiệm tải dữ liệu của chính nó.
  */
 
-import {
-    useCallback,
-    useEffect,
-    useState,
-} from 'react';
+import { useState } from 'react';
+import useSWR from 'swr';
 import {
     HistoryOutlined,
+    LoginOutlined,
     SafetyCertificateOutlined,
     TeamOutlined,
 } from '@ant-design/icons';
+import { useLanguage } from '@/hooks/useLanguage';
+import { tac } from '@/lib/i18n/pages/access-control';
 import {
-    Tabs,
-} from 'antd';
+    fetchAccessControlSuperAdminStatus,
+} from './access-control-api';
+import LoginHistoryTab from './LoginHistoryTab';
+import { Tabs } from 'antd';
 import AccessControlUiProvider from './AccessControlUiProvider';
 import UserDirectory from './UserDirectory';
-import {
-    fetchAccessControlData,
-    updateRolePermissions,
-    type AccessControlData,
-} from './access-control-api';
 import styles from './AccessControlPage.module.css';
 import RolesPermissionsTab from './RolesPermissionsTab';
 import AuditLogsTab from './AuditLogsTab';
 
 export default function AccessControlPage() {
-    const [data, setData] =
-        useState<AccessControlData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] =
-        useState<string | null>(null);
+    const { language } = useLanguage();
 
-    /** Tải dữ liệu quản trị từ API. */
-    const loadData = useCallback(async () => {
-        setLoading(true);
-        setError(null);
+    // Chỉ mount tab nặng sau lần người dùng thật sự mở nó.
+    const [hasOpenedRoles, setHasOpenedRoles] = useState(false);
+    const [hasOpenedAuditLogs, setHasOpenedAuditLogs] = useState(false);
+    const [hasOpenedLoginHistory, setHasOpenedLoginHistory] =
+        useState(false);
 
-        try {
-            const nextData = await fetchAccessControlData();
-            setData(nextData);
-        } catch (error) {
-            setError(
-                error instanceof Error
-                    ? error.message
-                    : 'Không thể tải dữ liệu phân quyền.',
-            );
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    const { data: superAdminStatus } = useSWR(
+        'access-control/super-admin-status',
+        fetchAccessControlSuperAdminStatus,
+        {
+            // Không dùng cache Super Admin của session đăng nhập trước.
+            revalidateOnMount: true,
+            dedupingInterval: 0,
+            revalidateOnFocus: false,
+            revalidateOnReconnect: true,
+        },
+    );
 
-    // Khi Super Admin mở trang, tải dữ liệu lần đầu.
-    // State chỉ được cập nhật sau khi API trả về, tránh render lồng nhau.
-    useEffect(() => {
-        let isCurrent = true;
-
-        async function loadInitialData() {
-            try {
-                const nextData = await fetchAccessControlData();
-
-                if (!isCurrent) return;
-
-                setData(nextData);
-            } catch (error) {
-                if (!isCurrent) return;
-
-                setError(
-                    error instanceof Error
-                        ? error.message
-                        : 'Không thể tải dữ liệu phân quyền.',
-                );
-            } finally {
-                if (isCurrent) {
-                    setLoading(false);
-                }
-            }
-        }
-
-        void loadInitialData();
-
-        return () => {
-            isCurrent = false;
-        };
-    }, []);
+    // Gate theo data đã biết — không ẩn tab khi SWR đang revalidate (tránh churn Tabs).
+    const canViewLoginHistory = superAdminStatus?.isSuperAdmin === true;
 
     return (
         <AccessControlUiProvider>
             <div className={styles.page}>
-
                 <section className={styles.content}>
                     <Tabs
+                        onChange={(activeKey) => {
+                            if (activeKey === 'roles') {
+                                setHasOpenedRoles(true);
+                            }
+
+                            if (activeKey === 'audit-logs') {
+                                setHasOpenedAuditLogs(true);
+                            }
+                            if (activeKey === 'login-history') {
+                                setHasOpenedLoginHistory(true);
+                            }
+                        }}
                         items={[
                             {
                                 key: 'users',
                                 label: (
                                     <span className={styles.tabLabel}>
                                         <TeamOutlined />
-                                        Người dùng
+                                        {tac('users', language)}
                                     </span>
                                 ),
-                                children: (
-                                    <UserDirectory
-                                        roles={data?.roles ?? []}
-                                        permissions={data?.permissions ?? []}
-                                    />
-                                ),
+                                children: <UserDirectory />,
                             },
                             {
                                 key: 'roles',
                                 label: (
                                     <span className={styles.tabLabel}>
                                         <SafetyCertificateOutlined />
-                                        Role & quyền
+                                        {tac('rolesAndPermissions', language)}
                                     </span>
                                 ),
-                                children: (
-                                    <RolesPermissionsTab
-                                        roles={data?.roles ?? []}
-                                        permissions={data?.permissions ?? []}
-                                        loading={loading}
-                                        error={error}
-                                        onRetry={loadData}
-                                        onRoleChanged={loadData}
-                                        onUpdatePermissions={updateRolePermissions}
-                                    />
-                                ),
+                                children: hasOpenedRoles
+                                    ? <RolesPermissionsTab />
+                                    : null,
                             },
                             {
                                 key: 'audit-logs',
                                 label: (
                                     <span className={styles.tabLabel}>
                                         <HistoryOutlined />
-                                        Lịch sử thay đổi
+                                        {tac('changeHistory', language)}
                                     </span>
                                 ),
-                                children: <AuditLogsTab />,
+                                children: hasOpenedAuditLogs
+                                    ? <AuditLogsTab />
+                                    : null,
                             },
+                            ...(canViewLoginHistory
+                                ? [
+                                    {
+                                        key: 'login-history',
+                                        label: (
+                                            <span className={styles.tabLabel}>
+                                                <LoginOutlined />
+                                                {tac('loginHistory', language)}
+                                            </span>
+                                        ),
+                                        children: hasOpenedLoginHistory
+                                            ? <LoginHistoryTab />
+                                            : null,
+                                    },
+                                ]
+                                : []),
                         ]}
                     />
                 </section>

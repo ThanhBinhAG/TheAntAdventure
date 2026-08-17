@@ -14,6 +14,7 @@ import {
 import type { Task } from '@/lib/types';
 import { addDays, localTodayIso, mondayOfWeek } from '@/lib/core/date-utils';
 import { useStore } from '@/hooks/useStore';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 const TEAM = ['Tai Pham', 'Linh N.', 'Minh T.', 'Huong L.', 'Khoa V.'];
 
@@ -43,6 +44,7 @@ function TaskStatusSelect({
 }
 
 export default function Planner() {
+  const { canWrite } = usePagePermission('planner');
   const tasks = useStore((s) => s.tasks) as Task[];
   const addTask = useStore((s) => s.addTask);
   const updateTask = useStore((s) => s.updateTask);
@@ -154,7 +156,13 @@ export default function Planner() {
           ))}
         </select>
         <div style={{ flex: 1 }} />
-        <button className="btn btn-p btn-sm" type="button" onClick={focusNoteBoard}>
+        <button
+          className="btn btn-p btn-sm"
+          type="button"
+          onClick={focusNoteBoard}
+          disabled={!canWrite}
+          title={!canWrite ? 'You need write permission for Planner to add a task' : undefined}
+        >
           + Add Task
         </button>
       </div>

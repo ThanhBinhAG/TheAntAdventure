@@ -1,0 +1,169 @@
+import React from 'react';
+import { Card, Radio, Button } from 'antd';
+import {
+    CalendarOutlined,
+    CheckSquareOutlined,
+    FilterOutlined,
+    GlobalOutlined,
+    MessageOutlined,
+    SaveOutlined,
+    TeamOutlined,
+} from '@ant-design/icons';
+import type { AccessControlResourceScope } from '../access-control-api';
+import { tac } from '@/lib/i18n/pages/access-control';
+import styles from '../AccessControlPage.module.css';
+
+export type ResourceScopeChoice = AccessControlResourceScope['scope'] | 'none';
+
+const RESOURCE_SCOPE_RESOURCES: Array<{
+    code: AccessControlResourceScope['resource_code'];
+    vi: string;
+    en: string;
+    supportsAssigned: boolean;
+}> = [
+    { code: 'customers', vi: 'Khách hàng', en: 'Customers', supportsAssigned: false },
+    { code: 'leads', vi: 'Lead', en: 'Leads', supportsAssigned: false },
+    { code: 'tour_drafts', vi: 'Bản nháp tour', en: 'Tour drafts', supportsAssigned: false },
+    { code: 'bookings', vi: 'Booking', en: 'Bookings', supportsAssigned: true },
+    { code: 'tasks', vi: 'Công việc', en: 'Tasks', supportsAssigned: true },
+    { code: 'comms', vi: 'Trao đổi khách hàng', en: 'Customer communications', supportsAssigned: false },
+];
+
+const RESOURCE_SCOPE_ACTIONS: AccessControlResourceScope['action'][] = [
+    'read',
+    'write',
+    'delete',
+];
+
+function resourceScopeIcon(
+    resourceCode: AccessControlResourceScope['resource_code'],
+) {
+    switch (resourceCode) {
+        case 'customers':
+            return <TeamOutlined />;
+        case 'leads':
+            return <FilterOutlined />;
+        case 'tour_drafts':
+            return <GlobalOutlined />;
+        case 'bookings':
+            return <CalendarOutlined />;
+        case 'tasks':
+            return <CheckSquareOutlined />;
+        case 'comms':
+            return <MessageOutlined />;
+    }
+}
+
+export interface ResourceScopesTabContentProps {
+    saving: boolean;
+    hasScopeChanges: boolean;
+    scopeFor: (resourceCode: AccessControlResourceScope['resource_code'], action: AccessControlResourceScope['action']) => ResourceScopeChoice;
+    updateScope: (resourceCode: AccessControlResourceScope['resource_code'], action: AccessControlResourceScope['action'], scope: ResourceScopeChoice) => void;
+    discardScopeChanges: () => void;
+    handleSaveResourceScopes: () => void;
+    language: 'vi' | 'en';
+}
+
+export const ResourceScopesTabContent = React.memo(function ResourceScopesTabContent({
+    saving,
+    hasScopeChanges,
+    scopeFor,
+    updateScope,
+    discardScopeChanges,
+    handleSaveResourceScopes,
+    language,
+}: ResourceScopesTabContentProps) {
+    return (
+        <section className={styles.resourceScopesSection}>
+            <div className={styles.resourceScopesHeader}>
+                <div>
+                    <h3 className={styles.resourceScopesTitle}>
+                        {tac('rlsDataScopes', language)}
+                    </h3>
+                    <p className={styles.sectionDescription}>
+                        {tac('rlsDataScopesDescription', language)}
+                    </p>
+                </div>
+            </div>
+            <div className={styles.resourceScopesGrid}>
+                {RESOURCE_SCOPE_RESOURCES.map((resource) => (
+                    <Card key={resource.code} size="small" className={styles.resourceScopeCard}>
+                        <div className={styles.resourceScopeCardTitle}>
+                            <span className={styles.resourceScopeIcon} aria-hidden="true">
+                                {resourceScopeIcon(resource.code)}
+                            </span>
+                            <strong>{language === 'vi' ? resource.vi : resource.en}</strong>
+                        </div>
+                        <div className={styles.resourceScopeActions}>
+                            {RESOURCE_SCOPE_ACTIONS.map((action) => {
+                                const allowedScopes: ResourceScopeChoice[] = [
+                                    'none',
+                                    'own',
+                                    ...(resource.supportsAssigned ? ['assigned'] as const : []),
+                                    'all',
+                                ];
+                                const actionLabel = tac(action, language);
+
+                                return (
+                                    <div key={action} className={styles.resourceScopeActionRow}>
+                                        <span className={styles.resourceScopeActionLabel}>{actionLabel}</span>
+                                        <Radio.Group
+                                            aria-label={`${language === 'vi' ? resource.vi : resource.en}: ${actionLabel}`}
+                                            buttonStyle="solid"
+                                            className={styles.resourceScopeControl}
+                                            disabled={saving}
+                                            optionType="button"
+                                            size="small"
+                                            value={scopeFor(resource.code, action)}
+                                            onChange={(event) => updateScope(
+                                                resource.code,
+                                                action,
+                                                event.target.value as ResourceScopeChoice,
+                                            )}
+                                        >
+                                            {allowedScopes.map((scope) => (
+                                                <Radio.Button key={scope} value={scope}>
+                                                    {scope === 'none'
+                                                        ? tac('scopeNone', language)
+                                                        : scope === 'own'
+                                                            ? tac('scopeOwn', language)
+                                                            : scope === 'assigned'
+                                                                ? tac('scopeAssigned', language)
+                                                                : tac('scopeAll', language)}
+                                                </Radio.Button>
+                                            ))}
+                                        </Radio.Group>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </Card>
+                ))}
+            </div>
+            <div className={styles.permissionSaveBar}>
+                <span aria-live="polite">
+                    {hasScopeChanges
+                        ? tac('unsavedScopeChanges', language)
+                        : tac('noUnsavedScopeChanges', language)}
+                </span>
+                <div className={styles.permissionSaveActions}>
+                    <Button
+                        disabled={!hasScopeChanges || saving}
+                        onClick={discardScopeChanges}
+                    >
+                        {tac('discardChanges', language)}
+                    </Button>
+                    <Button
+                        icon={<SaveOutlined />}
+                        type="primary"
+                        loading={saving}
+                        disabled={!hasScopeChanges}
+                        onClick={handleSaveResourceScopes}
+                    >
+                        {tac('saveScopes', language)}
+                    </Button>
+                </div>
+            </div>
+        </section>
+    );
+});

@@ -1337,5 +1337,1066 @@ create policy photos_auth_delete on storage.objects
   );
 
 -- ============================================================
+--  RLS SCOPE FOUNDATION (run after the RBAC migration chain)
+--
+--  The standalone schema intentionally skips this block when profiles/roles
+--  have not been created yet. `db:push` applies the canonical migration.
+-- ============================================================
+
+do $rls_scope$
+begin
+  if to_regclass('public.roles') is null then
+    raise notice 'Skipping RLS scope foundation until RBAC migrations are applied.';
+    return;
+  end if;
+
+  execute $ddl$
+    create schema if not exists private;
+    revoke all on schema private from public;
+    grant usage on schema private to authenticated;
+
+    create table if not exists public.role_resource_scopes (
+      role_code text not null references public.roles(code) on delete cascade,
+      resource_code text not null check (resource_code in (
+        'customers', 'leads', 'tour_drafts', 'bookings', 'tasks', 'comms'
+      )),
+      action text not null check (action in ('read', 'write', 'delete')),
+      scope text not null check (scope in ('own', 'assigned', 'all')),
+      created_at timestamptz not null default now(),
+      primary key (role_code, resource_code, action)
+    );
+
+    revoke all on table public.role_resource_scopes from anon, authenticated;
+
+    comment on table public.role_resource_scopes is
+      'Phạm vi truy cập dữ liệu theo role. Chỉ Access Control RPC được phép quản lý.';
+
+    alter table public.role_resource_scopes enable row level security;
+
+    create or replace function private.has_resource_scope(
+      requested_resource text,
+      requested_action text,
+      accepted_scopes text[]
+    )
+    returns boolean
+    language sql
+    stable
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+      select
+        public.has_permission('*')
+        or exists (
+          select 1
+          from public.user_roles ur
+          join public.profiles p on p.id = ur.user_id
+          join public.role_resource_scopes rrs on rrs.role_code = ur.role_code
+          where ur.user_id = (select auth.uid())
+            and p.is_active = true
+            and p.deleted_at is null
+            and rrs.resource_code = requested_resource
+            and rrs.action = requested_action
+            and rrs.scope = any(accepted_scopes)
+        );
+    $function$;
+
+    revoke all on function private.has_resource_scope(text, text, text[]) from public;
+    grant execute on function private.has_resource_scope(text, text, text[]) to authenticated;
+  $ddl$;
+end;
+$rls_scope$;
+
+-- ============================================================
+--  CORE RECORD OWNERSHIP (run after the RBAC migration chain)
+-- ============================================================
+
+do $record_ownership$
+begin
+  if to_regclass('public.profiles') is null then
+    raise notice 'Skipping record ownership columns until RBAC migrations are applied.';
+    return;
+  end if;
+
+  execute $ddl$
+    alter table public.customers
+      add column if not exists owner_user_id uuid
+      references public.profiles(id) on delete set null;
+
+    alter table public.leads
+      add column if not exists owner_user_id uuid
+      references public.profiles(id) on delete set null;
+
+    alter table public.tour_drafts
+      add column if not exists owner_user_id uuid
+      references public.profiles(id) on delete set null;
+
+    alter table public.bookings
+      add column if not exists owner_user_id uuid
+      references public.profiles(id) on delete set null,
+      add column if not exists assigned_user_id uuid
+      references public.profiles(id) on delete set null;
+
+    alter table public.tasks
+      add column if not exists creator_user_id uuid
+      references public.profiles(id) on delete set null,
+      add column if not exists assignee_user_id uuid
+      references public.profiles(id) on delete set null;
+
+    alter table public.comms
+      add column if not exists access_owner_user_id uuid
+      references public.profiles(id) on delete set null;
+
+    create index if not exists idx_customers_owner_user_id
+      on public.customers(owner_user_id);
+    create index if not exists idx_leads_owner_user_id
+      on public.leads(owner_user_id);
+    create index if not exists idx_tour_drafts_owner_user_id
+      on public.tour_drafts(owner_user_id);
+    create index if not exists idx_bookings_owner_user_id
+      on public.bookings(owner_user_id);
+    create index if not exists idx_bookings_assigned_user_id
+      on public.bookings(assigned_user_id);
+    create index if not exists idx_tasks_creator_user_id
+      on public.tasks(creator_user_id);
+    create index if not exists idx_tasks_assignee_user_id
+      on public.tasks(assignee_user_id);
+    create index if not exists idx_comms_access_owner_user_id
+      on public.comms(access_owner_user_id);
+  $ddl$;
+end;
+$record_ownership$;
+
+-- ============================================================
+--  CORE OWNER ATTRIBUTION (run after the RBAC migration chain)
+-- ============================================================
+
+do $owner_attribution$
+begin
+  if to_regclass('public.profiles') is null then
+    raise notice 'Skipping owner attribution triggers until RBAC migrations are applied.';
+    return;
+  end if;
+
+  execute $ddl$
+    create or replace function private.assign_customer_owner()
+    returns trigger
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    begin
+      if auth.uid() is not null then
+        new.owner_user_id := auth.uid();
+      end if;
+
+      return new;
+    end;
+    $function$;
+
+    create or replace function private.assign_lead_owner()
+    returns trigger
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    declare
+      inherited_owner_id uuid;
+    begin
+      if new.cust_id is not null then
+        select owner_user_id
+          into inherited_owner_id
+          from public.customers
+         where id = new.cust_id;
+      end if;
+
+      new.owner_user_id := coalesce(inherited_owner_id, auth.uid(), new.owner_user_id);
+      return new;
+    end;
+    $function$;
+
+    create or replace function private.assign_tour_draft_owner()
+    returns trigger
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    declare
+      inherited_owner_id uuid;
+    begin
+      if new.lead_id is not null then
+        select owner_user_id
+          into inherited_owner_id
+          from public.leads
+         where id = new.lead_id;
+      end if;
+
+      if inherited_owner_id is null and new.cust_id is not null then
+        select owner_user_id
+          into inherited_owner_id
+          from public.customers
+         where id = new.cust_id;
+      end if;
+
+      new.owner_user_id := coalesce(inherited_owner_id, auth.uid(), new.owner_user_id);
+      return new;
+    end;
+    $function$;
+
+    create or replace function private.assign_booking_owner()
+    returns trigger
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    declare
+      inherited_owner_id uuid;
+    begin
+      if new.lead_id is not null then
+        select owner_user_id
+          into inherited_owner_id
+          from public.leads
+         where id = new.lead_id;
+      end if;
+
+      if inherited_owner_id is null and new.cust_id is not null then
+        select owner_user_id
+          into inherited_owner_id
+          from public.customers
+         where id = new.cust_id;
+      end if;
+
+      new.owner_user_id := coalesce(inherited_owner_id, auth.uid(), new.owner_user_id);
+      return new;
+    end;
+    $function$;
+
+    create or replace function private.assign_task_creator()
+    returns trigger
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    begin
+      if auth.uid() is not null then
+        new.creator_user_id := auth.uid();
+      end if;
+
+      return new;
+    end;
+    $function$;
+
+    create or replace function private.assign_comm_access_owner()
+    returns trigger
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    declare
+      inherited_owner_id uuid;
+    begin
+      if new.cust_id is not null then
+        select owner_user_id
+          into inherited_owner_id
+          from public.customers
+         where id = new.cust_id;
+      end if;
+
+      new.access_owner_user_id := coalesce(
+        inherited_owner_id,
+        auth.uid(),
+        new.access_owner_user_id
+      );
+      return new;
+    end;
+    $function$;
+
+    revoke all on function private.assign_customer_owner() from public;
+    revoke all on function private.assign_lead_owner() from public;
+    revoke all on function private.assign_tour_draft_owner() from public;
+    revoke all on function private.assign_booking_owner() from public;
+    revoke all on function private.assign_task_creator() from public;
+    revoke all on function private.assign_comm_access_owner() from public;
+
+    drop trigger if exists trg_customers_assign_owner on public.customers;
+    create trigger trg_customers_assign_owner
+    before insert on public.customers
+    for each row execute function private.assign_customer_owner();
+
+    drop trigger if exists trg_leads_assign_owner on public.leads;
+    create trigger trg_leads_assign_owner
+    before insert on public.leads
+    for each row execute function private.assign_lead_owner();
+
+    drop trigger if exists trg_tour_drafts_assign_owner on public.tour_drafts;
+    create trigger trg_tour_drafts_assign_owner
+    before insert on public.tour_drafts
+    for each row execute function private.assign_tour_draft_owner();
+
+    drop trigger if exists trg_bookings_assign_owner on public.bookings;
+    create trigger trg_bookings_assign_owner
+    before insert on public.bookings
+    for each row execute function private.assign_booking_owner();
+
+    drop trigger if exists trg_tasks_assign_creator on public.tasks;
+    create trigger trg_tasks_assign_creator
+    before insert on public.tasks
+    for each row execute function private.assign_task_creator();
+
+    drop trigger if exists trg_comms_assign_access_owner on public.comms;
+    create trigger trg_comms_assign_access_owner
+    before insert on public.comms
+    for each row execute function private.assign_comm_access_owner();
+  $ddl$;
+end;
+$owner_attribution$;
+
+-- ============================================================
+--  ACCESS CONTROL RESOURCE SCOPES (run after access-control migrations)
+-- ============================================================
+
+do $access_control_resource_scopes$
+begin
+  if to_regclass('public.access_control_audit_logs') is null then
+    raise notice 'Skipping Access Control RLS scopes until access-control migrations are applied.';
+    return;
+  end if;
+
+  execute $ddl$
+    create schema if not exists private;
+    revoke all on schema private from public;
+
+    -- ============================================================================
+    -- Role-resource scope management. The public table remains unreadable to the
+    -- client; these RPCs authorize each request and write an audit entry instead.
+    -- ============================================================================
+
+    create or replace function public.list_access_control_staff_role_resource_scopes()
+    returns table (
+      role_code text,
+      resource_code text,
+      action text,
+      scope text
+    )
+    language plpgsql
+    stable
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    begin
+      if not public.has_permission('users.manage') then
+        raise exception 'Bạn không có quyền xem phạm vi dữ liệu của role.'
+          using errcode = '42501';
+      end if;
+
+      return query
+      select
+        rrs.role_code,
+        rrs.resource_code,
+        rrs.action,
+        rrs.scope
+      from public.role_resource_scopes rrs
+      join public.roles r on r.code = rrs.role_code
+      where r.is_system = false
+      order by rrs.role_code, rrs.resource_code, rrs.action;
+    end;
+    $function$;
+
+    create or replace function public.replace_access_control_staff_role_resource_scopes(
+      target_role_code text,
+      requested_scopes jsonb
+    )
+    returns void
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    declare
+      old_scopes jsonb;
+      normalized_scopes jsonb;
+    begin
+      if not public.has_permission('users.manage') then
+        raise exception 'Bạn không có quyền cập nhật phạm vi dữ liệu của role.'
+          using errcode = '42501';
+      end if;
+
+      if not exists (
+        select 1
+        from public.roles
+        where code = target_role_code
+          and is_system = false
+      ) then
+        raise exception 'Chỉ được chỉnh role nhân viên động.'
+          using errcode = '22023';
+      end if;
+
+      if jsonb_typeof(coalesce(requested_scopes, '[]'::jsonb)) <> 'array' then
+        raise exception 'Danh sách phạm vi dữ liệu không hợp lệ.'
+          using errcode = '22023';
+      end if;
+
+      if exists (
+        with requested as (
+          select
+            lower(trim(input.resource_code)) as resource_code,
+            lower(trim(input.action)) as action,
+            lower(trim(input.scope)) as scope
+          from jsonb_to_recordset(coalesce(requested_scopes, '[]'::jsonb))
+            as input(resource_code text, action text, scope text)
+        )
+        select 1
+        from requested
+        where resource_code is null
+          or action is null
+          or scope is null
+          or resource_code not in (
+            'customers', 'leads', 'tour_drafts', 'bookings', 'tasks', 'comms'
+          )
+          or action not in ('read', 'write', 'delete')
+          or scope not in ('own', 'assigned', 'all')
+      ) then
+        raise exception 'Danh sách phạm vi dữ liệu không hợp lệ.'
+          using errcode = '22023';
+      end if;
+
+      if exists (
+        with requested as (
+          select
+            lower(trim(input.resource_code)) as resource_code,
+            lower(trim(input.action)) as action
+          from jsonb_to_recordset(coalesce(requested_scopes, '[]'::jsonb))
+            as input(resource_code text, action text, scope text)
+        )
+        select 1
+        from requested
+        group by resource_code, action
+        having count(*) > 1
+      ) then
+        raise exception 'Mỗi resource chỉ có một scope cho mỗi action.'
+          using errcode = '22023';
+      end if;
+
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'resource_code', resource_code,
+            'action', action,
+            'scope', scope
+          )
+          order by resource_code, action
+        ),
+        '[]'::jsonb
+      )
+      into old_scopes
+      from public.role_resource_scopes
+      where role_code = target_role_code;
+
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'resource_code', resource_code,
+            'action', action,
+            'scope', scope
+          )
+          order by resource_code, action
+        ),
+        '[]'::jsonb
+      )
+      into normalized_scopes
+      from (
+        select
+          lower(trim(input.resource_code)) as resource_code,
+          lower(trim(input.action)) as action,
+          lower(trim(input.scope)) as scope
+        from jsonb_to_recordset(coalesce(requested_scopes, '[]'::jsonb))
+          as input(resource_code text, action text, scope text)
+      ) requested;
+
+      delete from public.role_resource_scopes
+      where role_code = target_role_code;
+
+      insert into public.role_resource_scopes (
+        role_code,
+        resource_code,
+        action,
+        scope
+      )
+      select
+        target_role_code,
+        resource_code,
+        action,
+        scope
+      from jsonb_to_recordset(normalized_scopes)
+        as input(resource_code text, action text, scope text);
+
+      insert into public.access_control_audit_logs (
+        actor_user_id,
+        action,
+        before_value,
+        after_value
+      )
+      values (
+        auth.uid(),
+        'staff_role_resource_scopes_replaced',
+        jsonb_build_object(
+          'role_code', target_role_code,
+          'scopes', old_scopes
+        ),
+        jsonb_build_object(
+          'role_code', target_role_code,
+          'scopes', normalized_scopes
+        )
+      );
+    end;
+    $function$;
+
+    revoke all on function public.list_access_control_staff_role_resource_scopes() from public;
+    revoke all on function public.replace_access_control_staff_role_resource_scopes(text, jsonb) from public;
+    grant execute on function public.list_access_control_staff_role_resource_scopes() to authenticated;
+    grant execute on function public.replace_access_control_staff_role_resource_scopes(text, jsonb) to authenticated;
+
+    -- ============================================================================
+    -- Only controlled RPCs may reassign the columns that future RLS policies use.
+    -- ============================================================================
+
+    create or replace function private.protect_core_record_access_columns()
+    returns trigger
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    declare
+      protected_column text;
+    begin
+      if current_setting('app.allow_core_record_access_change', true) = 'true' then
+        return new;
+      end if;
+
+      foreach protected_column in array tg_argv loop
+        if (to_jsonb(old) -> protected_column) is distinct from
+           (to_jsonb(new) -> protected_column) then
+          raise exception 'Không thể đổi quyền sở hữu trực tiếp.'
+            using errcode = '42501';
+        end if;
+      end loop;
+
+      return new;
+    end;
+    $function$;
+
+    create or replace function public.reassign_core_record_owner(
+      target_resource_code text,
+      target_record_id text,
+      new_owner_user_id uuid
+    )
+    returns void
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    declare
+      previous_owner_user_id uuid;
+    begin
+      if not public.has_permission('users.manage') then
+        raise exception 'Bạn không có quyền chuyển ownership dữ liệu.'
+          using errcode = '42501';
+      end if;
+
+      if target_resource_code not in (
+        'customers', 'leads', 'tour_drafts', 'bookings', 'comms'
+      ) or nullif(trim(target_record_id), '') is null then
+        raise exception 'Bản ghi ownership không hợp lệ.'
+          using errcode = '22023';
+      end if;
+
+      if new_owner_user_id is not null and not exists (
+        select 1
+        from public.profiles
+        where id = new_owner_user_id
+          and is_active = true
+          and deleted_at is null
+      ) then
+        raise exception 'Người nhận ownership không hợp lệ.'
+          using errcode = '22023';
+      end if;
+
+      case target_resource_code
+        when 'customers' then
+          select owner_user_id into previous_owner_user_id from public.customers where id = target_record_id;
+        when 'leads' then
+          select owner_user_id into previous_owner_user_id from public.leads where id = target_record_id;
+        when 'tour_drafts' then
+          select owner_user_id into previous_owner_user_id from public.tour_drafts where id = target_record_id;
+        when 'bookings' then
+          select owner_user_id into previous_owner_user_id from public.bookings where id = target_record_id;
+        when 'comms' then
+          select access_owner_user_id into previous_owner_user_id from public.comms where id = target_record_id;
+      end case;
+
+      if not found then
+        raise exception 'Không tìm thấy bản ghi cần chuyển ownership.'
+          using errcode = '22023';
+      end if;
+
+      perform set_config('app.allow_core_record_access_change', 'true', true);
+
+      case target_resource_code
+        when 'customers' then update public.customers set owner_user_id = new_owner_user_id where id = target_record_id;
+        when 'leads' then update public.leads set owner_user_id = new_owner_user_id where id = target_record_id;
+        when 'tour_drafts' then update public.tour_drafts set owner_user_id = new_owner_user_id where id = target_record_id;
+        when 'bookings' then update public.bookings set owner_user_id = new_owner_user_id where id = target_record_id;
+        when 'comms' then update public.comms set access_owner_user_id = new_owner_user_id where id = target_record_id;
+      end case;
+
+      insert into public.access_control_audit_logs (actor_user_id, action, before_value, after_value)
+      values (
+        auth.uid(),
+        'core_record_owner_reassigned',
+        jsonb_build_object('resource_code', target_resource_code, 'record_id', target_record_id, 'owner_user_id', previous_owner_user_id),
+        jsonb_build_object('resource_code', target_resource_code, 'record_id', target_record_id, 'owner_user_id', new_owner_user_id)
+      );
+    end;
+    $function$;
+
+    create or replace function public.set_core_record_assignee(
+      target_resource_code text,
+      target_record_id text,
+      new_assignee_user_id uuid
+    )
+    returns void
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    declare
+      previous_assignee_user_id uuid;
+    begin
+      if not public.has_permission('users.manage') then
+        raise exception 'Bạn không có quyền phân công dữ liệu.'
+          using errcode = '42501';
+      end if;
+
+      if target_resource_code not in ('bookings', 'tasks')
+        or nullif(trim(target_record_id), '') is null then
+        raise exception 'Bản ghi phân công không hợp lệ.'
+          using errcode = '22023';
+      end if;
+
+      if new_assignee_user_id is not null and not exists (
+        select 1
+        from public.profiles
+        where id = new_assignee_user_id
+          and is_active = true
+          and deleted_at is null
+      ) then
+        raise exception 'Người được phân công không hợp lệ.'
+          using errcode = '22023';
+      end if;
+
+      if target_resource_code = 'bookings' then
+        select assigned_user_id into previous_assignee_user_id from public.bookings where id = target_record_id;
+      else
+        select assignee_user_id into previous_assignee_user_id from public.tasks where id = target_record_id;
+      end if;
+
+      if not found then
+        raise exception 'Không tìm thấy bản ghi cần phân công.'
+          using errcode = '22023';
+      end if;
+
+      perform set_config('app.allow_core_record_access_change', 'true', true);
+
+      if target_resource_code = 'bookings' then
+        update public.bookings set assigned_user_id = new_assignee_user_id where id = target_record_id;
+      else
+        update public.tasks set assignee_user_id = new_assignee_user_id where id = target_record_id;
+      end if;
+
+      insert into public.access_control_audit_logs (actor_user_id, action, before_value, after_value)
+      values (
+        auth.uid(),
+        'core_record_assignee_changed',
+        jsonb_build_object('resource_code', target_resource_code, 'record_id', target_record_id, 'assignee_user_id', previous_assignee_user_id),
+        jsonb_build_object('resource_code', target_resource_code, 'record_id', target_record_id, 'assignee_user_id', new_assignee_user_id)
+      );
+    end;
+    $function$;
+
+    revoke all on function private.protect_core_record_access_columns() from public;
+    revoke all on function public.reassign_core_record_owner(text, text, uuid) from public;
+    revoke all on function public.set_core_record_assignee(text, text, uuid) from public;
+    grant execute on function public.reassign_core_record_owner(text, text, uuid) to authenticated;
+    grant execute on function public.set_core_record_assignee(text, text, uuid) to authenticated;
+
+    drop trigger if exists trg_customers_protect_access_columns on public.customers;
+    create trigger trg_customers_protect_access_columns
+    before update on public.customers
+    for each row execute function private.protect_core_record_access_columns('owner_user_id');
+
+    drop trigger if exists trg_leads_protect_access_columns on public.leads;
+    create trigger trg_leads_protect_access_columns
+    before update on public.leads
+    for each row execute function private.protect_core_record_access_columns('owner_user_id');
+
+    drop trigger if exists trg_tour_drafts_protect_access_columns on public.tour_drafts;
+    create trigger trg_tour_drafts_protect_access_columns
+    before update on public.tour_drafts
+    for each row execute function private.protect_core_record_access_columns('owner_user_id');
+
+    drop trigger if exists trg_bookings_protect_access_columns on public.bookings;
+    create trigger trg_bookings_protect_access_columns
+    before update on public.bookings
+    for each row execute function private.protect_core_record_access_columns('owner_user_id', 'assigned_user_id');
+
+    drop trigger if exists trg_tasks_protect_access_columns on public.tasks;
+    create trigger trg_tasks_protect_access_columns
+    before update on public.tasks
+    for each row execute function private.protect_core_record_access_columns('creator_user_id', 'assignee_user_id');
+
+    drop trigger if exists trg_comms_protect_access_columns on public.comms;
+    create trigger trg_comms_protect_access_columns
+    before update on public.comms
+    for each row execute function private.protect_core_record_access_columns('access_owner_user_id');
+
+  $ddl$;
+end;
+$access_control_resource_scopes$;
+
+-- ============================================================
+--  CORE RESOURCE RLS ENFORCEMENT (current CRM phase)
+--
+--  This schema mirror follows migration
+--  20260816111141_enforce_core_resource_rls.sql. The migration remains
+--  canonical; this guarded block keeps new SQL-editor environments aligned.
+-- ============================================================
+
+do $core_resource_rls$
+declare
+  root_resource record;
+  child_resource record;
+  access_predicate text;
+  table_name text;
+  action_name text;
+begin
+  if to_regclass('public.role_resource_scopes') is null
+    or to_regclass('public.customers') is null
+    or to_regclass('public.leads') is null
+    or to_regclass('public.tour_drafts') is null
+    or to_regclass('public.bookings') is null
+    or to_regclass('public.tasks') is null
+    or to_regclass('public.comms') is null then
+    raise notice 'Skipping core resource RLS until the RBAC and core CRM schema are available.';
+    return;
+  end if;
+
+  create index if not exists idx_booking_changes_booking_id
+    on public.booking_changes(booking_id);
+  create index if not exists idx_booking_activities_itinerary_id
+    on public.booking_activities(itinerary_id);
+
+  execute $ddl$
+    create or replace function private.can_access_core_resource(
+      requested_resource text,
+      requested_action text,
+      accepted_scopes text[]
+    )
+    returns boolean
+    language plpgsql
+    stable
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+    declare
+      required_permission text;
+    begin
+      required_permission := case
+        when requested_resource = 'customers' and requested_action = 'read' then 'customers.read'
+        when requested_resource = 'customers' then 'customers.write'
+        when requested_resource = 'leads' and requested_action = 'read' then 'sales.read'
+        when requested_resource = 'leads' then 'sales.write'
+        when requested_resource = 'tour_drafts' and requested_action = 'read' then 'tour_design.read'
+        when requested_resource = 'tour_drafts' then 'tour_design.write'
+        when requested_resource = 'bookings' and requested_action = 'read' then 'bookings.read'
+        when requested_resource = 'bookings' then 'bookings.write'
+        when requested_resource = 'tasks' and requested_action = 'read' then 'planner.read'
+        when requested_resource = 'tasks' then 'planner.write'
+        when requested_resource = 'comms' and requested_action = 'read' then 'customers.read'
+        when requested_resource = 'comms' then 'customers.write'
+        else null
+      end;
+
+      if required_permission is null
+        or requested_action not in ('read', 'write', 'delete') then
+        return false;
+      end if;
+
+      if exists (
+        select 1
+        from public.user_roles ur
+        join public.profiles p on p.id = ur.user_id
+        where ur.user_id = (select auth.uid())
+          and ur.role_code in ('admin', 'super_admin')
+          and p.is_active = true
+          and p.deleted_at is null
+      ) then
+        return true;
+      end if;
+
+      return public.has_permission(required_permission)
+        and private.has_resource_scope(
+          requested_resource,
+          requested_action,
+          accepted_scopes
+        );
+    end;
+    $function$;
+
+    create or replace function private.can_access_tour_draft_record(
+      target_draft_id text,
+      requested_action text
+    )
+    returns boolean
+    language sql
+    stable
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+      select
+        (select private.can_access_core_resource(
+          'tour_drafts', requested_action, array['all']
+        ))
+        or exists (
+          select 1
+          from public.tour_drafts td
+          where td.id = target_draft_id
+            and td.owner_user_id = (select auth.uid())
+            and (select private.can_access_core_resource(
+              'tour_drafts', requested_action, array['own']
+            ))
+        );
+    $function$;
+
+    create or replace function private.can_access_booking_record(
+      target_booking_id text,
+      requested_action text
+    )
+    returns boolean
+    language sql
+    stable
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+      select
+        (select private.can_access_core_resource(
+          'bookings', requested_action, array['all']
+        ))
+        or exists (
+          select 1
+          from public.bookings b
+          where b.id = target_booking_id
+            and (
+              (
+                b.owner_user_id = (select auth.uid())
+                and (select private.can_access_core_resource(
+                  'bookings', requested_action, array['own']
+                ))
+              )
+              or (
+                b.assigned_user_id = (select auth.uid())
+                and (select private.can_access_core_resource(
+                  'bookings', requested_action, array['assigned']
+                ))
+              )
+            )
+        );
+    $function$;
+
+    create or replace function private.can_access_booking_activity_record(
+      target_itinerary_id uuid,
+      requested_action text
+    )
+    returns boolean
+    language sql
+    stable
+    security definer
+    set search_path = pg_catalog, public
+    as $function$
+      select exists (
+        select 1
+        from public.booking_itinerary bi
+        where bi.id = target_itinerary_id
+          and private.can_access_booking_record(bi.booking_id, requested_action)
+      );
+    $function$;
+
+    revoke all on function private.can_access_core_resource(text, text, text[]) from public;
+    revoke all on function private.can_access_tour_draft_record(text, text) from public;
+    revoke all on function private.can_access_booking_record(text, text) from public;
+    revoke all on function private.can_access_booking_activity_record(uuid, text) from public;
+    grant execute on function private.can_access_core_resource(text, text, text[]) to authenticated;
+    grant execute on function private.can_access_tour_draft_record(text, text) to authenticated;
+    grant execute on function private.can_access_booking_record(text, text) to authenticated;
+    grant execute on function private.can_access_booking_activity_record(uuid, text) to authenticated;
+
+    revoke all on table
+      public.customers,
+      public.leads,
+      public.tour_drafts,
+      public.tour_outline_days,
+      public.bookings,
+      public.booking_changes,
+      public.booking_itinerary,
+      public.booking_activities,
+      public.tasks,
+      public.comms
+    from anon;
+
+    grant select, insert, update, delete on table
+      public.customers,
+      public.leads,
+      public.tour_drafts,
+      public.tour_outline_days,
+      public.bookings,
+      public.booking_changes,
+      public.booking_itinerary,
+      public.booking_activities,
+      public.tasks,
+      public.comms
+    to authenticated;
+  $ddl$;
+
+  foreach table_name in array array[
+    'customers', 'leads', 'tour_drafts', 'tour_outline_days', 'bookings',
+    'booking_changes', 'booking_itinerary', 'booking_activities', 'tasks', 'comms'
+  ] loop
+    execute format('drop policy if exists authenticated_access on public.%I', table_name);
+  end loop;
+
+  for root_resource in
+    select *
+    from (values
+      ('customers', 'customers', 'owner_user_id', null::text),
+      ('leads', 'leads', 'owner_user_id', null::text),
+      ('tour_drafts', 'tour_drafts', 'owner_user_id', null::text),
+      ('bookings', 'bookings', 'owner_user_id', 'assigned_user_id'),
+      ('tasks', 'tasks', 'creator_user_id', 'assignee_user_id'),
+      ('comms', 'comms', 'access_owner_user_id', null::text)
+    ) as resources(table_name, resource_code, owner_column, assigned_column)
+  loop
+    execute format('alter table public.%I enable row level security', root_resource.table_name);
+
+    foreach action_name in array array['select', 'insert', 'update', 'delete'] loop
+      execute format(
+        'drop policy if exists %I on public.%I',
+        'rls_' || root_resource.table_name || '_' || action_name,
+        root_resource.table_name
+      );
+    end loop;
+
+    access_predicate := format(
+      '(select private.can_access_core_resource(%L, %L, array[''all''])) or (%I = (select auth.uid()) and (select private.can_access_core_resource(%L, %L, array[''own''])))',
+      root_resource.resource_code,
+      'read',
+      root_resource.owner_column,
+      root_resource.resource_code,
+      'read'
+    );
+    if root_resource.assigned_column is not null then
+      access_predicate := access_predicate || format(
+        ' or (%I = (select auth.uid()) and (select private.can_access_core_resource(%L, %L, array[''assigned''])))',
+        root_resource.assigned_column,
+        root_resource.resource_code,
+        'read'
+      );
+    end if;
+    execute format(
+      'create policy %I on public.%I for select to authenticated using (%s)',
+      'rls_' || root_resource.table_name || '_select',
+      root_resource.table_name,
+      access_predicate
+    );
+
+    access_predicate := replace(access_predicate, '''read''', '''write''');
+    execute format(
+      'create policy %I on public.%I for insert to authenticated with check (%s)',
+      'rls_' || root_resource.table_name || '_insert',
+      root_resource.table_name,
+      access_predicate
+    );
+    execute format(
+      'create policy %I on public.%I for update to authenticated using (%s) with check (%s)',
+      'rls_' || root_resource.table_name || '_update',
+      root_resource.table_name,
+      access_predicate,
+      access_predicate
+    );
+
+    access_predicate := replace(access_predicate, '''write''', '''delete''');
+    execute format(
+      'create policy %I on public.%I for delete to authenticated using (%s)',
+      'rls_' || root_resource.table_name || '_delete',
+      root_resource.table_name,
+      access_predicate
+    );
+  end loop;
+
+  for child_resource in
+    select *
+    from (values
+      ('tour_outline_days', 'draft_id', 'private.can_access_tour_draft_record'),
+      ('booking_changes', 'booking_id', 'private.can_access_booking_record'),
+      ('booking_itinerary', 'booking_id', 'private.can_access_booking_record'),
+      ('booking_activities', 'itinerary_id', 'private.can_access_booking_activity_record')
+    ) as resources(table_name, parent_column, access_function)
+  loop
+    execute format('alter table public.%I enable row level security', child_resource.table_name);
+
+    foreach action_name in array array['select', 'insert', 'update', 'delete'] loop
+      execute format(
+        'drop policy if exists %I on public.%I',
+        'rls_' || child_resource.table_name || '_' || action_name,
+        child_resource.table_name
+      );
+    end loop;
+
+    execute format(
+      'create policy %I on public.%I for select to authenticated using (%s(%I, %L))',
+      'rls_' || child_resource.table_name || '_select',
+      child_resource.table_name,
+      child_resource.access_function,
+      child_resource.parent_column,
+      'read'
+    );
+    execute format(
+      'create policy %I on public.%I for insert to authenticated with check (%s(%I, %L))',
+      'rls_' || child_resource.table_name || '_insert',
+      child_resource.table_name,
+      child_resource.access_function,
+      child_resource.parent_column,
+      'write'
+    );
+    execute format(
+      'create policy %I on public.%I for update to authenticated using (%s(%I, %L)) with check (%s(%I, %L))',
+      'rls_' || child_resource.table_name || '_update',
+      child_resource.table_name,
+      child_resource.access_function,
+      child_resource.parent_column,
+      'write',
+      child_resource.access_function,
+      child_resource.parent_column,
+      'write'
+    );
+    execute format(
+      'create policy %I on public.%I for delete to authenticated using (%s(%I, %L))',
+      'rls_' || child_resource.table_name || '_delete',
+      child_resource.table_name,
+      child_resource.access_function,
+      child_resource.parent_column,
+      'delete'
+    );
+  end loop;
+end;
+$core_resource_rls$;
+
+-- ============================================================
 --  END OF SCHEMA v5.0
 -- ============================================================

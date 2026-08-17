@@ -72,6 +72,13 @@ export type AccessControlStaffRole = {
     sort_order: number;
     permission_codes: string[];
     assigned_user_count: number;
+    resource_scopes: AccessControlResourceScope[];
+};
+
+export type AccessControlResourceScope = {
+    resource_code: 'customers' | 'leads' | 'tour_drafts' | 'bookings' | 'tasks' | 'comms';
+    action: 'read' | 'write' | 'delete';
+    scope: 'own' | 'assigned' | 'all';
 };
 
 /** Dữ liệu tạo role nhân viên mới. */
@@ -388,6 +395,33 @@ export async function updateAccessControlStaffRolePermissions(
                 action: 'replace_role_permissions',
                 roleCode,
                 permissionCodes,
+            }),
+        },
+    );
+
+    await readApiResponse<Record<string, never>>(response);
+}
+
+/** Lưu scope RLS theo resource/action cho role nhân viên động. */
+export async function updateAccessControlStaffRoleResourceScopes(
+    roleCode: string,
+    scopes: AccessControlResourceScope[],
+): Promise<void> {
+    const response = await fetch(
+        '/api/access-control/staff-roles',
+        {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'replace_role_resource_scopes',
+                roleCode,
+                scopes: scopes.map((scope) => ({
+                    resourceCode: scope.resource_code,
+                    action: scope.action,
+                    scope: scope.scope,
+                })),
             }),
         },
     );

@@ -86,7 +86,7 @@ export default function StaffRoleCreateDrawer({
         <Drawer
             title={tac('createStaffRole', language)}
             open={open}
-            width={480}
+            size={480}
             destroyOnHidden
             onClose={onClose}
         >

@@ -1,10 +1,11 @@
 # app/api/health/ — Agent overview
 
 ## Role
-Liveness/health check endpoint for ops and CI.
+Liveness/readiness probe for ops and Docker healthcheck.
 
 ## Contents
-- Health route handler
+- `route.ts` — `GET` → `runHealthCheck()` (Auth ping + process memory)
 
 ## Boundaries
-- Keep dependency-light; prefer `lib/system/health` if shared checks grow.
+- Logic lives in `lib/system/health` + `lib/system/process-memory`.
+- HTTP 200 only when `status === 'ok'`; `degraded` / `error` → 503 (container may restart on sustained heap pressure).

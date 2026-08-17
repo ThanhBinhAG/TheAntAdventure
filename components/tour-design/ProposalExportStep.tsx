@@ -7,17 +7,29 @@ import {
   seedOptionBHotelRates,
 } from '@/lib/proposals/proposal-assembler';
 import {
-  applyProposalContentOverrides,
+  fetchCompanyProposalTemplatesClient,
+  saveCompanyProposalTemplateClient,
+} from '@/lib/proposals/proposal-company-template-client';
+import {
+  emptyCompanyTemplatesMap,
+  mergeProposalTemplateLayers,
+  type CompanyTemplatesMap,
+} from '@/lib/proposals/proposal-company-template';
+import {
   hasProposalTemplateOverrides,
   type ProposalTemplateOverrides,
 } from '@/lib/proposals/proposal-content-overrides';
-import { buildProposalHTML, downloadProposalWord } from '@/lib/proposals/proposal-html';
+import { downloadProposalWord } from '@/lib/proposals/proposal-html';
 import type { GalleryPhoto, TourBrief } from '@/lib/tour-design/tour-design-types';
 import type { ProposalHotelRatesPersist } from '@/lib/tour-design/tour-draft-utils';
 import type { ExperienceOverride, Hotel, Product, TourOutlineDay } from '@/lib/types';
 import type { ProposalDoc, ProposalHotelRate } from '@/lib/proposals/proposal-types';
-import ProposalHotelRatesPanel from '@/components/tour-design/ProposalHotelRatesPanel';
+import type { ProposalLayoutId } from '@/lib/proposals/proposal-layouts';
+import { normalizeProposalLayoutId } from '@/lib/proposals/proposal-layouts';
 import ProposalEditorModal from '@/components/tour-design/ProposalEditorModal';
+import ProposalExportActionBar from '@/components/tour-design/ProposalExportActionBar';
+import ProposalExportPreview from '@/components/tour-design/ProposalExportPreview';
+import ProposalExportSettings from '@/components/tour-design/ProposalExportSettings';
 import { toast } from '@/lib/toast';
 
 function formatPdfDownloadError(message: string): string {
@@ -43,9 +55,11 @@ interface Props {
   templateOverrides: ProposalTemplateOverrides;
   specialNotes: string;
   hotelRates: ProposalHotelRatesPersist | null;
+  layoutId: ProposalLayoutId;
   onTemplateOverridesChange: (overrides: ProposalTemplateOverrides) => void;
   onSpecialNotesChange: (notes: string) => void;
   onHotelRatesChange: (rates: ProposalHotelRatesPersist) => void;
+  onLayoutIdChange: (layoutId: ProposalLayoutId) => void;
   onReset: () => void;
   onBack: () => void;
 }
@@ -66,9 +80,11 @@ export default function ProposalExportStep({
   templateOverrides,
   specialNotes,
   hotelRates,
+  layoutId,
   onTemplateOverridesChange,
   onSpecialNotesChange,
   onHotelRatesChange,
+  onLayoutIdChange,
   onReset,
   onBack,
 }: Props) {
@@ -92,9 +108,21 @@ export default function ProposalExportStep({
       ? hotelRates.optionB
       : hotelRateSeed.optionB;
 
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [companyTemplates, setCompanyTemplates] = useState<CompanyTemplatesMap>(emptyCompanyTemplatesMap);
+  const [savingCompany, setSavingCompany] = useState(false);
   const prevHotelSeedKeyRef = useRef(hotelRateSeedKey);
+  const persistedSeedKey = hotelRates?.seedKey;
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCompanyProposalTemplatesClient().then((map) => {
+      if (!cancelled) setCompanyTemplates(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (prevHotelSeedKeyRef.current === hotelRateSeedKey) return;
@@ -108,14 +136,14 @@ export default function ProposalExportStep({
 
   // Drop stale persisted rates when seed fingerprint no longer matches.
   useEffect(() => {
-    if (!hotelRates?.seedKey) return;
-    if (hotelRates.seedKey === hotelRateSeedKey) return;
+    if (!persistedSeedKey || persistedSeedKey === hotelRateSeedKey) return;
+    prevHotelSeedKeyRef.current = hotelRateSeedKey;
     onHotelRatesChange({
       optionA: hotelRateSeed.optionA,
       optionB: hotelRateSeed.optionB,
       seedKey: hotelRateSeedKey,
     });
-  }, [hotelRates, hotelRateSeedKey, hotelRateSeed, onHotelRatesChange]);
+  }, [persistedSeedKey, hotelRateSeedKey, hotelRateSeed, onHotelRatesChange]);
 
   const updateHotelRatesA = useCallback(
     (next: ProposalHotelRate[]) => {
@@ -170,17 +198,17 @@ export default function ProposalExportStep({
     ]
   );
 
+  const companyFields = companyTemplates[clientType].fields;
   const proposalDoc = useMemo(
-    () => applyProposalContentOverrides(assembledDoc, templateOverrides),
-    [assembledDoc, templateOverrides]
+    () => ({
+      ...mergeProposalTemplateLayers(assembledDoc, companyFields, templateOverrides),
+      layoutId: normalizeProposalLayoutId(layoutId),
+    }),
+    [assembledDoc, companyFields, templateOverrides, layoutId]
   );
 
-  const hasEdits = hasProposalTemplateOverrides(templateOverrides);
-
-  const previewHtml = useMemo(
-    () => buildProposalHTML(proposalDoc, typeof window !== 'undefined' ? window.location.origin : ''),
-    [proposalDoc]
-  );
+  const hasEdits =
+    hasProposalTemplateOverrides(templateOverrides) || companyTemplates[clientType].source === 'company';
 
   const hasContent = selectedProducts.length > 0 || selectedPackageId || outlineRows.length > 0;
 
@@ -257,112 +285,69 @@ export default function ProposalExportStep({
           {clientType === 'b2b' ? 'B2B Net Quotation' : 'B2C Client Proposal'} · {proposalDoc.quoteRef}
         </span>
       </div>
-      <div className="card-body">
-        <div className="td-proposal-export-bar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-          <button className="btn btn-p" type="button" onClick={downloadPdf} disabled={pdfLoading || !hasContent}>
-            {pdfLoading ? 'Generating PDF…' : '📄 Download PDF'}
-          </button>
-          <button
-            className="btn btn-s"
-            type="button"
-            onClick={() => void printViaPdf()}
-            disabled={pdfLoading || !hasContent}
-          >
-            🖨 Print / Save PDF
-          </button>
-          <button
-            className="btn btn-s"
-            type="button"
-            onClick={() => downloadProposalWord(proposalDoc, window.location.origin)}
-            disabled={!hasContent}
-          >
-            📝 Download Word
-          </button>
-          <button className="btn btn-s" type="button" onClick={() => setPreviewOpen((v) => !v)} disabled={!hasContent}>
-            {previewOpen ? 'Hide Preview' : '👁 Preview Proposal'}
-          </button>
-          <button className="btn btn-s" type="button" onClick={() => setEditorOpen(true)} disabled={!hasContent}>
-            ✏️ Edit Template{hasEdits ? ' •' : ''}
-          </button>
-        </div>
-
-        {!hasContent && (
-          <div style={{ padding: 12, background: 'var(--amb-l)', borderRadius: 8, fontSize: 12.5, marginBottom: 12 }}>
-            Add experiences (Step 3), a package, or outline days before exporting a proposal.
-          </div>
-        )}
-
-        <div style={{ marginBottom: 12 }}>
-          <label className="lbl" style={{ display: 'block', marginBottom: 4 }}>
-            Special Notes (shown on proposal)
-          </label>
-          <textarea
-            rows={2}
-            value={specialNotes}
-            onChange={(e) => onSpecialNotesChange(e.target.value)}
-            placeholder={brief.specialRequests || 'Dietary, accessibility, pace, occasion…'}
-            style={{ width: '100%', fontSize: 12.5 }}
+      <div className="card-body td-export-body">
+        <div className="td-export-workspace">
+          <ProposalExportSettings
+            clientType={clientType}
+            hasContent={!!hasContent}
+            hasEdits={hasEdits}
+            layoutId={layoutId}
+            onLayoutIdChange={onLayoutIdChange}
+            specialNotes={specialNotes}
+            specialNotesPlaceholder={brief.specialRequests || 'Dietary, accessibility, pace, occasion…'}
+            onSpecialNotesChange={onSpecialNotesChange}
+            hotelRatesOptionA={hotelRatesOptionA}
+            hotelRatesOptionB={hotelRatesOptionB}
+            onHotelRatesAChange={updateHotelRatesA}
+            onHotelRatesBChange={updateHotelRatesB}
+            companyTemplateActive={companyTemplates[clientType].source === 'company'}
+            onEditTemplate={() => setEditorOpen(true)}
+          />
+          <ProposalExportPreview
+            proposalDoc={proposalDoc}
+            layoutId={normalizeProposalLayoutId(layoutId)}
+            hasContent={!!hasContent}
           />
         </div>
 
-        {clientType === 'b2b' && (
-          <div style={{ marginBottom: 16 }}>
-            <ProposalHotelRatesPanel
-              title="C. HOTELS — OPTION A (4★) — enter net rate per night"
-              rates={hotelRatesOptionA}
-              onChange={updateHotelRatesA}
-            />
-            <ProposalHotelRatesPanel
-              title="C. HOTELS — OPTION B (5★ Luxury) — enter hotel names & net rates"
-              rates={hotelRatesOptionB}
-              onChange={updateHotelRatesB}
-              editableHotelName
-              emptyHint="Option B rows appear once Outline hotels are detected (same stays as Option A)."
-            />
-          </div>
-        )}
-
-        {previewOpen && (
-          <div
-            className="td-proposal-preview"
-            style={{ marginBottom: 16, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}
-          >
-            <iframe
-              title="Proposal preview"
-              srcDoc={previewHtml}
-              style={{ width: '100%', height: 480, border: 'none', background: '#fff' }}
-            />
-          </div>
-        )}
-
         <ProposalEditorModal
           open={editorOpen}
-          doc={assembledDoc}
-          overrides={templateOverrides}
+          doc={proposalDoc}
+          companyByVariant={{
+            b2c: companyTemplates.b2c.fields,
+            b2b: companyTemplates.b2b.fields,
+          }}
+          companySourceByVariant={{
+            b2c: companyTemplates.b2c.source,
+            b2b: companyTemplates.b2b.source,
+          }}
           origin={typeof window !== 'undefined' ? window.location.origin : ''}
+          savingCompany={savingCompany}
           onClose={() => setEditorOpen(false)}
-          onSave={(next) => {
+          onSaveQuote={(next) => {
             onTemplateOverridesChange(next);
-            setPreviewOpen(true);
+          }}
+          onSaveCompany={async (variant, fields) => {
+            setSavingCompany(true);
+            try {
+              const next = await saveCompanyProposalTemplateClient(variant, fields);
+              setCompanyTemplates(next);
+            } finally {
+              setSavingCompany(false);
+            }
           }}
         />
 
-        {error && (
-          <div className="td-ai-error" style={{ whiteSpace: 'pre-wrap' }}>
-            {error}
-          </div>
-        )}
-
-        <div className="td-nav" style={{ marginTop: 16 }}>
-          <button className="btn btn-s" type="button" onClick={onBack}>
-            ← Back
-          </button>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn btn-s" type="button" onClick={onReset}>
-              + New Design
-            </button>
-          </div>
-        </div>
+        <ProposalExportActionBar
+          hasContent={!!hasContent}
+          pdfLoading={pdfLoading}
+          error={error}
+          onDownloadPdf={() => void downloadPdf()}
+          onPrintPdf={() => void printViaPdf()}
+          onDownloadWord={() => downloadProposalWord(proposalDoc, window.location.origin)}
+          onBack={onBack}
+          onReset={onReset}
+        />
       </div>
     </div>
   );

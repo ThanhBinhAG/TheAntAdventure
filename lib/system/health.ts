@@ -2,6 +2,11 @@ import 'server-only';
 
 import { checkRedisHealth, type RedisHealth } from '@/lib/redis/client';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
+import {
+  getProcessMemoryMetrics,
+  maybeReportMemoryPressure,
+  type ProcessMemoryMetrics,
+} from '@/lib/system/process-memory';
 
 export type HealthStatus = 'ok' | 'degraded' | 'error';
 
@@ -15,12 +20,22 @@ export type HealthReport = {
     error?: string;
   };
   redis: RedisHealth;
+  memory: ProcessMemoryMetrics;
 };
 
+/**
+ * Lightweight readiness probe: process is up + Supabase Auth is reachable.
+ * Uses the public Auth health endpoint (no user session / RLS required).
+ * Prefer this over browser-client quickPing for unauthenticated monitors.
+ * Marks `degraded` when V8 heap used/limit ≥ HEAP_USED_RATIO_THRESHOLD (0.85).
+ */
 export async function runHealthCheck(): Promise<HealthReport> {
   const redisPromise = checkRedisHealth();
   const ts = new Date().toISOString();
   const version = process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown';
+  const memory = getProcessMemoryMetrics();
+  maybeReportMemoryPressure(memory);
+
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();
 
@@ -31,6 +46,7 @@ export async function runHealthCheck(): Promise<HealthReport> {
       app: { ok: true, version },
       db: { ok: false, latencyMs: 0, error: 'Supabase env not configured' },
       redis: await redisPromise,
+      memory,
     };
   }
 
@@ -53,15 +69,19 @@ export async function runHealthCheck(): Promise<HealthReport> {
         app: { ok: true, version },
         db: { ok: false, latencyMs, error: `Auth health HTTP ${response.status}` },
         redis,
+        memory,
       };
     }
 
+    const status: HealthStatus =
+      memory.pressure || (redis.configured && !redis.ok) ? 'degraded' : 'ok';
     return {
-      status: redis.configured && !redis.ok ? 'degraded' : 'ok',
+      status,
       ts,
       app: { ok: true, version },
       db: { ok: true, latencyMs },
       redis,
+      memory,
     };
   } catch (error) {
     return {
@@ -74,6 +94,7 @@ export async function runHealthCheck(): Promise<HealthReport> {
         error: error instanceof Error ? error.message : 'Health ping failed',
       },
       redis: await redisPromise,
+      memory,
     };
   }
 }

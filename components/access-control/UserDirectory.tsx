@@ -501,7 +501,7 @@ export default function UserDirectory() {
                 <Alert
                     showIcon
                     type="error"
-                    message={tac('loadUsersFailed', language)}
+                    title={tac('loadUsersFailed', language)}
                     description={errorMessage}
                     action={
                         <Button
@@ -518,7 +518,7 @@ export default function UserDirectory() {
                 <Alert
                     showIcon
                     type="error"
-                    message={tac('loadRolesFailed', language)}
+                    title={tac('loadRolesFailed', language)}
                     description={staffRolesErrorMessage}
                 />
             )}
@@ -542,7 +542,11 @@ export default function UserDirectory() {
             />
 
             <UserAccessDrawer
-                key={selectedUser?.user_id ?? 'no-user-selected'}
+                key={
+                    selectedUser
+                        ? `access-${selectedUser.user_id}`
+                        : 'access-drawer-closed'
+                }
                 user={selectedUser}
                 roles={userRoleOptions}
                 saving={savingRole}
@@ -550,7 +554,11 @@ export default function UserDirectory() {
                 onSave={handleSaveRole}
             />
             <UserEditDrawer
-                key={editingUser?.user_id ?? 'no-user-selected'}
+                key={
+                    editingUser
+                        ? `edit-${editingUser.user_id}`
+                        : 'edit-drawer-closed'
+                }
                 user={editingUser}
                 saving={savingEdit}
                 onClose={() => setEditingUser(null)}

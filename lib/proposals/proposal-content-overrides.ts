@@ -7,6 +7,11 @@ import type {
   ProposalPricingText,
 } from './proposal-types';
 import {
+  isCustomProposalTheme,
+  pickProposalTheme,
+  type ProposalTemplateTheme,
+} from './proposal-theme';
+import {
   PROPOSAL_AMENDMENT_POLICY,
   PROPOSAL_CANCELLATION_POLICY,
   PROPOSAL_IMPORTANT_NOTES,
@@ -35,6 +40,7 @@ export interface ProposalContentOverrides {
   exclusions?: string[];
   pricingText?: Partial<ProposalPricingText>;
   legalText?: Partial<ProposalLegalText>;
+  theme?: ProposalTemplateTheme;
 }
 
 /** Commercial / legal template fields editable in Step 5. */
@@ -45,6 +51,7 @@ export type ProposalTemplateOverrides = {
   exclusions?: string[];
   pricingText?: Pick<ProposalPricingText, 'footnote' | 'b2bGroundDesc' | 'b2bFlightsDesc'>;
   legalText?: Partial<ProposalLegalText>;
+  theme?: ProposalTemplateTheme;
 };
 
 export const TEMPLATE_BOOKING_FIELD_KEYS = ['Payment Terms', 'Commission', 'Valid Until'] as const;
@@ -106,6 +113,8 @@ export function toProposalTemplateOverrides(
   if (overrides.legalText && Object.keys(overrides.legalText).length) {
     out.legalText = { ...overrides.legalText };
   }
+  const theme = pickProposalTheme((overrides as ProposalTemplateOverrides).theme);
+  if (theme) out.theme = theme;
   return out;
 }
 
@@ -119,7 +128,8 @@ export function hasProposalTemplateOverrides(
     (t.inclusions && t.inclusions.length) ||
     (t.exclusions && t.exclusions.length) ||
     (t.pricingText && Object.keys(t.pricingText).length) ||
-    (t.legalText && Object.keys(t.legalText).length)
+    (t.legalText && Object.keys(t.legalText).length) ||
+    isCustomProposalTheme(t.theme)
   );
 }
 
@@ -262,6 +272,9 @@ export function applyProposalContentOverrides(
     exclusions: full.exclusions ?? doc.exclusions,
     pricingText: pricingMerge,
     legalText: full.legalText ? { ...(doc.legalText ?? {}), ...full.legalText } : doc.legalText,
+    theme: pickProposalTheme(full.theme)
+      ? { ...(doc.theme ?? {}), ...pickProposalTheme(full.theme) }
+      : doc.theme,
   };
 }
 
@@ -281,7 +294,8 @@ export function hasProposalContentOverrides(
     (full.inclusions && full.inclusions.length) ||
     (full.exclusions && full.exclusions.length) ||
     (full.pricingText && Object.keys(full.pricingText).length) ||
-    (full.legalText && Object.keys(full.legalText).length)
+    (full.legalText && Object.keys(full.legalText).length) ||
+    isCustomProposalTheme(full.theme)
   );
 }
 
@@ -303,6 +317,8 @@ export function snapshotTemplateFromDoc(doc: ProposalDoc): ProposalTemplateOverr
   if (pricingText) out.pricingText = pricingText;
   if (doc.legalText) out.legalText = { ...doc.legalText };
   else out.legalText = defaultLegalText();
+  const theme = pickProposalTheme(doc.theme);
+  if (theme) out.theme = theme;
   return out;
 }
 
@@ -328,4 +344,22 @@ export function defaultLegalText(): ProposalLegalText {
     amendment: formatLegalKv(PROPOSAL_AMENDMENT_POLICY),
     importantNotes: formatLegalKv(PROPOSAL_IMPORTANT_NOTES),
   };
+}
+
+export function normalizeLegalCompare(value: string): string {
+  return value
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** True when the stored block is empty or still matches the boilerplate snapshot. */
+export function isUnchangedLegalText(
+  value: string | undefined,
+  key: keyof ProposalLegalText
+): boolean {
+  const fallback = defaultLegalText()[key] || '';
+  if (!value?.trim()) return true;
+  return normalizeLegalCompare(value) === normalizeLegalCompare(fallback);
 }

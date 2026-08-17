@@ -79,7 +79,14 @@ export default function ProductCard({
     >
       <div className="tp-card-media">
         {heroUrl ? (
-          <StorageImage src={heroUrl} alt={p.name} fill sizes="(max-width: 768px) 50vw, 220px" className="tp-card-img" />
+          <StorageImage
+            src={heroUrl}
+            alt={p.name}
+            fill
+            sizes="(max-width: 768px) 50vw, 220px"
+            className="tp-card-img"
+            unoptimized
+          />
         ) : (
           <div className="tp-card-media-placeholder" aria-hidden>
             <span className="tp-card-media-icon">🗺</span>

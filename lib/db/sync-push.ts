@@ -1,13 +1,14 @@
 import { isRemoteDataEnabled, isSupabaseReadOnly } from '../env';
 import { invalidateProductFacetsFromClient } from '../products/product-facets-client';
 import { useStore } from '../store';
-import type { BackupData } from '../types';
+import type { BackupData, Comm, Customer, Lead } from '../types';
 import {
   filterHydratedTables,
   getHydratedTables,
   isManualPushAllowed,
   isMessagesHydrated,
   isSyncAllowed,
+  isTableHydrated,
   updateBaselineCounts,
 } from './sync-lifecycle';
 import type { SyncTableOptions } from './sync-policy';
@@ -18,6 +19,16 @@ import {
   type SyncArrayTable,
 } from './sync-config';
 import { db as supabaseDb } from './supabase';
+import { upsertSimpleRows } from './supabase/generic-sync';
+import { HANDLERS, type Row } from './supabase/shared';
+
+export type StoreRowPatch = {
+  customers?: Customer[];
+  leads?: Lead[];
+  comms?: Comm[];
+};
+
+const STORE_ROW_TABLES = ['customers', 'leads', 'comms'] as const satisfies readonly SyncArrayTable[];
 
 export type PushOptions = {
   /** Bypass regression guard on mirror tables (catalogue tables stay upsert-only). */
@@ -115,4 +126,28 @@ export async function pushTablesToSupabase(
 /** Push only currently hydrated tables (+ messages if loaded). Call ensureAllTablesLoaded first for a full snapshot. */
 export async function pushSnapshotToSupabase(options: PushOptions = {}) {
   return pushTablesToSupabase(undefined, true, options);
+}
+
+/** Upsert a small store slice (create/edit) — no orphan delete, no full-table POST. */
+export async function pushStoreRowsToSupabase(
+  patch: StoreRowPatch
+): Promise<{ ok: boolean; error?: string }> {
+  if (!isRemoteDataEnabled()) {
+    return { ok: false, error: 'Supabase not configured' };
+  }
+  if (isSupabaseReadOnly()) {
+    return { ok: false, error: 'Supabase read-only mode — push disabled' };
+  }
+
+  try {
+    for (const table of STORE_ROW_TABLES) {
+      const rows = patch[table];
+      if (!rows?.length) continue;
+      if (!isTableHydrated(table)) continue;
+      await upsertSimpleRows(HANDLERS[table], rows as unknown as Row[]);
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: syncErrorMessage(e) };
+  }
 }

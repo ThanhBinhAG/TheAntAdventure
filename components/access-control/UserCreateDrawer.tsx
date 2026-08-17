@@ -143,7 +143,7 @@ export default function UserCreateDrawer({
         <Drawer
             title={tac('addNewUser', language)}
             open={open}
-            width={480}
+            size={480}
             destroyOnHidden
             keyboard={!saving}
             maskClosable={!saving}
@@ -163,7 +163,7 @@ export default function UserCreateDrawer({
                     <Alert
                         showIcon
                         type="error"
-                        message={error}
+                        title={error}
                     />
                 )}
 

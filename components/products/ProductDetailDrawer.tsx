@@ -199,6 +199,7 @@ function ProductHero({ images }: { images: { url: string; alt: string }[] }) {
           fill
           sizes="560px"
           className="tp-drawer-hero-img"
+          unoptimized
         />
       ) : (
         <div className="tp-drawer-hero-placeholder">

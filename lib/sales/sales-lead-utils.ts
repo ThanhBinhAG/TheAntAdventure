@@ -43,7 +43,8 @@ export interface ListSortState {
   direction: SortDirection;
 }
 
-export const PIPELINE_CARDS_LIMIT = 8;
+/** Default visible cards per stage before “show more”; column still scrolls when expanded. */
+export const PIPELINE_CARDS_LIMIT = 6;
 
 /** Normalize legacy month strings to `Mon YYYY` or `TBD`. */
 export function normalizeLeadMonth(month: string, year = new Date().getFullYear()): string {

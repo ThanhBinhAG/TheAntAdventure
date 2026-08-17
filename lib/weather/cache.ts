@@ -1,4 +1,5 @@
 import 'server-only';
+import { localIsoDate } from '../core/date-utils';
 import { WEATHER_DESTINATIONS, getDestinationsByRegion } from './coordinates';
 import { FEATURED_WEEKLY_IDS } from './coordinates';
 import { getWeatherAdminClient } from './supabase-admin';
@@ -14,17 +15,11 @@ import type {
 
 const destMeta = new Map(WEATHER_DESTINATIONS.map((d) => [d.id, d]));
 
-const TIMEZONE = 'Asia/Ho_Chi_Minh';
 const FORECAST_WINDOW_DAYS = 7;
 
-/** Calendar date YYYY-MM-DD in Vietnam time. */
+/** Calendar date YYYY-MM-DD in Vietnam time (shared date-utils). */
 export function getTodayVnDate(now = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
+  return localIsoDate(now);
 }
 
 export function isWeatherCacheConfigured(): boolean {

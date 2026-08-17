@@ -71,7 +71,7 @@ export default function PermissionCreateDrawer({
         <Drawer
             title={tac('createPermissionOrGroup', language)}
             open={open}
-            width={480}
+            size={480}
             destroyOnHidden
             onClose={onClose}
             afterOpenChange={(visible) => {

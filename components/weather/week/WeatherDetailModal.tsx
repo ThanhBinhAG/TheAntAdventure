@@ -57,7 +57,28 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
         )}
 
         <div className="wg-detail-body">
-          {loading && !data ? <p className="wg-muted" aria-busy>Đang tải thời tiết…</p> : null}
+          {loading && !data ? (
+            <div className="wg-detail-loading" aria-busy aria-label="Đang tải thời tiết">
+              <div className="wg-detail-current">
+                <div className="wg-skel wg-skel-icon" aria-hidden />
+                <div className="wg-skel-stack">
+                  <div className="wg-skel wg-skel-temp" aria-hidden />
+                  <div className="wg-skel wg-skel-line wg-skel-line--md" aria-hidden />
+                  <div className="wg-skel wg-skel-line wg-skel-line--sm" aria-hidden />
+                </div>
+              </div>
+              <dl className="wg-main-stats wg-main-stats--modal">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i}>
+                    <dt className="wg-skel wg-skel-line wg-skel-line--sm" aria-hidden />
+                    <dd className="wg-skel wg-skel-line wg-skel-line--md" aria-hidden />
+                  </div>
+                ))}
+              </dl>
+              <h3 className="wg-section-heading">Dự báo 7 ngày</h3>
+              <div className="wg-skel wg-skel-forecast" aria-hidden />
+            </div>
+          ) : null}
           {error ? (
             <div className="wg-main-card-error">
               <p>{error}</p>

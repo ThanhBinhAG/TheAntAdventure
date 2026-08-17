@@ -62,6 +62,9 @@ function publicUrl(client: SupabaseClient, path: string): string {
   return data.publicUrl;
 }
 
+/** Safe to cache for a year: URLs carry `?v=displayBytes` (see `withPhotoCacheBust`). */
+const GALLERY_ASSET_CACHE_CONTROL = '31536000';
+
 async function uploadBuffer(
   client: SupabaseClient,
   path: string,
@@ -70,6 +73,7 @@ async function uploadBuffer(
   const { error } = await client.storage.from(PHOTOS_BUCKET).upload(path, buffer, {
     contentType: 'image/webp',
     upsert: true,
+    cacheControl: GALLERY_ASSET_CACHE_CONTROL,
   });
   if (error) throw new Error(error.message);
 }

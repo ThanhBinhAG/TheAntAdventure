@@ -62,7 +62,7 @@ export default function StaffRoleEditDrawer({
         <Drawer
             title={tac('editStaffRole', language)}
             open={Boolean(role)}
-            width={480}
+            size={480}
             destroyOnHidden
             onClose={onClose}
             afterOpenChange={(visible) => {

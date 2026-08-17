@@ -34,9 +34,6 @@ export const SYNC_ARRAY_TABLES = [
 
 export type SyncArrayTable = (typeof SYNC_ARRAY_TABLES)[number];
 
-/** Sidebar badge tables — loaded idle after page boot. */
-export const SIDEBAR_IDLE_TABLES: readonly SyncArrayTable[] = ['tasks', 'tour_drafts'] as const;
-
 /** Customer profile modal — lazy on open. */
 export const PROFILE_LAZY_TABLES: readonly SyncArrayTable[] = ['comms', 'bookings'] as const;
 
@@ -50,6 +47,7 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   customers: ['customers', 'leads', 'feedback'],
   agents: ['agents', 'customers', 'leads'],
   sales: ['leads', 'customers', 'comms', 'tour_drafts', 'bookings'],
+  /** photos / photo_folders lazy on experiences (step 2) and proposal (step 4). */
   tourdesign: [
     'products',
     'customers',
@@ -57,8 +55,6 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
     'tour_drafts',
     'tour_outline_days',
     'hotels',
-    'photos',
-    'photo_folders',
     'comms',
   ],
   // Catalogue pages use the paginated server API. The full data set is loaded
@@ -224,14 +220,21 @@ export const TABLE_TO_STORE_KEY: Record<SyncArrayTable, keyof BackupData> = {
 
 export const MESSAGES_TABLE = 'chat_messages' as const;
 
+/**
+ * Nested/child tables counted in health checks via PostgREST `countTable`
+ * (not exposed on `db[table]` — only parent SyncArrayTables are).
+ */
+export const HEALTH_CHILD_COUNT_TABLES = [
+  'booking_itinerary',
+  'booking_activities',
+  'hotel_rooms',
+  'attraction_photos',
+] as const;
+
 /** Tables included in health-check row counts */
 export const HEALTH_COUNT_TABLES = [
   ...SYNC_ARRAY_TABLES,
-  'booking_itinerary',
-  'booking_activities',
-  'tour_outline_days',
-  'hotel_rooms',
-  'attraction_photos',
+  ...HEALTH_CHILD_COUNT_TABLES,
   MESSAGES_TABLE,
 ] as const;
 

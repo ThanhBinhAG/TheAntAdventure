@@ -6,11 +6,13 @@ import {
   type ProposalTemplateOverrides,
 } from '../proposals/proposal-content-overrides';
 import type { ProposalHotelRate } from '../proposals/proposal-types';
+import { normalizeProposalLayoutId, type ProposalLayoutId } from '../proposals/proposal-layouts';
 
 export const EXPERIENCE_OVERRIDES_KEY = '__experienceOverrides';
 export const PROPOSAL_TEMPLATE_OVERRIDES_KEY = '__proposalTemplateOverrides';
 export const PROPOSAL_SPECIAL_NOTES_KEY = '__proposalSpecialNotes';
 export const PROPOSAL_HOTEL_RATES_KEY = '__proposalHotelRates';
+export const PROPOSAL_LAYOUT_ID_KEY = '__proposalLayoutId';
 
 export type ProposalHotelRatesPersist = {
   optionA: ProposalHotelRate[];
@@ -23,6 +25,7 @@ export type ProposalExportPersistState = {
   templateOverrides?: ProposalTemplateOverrides;
   specialNotes?: string;
   hotelRates?: ProposalHotelRatesPersist;
+  layoutId?: ProposalLayoutId;
 };
 
 export function getExperienceOverridesFromBriefJson(
@@ -133,6 +136,13 @@ export function getProposalSpecialNotesFromBriefJson(
   return typeof raw === 'string' ? raw : '';
 }
 
+export function getProposalLayoutIdFromBriefJson(
+  briefJson?: Record<string, unknown> | null
+): ProposalLayoutId {
+  if (!briefJson) return normalizeProposalLayoutId(undefined);
+  return normalizeProposalLayoutId(briefJson[PROPOSAL_LAYOUT_ID_KEY]);
+}
+
 export function getProposalHotelRatesFromBriefJson(
   briefJson?: Record<string, unknown> | null
 ): ProposalHotelRatesPersist | undefined {
@@ -159,6 +169,7 @@ export function resolveProposalExportState(
     templateOverrides: getProposalTemplateOverridesFromBriefJson(draft.briefJson),
     specialNotes: getProposalSpecialNotesFromBriefJson(draft.briefJson),
     hotelRates: getProposalHotelRatesFromBriefJson(draft.briefJson),
+    layoutId: getProposalLayoutIdFromBriefJson(draft.briefJson),
   };
 }
 
@@ -191,6 +202,14 @@ export function mergeProposalExportStateIntoBriefJson(
   } else {
     delete base[PROPOSAL_HOTEL_RATES_KEY];
   }
+
+  const layoutId = normalizeProposalLayoutId(state?.layoutId);
+  if (layoutId !== 'classic') {
+    base[PROPOSAL_LAYOUT_ID_KEY] = layoutId;
+  } else {
+    delete base[PROPOSAL_LAYOUT_ID_KEY];
+  }
+
   return base;
 }
 
@@ -307,5 +326,6 @@ export function briefFromDraft(draft?: TourDraft | null): Partial<TourBrief> | u
   delete brief[PROPOSAL_TEMPLATE_OVERRIDES_KEY];
   delete brief[PROPOSAL_SPECIAL_NOTES_KEY];
   delete brief[PROPOSAL_HOTEL_RATES_KEY];
+  delete brief[PROPOSAL_LAYOUT_ID_KEY];
   return brief as unknown as Partial<TourBrief>;
 }

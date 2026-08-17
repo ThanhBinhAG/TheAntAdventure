@@ -35,13 +35,29 @@ services:
       PORT: 3006
       HOSTNAME: 0.0.0.0
       REDIS_URL: redis://redis:6379
+      # Keep V8 heap under mem_limit so OOM is controllable (not host-wide kill).
+      NODE_OPTIONS: --max-old-space-size=1536
 
     depends_on:
       redis:
         condition: service_healthy
 
-    # Caps the app at 2 GB ...
+    # Caps the app at 2 GB so a runaway request is killed inside the container instead of
+    # letting the kernel pick a victim host-wide. Measured peak for image processing is
+    # ~130 MB (Sharp runs in a short-lived child worker), so this is generous headroom.
     mem_limit: 2g
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3006/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
 
   redis:

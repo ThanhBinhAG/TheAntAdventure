@@ -74,7 +74,8 @@ export default function UserAccessDrawer({
                 roles.find((role) => role.is_active)?.role_code ?? '',
         );
 
-    // UserDirectory truyền key theo user_id, nên Drawer được tạo lại khi đổi user.
+    // UserDirectory truyền key riêng theo user (và fallback khác Edit drawer)
+    // để remount form khi đổi user, không đụng key trùng sibling.
     // Vì vậy state trên luôn bắt đầu từ role hiện tại, không cần useEffect.
 
     /** Lấy thông tin đầy đủ của role đang chọn. */
@@ -201,7 +202,7 @@ export default function UserAccessDrawer({
         <Drawer
             title={tac('assignUserRole', language)}
             open={Boolean(user)}
-            width={560}
+            size={560}
             onClose={onClose}
             destroyOnHidden
         >
@@ -261,7 +262,7 @@ export default function UserAccessDrawer({
                         <Alert
                             type="warning"
                             showIcon
-                            message={tac('fullAccessTitle', language)}
+                            title={tac('fullAccessTitle', language)}
                             description={tac('fullAccessDescription', language)}
                         />
                     ) : loadingPermissions ? (
@@ -270,7 +271,7 @@ export default function UserAccessDrawer({
                         <Alert
                             type="error"
                             showIcon
-                            message={tac('cannotLoadPermissions', language)}
+                            title={tac('cannotLoadPermissions', language)}
                             description={permissionsError}
                             action={
                                 <Button

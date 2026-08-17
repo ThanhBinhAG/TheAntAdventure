@@ -11,25 +11,27 @@ type Props = {
   loading?: boolean;
   onOpenDetail: (id: string) => void;
   onEdit: (id: string) => void;
-  refreshToken?: number;
+  cacheVersion?: number;
 };
 
 function FeaturedSlot({
   meta,
   onOpenDetail,
   onEdit,
-  refreshToken = 0,
+  cacheVersion = 0,
 }: {
   meta: WeatherDestinationMeta;
   onOpenDetail: (id: string) => void;
   onEdit: (id: string) => void;
-  refreshToken?: number;
+  cacheVersion?: number;
 }) {
-  const { data, loading, error, refresh } = useDestinationWeather(meta.id, { enabled: true });
+  const { data, loading, error, refresh, reload } = useDestinationWeather(meta.id, {
+    enabled: true,
+  });
 
   useEffect(() => {
-    if (refreshToken > 0) void refresh();
-  }, [refreshToken, refresh]);
+    if (cacheVersion > 0) void reload();
+  }, [cacheVersion, reload]);
 
   return (
     <div className="wg-featured-card-wrap">
@@ -59,7 +61,7 @@ export default function FeaturedWeatherRow({
   loading = false,
   onOpenDetail,
   onEdit,
-  refreshToken = 0,
+  cacheVersion = 0,
 }: Props) {
   if (loading && !destinations.length) {
     return <FeaturedWeatherSkeleton count={2} />;
@@ -81,7 +83,7 @@ export default function FeaturedWeatherRow({
           meta={d}
           onOpenDetail={onOpenDetail}
           onEdit={onEdit}
-          refreshToken={refreshToken}
+          cacheVersion={cacheVersion}
         />
       ))}
     </div>

@@ -1,4 +1,5 @@
 import type { TourBrief } from '../tour-design/tour-design-types';
+import type { ProposalLayoutId } from './proposal-layouts';
 
 export type ProposalVariant = 'b2c' | 'b2b';
 
@@ -105,6 +106,8 @@ export type ProposalPricing = ProposalB2CPricing | ProposalB2BPricing;
 
 export interface ProposalDoc {
   variant: ProposalVariant;
+  /** Built-in export layout; defaults to classic when omitted. */
+  layoutId?: ProposalLayoutId;
   quoteRef: string;
   preparedDate: string;
   validUntil: string;
@@ -141,6 +144,8 @@ export interface ProposalDoc {
   pricingText?: ProposalPricingText;
   /** Editor overrides for B2C legal section prose (serialized blocks). */
   legalText?: ProposalLegalText;
+  /** Optional brand / table colors from the company or quote template. */
+  theme?: import('./proposal-theme').ProposalTemplateTheme;
 }
 
 export interface AssembleProposalInput {
@@ -166,4 +171,6 @@ export interface AssembleProposalInput {
   hotelsCatalog?: import('../types').Hotel[];
   /** Per-product draft edits (desc / date / clientNote) from Step 2. */
   experienceOverrides?: Record<string, import('../types').ExperienceOverride>;
+  /** Saved company template (empty = keep assembler/boilerplate defaults). */
+  companyTemplate?: import('./proposal-content-overrides').ProposalTemplateOverrides;
 }

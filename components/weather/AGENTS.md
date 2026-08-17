@@ -12,4 +12,5 @@ Weather Guide UI: featured destination cards, explore grid, add/edit destination
 
 ## Boundaries
 - Catalog + forecast APIs: `app/api/weather`. Domain: `lib/weather`.
-- Page shell: `components/pages/Weather.tsx`. No seasonal/region/best-time tabs.
+- Page shell: `components/pages/Weather.tsx` — Add/Edit/Featured/Detail modals via `next/dynamic` (gallery picker out of initial chunk).
+- No seasonal/region/best-time tabs.

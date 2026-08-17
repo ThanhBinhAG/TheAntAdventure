@@ -13,8 +13,8 @@ Supabase photo path helpers, gallery persist layer, avatar/logo uploads.
 - `photo-variants.ts` — **avatar only** (`avatarImageFileSchema`, 20 MB cap)
 - `upload-guide-avatar.ts`, `upload-company-logo.ts`
 - `company-logo-client.ts` — browser GET/POST/DELETE for branding logo; in-flight
-  dedupe + module cache + localStorage last-known URL (sync Sidebar paint, no default
-  SVG flash); session revalidate still hits GET once
+  dedupe + module cache + localStorage last-known URL (Sidebar reads cache via
+  `useSyncExternalStore` so SSR/hydration match; then session GET once)
 
 ## Boundaries
 - Chunk sessions + Sharp worker: `lib/image-pipeline`. Gallery client: `lib/gallery/photo-api.ts`.

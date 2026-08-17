@@ -46,8 +46,8 @@ export default function ProductCard({
       if (thumb) return thumb;
     }
     const resolved = resolveProductPhotos(product, photos, 1);
-    return resolved[0]?.thumbUrl || resolved[0]?.url || null;
-  }, [photos, product, preview, p.code]);
+    return resolved[0]?.thumbUrl || resolved[0]?.url || p.coverThumbUrl || null;
+  }, [photos, product, preview, p.code, p.coverThumbUrl]);
 
   const metaTags = [p.dur, p.cat].filter(Boolean).slice(0, 2);
 

@@ -2,14 +2,12 @@ import { NextResponse } from 'next/server';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import {
     optionalProductQueryParam,
-    productListQuerySchema,
+    productListFilterQuerySchema,
 } from '@/lib/products/product-list-input';
 import {
-    listProductsPage,
+    listProductFacets,
     ProductListError,
 } from '@/lib/products/product-list-server';
-import { invalidateProductFacetsCache } from '@/lib/redis/product-facets';
-
 
 export const dynamic = 'force-dynamic';
 
@@ -29,10 +27,7 @@ export async function GET(request: Request) {
     }
 
     const url = new URL(request.url);
-    const parsed = productListQuerySchema.safeParse({
-        page: optionalProductQueryParam(url, 'page'),
-        pageSize: optionalProductQueryParam(url, 'pageSize'),
-        view: optionalProductQueryParam(url, 'view'),
+    const parsed = productListFilterQuerySchema.safeParse({
         q: optionalProductQueryParam(url, 'q'),
         region: optionalProductQueryParam(url, 'region'),
         duration: optionalProductQueryParam(url, 'duration'),
@@ -45,19 +40,19 @@ export async function GET(request: Request) {
         return NextResponse.json(
             {
                 ok: false,
-                error: 'Thông tin phân trang không hợp lệ.',
+                error: 'Thông tin bộ lọc không hợp lệ.',
             },
             { status: 400 },
         );
     }
 
     try {
-        const productPage = await listProductsPage(parsed.data);
+        const facets = await listProductFacets(parsed.data);
 
         return NextResponse.json(
             {
                 ok: true,
-                ...productPage,
+                facets,
             },
             {
                 headers: {
@@ -68,12 +63,12 @@ export async function GET(request: Request) {
     } catch (error) {
         if (error instanceof ProductListError) {
             console.error(
-                'Không thể lấy danh sách product phân trang:',
+                'Không thể lấy facet product:',
                 error.message,
             );
         } else {
             console.error(
-                'Lỗi không xác định khi lấy danh sách product:',
+                'Lỗi không xác định khi lấy facet product:',
                 error,
             );
         }
@@ -81,24 +76,9 @@ export async function GET(request: Request) {
         return NextResponse.json(
             {
                 ok: false,
-                error: 'Không thể tải danh sách product.',
+                error: 'Không thể tải bộ lọc product.',
             },
             { status: 500 },
         );
     }
-}
-
-export async function POST() {
-    const permission = await checkPermissionForRequest('products.write');
-
-    if (!permission.allowed) {
-        return NextResponse.json(
-            { ok: false, error: 'Bạn không có quyền sửa product.' },
-            { status: permission.status },
-        );
-    }
-
-    await invalidateProductFacetsCache();
-
-    return NextResponse.json({ ok: true });
 }

@@ -2,10 +2,13 @@ import 'server-only';
 
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { rowToProduct } from '@/lib/db/mappers';
+import { assembleProducts, rowToPhoto } from '@/lib/db/mappers';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
+import { photoDisplayUrl, photoThumbUrl } from '@/lib/gallery/gallery-helpers';
+import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import type { Product } from '@/lib/types';
 import type {
+    ProductListFilters,
     ProductListQuery,
     ProductListFacets,
     ProductPageResponse,
@@ -18,6 +21,9 @@ import {
 
 type ProductRow = Record<string, unknown>;
 type ProductListRpcResponse = ProductPageResponse<ProductRow>;
+type ProductPhotoLinkRow = ProductRow & {
+    photo?: ProductRow | ProductRow[] | null;
+};
 
 export class ProductListError extends Error {
     constructor(message: string) {
@@ -47,6 +53,79 @@ function createProductServerClient() {
                 // Danh sách product chỉ đọc, không cần ghi cookie.
             },
         },
+    });
+}
+
+function galleryPhotoFromRow(row: ProductRow): GalleryPhoto {
+    const mapped = rowToPhoto(row);
+    return {
+        id: String(mapped.id),
+        caption: String(mapped.caption ?? ''),
+        region: String(mapped.region ?? ''),
+        url: mapped.url ? String(mapped.url) : undefined,
+        thumbUrl: mapped.thumbUrl ? String(mapped.thumbUrl) : undefined,
+        storagePath: mapped.storagePath
+            ? String(mapped.storagePath)
+            : undefined,
+        displayBytes:
+            typeof mapped.displayBytes === 'number'
+                ? mapped.displayBytes
+                : undefined,
+    };
+}
+
+async function attachPageCoverThumbs(
+    supabase: ReturnType<typeof createProductServerClient>,
+    rows: ProductRow[],
+): Promise<Product[]> {
+    if (rows.length === 0) return [];
+
+    const codes = rows.map((row) => String(row.code));
+    const { data: links, error: linkError } = await supabase
+        .from('product_photos')
+        .select(`
+            product_code,
+            photo_id,
+            sort_order,
+            is_featured,
+            photo:photos!product_photos_photo_id_fkey(
+                id,
+                url,
+                thumb_url,
+                storage_path,
+                display_bytes
+            )
+        `)
+        .in('product_code', codes);
+
+    if (linkError) throw new ProductListError(linkError.message);
+
+    const linkRows = (links ?? []) as ProductPhotoLinkRow[];
+    const assembled = assembleProducts(
+        rows,
+        linkRows,
+    ) as unknown as Product[];
+
+    const coverByPhotoId = new Map<string, string>();
+    for (const link of linkRows) {
+        const nestedPhoto = Array.isArray(link.photo)
+            ? link.photo[0]
+            : link.photo;
+        if (!nestedPhoto) continue;
+        const photo = galleryPhotoFromRow(nestedPhoto);
+        const cover_thumb_url =
+            photoThumbUrl(photo) || photoDisplayUrl(photo);
+        if (cover_thumb_url) coverByPhotoId.set(photo.id, cover_thumb_url);
+    }
+
+    return assembled.map((product) => {
+        const heroId = product.photoIds?.[0];
+        const cover_thumb_url = heroId
+            ? coverByPhotoId.get(heroId)
+            : undefined;
+        return cover_thumb_url
+            ? { ...product, coverThumbUrl: cover_thumb_url }
+            : product;
     });
 }
 
@@ -80,9 +159,7 @@ export async function listProductsPage(
     }
 
     return {
-        items: page.items.map((row) =>
-            rowToProduct(row as ProductRow),
-        ),
+        items: await attachPageCoverThumbs(supabase, page.items),
         page: page.page,
         pageSize: page.pageSize,
         totalCount: page.totalCount,
@@ -93,7 +170,7 @@ export async function listProductsPage(
 }
 
 export async function listProductFacets(
-    input: ProductListQuery,
+    input: ProductListFilters,
 ): Promise<ProductListFacets> {
     const cached = await getCachedProductFacets(input);
     if (cached) return cached;

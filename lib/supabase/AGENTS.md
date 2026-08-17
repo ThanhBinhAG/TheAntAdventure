@@ -4,7 +4,7 @@
 Browser Supabase client factory and Next middleware helpers.
 
 ## Contents
-- `client.ts`, `index.ts`, `middleware.ts` (chunk upload skips Auth RTT when session cookies present)
+- `client.ts`, `index.ts`, `middleware.ts` (chunk upload and self-authorizing Products APIs skip duplicate middleware Auth)
 - `tls-config.ts` — Edge-safe TLS insecure flags (no undici)
 - `insecure-fetch.ts` — Node/`server-only` undici Agent for company Supabase TLS
 

@@ -14,7 +14,9 @@ import {
     createAccessControlStaffRole,
     deleteAccessControlStaffRole,
     getAccessControlStaffRoles,
+    getAccessControlStaffRoleResourceScopes,
     replaceAccessControlStaffRolePermissions,
+    replaceAccessControlStaffRoleResourceScopes,
     updateAccessControlStaffRole,
 } from '@/lib/access-control/server';
 import {
@@ -81,10 +83,20 @@ export async function GET() {
     }
 
     try {
-        const roles = await getAccessControlStaffRoles();
+        const [roles, resourceScopes] = await Promise.all([
+            getAccessControlStaffRoles(),
+            getAccessControlStaffRoleResourceScopes(),
+        ]);
+
+        const rolesWithScopes = roles.map((role) => ({
+            ...role,
+            resource_scopes: resourceScopes.filter(
+                (scope) => scope.role_code === role.role_code,
+            ),
+        }));
 
         return NextResponse.json(
-            { ok: true, roles },
+            { ok: true, roles: rolesWithScopes },
             {
                 headers: {
                     // SWR ở browser chịu trách nhiệm cache ngắn hạn.
@@ -176,6 +188,16 @@ export async function PATCH(request: Request) {
             await replaceAccessControlStaffRolePermissions(
                 parsed.data.roleCode,
                 parsed.data.permissionCodes,
+            );
+        }
+
+        if (
+            parsed.data.action ===
+            'replace_role_resource_scopes'
+        ) {
+            await replaceAccessControlStaffRoleResourceScopes(
+                parsed.data.roleCode,
+                parsed.data.scopes,
             );
         }
 

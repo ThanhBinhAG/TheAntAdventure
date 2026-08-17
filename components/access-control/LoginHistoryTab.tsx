@@ -1,7 +1,6 @@
 'use client';
 
 import {
-    useCallback,
     useMemo,
     useState,
 } from 'react';
@@ -110,7 +109,6 @@ export default function LoginHistoryTab() {
         data,
         error,
         isLoading,
-        mutate: reloadEvents,
     } = useSWR(
         loginHistoryQueryKey,
         () => fetchAuthLoginEvents({
@@ -125,10 +123,6 @@ export default function LoginHistoryTab() {
             revalidateOnReconnect: true,
         },
     );
-
-    const refreshEvents = useCallback(async (): Promise<void> => {
-        await reloadEvents();
-    }, [reloadEvents]);
 
     const applyFilters = () => {
         const from = toIsoOrUndefined(filterForm.from);
@@ -231,9 +225,7 @@ export default function LoginHistoryTab() {
                     </p>
                 </div>
 
-                <Button onClick={() => void refreshEvents()}>
-                    {tac('refresh', language)}
-                </Button>
+
             </header>
 
             <div className={styles.loginHistoryFilters}>
@@ -335,14 +327,7 @@ export default function LoginHistoryTab() {
                     showIcon
                     title={tac('loadLoginHistoryFailed', language)}
                     description={errorMessage}
-                    action={
-                        <Button
-                            size="small"
-                            onClick={() => void refreshEvents()}
-                        >
-                            {tac('retry', language)}
-                        </Button>
-                    }
+
                 />
             ) : (
                 <Table<AuthLoginEvent>

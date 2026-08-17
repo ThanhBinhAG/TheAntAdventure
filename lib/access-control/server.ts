@@ -107,6 +107,13 @@ export type AccessControlStaffRole = {
     assigned_user_count: number;
 };
 
+export type AccessControlRoleResourceScope = {
+    role_code: string;
+    resource_code: string;
+    action: string;
+    scope: string;
+};
+
 /** Dữ liệu thô PostgreSQL trả về từ RPC role nhân viên. */
 type AccessControlStaffRoleRow = {
     role_code: string;
@@ -418,6 +425,46 @@ export async function replaceAccessControlStaffRolePermissions(
         {
             target_role_code: roleCode,
             requested_permission_codes: permissionCodes,
+        },
+    );
+
+    throwRpcError(result.error);
+    await invalidatePermissionCache();
+    await invalidateAccessControlStaffRolesCache();
+}
+
+/** Lấy các scope RLS đã cấu hình; RPC vẫn kiểm tra users.manage. */
+export async function getAccessControlStaffRoleResourceScopes(): Promise<
+    AccessControlRoleResourceScope[]
+> {
+    const supabase = createAccessControlServerClient();
+    const result = await supabase.rpc(
+        'list_access_control_staff_role_resource_scopes',
+    );
+
+    throwRpcError(result.error);
+    return (result.data ?? []) as AccessControlRoleResourceScope[];
+}
+
+/** Thay toàn bộ scope RLS của một role nhân viên động. */
+export async function replaceAccessControlStaffRoleResourceScopes(
+    roleCode: string,
+    scopes: Array<{
+        resourceCode: string;
+        action: string;
+        scope: string;
+    }>,
+): Promise<void> {
+    const supabase = createAccessControlServerClient();
+    const result = await supabase.rpc(
+        'replace_access_control_staff_role_resource_scopes',
+        {
+            target_role_code: roleCode,
+            requested_scopes: scopes.map((scope) => ({
+                resource_code: scope.resourceCode,
+                action: scope.action,
+                scope: scope.scope,
+            })),
         },
     );
 

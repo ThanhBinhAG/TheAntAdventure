@@ -16,5 +16,5 @@ test('staff-role reads use Redis cache and all relevant writes invalidate it', (
   assert.match(server, /await setCachedAccessControlStaffRoles\(roles\);/);
 
   const invalidations = server.match(/await invalidateAccessControlStaffRolesCache\(\);/g) ?? [];
-  assert.equal(invalidations.length, 5);
+  assert.equal(invalidations.length, 6);
 });

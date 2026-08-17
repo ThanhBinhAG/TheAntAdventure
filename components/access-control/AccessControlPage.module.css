@@ -449,8 +449,124 @@
     gap: 8px;
 }
 
+.roleConfigurationTabs :global(.ant-tabs-nav) {
+    margin-bottom: 14px;
+}
+
+.roleConfigurationTabs :global(.ant-tabs-content-holder) {
+    display: none;
+}
+
+.roleConfigurationTabLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .permissionGroup {
     border-color: var(--b);
+}
+
+.resourceScopesSection {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    background: var(--bg);
+    border: 1px solid var(--b);
+    border-radius: 10px;
+}
+
+.resourceScopesSection[hidden] {
+    display: none;
+}
+
+.resourceScopesHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.resourceScopesTitle {
+    margin: 0;
+    color: var(--t);
+    font-size: 17px;
+    font-weight: 650;
+    line-height: 1.3;
+}
+
+.resourceScopesNotice {
+    flex: 1 1 390px;
+    max-width: 620px;
+    margin: 0;
+}
+
+.resourceScopesGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.resourceScopeCard {
+    border-color: var(--b);
+    box-shadow: 0 2px 7px rgba(33, 53, 43, 0.04);
+}
+
+.resourceScopeCard :global(.ant-card-body) {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+}
+
+.resourceScopeCardTitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--t);
+    font-size: 15px;
+}
+
+.resourceScopeIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    color: var(--g);
+    font-size: 18px;
+}
+
+.resourceScopeActions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.resourceScopeActionRow {
+    display: grid;
+    grid-template-columns: minmax(46px, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+}
+
+.resourceScopeActionLabel {
+    color: var(--t);
+    font-size: 12.5px;
+}
+
+.resourceScopeControl {
+    display: flex;
+    width: 100%;
+}
+
+.resourceScopeControl :global(.ant-radio-button-wrapper) {
+    flex: 1;
+    min-width: 0;
+    padding-inline: 6px;
+    text-align: center;
+    white-space: nowrap;
 }
 
 .permissionGroupHeader {
@@ -539,15 +655,34 @@
     .permissionGroups {
         grid-template-columns: 1fr;
     }
+
+    .resourceScopesGrid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 640px) {
 
     .permissionWorkspaceHeader,
     .permissionWorkspaceMeta,
-    .permissionSaveBar {
+    .permissionSaveBar,
+    .resourceScopesHeader {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .resourceScopesNotice {
+        max-width: none;
+    }
+
+    .resourceScopeActionRow {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+
+    .resourceScopeControl :global(.ant-radio-button-wrapper) {
+        padding-inline: 4px;
+        font-size: 11px;
     }
 
     .permissionCatalogAction {

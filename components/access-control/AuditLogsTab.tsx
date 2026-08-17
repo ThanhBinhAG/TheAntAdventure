@@ -60,12 +60,22 @@ function readStringArray(
     );
 }
 
+function readArrayLength(value: unknown): number {
+    return Array.isArray(value) ? value.length : 0;
+}
+
 /** Các action này thay đổi role, nên không có target user để hiển thị. */
 const STAFF_ROLE_ACTIONS = new Set([
     'staff_role_created',
     'staff_role_updated',
     'staff_role_deleted',
     'staff_role_permissions_replaced',
+    'staff_role_resource_scopes_replaced',
+]);
+
+const CORE_RECORD_ACCESS_ACTIONS = new Set([
+    'core_record_owner_reassigned',
+    'core_record_assignee_changed',
 ]);
 
 /** Đổi mã role kỹ thuật thành nhãn dễ đọc trong lịch sử. */
@@ -152,6 +162,16 @@ function getAuditTarget(log: AccessControlAuditLog, language: AppLanguage): stri
             role: getAuditRoleLabel(log, language),
         });
     }
+    if (CORE_RECORD_ACCESS_ACTIONS.has(log.action)) {
+        const resourceCode = readString(log.afterValue.resource_code) ??
+            readString(log.beforeValue.resource_code) ??
+            tac('unknown', language);
+        const recordId = readString(log.afterValue.record_id) ??
+            readString(log.beforeValue.record_id) ??
+            tac('unknown', language);
+
+        return `${resourceCode}: ${recordId}`;
+    }
 
     return getUserTarget(log, language);
 }
@@ -195,6 +215,16 @@ function getAuditSummary(log: AccessControlAuditLog, language: AppLanguage): str
         ).length;
 
         return tacTemplate('permissionCountChanged', language, {
+            oldCount,
+            newCount,
+        });
+    }
+
+    if (log.action === 'staff_role_resource_scopes_replaced') {
+        const oldCount = readArrayLength(log.beforeValue.scopes);
+        const newCount = readArrayLength(log.afterValue.scopes);
+
+        return tacTemplate('scopeCountChanged', language, {
             oldCount,
             newCount,
         });

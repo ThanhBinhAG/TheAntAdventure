@@ -56,6 +56,18 @@ const AUDIT_ACTION_PRESENTATIONS: Record<
         labelKey: 'auditStaffRolePermissionsReplaced',
         color: 'green',
     },
+    staff_role_resource_scopes_replaced: {
+        labelKey: 'auditStaffRoleResourceScopesReplaced',
+        color: 'green',
+    },
+    core_record_owner_reassigned: {
+        labelKey: 'auditCoreRecordOwnerReassigned',
+        color: 'blue',
+    },
+    core_record_assignee_changed: {
+        labelKey: 'auditCoreRecordAssigneeChanged',
+        color: 'cyan',
+    },
     user_profile_updated: {
         labelKey: 'auditUserProfileUpdated',
         color: 'cyan',

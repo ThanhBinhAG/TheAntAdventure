@@ -230,6 +230,8 @@ export interface Product {
   photoIds?: string[];
   /** Full photo pool linked from Photo Library */
   linkedPhotoIds?: string[];
+  /** Catalog-page hero thumb from the list API — not persisted. */
+  coverThumbUrl?: string;
 }
 
 export interface ProductPricingInclusions {

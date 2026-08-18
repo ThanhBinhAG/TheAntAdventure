@@ -10,7 +10,7 @@ Open-Meteo fetch, Supabase cache, ratings, destination catalog CRUD, and weather
 - `open-meteo.ts` — batch weekly + **single-destination** current/daily (+ UV)
 - `refresh.ts` — per-destination cache-first fetch (`string | WeatherDestinationMeta`); cron warms featured only
 - `cache.ts` — forecast + `weather_current_cache` helpers
-- `client-cache.ts` — browser localStorage per destination (TTL on read/write prune, max 8 keys)
+- `client-cache.ts` — browser localStorage per destination (TTL on read/write prune, max 24 keys)
 - `rating.ts`, `auth.ts`, `supabase-admin.ts`, `types.ts`
 
 ## Adding a destination

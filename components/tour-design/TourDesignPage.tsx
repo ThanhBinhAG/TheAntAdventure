@@ -21,10 +21,13 @@ import {
   patchOutlineRevise,
   patchOutlineSent,
 } from '@/lib/tour-design/tour-design-lead';
+import { persistCustomerRowsNow, scheduleAutoSync } from '@/lib/db/auto-sync';
 import {
+  ackTourDesignLead,
   getOutlineAwaitingApproval,
   getPendingTourDesignLeads,
   getTourDraftForLead,
+  isPendingTourDesignLead,
 } from '@/lib/tour-design/tour-design-leads';
 import { DEFAULT_TOUR_BRIEF, type TourBrief, type GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import {
@@ -140,7 +143,7 @@ export default function TourDesignPage() {
       overrideLeadId?: string
     ) => {
       const lid = overrideLeadId ?? leadId;
-      if (!lid || !custId) return;
+      if (!lid || !custId) return false;
       const rows = patch?.outlineRows ?? outlineRows;
       const templateOverrides = patch?.proposalTemplateOverrides ?? proposalTemplateOverrides;
       const specialNotes = patch?.proposalSpecialNotes ?? proposalSpecialNotes;
@@ -170,10 +173,11 @@ export default function TourDesignPage() {
         currentStep: patch?.step ?? step,
       });
       const fingerprint = JSON.stringify({ draft, rows });
-      if (lastDraftFingerprintRef.current === fingerprint) return;
+      if (lastDraftFingerprintRef.current === fingerprint) return true;
       lastDraftFingerprintRef.current = fingerprint;
       upsertTourDraft(draft);
       replaceOutlineDaysForDraft(draft.id, rows);
+      return true;
     },
     [
       leadId,
@@ -200,9 +204,25 @@ export default function TourDesignPage() {
     ]
   );
 
+  const persistTourDesignAck = useCallback(
+    async (lid: string) => {
+      const lead = useStore.getState().leads.find((l) => l.id === lid);
+      if (!lead || !isPendingTourDesignLead(lead)) return;
+      updateLead(lid, { tourDesignAcked: true });
+      const result = await persistCustomerRowsNow({ leads: [ackTourDesignLead(lead)] });
+      if (result.ok) return;
+      if (result.error === 'Auto-sync not allowed') {
+        scheduleAutoSync({ tables: ['leads'] });
+        return;
+      }
+      updateLead(lid, { tourDesignAcked: false });
+      toast.warning('Could not save the Tour Design task. It will stay in the queue.');
+    },
+    [updateLead]
+  );
+
   const openLeadSession = useCallback(
     (lid: string, cid: string, urlStep?: number) => {
-      updateLead(lid, { tourDesignAcked: true });
       setLeadId(lid);
       setCustId(cid);
 
@@ -252,7 +272,7 @@ export default function TourDesignPage() {
         setProposalLayoutId(DEFAULT_PROPOSAL_LAYOUT_ID);
       }
     },
-    [customers, tourDrafts, tourOutlineDays, updateLead]
+    [customers, tourDrafts, tourOutlineDays]
   );
 
   const ensureLeadSession = useCallback((): string => {
@@ -277,8 +297,12 @@ export default function TourDesignPage() {
     const key = `${urlLeadId}:${urlCustId}:${urlStepRaw ?? ''}`;
     if (urlInitRef.current === key) return;
     urlInitRef.current = key;
-    openLeadSession(urlLeadId, urlCustId, Number.isFinite(urlStep) ? urlStep : undefined);
-  }, [searchParams, openLeadSession]);
+    const restoredStep = Number.isFinite(urlStep) ? urlStep : undefined;
+    openLeadSession(urlLeadId, urlCustId, restoredStep);
+    if ((restoredStep ?? 0) >= 1) {
+      void persistTourDesignAck(urlLeadId);
+    }
+  }, [searchParams, openLeadSession, persistTourDesignAck]);
 
   useEffect(() => {
     if (!leadId || !custId) return;
@@ -402,9 +426,14 @@ export default function TourDesignPage() {
       }
       const lid = ensureLeadSession();
       if (!lid) return;
+      const saved = persistDraft({ step: next }, lid);
+      if (!saved) {
+        toast.warning('Could not save the client brief.');
+        return;
+      }
       setStep(next);
       syncUrl(lid, custId, next);
-      persistDraft({ step: next }, lid);
+      void persistTourDesignAck(lid);
       return;
     }
     setStep(next);

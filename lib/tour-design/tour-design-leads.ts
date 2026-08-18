@@ -4,24 +4,30 @@ export function getTourDraftForLead(leadId: string, tourDrafts: TourDraft[]): To
   return tourDrafts.find((d) => d.leadId === leadId);
 }
 
+/** Sales Pipeline handoff still waiting for Client Brief progress (Next → Outline). */
+export function isPendingTourDesignLead(lead: Lead): boolean {
+  return Boolean(
+    lead.needsTourDesign &&
+      !lead.tourDesignAcked &&
+      lead.stage !== 'Lost' &&
+      lead.stage !== 'Completed'
+  );
+}
+
+export function ackTourDesignLead(lead: Lead): Lead {
+  return { ...lead, tourDesignAcked: true };
+}
+
+export function ackTourDesignLeadInList(leads: Lead[], leadId: string): Lead[] {
+  return leads.map((l) => (l.id === leadId ? ackTourDesignLead(l) : l));
+}
+
 export function countPendingTourDesignLeads(leads: Lead[]): number {
-  return leads.filter(
-    (l) =>
-      l.needsTourDesign &&
-      !l.tourDesignAcked &&
-      l.stage !== 'Lost' &&
-      l.stage !== 'Completed'
-  ).length;
+  return leads.filter(isPendingTourDesignLead).length;
 }
 
 export function getPendingTourDesignLeads(leads: Lead[]): Lead[] {
-  return leads.filter(
-    (l) =>
-      l.needsTourDesign &&
-      !l.tourDesignAcked &&
-      l.stage !== 'Lost' &&
-      l.stage !== 'Completed'
-  );
+  return leads.filter(isPendingTourDesignLead);
 }
 
 export function getOutlineAwaitingApproval(leads: Lead[], tourDrafts: TourDraft[]): Lead[] {

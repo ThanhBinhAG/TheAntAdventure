@@ -3,13 +3,13 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import type {
     ProductListFacets,
-    ProductListQuery,
+    ProductListFilters,
 } from '@/lib/products/product-list-input';
 import { getRedisClient } from './client';
 
 const PRODUCT_FACETS_TTL_SECONDS = 5 * 60;
 
-function getFacetsCacheKey(input: ProductListQuery) {
+function getFacetsCacheKey(input: ProductListFilters) {
     const filters = {
         q: input.q ?? null,
         region: input.region ?? null,
@@ -28,7 +28,7 @@ function getFacetsCacheKey(input: ProductListQuery) {
 }
 
 export async function getCachedProductFacets(
-    input: ProductListQuery,
+    input: ProductListFilters,
 ): Promise<ProductListFacets | undefined> {
     try {
         const client = await getRedisClient();
@@ -42,7 +42,7 @@ export async function getCachedProductFacets(
 }
 
 export async function setCachedProductFacets(
-    input: ProductListQuery,
+    input: ProductListFilters,
     facets: ProductListFacets,
 ) {
     try {

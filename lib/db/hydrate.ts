@@ -13,6 +13,8 @@ export {
 export {
   checkSupabaseConnection,
   quickSupabasePing,
+  readCachedConnectionStatus,
+  resetQuickSupabasePingCache,
   type ConnectionStatus,
 } from './hydrate/connection';
 

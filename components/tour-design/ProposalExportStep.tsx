@@ -62,6 +62,7 @@ interface Props {
   onLayoutIdChange: (layoutId: ProposalLayoutId) => void;
   onReset: () => void;
   onBack: () => void;
+  canWrite?: boolean;
 }
 
 export default function ProposalExportStep({
@@ -87,6 +88,7 @@ export default function ProposalExportStep({
   onLayoutIdChange,
   onReset,
   onBack,
+  canWrite = true,
 }: Props) {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState('');
@@ -302,6 +304,7 @@ export default function ProposalExportStep({
             onHotelRatesBChange={updateHotelRatesB}
             companyTemplateActive={companyTemplates[clientType].source === 'company'}
             onEditTemplate={() => setEditorOpen(true)}
+            canWrite={canWrite}
           />
           <ProposalExportPreview
             proposalDoc={proposalDoc}
@@ -347,6 +350,7 @@ export default function ProposalExportStep({
           onDownloadWord={() => downloadProposalWord(proposalDoc, window.location.origin)}
           onBack={onBack}
           onReset={onReset}
+          canWrite={canWrite}
         />
       </div>
     </div>

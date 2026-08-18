@@ -14,9 +14,10 @@ interface Props {
   placeholder?: string;
   minRows?: number;
   onChange: (html: string) => void;
+  disabled?: boolean;
 }
 
-export default function OutlineRichCell({ value = '', placeholder, minRows = 4, onChange }: Props) {
+export default function OutlineRichCell({ value = '', placeholder, minRows = 4, onChange, disabled = false }: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
   const lastEmitted = useRef(value);
@@ -66,44 +67,46 @@ export default function OutlineRichCell({ value = '', placeholder, minRows = 4, 
   const minHeight = Math.max(44, minRows * 18);
 
   return (
-    <div className={`outline-rich-cell${focused ? ' outline-rich-cell-focused' : ''}`}>
-      <div className="outline-rich-toolbar" onMouseDown={(e) => e.preventDefault()}>
-        <button type="button" className="outline-rich-btn" title="Bold" onClick={() => runCmd('bold')}>
-          <strong>B</strong>
-        </button>
-        <button type="button" className="outline-rich-btn" title="Italic" onClick={() => runCmd('italic')}>
-          <em>I</em>
-        </button>
-        <button type="button" className="outline-rich-btn" title="Underline" onClick={() => runCmd('underline')}>
-          <span style={{ textDecoration: 'underline' }}>U</span>
-        </button>
-        <span className="outline-rich-sep" />
-        {OUTLINE_TEXT_COLORS.map((c) => (
-          <button
-            key={c.value}
-            type="button"
-            className="outline-rich-color"
-            title={c.label}
-            style={{ background: c.value }}
-            onClick={() => applyColor(c.value)}
+    <div className={`outline-rich-cell${focused ? ' outline-rich-cell-focused' : ''}${disabled ? ' outline-rich-cell-disabled' : ''}`}>
+      {!disabled && (
+        <div className="outline-rich-toolbar" onMouseDown={(e) => e.preventDefault()}>
+          <button type="button" className="outline-rich-btn" title="Bold" onClick={() => runCmd('bold')}>
+            <strong>B</strong>
+          </button>
+          <button type="button" className="outline-rich-btn" title="Italic" onClick={() => runCmd('italic')}>
+            <em>I</em>
+          </button>
+          <button type="button" className="outline-rich-btn" title="Underline" onClick={() => runCmd('underline')}>
+            <span style={{ textDecoration: 'underline' }}>U</span>
+          </button>
+          <span className="outline-rich-sep" />
+          {OUTLINE_TEXT_COLORS.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              className="outline-rich-color"
+              title={c.label}
+              style={{ background: c.value }}
+              onClick={() => applyColor(c.value)}
+            />
+          ))}
+          <input
+            type="color"
+            className="outline-rich-picker"
+            title="Custom color"
+            defaultValue="#000000"
+            onChange={(e) => applyColor(e.target.value)}
           />
-        ))}
-        <input
-          type="color"
-          className="outline-rich-picker"
-          title="Custom color"
-          defaultValue="#000000"
-          onChange={(e) => applyColor(e.target.value)}
-        />
-      </div>
+        </div>
+      )}
       <div
         ref={editorRef}
         className="outline-rich-editor"
-        contentEditable
+        contentEditable={!disabled}
         suppressContentEditableWarning
         data-placeholder={placeholder}
         style={{ minHeight }}
-        onFocus={() => setFocused(true)}
+        onFocus={() => !disabled && setFocused(true)}
         onBlur={() => {
           setFocused(false);
           emitChange();

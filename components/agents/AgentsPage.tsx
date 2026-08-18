@@ -18,8 +18,10 @@ import AgentFormModal from '@/components/agents/AgentFormModal';
 import { toast } from '@/lib/toast';
 
 import { confirmDialog } from '@/lib/confirm';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 export default function Agents() {
+  const { canWrite } = usePagePermission('agents');
   const agents = useStore((s) => s.agents);
   const leads = useStore((s) => s.leads);
   const addAgent = useStore((s) => s.addAgent);
@@ -271,6 +273,7 @@ export default function Agents() {
               <button
                 type="button"
                 className="btn btn-s btn-sm"
+                disabled={!canWrite}
                 onClick={() => {
                   setProfileId(null);
                   openEdit(a.id);
@@ -278,7 +281,12 @@ export default function Agents() {
               >
                 ✎ Edit
               </button>
-              <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDelete(a.id)}>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm"
+                disabled={!canWrite}
+                onClick={() => handleDelete(a.id)}
+              >
                 🗑 Delete Agent
               </button>
             </>
@@ -313,7 +321,12 @@ export default function Agents() {
           onChange={(e) => setSearch(e.target.value)}
           style={{ padding: '6px 11px', border: '1.5px solid var(--b)', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, width: 170 }}
         />
-        <button className="btn btn-p btn-sm" type="button" onClick={() => setFormMode('add')}>
+        <button
+          className="btn btn-p btn-sm"
+          type="button"
+          disabled={!canWrite}
+          onClick={() => setFormMode('add')}
+        >
           + Add Agent
         </button>
       </div>
@@ -356,7 +369,12 @@ export default function Agents() {
                   Clear search
                 </button>
               )}
-              <button type="button" className="btn btn-p btn-sm" onClick={() => setFormMode('add')}>
+              <button
+                type="button"
+                className="btn btn-p btn-sm"
+                disabled={!canWrite}
+                onClick={() => setFormMode('add')}
+              >
                 + Add Agent
               </button>
             </>
@@ -427,10 +445,20 @@ export default function Agents() {
                           </button>
                           {a.id !== 'AGT-001' && (
                             <>
-                              <button className="btn btn-s btn-sm" type="button" onClick={() => openEdit(a.id)}>
+                              <button
+                                className="btn btn-s btn-sm"
+                                type="button"
+                                disabled={!canWrite}
+                                onClick={() => openEdit(a.id)}
+                              >
                                 Edit
                               </button>
-                              <button className="btn btn-danger btn-sm" type="button" onClick={() => handleDelete(a.id)}>
+                              <button
+                                className="btn btn-danger btn-sm"
+                                type="button"
+                                disabled={!canWrite}
+                                onClick={() => handleDelete(a.id)}
+                              >
                                 🗑
                               </button>
                             </>

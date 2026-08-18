@@ -27,7 +27,6 @@ function createRedisClient(): RedisClient {
         url: process.env.REDIS_URL,
         socket: {
             connectTimeout: getConnectTimeoutMs(),
-            socketTimeout: 3_000,
             reconnectStrategy: (retries) => {
                 // Thử kết nối lại tối đa 3 lần với khoảng cách 1 giây để xử lý các sự cố mạng tạm thời
                 if (retries >= 3) {

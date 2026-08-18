@@ -20,7 +20,7 @@ type Props = {
   todayLabel: string;
   photos: GalleryPhoto[];
   onToggle: () => void;
-  onEdit: () => void;
+  onEdit?: () => void;
   onPhotoClick: (index: number) => void;
 };
 
@@ -123,9 +123,11 @@ export default function AttractionRow({
           <CellText text={attraction.seasonal} title={attraction.seasonal} wrap />
         </td>
         <td className="att-col-actions" onClick={(e) => e.stopPropagation()}>
-          <button type="button" className="btn btn-s btn-sm att-row-edit" onClick={onEdit}>
-            Edit
-          </button>
+          {onEdit && (
+            <button type="button" className="btn btn-s btn-sm att-row-edit" onClick={onEdit}>
+              Edit
+            </button>
+          )}
         </td>
       </tr>
       {expanded && (

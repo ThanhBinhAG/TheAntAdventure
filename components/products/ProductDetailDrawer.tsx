@@ -20,6 +20,7 @@ interface ProductDetailDrawerProps {
   mode?: ProductDrawerMode;
   onClose: () => void;
   onEdit?: (product: Product) => void;
+  canWrite?: boolean;
 }
 
 const PRICING_BADGE: Record<string, { label: string; cls: string }> = {
@@ -34,6 +35,7 @@ export default function ProductDetailDrawer({
   mode = 'view',
   onClose,
   onEdit,
+  canWrite = true,
 }: ProductDetailDrawerProps) {
   const isPreview = mode === 'preview';
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
@@ -170,12 +172,23 @@ export default function ProductDetailDrawer({
         {!isPreview && (
           <footer className="tp-drawer-ft">
             {product.code && (
-              <Link href={pricingUrlForProduct(product.code)} className="btn btn-s btn-sm">
-                Edit pricing
-              </Link>
+              canWrite ? (
+                <Link href={pricingUrlForProduct(product.code)} className="btn btn-s btn-sm">
+                  Edit pricing
+                </Link>
+              ) : (
+                <button type="button" className="btn btn-s btn-sm" disabled>
+                  Edit pricing
+                </button>
+              )
             )}
             {onEdit && (
-              <button type="button" className="btn btn-p btn-sm" onClick={() => onEdit(product)}>
+              <button
+                type="button"
+                className="btn btn-p btn-sm"
+                onClick={() => onEdit(product)}
+                disabled={!canWrite}
+              >
                 Edit
               </button>
             )}

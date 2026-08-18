@@ -83,7 +83,8 @@ const PermissionGroupCard = React.memo(
             prevProps.group !== nextProps.group ||
             prevProps.saving !== nextProps.saving ||
             prevProps.language !== nextProps.language ||
-            prevProps.permissionSearch !== nextProps.permissionSearch
+            prevProps.permissionSearch !== nextProps.permissionSearch ||
+            prevProps.updateDraft !== nextProps.updateDraft
         ) {
             return false;
         }

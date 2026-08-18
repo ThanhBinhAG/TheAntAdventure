@@ -19,9 +19,10 @@ interface Props {
   onMarkupChange: (v: number) => void;
   onBack: () => void;
   onNext: () => void;
+  canWrite?: boolean;
 }
 
-export default function PricingStep({ briefPax, selectedProducts, markupPct: markup, onMarkupChange, onBack, onNext }: Props) {
+export default function PricingStep({ briefPax, selectedProducts, markupPct: markup, onMarkupChange, onBack, onNext, canWrite = true }: Props) {
   const [aiOpen, setAiOpen] = useState(false);
 
   const activeTierN = paxToTierN(briefPax);
@@ -63,7 +64,7 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
     <div className="card">
       <div className="card-hd">
         <span className="card-title">Step 3 — Pricing Confirmation</span>
-        <button className="btn btn-pu btn-sm" type="button" onClick={aiReview}>
+        <button className="btn btn-pu btn-sm" type="button" onClick={aiReview} disabled={!canWrite}>
           ✦ AI Pricing Review
         </button>
       </div>
@@ -83,9 +84,10 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
               value={markup}
               onChange={(e) => onMarkupChange(+e.target.value)}
               style={{ width: 110, accentColor: 'var(--g)' }}
+              disabled={!canWrite}
             />
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--g)', minWidth: 36 }}>{markup}%</span>
-            <button type="button" className="btn btn-s btn-sm" onClick={() => onMarkupChange(30)}>
+            <button type="button" className="btn btn-s btn-sm" onClick={() => onMarkupChange(30)} disabled={!canWrite}>
               Reset 30%
             </button>
           </div>

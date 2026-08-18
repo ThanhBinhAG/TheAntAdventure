@@ -142,6 +142,7 @@ export default function TourDesignPage() {
       },
       overrideLeadId?: string
     ) => {
+      if (!canWrite) return false;
       const lid = overrideLeadId ?? leadId;
       if (!lid || !custId) return false;
       const rows = patch?.outlineRows ?? outlineRows;
@@ -635,6 +636,7 @@ export default function TourDesignPage() {
           onAiSuggest={aiSuggestStyle}
           onCloseAi={() => setAiPanel(null)}
           onNext={() => goToStep(1)}
+          canWrite={canWrite}
         />
       )}
 
@@ -660,6 +662,7 @@ export default function TourDesignPage() {
           onResend={resendOutline}
           onBack={() => goToStep(0)}
           onNext={() => goToStep(2)}
+          canWrite={canWrite}
         />
       )}
 
@@ -682,6 +685,7 @@ export default function TourDesignPage() {
             markupPct={markupPct}
             leadId={leadId || undefined}
             onEditBrief={() => goToStep(0)}
+            canWrite={canWrite}
           />
           <div className="td-nav" style={{ marginTop: 14 }}>
             <button className="btn btn-s" type="button" onClick={() => goToStep(1)}>
@@ -713,6 +717,7 @@ export default function TourDesignPage() {
           }}
           onBack={() => goToStep(2)}
           onNext={() => goToStep(4)}
+          canWrite={canWrite}
         />
       )}
 
@@ -743,6 +748,7 @@ export default function TourDesignPage() {
           }}
           onReset={resetDesign}
           onBack={() => goToStep(3)}
+          canWrite={canWrite}
         />
       )}
 

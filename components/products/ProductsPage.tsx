@@ -296,7 +296,13 @@ export default function Products() {
           </div>
 
           {!pickMode && !formOpen && (
-            <button type="button" className="btn btn-s btn-sm" onClick={() => setImportOpen(true)}>
+            <button
+              type="button"
+              className="btn btn-s btn-sm"
+              onClick={() => setImportOpen(true)}
+              disabled={!canWrite}
+              title={!canWrite ? 'You need write permission for Products to import products' : undefined}
+            >
               Import
             </button>
           )}
@@ -372,6 +378,7 @@ export default function Products() {
         mode={formOpen ? 'preview' : 'view'}
         onClose={handleDrawerClose}
         onEdit={formOpen ? undefined : openFormForProduct}
+        canWrite={canWrite}
       />
 
       <ProductEditPanel

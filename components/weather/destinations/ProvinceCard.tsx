@@ -15,7 +15,7 @@ const HOVER_PREFETCH_MS = 200;
 type Props = {
   destination: WeatherDestinationMeta;
   onSelect: (id: string) => void;
-  onEdit: (id: string) => void;
+  onEdit?: (id: string) => void;
 };
 
 export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
@@ -80,18 +80,20 @@ export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
           </span>
         </div>
       </button>
-      <button
-        type="button"
-        className="wg-province-edit"
-        onClick={(e) => {
-          e.stopPropagation();
-          onEdit(destination.id);
-        }}
-        aria-label={`Sửa ${destination.name}`}
-        title="Sửa"
-      >
-        ✎
-      </button>
+      {onEdit && (
+        <button
+          type="button"
+          className="wg-province-edit"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(destination.id);
+          }}
+          aria-label={`Sửa ${destination.name}`}
+          title="Sửa"
+        >
+          ✎
+        </button>
+      )}
     </div>
   );
 }

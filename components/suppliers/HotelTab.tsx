@@ -16,9 +16,10 @@ import { confirmDialog } from '@/lib/confirm';
 
 type Props = {
   filters: SupplierFilters;
+  canWrite?: boolean;
 };
 
-export default function HotelTab({ filters }: Props) {
+export default function HotelTab({ filters, canWrite }: Props) {
   const hotels = useStore((s) => s.hotels);
   const addHotel = useStore((s) => s.addHotel);
   const updateHotel = useStore((s) => s.updateHotel);
@@ -73,7 +74,13 @@ export default function HotelTab({ filters }: Props) {
         <Link href="/attractions" className="btn btn-s btn-sm">
           🏛 Attraction Schedule
         </Link>
-        <button className="btn btn-p btn-sm" type="button" onClick={openAdd}>
+        <button
+          className="btn btn-p btn-sm"
+          type="button"
+          onClick={openAdd}
+          disabled={!canWrite}
+          title={!canWrite ? 'You need write permission for Suppliers to add a hotel' : undefined}
+        >
           ＋ Add Hotel
         </button>
       </div>
@@ -147,10 +154,23 @@ export default function HotelTab({ filters }: Props) {
                     <td className="sup-td sup-td-net sup-td-peak">${r.pn}</td>
                     {ri === 0 && (
                       <td rowSpan={h.rooms.length} style={{ verticalAlign: 'top', paddingTop: 12 }}>
-                        <button className="btn btn-s btn-sm" type="button" onClick={() => openEdit(h.id)}>
+                        <button
+                          className="btn btn-s btn-sm"
+                          type="button"
+                          onClick={() => openEdit(h.id)}
+                          disabled={!canWrite}
+                          title={!canWrite ? 'You need write permission to edit a hotel' : undefined}
+                        >
                           ✏
                         </button>
-                        <button className="btn btn-s btn-sm" type="button" style={{ marginLeft: 4 }} onClick={() => handleDelete(h.id)}>
+                        <button
+                          className="btn btn-s btn-sm"
+                          type="button"
+                          style={{ marginLeft: 4 }}
+                          onClick={() => handleDelete(h.id)}
+                          disabled={!canWrite}
+                          title={!canWrite ? 'You need write permission to delete a hotel' : undefined}
+                        >
                           ✕
                         </button>
                       </td>
@@ -168,7 +188,13 @@ export default function HotelTab({ filters }: Props) {
                       title="No hotels found"
                       description="Add a hotel partner, or adjust search/region filters."
                       action={
-                        <button type="button" className="btn btn-p btn-sm" onClick={openAdd}>
+                        <button
+                          type="button"
+                          className="btn btn-p btn-sm"
+                          onClick={openAdd}
+                          disabled={!canWrite}
+                          title={!canWrite ? 'You need write permission for Suppliers to add a hotel' : undefined}
+                        >
                           ＋ Add Hotel
                         </button>
                       }

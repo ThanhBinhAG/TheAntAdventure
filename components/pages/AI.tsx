@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
 import { confirmDialog } from '@/lib/confirm';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 const LS_KEY = 'ant-ai-requirements';
 /** Cap each text field so localStorage cannot grow unbounded from paste. */
@@ -91,6 +92,7 @@ function statusLabel(val: string) {
 }
 
 export default function AI() {
+  const { canWrite } = usePagePermission('ai');
   const [form, setForm] = useState<AIForm>(getSavedForm);
   const [saved, setSaved] = useState(false);
 
@@ -168,7 +170,7 @@ export default function AI() {
               <button className="btn btn-s" type="button" onClick={clearAll}>
                 Clear All
               </button>
-              <button className="btn btn-p" type="button" onClick={save}>
+              <button className="btn btn-p" type="button" onClick={save} disabled={!canWrite} title={!canWrite ? 'Read-only mode: save disabled' : undefined}>
                 💾 Save Requirements
               </button>
             </div>

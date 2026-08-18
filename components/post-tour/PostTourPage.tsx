@@ -6,6 +6,7 @@ import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
 import { localTodayIso } from '@/lib/core/date-utils';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 type PtTab = 'log' | 'ops' | 'guide' | 'client' | 'agent';
 
@@ -34,6 +35,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function PostTour() {
+  const { canWrite } = usePagePermission('posttour');
   const feedback = useStore((s) => s.feedback) as Feedback[];
   const addFeedback = useStore((s) => s.addFeedback);
   const [tab, setTab] = useState<PtTab>('log');
@@ -206,7 +208,13 @@ export default function PostTour() {
               <button className="btn btn-s" type="button" onClick={() => setTab('log')}>
                 Cancel
               </button>
-              <button className="btn btn-p" type="button" onClick={() => { addFeedback({ id: `FB-${Date.now()}`, type: 'ops', date: localTodayIso() }); setTab('log'); }}>
+              <button
+                className="btn btn-p"
+                type="button"
+                onClick={() => { addFeedback({ id: `FB-${Date.now()}`, type: 'ops', date: localTodayIso() }); setTab('log'); }}
+                disabled={!canWrite}
+                title={!canWrite ? 'You need write permission to save debrief' : undefined}
+              >
                 ✓ Save Debrief
               </button>
             </div>
@@ -248,7 +256,13 @@ export default function PostTour() {
               <button className="btn btn-s" type="button" onClick={() => setTab('log')}>
                 Cancel
               </button>
-              <button className="btn btn-p" type="button" onClick={() => { addFeedback({ id: `FB-${Date.now()}`, type: 'guide', date: localTodayIso() }); setTab('log'); }}>
+              <button
+                className="btn btn-p"
+                type="button"
+                onClick={() => { addFeedback({ id: `FB-${Date.now()}`, type: 'guide', date: localTodayIso() }); setTab('log'); }}
+                disabled={!canWrite}
+                title={!canWrite ? 'You need write permission to submit report' : undefined}
+              >
                 ✓ Submit Report
               </button>
             </div>
@@ -358,7 +372,12 @@ export default function PostTour() {
                 <button className="btn btn-s" type="button" onClick={() => setTab('log')}>
                   Cancel
                 </button>
-                <button className="btn btn-p" type="submit">
+                <button
+                  className="btn btn-p"
+                  type="submit"
+                  disabled={!canWrite}
+                  title={!canWrite ? 'You need write permission to save survey' : undefined}
+                >
                   ✓ Save Survey
                 </button>
               </div>
@@ -399,7 +418,13 @@ export default function PostTour() {
               Agent commission paid within 14 days of tour completion per B2B policy.
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9, marginTop: 14 }}>
-              <button className="btn btn-p" type="button" onClick={() => { addFeedback({ id: `FB-${Date.now()}`, type: 'agent', date: localTodayIso() }); setTab('log'); }}>
+              <button
+                className="btn btn-p"
+                type="button"
+                onClick={() => { addFeedback({ id: `FB-${Date.now()}`, type: 'agent', date: localTodayIso() }); setTab('log'); }}
+                disabled={!canWrite}
+                title={!canWrite ? 'You need write permission to save agent feedback' : undefined}
+              >
                 ✓ Save Agent Feedback
               </button>
             </div>

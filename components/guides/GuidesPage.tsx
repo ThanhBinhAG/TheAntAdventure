@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client';
 import { uploadGuideAvatar } from '@/lib/storage/upload-guide-avatar';
 import type { Guide } from '@/lib/types';
 import { toast } from '@/lib/toast';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 const REG_COLORS: Record<string, string> = { North: 'bdg-g', Central: 'bdg-a', South: 'bdg-b' };
 const STATUS_C: Record<string, string> = {
@@ -47,6 +48,7 @@ const emptyGuide = (): Partial<Guide> => ({
 });
 
 export default function Guides() {
+  const { canWrite } = usePagePermission('guides');
   const guides = useStore((s) => s.guides);
   const addGuide = useStore((s) => s.addGuide);
   const updateGuide = useStore((s) => s.updateGuide);
@@ -171,7 +173,13 @@ export default function Guides() {
             <button className="btn btn-s btn-sm" type="button" onClick={() => setTab('bios')}>
               View Bio Cards →
             </button>
-            <button className="btn btn-p btn-sm" type="button" onClick={() => openAdd()}>
+            <button
+              className="btn btn-p btn-sm"
+              type="button"
+              onClick={() => openAdd()}
+              disabled={!canWrite}
+              title={!canWrite ? 'You need write permission to add a guide' : undefined}
+            >
               ＋ Add Guide
             </button>
           </div>
@@ -246,7 +254,14 @@ export default function Guides() {
                         <button className="btn btn-s btn-sm" type="button" onClick={() => setBioGuide(g)}>
                           👤 Profile
                         </button>
-                        <button className="btn btn-s btn-sm" type="button" style={{ marginLeft: 4 }} onClick={() => openAdd(g)}>
+                        <button
+                          className="btn btn-s btn-sm"
+                          type="button"
+                          style={{ marginLeft: 4 }}
+                          onClick={() => openAdd(g)}
+                          disabled={!canWrite}
+                          title={!canWrite ? 'You need write permission to edit a guide' : undefined}
+                        >
                           ✏ Edit
                         </button>
                       </td>
@@ -294,7 +309,7 @@ export default function Guides() {
         </>
       )}
 
-      {tab === 'calendar' && <GuideCalendar />}
+      {tab === 'calendar' && <GuideCalendar canWrite={canWrite} />}
 
       {bioGuide && (
         <div className="overlay open" onClick={() => setBioGuide(null)}>

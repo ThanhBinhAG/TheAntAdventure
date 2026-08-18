@@ -14,6 +14,7 @@ Tour Design wizard UI (brief → experiences → outline → pricing → proposa
 - `ProposalLayoutPicker` — radio cards with page thumbnails (Classic / Modern / Compact)
 - `ProposalEditorModal` + `ProposalTemplateForm` — template editor (sectioned form, sticky nav chips, document canvas preview)
 - Panels: PackagePreview, SelectedExperiences, PhotoStack, GuestProfile
+- `TourDesignQueueCards.tsx` — compact Tour tasks popover (Sales handoffs + outlines awaiting approval); stays visible while a session is open
 
 ## Boundaries
 - Workflow/types: `lib/tour-design`. Outline HTML: `lib/outline`. Proposals: `lib/proposals`.

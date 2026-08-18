@@ -1,5 +1,6 @@
 import { create, type StateCreator } from 'zustand';
 import { deleteProductFromRemote, deleteProductPricingFromRemote } from './db/remote-delete';
+import { applyLocalCustomerDelete } from './customers/customer-delete';
 import { appLog } from './system/app-logger';
 import { rolloverTasks } from './planner/planner-task-utils';
 import { localTodayIso } from './core/date-utils';
@@ -183,7 +184,16 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           customers: s.customers.map((c) => (c.id === id ? { ...c, ...data } : c)),
         })),
       deleteCustomer: (id) =>
-        set((s) => ({ customers: s.customers.filter((c) => c.id !== id) })),
+        set((s) =>
+          applyLocalCustomerDelete(id, {
+            customers: s.customers,
+            leads: s.leads,
+            comms: s.comms,
+            tourDrafts: s.tourDrafts,
+            tourOutlineDays: s.tourOutlineDays,
+            feedback: s.feedback,
+          })
+        ),
 
       setComms: (comms) => set({ comms }),
       addComm: (comm) => set((s) => ({ comms: [comm, ...s.comms] })),

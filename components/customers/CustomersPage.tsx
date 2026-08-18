@@ -14,6 +14,7 @@ import { usePagePermission } from '@/hooks/usePagePermission';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import CustomerProfileModal from '@/components/customers/CustomerProfileModal';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
+import { useDeleteCustomer } from '@/hooks/useDeleteCustomer';
 import { toast } from '@/lib/toast';
 
 import { confirmDialog } from '@/lib/confirm';
@@ -42,8 +43,8 @@ export default function Customers() {
   const customers = useStore((s) => s.customers);
   const leads = useStore((s) => s.leads);
   const feedback = useStore((s) => s.feedback) as { custId?: string; nps?: number }[];
-  const deleteCustomer = useStore((s) => s.deleteCustomer);
   const { saveFromForm } = useRegisterCustomer();
+  const { deleteCustomer } = useDeleteCustomer();
 
   const [search, setSearch] = useState('');
   const [sourceF, setSourceF] = useState('');
@@ -55,6 +56,7 @@ export default function Customers() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profileInitialTab, setProfileInitialTab] = useState<'overview' | 'pipeline'>('overview');
   const [editId, setEditId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let list = customers.filter(
@@ -108,6 +110,26 @@ export default function Customers() {
     setFormMode(null);
     setEditId(null);
     return true;
+  }
+
+  async function handleDeleteCustomer(id: string, name: string, onSuccess?: () => void) {
+    const ok = await confirmDialog(`Delete ${name}?`, {
+      title: 'Delete customer',
+    });
+    if (!ok) return;
+
+    setDeletingId(id);
+    try {
+      const result = await deleteCustomer(id);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      onSuccess?.();
+      toast.success('Customer deleted.');
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -329,18 +351,12 @@ export default function Customers() {
                           <button
                             className="btn btn-danger btn-sm"
                             type="button"
+                            disabled={deletingId === c.id}
                             onClick={() => {
-                              void (async () => {
-                                const ok = await confirmDialog(`Delete ${c.name}?`, {
-                                  title: 'Delete customer',
-                                });
-                                if (!ok) return;
-                                deleteCustomer(c.id);
-                                toast.success('Customer deleted.');
-                              })();
+                              void handleDeleteCustomer(c.id, c.name);
                             }}
                           >
-                            ✕
+                            {deletingId === c.id ? '…' : '✕'}
                           </button>
                         </td>
                       </tr>
@@ -377,15 +393,7 @@ export default function Customers() {
             setFormMode('edit');
           }}
           onDelete={() => {
-            void (async () => {
-              const ok = await confirmDialog(`Delete ${profileCustomer.name}?`, {
-                title: 'Delete customer',
-              });
-              if (!ok) return;
-              deleteCustomer(profileCustomer.id);
-              closeProfile();
-              toast.success('Customer deleted.');
-            })();
+            void handleDeleteCustomer(profileCustomer.id, profileCustomer.name, closeProfile);
           }}
         />
       )}

@@ -34,8 +34,8 @@ function seedFeaturedWeatherCache(featuredWeather: DestinationWeatherDetail[]): 
   }
 }
 
-async function fetchWeatherPageBoot(): Promise<WeatherPageBootPayload> {
-  if (bootInflight) return bootInflight;
+async function fetchWeatherPageBoot(options?: { force?: boolean }): Promise<WeatherPageBootPayload> {
+  if (bootInflight && !options?.force) return bootInflight;
 
   bootInflight = (async () => {
     const res = await fetch('/api/weather/boot', { cache: 'no-store' });
@@ -75,7 +75,7 @@ export function useWeatherPageBoot() {
       setError(null);
     }
     try {
-      const boot = await fetchWeatherPageBoot();
+      const boot = await fetchWeatherPageBoot({ force: true });
       if (mounted.current) {
         setDestinations(boot.destinations);
         setLoading(false);

@@ -3,6 +3,13 @@ import { invalidateProductFacetsFromClient } from '../products/product-facets-cl
 import { appLog } from '../system/app-logger';
 import { db } from './supabase';
 
+/** Explicit remote delete when user removes a customer in the UI. */
+export async function deleteCustomerFromRemote(id: string): Promise<void> {
+  if (!isRemoteDataEnabled() || isSupabaseReadOnly()) return;
+
+  await db.customers.deleteRemote(id);
+}
+
 /** Explicit remote delete when user removes a product in the UI. */
 export async function deleteProductFromRemote(code: string): Promise<void> {
   if (!isRemoteDataEnabled() || isSupabaseReadOnly()) return;

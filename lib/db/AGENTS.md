@@ -9,7 +9,8 @@ Supabase hydrate, push, auto-sync, mappers, and timeouts.
   (`bootSettled` session memo, denylist-safe delayed revalidate, ping inflight cache)
 - `route-cache.ts` — sessionStorage route snapshot (5 min TTL, 60s revalidate min) for faster F5
 - `shell-cache.ts` — **deprecated** compatibility shim over `route-cache.ts`; do not add new callers — use `route-cache` directly.
-- `sync-config.ts` — `PAGE_BOOT_TABLES`, `PROFILE_LAZY_TABLES`, push waves, store key map
+- `sync-config.ts` — `PAGE_BOOT_TABLES`, `SIDEBAR_BADGE_TABLES`, `PROFILE_LAZY_TABLES`, push waves, store key map
+- `sidebar-badge-tables.ts` — permission-scoped subset for sidebar badge hydrate
 - `sync-lifecycle.ts` — phase + `hydratedTables` / messages flags; hard `markHydrationPending` (wipe) vs soft `markHydrationSoftPending` (nav); auto-sync only pushes hydrated
 - `sync-push.ts` — full-table push + `pushStoreRowsToSupabase` (row upsert for create/edit); successful product/pricing sync invalidates the Product facet cache through the authenticated API
 - `auto-sync.ts` — debounce (2.5s) + `{ immediate: true }` + `persistCustomerRowsNow`; ignores store writes while `withoutAutoSyncAsync` is active

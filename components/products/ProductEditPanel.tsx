@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import DestinationCombobox from '@/components/products/DestinationCombobox';
 import PhotoLibraryPicker from '@/components/gallery/PhotoLibraryPicker';
-import { ensureTablesLoaded } from '@/lib/db/hydrate';
 import {
   destinationsForRegion,
   suggestTypeSegment,
@@ -164,11 +163,6 @@ export default function ProductEditPanel({
     if (!open) return;
     onDraftChange?.(draftFromForm(form));
   }, [form, open, onDraftChange]);
-
-  useEffect(() => {
-    if (!open) return;
-    void ensureTablesLoaded(['photos', 'photo_folders']);
-  }, [open]);
 
   if (saveState === 'saved' && dirty) {
     setSaveState('idle');

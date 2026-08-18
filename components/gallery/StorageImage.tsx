@@ -15,14 +15,17 @@ type Props = {
   style?: CSSProperties;
   loading?: 'lazy' | 'eager';
   sizes?: string;
+  fetchPriority?: 'high' | 'low' | 'auto';
+  /** When false, one network fetch per URL (no preload probe). Default true. */
+  holdUntilLoaded?: boolean;
   /** Bypass Next.js image optimizer (e.g. company branding — avoids stale /_next/image cache). */
   unoptimized?: boolean;
 };
 
 /**
- * Renders storage / remote images. When `src` changes (e.g. after replace + cache-bust),
- * keeps showing the previous frame until the new URL has loaded so placeholders / old
- * default backgrounds do not flash.
+ * Renders storage / remote images. When `holdUntilLoaded` (default), keeps the previous
+ * frame until the new URL has loaded. Set `holdUntilLoaded={false}` on list tiles to
+ * avoid a duplicate preload request per image.
  */
 export default function StorageImage({
   src,
@@ -34,11 +37,14 @@ export default function StorageImage({
   style,
   loading = 'lazy',
   sizes,
+  fetchPriority,
+  holdUntilLoaded = true,
   unoptimized = false,
 }: Props) {
   const [shownSrc, setShownSrc] = useState(src);
 
   useEffect(() => {
+    if (!holdUntilLoaded) return;
     if (!src || src === shownSrc) return;
 
     let cancelled = false;
@@ -49,7 +55,6 @@ export default function StorageImage({
     };
     probe.onerror = () => {
       if (cancelled) return;
-      // Keep previous frame briefly; then adopt new src (CDN may still be catching up).
       if (!shownSrc) {
         setShownSrc(src);
         return;
@@ -63,12 +68,13 @@ export default function StorageImage({
       cancelled = true;
       if (fallbackTimer) clearTimeout(fallbackTimer);
     };
-  }, [src, shownSrc]);
+  }, [src, shownSrc, holdUntilLoaded]);
 
-  // No src → hide (do not clear shownSrc in an effect; that trips set-state-in-effect).
-  if (!src || !shownSrc) return null;
+  const activeSrc = holdUntilLoaded ? shownSrc : src;
 
-  const useNext = !unoptimized && isNextImageOptimizable(shownSrc);
+  if (!activeSrc) return null;
+
+  const useNext = !unoptimized && isNextImageOptimizable(activeSrc);
 
   const fillClass = className?.includes('gallery-img-contain')
     ? className
@@ -80,11 +86,13 @@ export default function StorageImage({
         // Raw storage URLs are intentionally rendered without Next optimization.
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          key={shownSrc}
-          src={shownSrc}
+          key={activeSrc}
+          src={activeSrc}
           alt={alt}
           className={fillClass}
           loading={loading}
+          decoding="async"
+          fetchPriority={fetchPriority}
           sizes={sizes}
           style={{
             position: 'absolute',
@@ -101,20 +109,22 @@ export default function StorageImage({
       // Raw storage URLs are intentionally rendered without Next optimization.
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        key={shownSrc}
-        src={shownSrc}
+        key={activeSrc}
+        src={activeSrc}
         alt={alt}
         className={className}
         width={width ?? 480}
         height={height ?? 320}
         loading={loading}
+        decoding="async"
+        fetchPriority={fetchPriority}
         style={style}
       />
     );
   }
 
   const shared = {
-    src: shownSrc,
+    src: activeSrc,
     alt,
     className: fill ? fillClass : className,
     style,
@@ -123,8 +133,8 @@ export default function StorageImage({
   };
 
   if (fill) {
-    return <Image key={shownSrc} {...shared} alt={alt} fill />;
+    return <Image key={activeSrc} {...shared} alt={alt} fill />;
   }
 
-  return <Image key={shownSrc} {...shared} alt={alt} width={width ?? 480} height={height ?? 320} />;
+  return <Image key={activeSrc} {...shared} alt={alt} width={width ?? 480} height={height ?? 320} />;
 }

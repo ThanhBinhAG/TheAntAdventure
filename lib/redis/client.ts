@@ -32,8 +32,8 @@ function createRedisClient(): RedisClient {
         },
     });
 
-    client.on('error', () => {
-        console.warn('Redis client connection failed.');
+    client.on('error', (err) => {
+        console.warn('Redis client connection failed:', err);
     });
 
     return client;
@@ -52,7 +52,11 @@ export async function getRedisClient(): Promise<RedisClient | null> {
         .connect()
         .then(() => client)
         .catch(() => {
-            client.destroy();
+            try {
+                client.destroy();
+            } catch {
+                // Nuốt lỗi an toàn nếu socket đã đóng sẵn
+            }
             if (globalForRedis.redisClient === client) globalForRedis.redisClient = undefined;
             return null;
         });

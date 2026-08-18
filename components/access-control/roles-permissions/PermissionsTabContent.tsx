@@ -131,7 +131,7 @@ export const PermissionsTabContent = React.memo(function PermissionsTabContent({
     const selectedSet = useMemo(() => new Set(selectedPermissionCodes), [selectedPermissionCodes]);
 
     return (
-        <div>
+        <div className={styles.permissionsSection}>
             <div className={styles.permissionWorkspaceMeta}>
                 <span>
                     {formatPermissionAssignmentSummary(

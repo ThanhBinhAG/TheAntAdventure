@@ -5,7 +5,6 @@ import {
     CheckSquareOutlined,
     FilterOutlined,
     GlobalOutlined,
-    LockOutlined,
     MessageOutlined,
     SaveOutlined,
     TeamOutlined,

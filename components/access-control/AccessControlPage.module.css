@@ -467,6 +467,16 @@
     border-color: var(--b);
 }
 
+.permissionsSection {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    background: var(--bg);
+    border: 1px solid var(--b);
+    border-radius: 10px;
+}
+
 .resourceScopesSection {
     display: flex;
     flex-direction: column;

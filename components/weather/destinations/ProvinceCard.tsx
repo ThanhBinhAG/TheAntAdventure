@@ -5,6 +5,8 @@ import type { WeatherDestinationMeta } from '@/lib/weather/types';
 import { regionLabel } from '@/components/weather/weatherLabels';
 import { useResolvedCover } from '@/components/weather/hooks/useResolvedCover';
 import { prefetchDestinationWeather } from '@/components/weather/hooks/useDestinationWeather';
+import { weatherCardCoverUrl } from '@/lib/weather/resolve-cover';
+import { useInViewport } from '@/hooks/useInViewport';
 import DestinationCoverPlaceholder from '@/components/weather/destinations/DestinationCoverPlaceholder';
 import StorageImage from '@/components/gallery/StorageImage';
 
@@ -17,9 +19,10 @@ type Props = {
 };
 
 export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
-  const { coverUrl, coverThumbUrl } = useResolvedCover(destination);
-  /** Prefer thumb so explore grid does not download full display assets. */
-  const cover = coverThumbUrl || coverUrl;
+  const cardRef = useRef<HTMLDivElement>(null);
+  const inView = useInViewport(cardRef);
+  const resolved = useResolvedCover(destination);
+  const cover = weatherCardCoverUrl(resolved);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function clearHoverPrefetch() {
@@ -38,7 +41,7 @@ export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
   }
 
   return (
-    <div className={`wg-province-card${!cover ? ' wg-province-card--no-cover' : ''}`}>
+    <div ref={cardRef} className={`wg-province-card${!cover ? ' wg-province-card--no-cover' : ''}`}>
       <button
         type="button"
         className="wg-province-card-hit"
@@ -48,7 +51,7 @@ export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
         onFocus={() => prefetchDestinationWeather(destination.id)}
         aria-label={`Xem thời tiết ${destination.name}`}
       >
-        {cover ? (
+        {cover && inView ? (
           <StorageImage
             src={cover}
             alt=""
@@ -56,8 +59,12 @@ export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
             sizes="(max-width: 900px) 50vw, (max-width: 1100px) 33vw, 25vw"
             className="wg-province-card-bg"
             loading="lazy"
+            fetchPriority="low"
+            holdUntilLoaded={false}
             unoptimized
           />
+        ) : cover ? (
+          <div className="wg-province-card-bg wg-province-card-bg--pending" aria-hidden />
         ) : (
           <DestinationCoverPlaceholder name={destination.name} className="wg-province-card-bg" />
         )}

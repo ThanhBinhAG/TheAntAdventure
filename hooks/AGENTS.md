@@ -4,7 +4,7 @@
 Shared React hooks for language, pagination, pricing catalog, customer registration, and store access.
 
 ## Contents
-- `useLanguage.ts`, `usePagination.ts`, `usePageSize.ts`, `usePricingCatalog.ts` (catalog GET inflight-deduped), `useProductPage.ts` (list + facets in parallel, GETs inflight-deduped), `useRegisterCustomer.ts`, `useStore.ts` (re-export)
+- `useLanguage.ts`, `usePagination.ts`, `usePageSize.ts`, `usePricingCatalog.ts` (catalog GET inflight-deduped), `useProductPage.ts` (list + facets in parallel, GETs inflight-deduped), `useRegisterCustomer.ts`, `useDeleteCustomer.ts` (remote delete + rollback), `useEnsureGalleryTablesLoaded.ts` (lazy gallery hydrate for pickers), `useSidebarBadgeBoot.ts` (permission-scoped badge tables), `useInViewport.ts` (defer off-screen media), `useStore.ts` (re-export)
 
 ## Boundaries
 - Domain logic stays in `lib/`; hooks wrap React usage only.

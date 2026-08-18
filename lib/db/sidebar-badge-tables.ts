@@ -1,8 +1,8 @@
-import { canReadPage, type PermissionCode } from '@/lib/auth/permissions';
+import { canReadPage } from '@/lib/auth/permissions';
 import type { SyncArrayTable } from './sync-config';
 
 /** Minimal tables for sidebar badges given the user's page permissions. */
-export function sidebarBadgeTablesForPermissions(codes: readonly PermissionCode[]): SyncArrayTable[] {
+export function sidebarBadgeTablesForPermissions(codes: ReadonlySet<string>): SyncArrayTable[] {
   const tables: SyncArrayTable[] = [];
   const needsTourDesign =
     canReadPage(codes, 'tourdesign') || canReadPage(codes, 'sales');

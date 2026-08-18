@@ -1,10 +1,11 @@
 import React from 'react';
-import { Card, Radio, Button } from 'antd';
+import { Card, Radio, Button, Tooltip } from 'antd';
 import {
     CalendarOutlined,
     CheckSquareOutlined,
     FilterOutlined,
     GlobalOutlined,
+    LockOutlined,
     MessageOutlined,
     SaveOutlined,
     TeamOutlined,
@@ -21,13 +22,13 @@ const RESOURCE_SCOPE_RESOURCES: Array<{
     en: string;
     supportsAssigned: boolean;
 }> = [
-    { code: 'customers', vi: 'Khách hàng', en: 'Customers', supportsAssigned: false },
-    { code: 'leads', vi: 'Lead', en: 'Leads', supportsAssigned: false },
-    { code: 'tour_drafts', vi: 'Bản nháp tour', en: 'Tour drafts', supportsAssigned: false },
-    { code: 'bookings', vi: 'Booking', en: 'Bookings', supportsAssigned: true },
-    { code: 'tasks', vi: 'Công việc', en: 'Tasks', supportsAssigned: true },
-    { code: 'comms', vi: 'Trao đổi khách hàng', en: 'Customer communications', supportsAssigned: false },
-];
+        { code: 'customers', vi: 'Khách hàng', en: 'Customers', supportsAssigned: false },
+        { code: 'leads', vi: 'Lead', en: 'Leads', supportsAssigned: false },
+        { code: 'tour_drafts', vi: 'Bản nháp tour', en: 'Tour drafts', supportsAssigned: false },
+        { code: 'bookings', vi: 'Booking', en: 'Bookings', supportsAssigned: true },
+        { code: 'tasks', vi: 'Công việc', en: 'Tasks', supportsAssigned: true },
+        { code: 'comms', vi: 'Trao đổi khách hàng', en: 'Customer communications', supportsAssigned: false },
+    ];
 
 const RESOURCE_SCOPE_ACTIONS: AccessControlResourceScope['action'][] = [
     'read',
@@ -61,7 +62,27 @@ export interface ResourceScopesTabContentProps {
     updateScope: (resourceCode: AccessControlResourceScope['resource_code'], action: AccessControlResourceScope['action'], scope: ResourceScopeChoice) => void;
     discardScopeChanges: () => void;
     handleSaveResourceScopes: () => void;
+    selectedPermissionCodes: string[];
     language: 'vi' | 'en';
+}
+
+function getRequiredPermission(
+    resource: AccessControlResourceScope['resource_code'],
+    action: AccessControlResourceScope['action'],
+): string {
+    if (resource === 'customers' && action === 'read') return 'customers.read';
+    if (resource === 'customers') return 'customers.write';
+    if (resource === 'leads' && action === 'read') return 'sales.read';
+    if (resource === 'leads') return 'sales.write';
+    if (resource === 'tour_drafts' && action === 'read') return 'tour_design.read';
+    if (resource === 'tour_drafts') return 'tour_design.write';
+    if (resource === 'bookings' && action === 'read') return 'bookings.read';
+    if (resource === 'bookings') return 'bookings.write';
+    if (resource === 'tasks' && action === 'read') return 'planner.read';
+    if (resource === 'tasks') return 'planner.write';
+    if (resource === 'comms' && action === 'read') return 'customers.read';
+    if (resource === 'comms') return 'customers.write';
+    return '';
 }
 
 export const ResourceScopesTabContent = React.memo(function ResourceScopesTabContent({
@@ -71,6 +92,7 @@ export const ResourceScopesTabContent = React.memo(function ResourceScopesTabCon
     updateScope,
     discardScopeChanges,
     handleSaveResourceScopes,
+    selectedPermissionCodes,
     language,
 }: ResourceScopesTabContentProps) {
     return (
@@ -103,36 +125,53 @@ export const ResourceScopesTabContent = React.memo(function ResourceScopesTabCon
                                     'all',
                                 ];
                                 const actionLabel = tac(action, language);
+                                const requiredPermission = getRequiredPermission(resource.code, action);
+                                const hasPermission = !requiredPermission || selectedPermissionCodes.includes(requiredPermission);
+                                const isRowDisabled = !hasPermission;
+                                const tooltipTitle = language === 'vi'
+                                    ? `Yêu cầu quyền chức năng: ${requiredPermission}`
+                                    : `Requires functional permission: ${requiredPermission}`;
 
                                 return (
-                                    <div key={action} className={styles.resourceScopeActionRow}>
+                                    <div
+                                        key={action}
+                                        className={`${styles.resourceScopeActionRow} ${isRowDisabled ? styles.resourceScopeActionRowDisabled : ''
+                                            }`}
+                                    >
                                         <span className={styles.resourceScopeActionLabel}>{actionLabel}</span>
-                                        <Radio.Group
-                                            aria-label={`${language === 'vi' ? resource.vi : resource.en}: ${actionLabel}`}
-                                            buttonStyle="solid"
-                                            className={styles.resourceScopeControl}
-                                            disabled={saving}
-                                            optionType="button"
-                                            size="small"
-                                            value={scopeFor(resource.code, action)}
-                                            onChange={(event) => updateScope(
-                                                resource.code,
-                                                action,
-                                                event.target.value as ResourceScopeChoice,
-                                            )}
+                                        <Tooltip
+                                            title={isRowDisabled ? tooltipTitle : undefined}
+                                            placement="topLeft"
                                         >
-                                            {allowedScopes.map((scope) => (
-                                                <Radio.Button key={scope} value={scope}>
-                                                    {scope === 'none'
-                                                        ? tac('scopeNone', language)
-                                                        : scope === 'own'
-                                                            ? tac('scopeOwn', language)
-                                                            : scope === 'assigned'
-                                                                ? tac('scopeAssigned', language)
-                                                                : tac('scopeAll', language)}
-                                                </Radio.Button>
-                                            ))}
-                                        </Radio.Group>
+                                            <div style={{ width: '100%' }}>
+                                                <Radio.Group
+                                                    aria-label={`${language === 'vi' ? resource.vi : resource.en}: ${actionLabel}`}
+                                                    buttonStyle="solid"
+                                                    className={styles.resourceScopeControl}
+                                                    disabled={saving || isRowDisabled}
+                                                    optionType="button"
+                                                    size="small"
+                                                    value={isRowDisabled ? 'none' : scopeFor(resource.code, action)}
+                                                    onChange={(event) => updateScope(
+                                                        resource.code,
+                                                        action,
+                                                        event.target.value as ResourceScopeChoice,
+                                                    )}
+                                                >
+                                                    {allowedScopes.map((scope) => (
+                                                        <Radio.Button key={scope} value={scope}>
+                                                            {scope === 'none'
+                                                                ? tac('scopeNone', language)
+                                                                : scope === 'own'
+                                                                    ? tac('scopeOwn', language)
+                                                                    : scope === 'assigned'
+                                                                        ? tac('scopeAssigned', language)
+                                                                        : tac('scopeAll', language)}
+                                                        </Radio.Button>
+                                                    ))}
+                                                </Radio.Group>
+                                            </div>
+                                        </Tooltip>
                                     </div>
                                 );
                             })}

@@ -17,6 +17,7 @@ import {
   isRemoteDataEnabled,
   pushSnapshotToSupabase,
   quickSupabasePing,
+  readCachedConnectionStatus,
   resetShellHydrateGuard,
   subscribeHydration,
   verifyLocalMatchesRemote,
@@ -80,17 +81,38 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // Lightweight boot ping so Topbar/panel show "Kết nối OK (Nms)" without waiting for Test connection.
   // Full table counts stay on the Test connection button (healthCheck).
+  // A session-cached status resolves with zero requests; a cold cache pings on idle so the
+  // status dot never competes with the route's own data fetches.
   useEffect(() => {
     if (!remoteEnabled) return;
     let cancelled = false;
-    void (async () => {
-      const status = await quickSupabasePing();
-      if (cancelled) return;
-      setConn(status);
-      setChecking(false);
-    })();
+    const run = () => {
+      void (async () => {
+        const status = await quickSupabasePing();
+        if (cancelled) return;
+        setConn(status);
+        setChecking(false);
+      })();
+    };
+
+    if (readCachedConnectionStatus()) {
+      run();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    let idleId: number | undefined;
+    let timerId: number | undefined;
+    if (typeof requestIdleCallback !== 'undefined') {
+      idleId = requestIdleCallback(run, { timeout: 3000 });
+    } else {
+      timerId = window.setTimeout(run, 1200);
+    }
     return () => {
       cancelled = true;
+      if (idleId !== undefined && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(idleId);
+      if (timerId !== undefined) window.clearTimeout(timerId);
     };
   }, [remoteEnabled]);
 

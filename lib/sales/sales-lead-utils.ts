@@ -43,7 +43,7 @@ export interface ListSortState {
   direction: SortDirection;
 }
 
-/** Default visible cards per stage before “show more”; column still scrolls when expanded. */
+/** Default visible cards per stage before “show more”; the column then grows with the page. */
 export const PIPELINE_CARDS_LIMIT = 6;
 
 /** Normalize legacy month strings to `Mon YYYY` or `TBD`. */
@@ -93,6 +93,12 @@ export function parseLeadTravelMonth(month: string): number | null {
   const mIdx = MONTH_MAP[match[1]];
   if (mIdx === undefined) return null;
   return new Date(parseInt(match[2], 10), mIdx, 1).getTime();
+}
+
+export function leadMatchesCustomerName(lead: Lead, query: string, customers: Customer[]): boolean {
+  const q = query.toLowerCase().trim();
+  if (!q) return true;
+  return getCustomerName(customers, lead.custId).toLowerCase().includes(q);
 }
 
 export function leadMatchesSearch(lead: Lead, query: string, customers: Customer[]): boolean {

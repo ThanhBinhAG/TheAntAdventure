@@ -1,9 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import { getTourDraftForLead } from '@/lib/tour-design/tour-design-leads';
 import { getCustomerName } from '@/lib/core/crm-utils';
 import type { Customer, Lead, TourDraft } from '@/lib/types';
+
+function sessionHref(lead: Lead, step: number) {
+  return `/tourdesign?leadId=${encodeURIComponent(lead.id)}&custId=${encodeURIComponent(lead.custId)}&step=${step}`;
+}
 
 export function TourDesignQueueCards({
   pendingLeads,
@@ -18,80 +23,110 @@ export function TourDesignQueueCards({
   customers: Customer[];
   tourDrafts: TourDraft[];
 }) {
-  return (
-    <>
-      {pendingLeads.length > 0 && !leadId && (
-        <div className="card" style={{ marginBottom: 14 }}>
-          <div className="card-hd">
-            <span className="card-title">New clients from Sales Pipeline</span>
-          </div>
-          <div className="card-body" style={{ padding: 12 }}>
-            {pendingLeads.map((l) => (
-              <div
-                key={l.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  padding: '8px 0',
-                  borderBottom: '1px solid var(--b)',
-                }}
-              >
-                <div style={{ fontSize: 13 }}>
-                  <strong>{getCustomerName(customers, l.custId)}</strong>
-                  <span style={{ color: 'var(--m)', marginLeft: 8 }}>{l.month}</span>
-                </div>
-                <Link
-                  href={`/tourdesign?leadId=${encodeURIComponent(l.id)}&custId=${encodeURIComponent(l.custId)}&step=0`}
-                  className="btn btn-p btn-sm"
-                >
-                  Continue →
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const total = pendingLeads.length + awaitingOutline.length;
 
-      {awaitingOutline.length > 0 && (
-        <div className="card" style={{ marginBottom: 14, borderColor: 'var(--amb)' }}>
-          <div className="card-hd">
-            <span className="card-title">Awaiting outline approval</span>
-          </div>
-          <div className="card-body" style={{ padding: 12 }}>
-            {awaitingOutline.map((l) => {
-              const draft = getTourDraftForLead(l.id, tourDrafts);
-              return (
-                <div
-                  key={l.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    padding: '8px 0',
-                    borderBottom: '1px solid var(--b)',
-                  }}
-                >
-                  <div style={{ fontSize: 13 }}>
-                    <strong>{getCustomerName(customers, l.custId)}</strong>
-                    <span style={{ color: 'var(--m)', marginLeft: 8 }}>
-                      Outline v{draft?.outlineRevision ?? 1} sent — waiting for client
-                    </span>
-                  </div>
-                  <Link
-                    href={`/tourdesign?leadId=${encodeURIComponent(l.id)}&custId=${encodeURIComponent(l.custId)}&step=1`}
-                    className="btn btn-s btn-sm"
-                  >
-                    Open outline →
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  if (total === 0) return null;
+
+  return (
+    <div className="td-queue" ref={rootRef}>
+      <button
+        type="button"
+        className="td-queue-trigger"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>Tour tasks</span>
+        <span className="td-queue-badge">{total}</span>
+        <span className="td-queue-chevron" aria-hidden>
+          {open ? '▴' : '▾'}
+        </span>
+      </button>
+
+      {open && (
+        <div className="td-queue-popover" role="dialog" aria-label="Tour Design tasks">
+          {pendingLeads.length > 0 && (
+            <section className="td-queue-group">
+              <div className="td-queue-group-hd">New from Sales Pipeline</div>
+              <ul className="td-queue-list">
+                {pendingLeads.map((l) => {
+                  const current = l.id === leadId;
+                  return (
+                    <li key={l.id} className={`td-queue-item${current ? ' is-current' : ''}`}>
+                      <div className="td-queue-item-copy">
+                        <strong>{getCustomerName(customers, l.custId)}</strong>
+                        {l.month ? <span className="td-queue-meta">{l.month}</span> : null}
+                      </div>
+                      {current ? (
+                        <span className="td-queue-current">Open</span>
+                      ) : (
+                        <Link
+                          href={sessionHref(l, 0)}
+                          className="btn btn-p btn-sm"
+                          onClick={() => setOpen(false)}
+                        >
+                          Open
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          {awaitingOutline.length > 0 && (
+            <section className="td-queue-group">
+              <div className="td-queue-group-hd">Awaiting outline approval</div>
+              <ul className="td-queue-list">
+                {awaitingOutline.map((l) => {
+                  const draft = getTourDraftForLead(l.id, tourDrafts);
+                  const current = l.id === leadId;
+                  return (
+                    <li key={l.id} className={`td-queue-item${current ? ' is-current' : ''}`}>
+                      <div className="td-queue-item-copy">
+                        <strong>{getCustomerName(customers, l.custId)}</strong>
+                        <span className="td-queue-meta">
+                          Outline v{draft?.outlineRevision ?? 1} sent
+                        </span>
+                      </div>
+                      {current ? (
+                        <span className="td-queue-current">Open</span>
+                      ) : (
+                        <Link
+                          href={sessionHref(l, 1)}
+                          className="btn btn-s btn-sm"
+                          onClick={() => setOpen(false)}
+                        >
+                          Open
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
         </div>
       )}
-    </>
+    </div>
   );
 }

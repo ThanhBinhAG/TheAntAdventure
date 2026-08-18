@@ -2,6 +2,7 @@
 
 import WeatherIcon from '@/components/weather/icons/WeatherIcon';
 import { useResolvedCover } from '@/components/weather/hooks/useResolvedCover';
+import { weatherCardCoverUrl } from '@/lib/weather/resolve-cover';
 import {
   formatDayLabel,
   formatUpdatedAt,
@@ -28,8 +29,8 @@ export default function MainWeatherCard({
   onOpenDetail,
   onRetry,
 }: Props) {
-  const { coverUrl } = useResolvedCover(meta);
-  const cover = coverUrl;
+  const resolved = useResolvedCover(meta);
+  const cover = weatherCardCoverUrl(resolved);
   const current = detail?.current;
   const days = detail?.days?.slice(0, 5) ?? [];
 

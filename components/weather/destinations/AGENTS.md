@@ -12,6 +12,7 @@ Explore destination tiles and add/edit destination modals (gallery cover pick).
 
 ## Boundaries
 - Catalog via `../hooks/useWeatherPageBoot` (page boot).
+- Gallery cover pick lazy-loads `photos` / `photo_folders` via `PhotoLibraryPicker` (not route boot).
 - Covers: prefer `coverThumbUrl`, lazy `StorageImage` (no full CSS background).
 - Prefetch: 200ms hover-intent; immediate on keyboard focus; click still opens detail (in-flight dedupe).
 - Max 2 featured enforced in `lib/weather/destinations` + FeaturedSlotsModal.

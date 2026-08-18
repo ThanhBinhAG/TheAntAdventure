@@ -94,14 +94,8 @@ export default function EditProvinceModal({
 
   const dest = destination;
 
-  const cover =
-    photos.find((p) => p.id === form.coverPhotoId) ||
-    (dest.coverUrl
-      ? ({ id: form.coverPhotoId, url: dest.coverUrl, thumbUrl: dest.coverThumbUrl } as GalleryPhoto)
-      : undefined);
-  const coverThumb = cover
-    ? photoThumbUrl(cover) || cover.url || dest.coverThumbUrl || dest.coverUrl
-    : dest.coverThumbUrl || dest.coverUrl;
+  const cover = form.coverPhotoId ? photos.find((p) => p.id === form.coverPhotoId) : undefined;
+  const coverThumb = cover ? photoThumbUrl(cover) || cover.url : null;
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));

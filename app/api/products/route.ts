@@ -6,7 +6,6 @@ import {
 } from '@/lib/products/product-list-input';
 import {
     listProductsPage,
-    listProductFacets,
     ProductListError,
 } from '@/lib/products/product-list-server';
 import { invalidateProductFacetsCache } from '@/lib/redis/product-facets';
@@ -53,16 +52,12 @@ export async function GET(request: Request) {
     }
 
     try {
-        const [productPage, facets] = await Promise.all([
-            listProductsPage(parsed.data),
-            parsed.data.view === 'catalog' ? listProductFacets(parsed.data) : Promise.resolve(undefined),
-        ]);
+        const productPage = await listProductsPage(parsed.data);
 
         return NextResponse.json(
             {
                 ok: true,
                 ...productPage,
-                ...(facets ? { facets } : {}),
             },
             {
                 headers: {

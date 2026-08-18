@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useEnsureGalleryTablesLoaded } from '@/hooks/useEnsureGalleryTablesLoaded';
 import {
   DndContext,
   DragOverlay,
@@ -189,6 +190,8 @@ export default function PhotoLibraryPicker({
 }: Props) {
   const isInline = variant === 'inline';
   const isSingle = mode === 'single';
+  const galleryLoadEnabled = isInline || open;
+  const { loading: galleryLoading } = useEnsureGalleryTablesLoaded(galleryLoadEnabled);
   const folders = useMemo(
     () => ensureUnsortedFolder(foldersProp ?? []),
     [foldersProp]
@@ -360,9 +363,15 @@ export default function PhotoLibraryPicker({
       {atRoot ? (
         <div className="phlib-picker-root">
           <p className="phlib-picker-hint">
-            {rootFolders.length} folder{rootFolders.length === 1 ? '' : 's'} · open one to browse photos
+            {galleryLoading && (foldersProp?.length ?? 0) === 0
+              ? 'Đang tải thư mục…'
+              : `${rootFolders.length} folder${rootFolders.length === 1 ? '' : 's'} · open one to browse photos`}
           </p>
-          {rootFolders.length ? (
+          {galleryLoading && (foldersProp?.length ?? 0) === 0 ? (
+            <p className="phlib-picker-hint" aria-busy="true">
+              Đang tải thư viện ảnh…
+            </p>
+          ) : rootFolders.length ? (
             <GalleryFolderGrid
               folders={rootFolders}
               photoCounts={photoCounts}

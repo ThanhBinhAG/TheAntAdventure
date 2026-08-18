@@ -38,6 +38,16 @@ export type SyncArrayTable = (typeof SYNC_ARRAY_TABLES)[number];
 export const PROFILE_LAZY_TABLES: readonly SyncArrayTable[] = ['comms', 'bookings'] as const;
 
 /**
+ * Tables used for global sidebar badges (see sidebarBadgeTablesForPermissions).
+ * Loaded from Sidebar — subset depends on page permissions.
+ */
+export const SIDEBAR_BADGE_TABLES: readonly SyncArrayTable[] = [
+  'leads',
+  'tour_drafts',
+  'tasks',
+] as const;
+
+/**
  * Tables fetched immediately when entering a CRM route (route-first boot).
  * Omitted slugs load nothing until explicitly needed (e.g. pricing catalog APIs).
  */

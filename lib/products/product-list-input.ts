@@ -54,6 +54,16 @@ export type ProductListQuery = z.infer<
     typeof productListQuerySchema
 >;
 
+/** Filter-only query for `/api/products/facets` (no page / view). */
+export const productListFilterQuerySchema = productListQuerySchema.pick({
+    q: true,
+    region: true,
+    duration: true,
+    category: true,
+    destination: true,
+    pricingStatus: true,
+});
+
 export type ProductPageResponse<T> = {
     items: T[];
     page: number;

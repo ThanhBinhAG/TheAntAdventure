@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useEnsureGalleryTablesLoaded } from '@/hooks/useEnsureGalleryTablesLoaded';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import { photoThumbUrl } from '@/lib/gallery/gallery-helpers';
 import {
@@ -32,6 +33,7 @@ export default function CompanyLogoGalleryPicker({
   onClose,
   onPick,
 }: Props) {
+  const { loading: galleryLoading } = useEnsureGalleryTablesLoaded(open);
   const folders = useMemo(() => ensureUnsortedFolder(foldersProp ?? []), [foldersProp]);
   const [folderId, setFolderId] = useState<string | null>(null);
 
@@ -81,12 +83,14 @@ export default function CompanyLogoGalleryPicker({
           )}
 
             <p className="logo-gallery-hint">
-              {atRoot
-                ? `${visibleFolders.length} folder${visibleFolders.length === 1 ? '' : 's'} · pick one to browse photos`
-                : `${folderPhotos.length} photo${folderPhotos.length === 1 ? '' : 's'} in this folder`}
+              {galleryLoading && foldersProp.length === 0
+                ? 'Đang tải thư mục…'
+                : atRoot
+                  ? `${visibleFolders.length} folder${visibleFolders.length === 1 ? '' : 's'} · pick one to browse photos`
+                  : `${folderPhotos.length} photo${folderPhotos.length === 1 ? '' : 's'} in this folder`}
             </p>
 
-          {visibleFolders.length > 0 && (
+          {visibleFolders.length > 0 && !(galleryLoading && foldersProp.length === 0) && (
             <GalleryFolderGrid
               className="logo-gallery-folders"
               folders={visibleFolders}
@@ -95,7 +99,13 @@ export default function CompanyLogoGalleryPicker({
             />
           )}
 
-          {atRoot && visibleFolders.length === 0 && (
+          {atRoot && visibleFolders.length === 0 && galleryLoading && foldersProp.length === 0 && (
+            <p className="logo-gallery-hint" aria-busy="true">
+              Đang tải thư viện ảnh…
+            </p>
+          )}
+
+          {atRoot && visibleFolders.length === 0 && !(galleryLoading && foldersProp.length === 0) && (
             <EmptyState
               className="crm-empty-state--flush"
               variant="photos"

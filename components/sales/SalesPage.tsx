@@ -16,6 +16,7 @@ import {
   getUniqueTravelMonths,
   groupLeadsByTravelMonth,
   hasActiveFilters,
+  leadMatchesCustomerName,
   leadMatchesSearch,
   sortLeads,
   type ListSortField,
@@ -100,7 +101,6 @@ export default function SalesPage() {
   const [timeFilter, setTimeFilter] = useState<SalesTimeFilterState>({ mode: 'all' });
   const [stageFilter, setStageFilter] = useState('');
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
-  const [showEmptyStages, setShowEmptyStages] = useState(false);
   const [listSort, setListSort] = useState<ListSortState>({ field: 'followUp', direction: 'asc' });
   const [groupByMonth, setGroupByMonth] = useState(false);
 
@@ -122,7 +122,13 @@ export default function SalesPage() {
     list = filterLeadsByTime(list, timeFilter, today);
     if (stageFilter) list = list.filter((l) => l.stage === stageFilter);
     if (effectiveCustIdFilter) list = list.filter((l) => l.custId === effectiveCustIdFilter);
-    if (search.trim()) list = list.filter((l) => leadMatchesSearch(l, search, customers));
+    if (search.trim()) {
+      const matchesSearch =
+        tab === 'pipeline'
+          ? (l: Lead) => leadMatchesCustomerName(l, search, customers)
+          : (l: Lead) => leadMatchesSearch(l, search, customers);
+      list = list.filter(matchesSearch);
+    }
 
     if (highlightLeadId) {
       const highlighted = leads.find((l) => l.id === highlightLeadId);
@@ -132,39 +138,12 @@ export default function SalesPage() {
     }
 
     return list;
-  }, [leads, timeFilter, stageFilter, effectiveCustIdFilter, search, customers, today, highlightLeadId]);
+  }, [leads, timeFilter, stageFilter, effectiveCustIdFilter, search, customers, today, highlightLeadId, tab]);
 
   const activeLeads = filteredLeads.filter((l) => l.stage !== 'Lost' && l.stage !== 'Completed');
   const totalPipelineVal = activeLeads.reduce((s, l) => s + (l.value || 0), 0);
   const weightedForecast = activeLeads.reduce((s, l) => s + getLeadWeightedValue(l), 0);
   const confirmedVal = filteredLeads.filter((l) => l.stage === 'Confirmed').reduce((s, l) => s + (l.value || 0), 0);
-
-  const pipelineStages = useMemo(() => {
-    const stages = stageFilter
-      ? KANBAN_STAGES.filter((stage) => stage === stageFilter)
-      : [...KANBAN_STAGES];
-    const filled: string[] = [];
-    const empty: string[] = [];
-    for (const stage of stages) {
-      if (filteredLeads.some((l) => l.stage === stage)) filled.push(stage);
-      else empty.push(stage);
-    }
-    if (
-      highlightedLead &&
-      stages.includes(highlightedLead.stage as (typeof KANBAN_STAGES)[number]) &&
-      !filled.includes(highlightedLead.stage)
-    ) {
-      filled.push(highlightedLead.stage);
-      const emptyIdx = empty.indexOf(highlightedLead.stage);
-      if (emptyIdx >= 0) empty.splice(emptyIdx, 1);
-    }
-    return { all: stages, filled, empty };
-  }, [filteredLeads, stageFilter, highlightedLead]);
-
-  const visiblePipelineStages =
-    showEmptyStages || pipelineStages.filled.length === 0
-      ? pipelineStages.all
-      : pipelineStages.filled;
 
   const listLeads = useMemo(() => sortLeads(filteredLeads, listSort, customers), [filteredLeads, listSort, customers]);
 
@@ -295,16 +274,20 @@ export default function SalesPage() {
     );
   }
 
+  const searchActive = search.trim().length > 0;
+
   const salesToolbar = (tab === 'pipeline' || tab === 'list') && (
     <div className="sales-filter-row">
-      <div className="search-row" style={{ marginBottom: 0 }}>
-        <input
-          type="search"
-          placeholder={tsf('searchPlaceholder')}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      {tab === 'list' && (
+        <div className="search-row" style={{ marginBottom: 0 }}>
+          <input
+            type="search"
+            placeholder={tsf('searchPlaceholder')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      )}
       <div className="sales-filter-chips" role="group" aria-label={tsf('filterAll')}>
         {TIME_FILTER_MODES.map((mode) => (
           <button
@@ -421,7 +404,15 @@ export default function SalesPage() {
               </div>
               <div className="pipeline-forecast-lbl">{tc('totalPipeline')}</div>
             </div>
-            <div style={{ flex: 1 }} />
+            <div className="pipeline-forecast-search">
+              <input
+                type="search"
+                placeholder={tsf('pipelineSearchPlaceholder')}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label={tsf('pipelineSearchPlaceholder')}
+              />
+            </div>
             <span style={{ fontSize: 11, color: 'var(--m)' }}>{tsf('weightedFormula')}</span>
           </div>
 
@@ -446,78 +437,46 @@ export default function SalesPage() {
             />
           ) : (
             <div className="pipeline">
-              {visiblePipelineStages.map((stage) => {
+              {KANBAN_STAGES.map((stage) => {
                 const stageLeads = filteredLeads.filter((l) => l.stage === stage);
                 const stageVal = stageLeads.reduce((acc, l) => acc + (l.value || 0), 0);
                 const expanded = effectiveExpandedStages.has(stage);
-                const visibleLeads = expanded ? stageLeads : stageLeads.slice(0, PIPELINE_CARDS_LIMIT);
-                const hiddenCount = stageLeads.length - visibleLeads.length;
-                const isEmpty = stageLeads.length === 0;
+                const showAllInStage = searchActive || expanded;
+                const visibleLeads = showAllInStage ? stageLeads : stageLeads.slice(0, PIPELINE_CARDS_LIMIT);
+                const hiddenCount = showAllInStage ? 0 : stageLeads.length - visibleLeads.length;
                 return (
-                  <div className={`pipe-col${isEmpty ? ' is-empty' : ''}`} key={stage}>
+                  <div className="pipe-col" key={stage}>
                     <div className="pipe-hd">
                       <span>{tStage(stage)}</span>
                       <span className={`bdg ${STAGE_COLORS[stage] || 'bdg-w'}`}>{stageLeads.length}</span>
                       {stageVal > 0 && <span className="pipe-col-val">${fmt(Math.round(stageVal))}</span>}
                     </div>
-                    <div className="pipe-col-body">
-                      {isEmpty ? (
-                        <div className="pipe-col-empty">{tsf('emptyStage')}</div>
-                      ) : (
-                        <>
-                          {visibleLeads.map((l) => (
-                            <PipeCard
-                              key={l.id}
-                              lead={l}
-                              stage={stage}
-                              name={getCustomerName(customers, l.custId)}
-                              today={today}
-                              tourDrafts={tourDrafts}
-                              onStageChange={moveStage}
-                              onUpdate={updateLead}
-                              onApproveOutline={handleApproveOutline}
-                            />
-                          ))}
-                          {hiddenCount > 0 && (
-                            <button type="button" className="sales-show-more-btn" onClick={() => toggleStageExpanded(stage)}>
-                              +{hiddenCount} {tsf('showMore')}
-                            </button>
-                          )}
-                          {expanded && stageLeads.length > PIPELINE_CARDS_LIMIT && (
-                            <button type="button" className="sales-show-more-btn" onClick={() => toggleStageExpanded(stage)}>
-                              {tsf('showLess')}
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
+                    {visibleLeads.map((l) => (
+                      <PipeCard
+                        key={l.id}
+                        lead={l}
+                        stage={stage}
+                        name={getCustomerName(customers, l.custId)}
+                        today={today}
+                        tourDrafts={tourDrafts}
+                        onStageChange={moveStage}
+                        onUpdate={updateLead}
+                        onApproveOutline={handleApproveOutline}
+                      />
+                    ))}
+                    {hiddenCount > 0 && (
+                      <button type="button" className="sales-show-more-btn" onClick={() => toggleStageExpanded(stage)}>
+                        +{hiddenCount} {tsf('showMore')}
+                      </button>
+                    )}
+                    {!searchActive && expanded && stageLeads.length > PIPELINE_CARDS_LIMIT && (
+                      <button type="button" className="sales-show-more-btn" onClick={() => toggleStageExpanded(stage)}>
+                        {tsf('showLess')}
+                      </button>
+                    )}
                   </div>
                 );
               })}
-              {!stageFilter && !showEmptyStages && pipelineStages.empty.length > 0 && pipelineStages.filled.length > 0 && (
-                <div className="pipeline-empty-strip">
-                  <button
-                    type="button"
-                    className="pipeline-empty-chip"
-                    onClick={() => setShowEmptyStages(true)}
-                    title={tsf('showEmptyStages')}
-                  >
-                    +{pipelineStages.empty.length} {tsf('emptyStagesHidden')}
-                  </button>
-                </div>
-              )}
-              {!stageFilter && showEmptyStages && pipelineStages.empty.length > 0 && pipelineStages.filled.length > 0 && (
-                <div className="pipeline-empty-strip">
-                  <button
-                    type="button"
-                    className="pipeline-empty-chip"
-                    onClick={() => setShowEmptyStages(false)}
-                    title={tsf('hideEmptyStages')}
-                  >
-                    {tsf('hideEmptyStages')}
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </>

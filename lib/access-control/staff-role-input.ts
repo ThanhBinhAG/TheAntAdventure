@@ -7,6 +7,9 @@
 
 import { z } from 'zod';
 import { accessControlRoleCodeSchema } from './role-input';
+import {
+    replaceAccessControlStaffRoleScopesBodySchema,
+} from './resource-scope-input';
 
 /** Payload tạo role nhân viên. */
 export const createAccessControlStaffRoleBodySchema = z.object({
@@ -38,6 +41,7 @@ export const updateAccessControlStaffRoleBodySchema =
             roleCode: accessControlRoleCodeSchema,
             permissionCodes: z.array(z.string().min(1)).max(100),
         }),
+        replaceAccessControlStaffRoleScopesBodySchema,
     ]);
 
 /** DELETE chỉ nhận mã; RPC chặn role hệ thống và role còn user. */

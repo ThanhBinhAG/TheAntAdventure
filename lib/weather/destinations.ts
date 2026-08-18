@@ -1,4 +1,5 @@
 import 'server-only';
+import { withPhotoCacheBust } from '@/lib/gallery/gallery-helpers';
 import { FEATURED_WEEKLY_IDS, WEATHER_DESTINATIONS, type WeatherRegion } from './coordinates';
 import { getWeatherAdminClient } from './supabase-admin';
 import type { WeatherDestinationMeta } from './types';
@@ -53,12 +54,23 @@ function isMissingColumnError(message: string): boolean {
   return /cover_photo_id|is_featured|description|notes|schema cache/i.test(message);
 }
 
+function thumbUrlFromDisplay(displayUrl: string | null | undefined): string | null {
+  if (!displayUrl) return null;
+  const base = displayUrl.split('?')[0] ?? displayUrl;
+  if (!base.endsWith('/display.webp')) return null;
+  return `${base.slice(0, -'/display.webp'.length)}thumb.webp`;
+}
+
 function mapRow(
   row: DestRow,
-  photo?: { url: string | null; thumb_url: string | null } | null,
+  photo?: { url: string | null; thumb_url: string | null; display_bytes?: number | null } | null,
   featuredFallback?: boolean
 ): WeatherDestinationMeta {
   const featuredIds = new Set<string>(FEATURED_WEEKLY_IDS);
+  const cacheVersion = photo?.display_bytes ?? row.cover_photo_id ?? null;
+  const coverUrl = photo?.url ? withPhotoCacheBust(photo.url, cacheVersion) : null;
+  const thumbPath = photo?.thumb_url ?? thumbUrlFromDisplay(photo?.url);
+  const coverThumbUrl = thumbPath ? withPhotoCacheBust(thumbPath, cacheVersion) : null;
   return {
     id: row.id,
     name: row.name,
@@ -71,8 +83,8 @@ function mapRow(
     description: row.description ?? null,
     notes: row.notes ?? null,
     coverPhotoId: row.cover_photo_id ?? null,
-    coverUrl: photo?.url ?? null,
-    coverThumbUrl: photo?.thumb_url ?? photo?.url ?? null,
+    coverUrl,
+    coverThumbUrl,
     isFeatured:
       row.is_featured != null
         ? Boolean(row.is_featured)
@@ -84,12 +96,16 @@ function mapRow(
 async function attachCoverPhotos(rows: DestRow[]): Promise<WeatherDestinationMeta[]> {
   const client = getWeatherAdminClient();
   const ids = [...new Set(rows.map((r) => r.cover_photo_id).filter(Boolean))] as string[];
-  const byId = new Map<string, { url: string | null; thumb_url: string | null }>();
+  const byId = new Map<string, { url: string | null; thumb_url: string | null; display_bytes: number | null }>();
 
   if (client && ids.length) {
-    const { data } = await client.from('photos').select('id, url, thumb_url').in('id', ids);
+    const { data } = await client.from('photos').select('id, url, thumb_url, display_bytes').in('id', ids);
     for (const p of data ?? []) {
-      byId.set(p.id as string, { url: p.url, thumb_url: p.thumb_url });
+      byId.set(p.id as string, {
+        url: p.url as string | null,
+        thumb_url: p.thumb_url as string | null,
+        display_bytes: p.display_bytes != null ? Number(p.display_bytes) : null,
+      });
     }
   }
 

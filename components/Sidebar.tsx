@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { NAV_SECTIONS, type NavItem } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useSidebarBadgeBoot } from '@/hooks/useSidebarBadgeBoot';
 import { useStore } from '@/hooks/useStore';
 import { countActiveTasks } from '@/lib/planner/planner-task-utils';
 import { countTourDesignAttention } from '@/lib/tour-design/tour-design-leads';
@@ -70,8 +71,9 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
     };
   }, []);
 
-  // Badge counts: 0 until Planner / Tour Design / sales (etc.) hydrate those tables.
-  // No global sidebar prefetch on unrelated routes (e.g. Access Control).
+  useSidebarBadgeBoot(permissionCodes);
+
+  // Badge counts hydrate via useSidebarBadgeBoot (permission-scoped tables).
   const activeTaskCount = useMemo(() => countActiveTasks(tasks), [tasks]);
   const pendingTourDesign = useMemo(
     () => countTourDesignAttention(leads, tourDrafts),

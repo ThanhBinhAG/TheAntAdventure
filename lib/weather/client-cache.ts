@@ -2,8 +2,12 @@ import type { DestinationWeatherDetail } from '@/lib/weather/types';
 
 const PREFIX = 'ant_weather_dest_v1:';
 
-/** Cap localStorage weather entries (featured + recent explore). */
-export const WEATHER_CLIENT_CACHE_MAX_KEYS = 8;
+/**
+ * Cap localStorage weather entries (featured + explore prefetches).
+ * Seed catalog is ~14 destinations; 24 covers the full grid plus a few custom
+ * adds so hover-prefetch is not evicted mid-sweep (~1.5KB JSON each).
+ */
+export const WEATHER_CLIENT_CACHE_MAX_KEYS = 24;
 
 export type ClientWeatherCacheEntry = {
   fetchedAt: string;

@@ -80,15 +80,15 @@ export async function updateSession(request: NextRequest) {
     });
     return new NextResponse(null, { status: 404 });
   }
-  // Các route auth này tự kiểm tra session và phải trả JSON,
-  // không redirect API request sang trang /login.
-  // Allow unauthenticated access to auth API routes (login/logout).
+  // Các route này tự kiểm tra session/quyền và phải trả JSON, không redirect
+  // API request sang /login. In particular, Products checks products.read/write
+  // in its Route Handlers, so resolving Auth here would duplicate that work.
   if (
     pathname.startsWith('/api/auth/login') ||
     pathname.startsWith('/api/auth/logout') ||
     pathname === '/api/auth/permissions' ||
-    pathname.startsWith('/api/access-control')
-
+    pathname.startsWith('/api/access-control') ||
+    pathname.startsWith('/api/products')
   ) {
     return NextResponse.next({ request });
   }

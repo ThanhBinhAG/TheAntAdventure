@@ -2,6 +2,8 @@
 
 import WeatherIcon from '@/components/weather/icons/WeatherIcon';
 import { useDestinationWeather } from '@/components/weather/hooks/useDestinationWeather';
+import { useResolvedCover } from '@/components/weather/hooks/useResolvedCover';
+import { weatherHeroCoverUrl } from '@/lib/weather/resolve-cover';
 import {
   formatDayLabel,
   formatUpdatedAt,
@@ -21,10 +23,11 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
   const { data, loading, error, refresh } = useDestinationWeather(destinationId, {
     enabled: open && Boolean(destinationId),
   });
+  const resolved = useResolvedCover(meta);
 
   if (!open || !destinationId) return null;
 
-  const cover = meta?.coverUrl || meta?.coverThumbUrl || data?.coverUrl;
+  const cover = weatherHeroCoverUrl(resolved);
   const current = data?.current;
   const days = data?.days ?? [];
 

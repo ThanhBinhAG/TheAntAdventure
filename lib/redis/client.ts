@@ -28,7 +28,13 @@ function createRedisClient(): RedisClient {
         socket: {
             connectTimeout: getConnectTimeoutMs(),
             socketTimeout: 3_000,
-            reconnectStrategy: false,
+            reconnectStrategy: (retries) => {
+                // Thử kết nối lại tối đa 3 lần với khoảng cách 1 giây để xử lý các sự cố mạng tạm thời
+                if (retries >= 3) {
+                    return false; // Ngừng thử và kích hoạt lỗi kết nối thất bại hẳn
+                }
+                return 1000;
+            },
         },
     });
 
@@ -42,8 +48,18 @@ function createRedisClient(): RedisClient {
 export async function getRedisClient(): Promise<RedisClient | null> {
     if (!process.env.REDIS_URL) return null;
 
-    const client = globalForRedis.redisClient ?? createRedisClient();//Có client redis thì dùng lại không thì tạo mới
-    globalForRedis.redisClient = client;
+    let client = globalForRedis.redisClient;
+
+    // Nếu client đã tồn tại nhưng không còn mở (bị đóng/ngắt kết nối hẳn), dọn dẹp và tạo client mới
+    if (client && !client.isOpen && !globalForRedis.redisConnectPromise) {
+        client = undefined;
+        globalForRedis.redisClient = undefined;
+    }
+
+    if (!client) {
+        client = createRedisClient();
+        globalForRedis.redisClient = client;
+    }
 
     if (client.isReady) return client;
     if (globalForRedis.redisConnectPromise) return globalForRedis.redisConnectPromise;
@@ -57,7 +73,9 @@ export async function getRedisClient(): Promise<RedisClient | null> {
             } catch {
                 // Nuốt lỗi an toàn nếu socket đã đóng sẵn
             }
-            if (globalForRedis.redisClient === client) globalForRedis.redisClient = undefined;
+            if (globalForRedis.redisClient === client) {
+                globalForRedis.redisClient = undefined;
+            }
             return null;
         });
 

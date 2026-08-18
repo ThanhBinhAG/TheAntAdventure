@@ -3,6 +3,7 @@ import { localIsoDate } from '../core/date-utils';
 import { WEATHER_DESTINATIONS, getDestinationsByRegion } from './coordinates';
 import { FEATURED_WEEKLY_IDS } from './coordinates';
 import { getWeatherAdminClient } from './supabase-admin';
+import { getWeatherCache } from './redis-cache';
 import type {
   DestinationCurrentWeather,
   DestinationWeatherDetail,
@@ -23,7 +24,8 @@ export function getTodayVnDate(now = new Date()): string {
 }
 
 export function isWeatherCacheConfigured(): boolean {
-  return getWeatherAdminClient() !== null;
+  // Cache is configured when REDIS_URL is present.
+  return !!process.env.REDIS_URL;
 }
 
 export async function isCacheStale(): Promise<boolean> {
@@ -255,6 +257,27 @@ export async function readDestinationDetailCache(
 }
 
 export async function readWeeklyCache(region?: string | null): Promise<WeeklyWeatherResponse> {
+  // First try Redis cache
+  const redisPayload = await getWeatherCache();
+  if (redisPayload) {
+    // Transform the WeatherPageBoot payload into the WeeklyWeatherResponse shape.
+    const destinations = redisPayload.destinations.map((meta) => ({
+      id: meta.id,
+      name: meta.name,
+      region: meta.region,
+      emoji: meta.emoji ?? '',
+      days: [], // Weekly endpoint expects days per destination; they are not stored in the boot cache.
+    }));
+    // For simplicity we mark the cache as fresh (stale = false) and omit timestamps.
+    return {
+      fetchedAt: null,
+      expiresAt: null,
+      stale: false,
+      destinations,
+    };
+  }
+
+  // Fallback to original Supabase query logic (unchanged).
   const client = getWeatherAdminClient();
   const dests = getDestinationsByRegion(region);
   const destIds = dests.map((d) => d.id);

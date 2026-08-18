@@ -10,6 +10,7 @@ Open-Meteo fetch, Supabase cache, ratings, destination catalog CRUD, and weather
 - `open-meteo.ts` — batch weekly + **single-destination** current/daily (+ UV)
 - `refresh.ts` — per-destination cache-first fetch (`string | WeatherDestinationMeta`); cron warms featured only
 - `cache.ts` — forecast + `weather_current_cache` helpers
+- `redis-cache.ts` — Redis wrapper for weather guide caching (shared key `weather:guide`, TTL 24 h, error handling 503 "Cache unavailable")
 - `client-cache.ts` — browser localStorage per destination (TTL on read/write prune, max 24 keys)
 - `resolve-cover.ts` — resolve cover URLs from gallery store / API (ignores stale denormalized `coverUrl`)
 - `rating.ts`, `auth.ts`, `supabase-admin.ts`, `types.ts`

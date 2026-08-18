@@ -202,6 +202,7 @@ export default function TourDesignPage() {
       step,
       upsertTourDraft,
       replaceOutlineDaysForDraft,
+      canWrite,
     ]
   );
 

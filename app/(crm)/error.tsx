@@ -1,8 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
 import Link from 'next/link';
-import * as Sentry from '@sentry/nextjs';
 
 type ErrorProps = {
   error: Error & { digest?: string };
@@ -10,10 +8,6 @@ type ErrorProps = {
 };
 
 export default function CrmError({ error, reset }: ErrorProps) {
-  useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
-
   return (
     <div className="card" style={{ margin: 24, maxWidth: 560 }}>
       <div className="card-hd">

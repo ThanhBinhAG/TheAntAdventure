@@ -26,7 +26,7 @@ cache:
 
 lint:
   stage: verify
-  image: node:20-alpine
+  image: node:22-alpine
   tags:
     - vm06-deploy-ant-admin
   rules:
@@ -41,7 +41,7 @@ lint:
 
 build:
   stage: verify
-  image: node:20-alpine
+  image: node:22-alpine
   tags:
     - vm06-deploy-ant-admin
   rules:

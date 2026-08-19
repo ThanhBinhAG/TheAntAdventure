@@ -11,7 +11,7 @@
 | Điều hướng/trang CRM | `lib/constants.ts` (`NAV_SECTIONS`, `VALID_PAGES`) | `app/(crm)/[page]/page.tsx` → `components/pages/index.ts` → page component |
 | Dữ liệu CRM | `lib/store.ts`, `lib/types.ts` | `components/StoreProvider.tsx` → `lib/db/hydrate.ts` / `lib/db/sync-push.ts` → `lib/db/supabase.ts` |
 | Supabase/schema & RLS | `supabase/schema.sql`, `supabase/migrations/20260730042242_02_migrations.sql`, `docs/DATABASE.md` | table → mapper trong `lib/db/mappers.ts` → `lib/db/supabase.ts`; RLS chuyển tiếp ở `supabase/rls-authenticated.sql` |
-| Đăng nhập/session | `app/api/auth/login/route.ts` | `lib/auth/*`, `lib/env.ts`, `middleware.ts` |
+| Đăng nhập/session | `app/api/auth/login/route.ts` | `lib/auth/*`, `lib/env.ts`, `proxy.ts` |
 | Quyền và Access Control | `lib/auth/permissions.ts` | `app/(crm)/layout.tsx` → `getInitialPermissionCodesForCRMLayout()` → `current_permission_codes()` → `PermissionsProvider`; `/access-control` → `components/access-control/*` → `/api/access-control/*` → RPC Supabase |
 | Sales đến booking | `components/pages/Sales.tsx` | `lib/customers/*`, `lib/sales/*`, `components/pages/Bookings.tsx` |
 | Thiết kế tour/proposal | `components/pages/TourDesign.tsx` | `components/tour-design/*` → `lib/tour-design/*` / `lib/proposals/*` |
@@ -24,7 +24,7 @@
 
 ```mermaid
 flowchart LR
-  U[Nhân viên / Browser] --> N[Next.js 14 App Router]
+  U[Nhân viên / Browser] --> N[Next.js 16 App Router]
   N --> L[Root layout]
   L --> R[/(crm)/[page] dynamic route]
   R --> C[CRM client shell]
@@ -41,7 +41,7 @@ flowchart LR
   D --> SB[(Supabase PostgreSQL + Storage)]
   N --> API[app/api/* route handlers]
   API --> SB
-  API --> EXT[Open-Meteo / Puppeteer PDF / Sentry]
+  API --> EXT[Open-Meteo / Puppeteer PDF]
   P --> AC[Access Control UI]
   AC --> API
   API --> ARBAC[Access Control RPC]
@@ -226,7 +226,7 @@ sequenceDiagram
   B->>CRM: navigate to protected CRM route
 ```
 
-Implemented session bridge: `middleware.ts` calls `updateSession` from `lib/supabase/middleware.ts`; `lib/supabase/index.ts` caches the browser client created by `lib/supabase/client.ts`. Middleware keeps `/api/health`, login/logout and configured debug paths public, refreshes Supabase cookies, and redirects unauthenticated CRM traffic to `/login`. Break-glass sessions can also attach a shadow Supabase session for authenticated RLS access.
+Implemented session bridge: [`proxy.ts`](proxy.ts) calls `updateSession` from `lib/supabase/middleware.ts`; `lib/supabase/index.ts` caches the browser client created by `lib/supabase/client.ts`. Proxy keeps `/api/health`, login/logout and configured debug paths public, refreshes Supabase cookies, and redirects unauthenticated CRM traffic to `/login`. Break-glass sessions can also attach a shadow Supabase session for authenticated RLS access.
 
 ### Permission load and Access Control
 

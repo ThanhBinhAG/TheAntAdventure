@@ -8,14 +8,15 @@ import type { PageSlug } from '@/lib/types';
 import { PermissionGate } from '@/components/PermissionGate';
 
 interface PageProps {
-  params: { page: string };
+  params: Promise<{ page: string }>;
 }
 
 export function generateStaticParams() {
   return VALID_PAGES.map((page) => ({ page }));
 }
 
-export default function CRMPage({ params }: PageProps) {
+export default async function CRMPage(props: PageProps) {
+  const params = await props.params;
   const slug = params.page as PageSlug;
   if (!VALID_PAGES.includes(slug)) notFound();
 

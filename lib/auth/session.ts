@@ -33,7 +33,7 @@ export async function authContextFromBreakGlassCookie(
 
 /** Cookie-store based context (Route Handlers / Server Components). */
 export async function getAuthContext(): Promise<AuthContext> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const bg = cookieStore.get(BG_SESSION_COOKIE)?.value;
   const fromBg = await authContextFromBreakGlassCookie(bg);
   if (fromBg) return fromBg;

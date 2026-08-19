@@ -1,8 +1,7 @@
 /**
  * Always-on structured app logger (not gated by SYSTEM_DEBUG).
- * Writes JSON to stdout and reports errors to Sentry when DSN is set.
+ * Writes JSON to stdout.
  */
-import * as Sentry from '@sentry/nextjs';
 
 export type AppLogLevel = 'info' | 'warn' | 'error';
 
@@ -21,11 +20,6 @@ function sanitize(meta?: Record<string, unknown>): Record<string, unknown> | und
     out[key] = SENSITIVE.test(key) ? '[redacted]' : value;
   }
   return out;
-}
-
-function toError(error: unknown): Error {
-  if (error instanceof Error) return error;
-  return new Error(typeof error === 'string' ? error : String(error));
 }
 
 export function appLog(scope: string, message: string, options?: LogOptions): void {
@@ -52,19 +46,6 @@ export function appLog(scope: string, message: string, options?: LogOptions): vo
   if (level === 'error') console.error(line);
   else if (level === 'warn') console.warn(line);
   else console.log(line);
-
-  if (level === 'error' && options?.error != null) {
-    Sentry.captureException(toError(options.error), {
-      tags: { scope },
-      extra: { message, ...(meta ?? {}) },
-    });
-  } else if (level === 'error') {
-    Sentry.captureMessage(message, {
-      level: 'error',
-      tags: { scope },
-      extra: meta,
-    });
-  }
 }
 
 export function captureAppError(scope: string, error: unknown, message?: string, meta?: Record<string, unknown>): void {

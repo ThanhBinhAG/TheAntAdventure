@@ -11,7 +11,7 @@ import {
   isTableHydrated,
   updateBaselineCounts,
 } from './sync-lifecycle';
-import type { SyncTableOptions } from './sync-policy';
+import type { SyncTableOptions, SyncTableResult } from './sync-policy';
 import {
   countBackupRows,
   SYNC_PUSH_WAVES,
@@ -54,7 +54,10 @@ async function syncTableFromBackup(
   table: SyncArrayTable,
   backup: BackupData,
   options: SyncTableOptions
-) {
+): Promise<SyncTableResult> {
+  if (table === 'products' || table === 'product_pricing') {
+    return { skippedOrphanDelete: false };
+  }
   const key = TABLE_TO_STORE_KEY[table];
   const rows = backup[key];
   const list = Array.isArray(rows) ? (rows as unknown as Record<string, unknown>[]) : [];

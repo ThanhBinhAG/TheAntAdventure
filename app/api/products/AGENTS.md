@@ -4,8 +4,12 @@
 Route Handler cho danh sách Tour Products phân trang ở server.
 
 ## Contents
-- `route.ts` — GET một trang product (không chờ facets); POST xóa Redis facet cache sau catalogue write.
+- `route.ts` — GET trang product phân trang, POST/PATCH/DELETE chỉnh sửa hoặc xóa product.
+- `all/route.ts` — GET toàn bộ danh sách products cho hydration.
 - `facets/route.ts` — GET bộ lọc catalog (categories / destinations / pricing pulse).
+- `pricing/all/route.ts` — GET toàn bộ product pricing cho hydration.
+- `pricing/route.ts` — PATCH cập nhật chi tiết bảng giá.
+- `import/route.ts` — POST import Excel thay thế toàn bộ catalogue.
 
 ## Boundaries
 - Validate request và kiểm tra quyền tại route.

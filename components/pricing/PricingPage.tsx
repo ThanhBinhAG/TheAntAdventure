@@ -127,9 +127,28 @@ export default function Pricing() {
   const mkSell = mkCost * (1 + mkPctVal / 100);
   const mkProfit = mkSell - mkCost;
 
-  const handleSavePricing = (row: ReturnType<typeof emptyProductPricing>) => {
-    upsertProductPricing(row);
-    setEditRow(null);
+  const handleSavePricing = async (row: ReturnType<typeof emptyProductPricing>) => {
+    try {
+      const res = await fetch('/api/products/pricing', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pricing: row }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Không thể lưu bảng giá.');
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? 'Không thể lưu bảng giá.');
+      }
+
+      upsertProductPricing(row);
+      setEditRow(null);
+      toast.success('Đã lưu bảng giá thành công.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Lưu bảng giá thất bại.');
+    }
   };
 
   const exportOptions = useMemo(

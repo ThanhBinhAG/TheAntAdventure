@@ -5,11 +5,9 @@ import {
   getAttractions,
   getBookings,
   getHotels,
-  getProducts,
   syncAttractions,
   syncBookings,
   syncHotels,
-  syncProducts,
 } from './nested-sync';
 import { countTable, HANDLERS, supabase, type Row } from './shared';
 
@@ -51,12 +49,43 @@ export function makeTableApi(table: SyncArrayTable) {
 
   if (table === 'products') {
     return {
-      getAll: () => getProducts(),
-      syncTable: (rows: Row[], options?: SyncTableOptions) => syncProducts(rows, options),
-      deleteRemote: async (id: string) => {
-        await executeDeleteAndVerify(supabase(), 'products', 'code', id);
+      getAll: async () => {
+        try {
+          const res = await fetch('/api/products/all', { credentials: 'same-origin' });
+          if (!res.ok) throw new Error('BFF products load failed');
+          const json = await res.json();
+          return json.ok ? json.data : [];
+        } catch (e) {
+          console.error(e);
+          return [];
+        }
       },
-      count: () => countTable('products'),
+      syncTable: async () => {
+        return { skippedOrphanDelete: true };
+      },
+      deleteRemote: async () => {},
+      count: async () => 0,
+    };
+  }
+
+  if (table === 'product_pricing') {
+    return {
+      getAll: async () => {
+        try {
+          const res = await fetch('/api/products/pricing/all', { credentials: 'same-origin' });
+          if (!res.ok) throw new Error('BFF pricing load failed');
+          const json = await res.json();
+          return json.ok ? json.data : [];
+        } catch (e) {
+          console.error(e);
+          return [];
+        }
+      },
+      syncTable: async () => {
+        return { skippedOrphanDelete: true };
+      },
+      deleteRemote: async () => {},
+      count: async () => 0,
     };
   }
 

@@ -62,7 +62,7 @@ export function bffRoute<
       const supabase = await getServerSupabaseClient();
 
       // 4. Validate query parameters (nếu có schema)
-      let queryData: z.infer<TQuery> = undefined;
+      let queryData: z.infer<TQuery> | undefined = undefined;
       if (options.querySchema) {
         const url = new URL(request.url);
         const queryObj: Record<string, string | string[]> = {};
@@ -95,7 +95,7 @@ export function bffRoute<
       }
 
       // 5. Validate JSON body (nếu có schema)
-      let bodyData: z.infer<TBody> = undefined;
+      let bodyData: z.infer<TBody> | undefined = undefined;
       if (options.bodySchema) {
         let bodyObj: unknown;
         try {
@@ -121,13 +121,12 @@ export function bffRoute<
         bodyData = parsedBody.data;
       }
 
-      // 6. Thực thi Route Handler nghiệp vụ
       const result = await handler({
         request: nextRequest,
         auth,
         supabase,
-        query: queryData,
-        body: bodyData,
+        query: queryData as z.infer<TQuery>,
+        body: bodyData as z.infer<TBody>,
       });
 
       // Nếu handler trả về Response/NextResponse trực tiếp thì chuyển tiếp thẳng

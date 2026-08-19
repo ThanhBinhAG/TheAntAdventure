@@ -41,7 +41,8 @@ export const ENSURE_TIMEOUT_MS = 12_000;
 type StoreKey = keyof BackupData;
 
 /** Single-instance guards — must live in one module so dedupe maps stay consistent. */
-export const bootPromises = new Map<string, Promise<boolean>>();
+export type BootPromiseEntry = { gen: number; promise: Promise<boolean> };
+export const bootPromises = new Map<string, BootPromiseEntry>();
 /** Slugs whose boot already succeeded this session. Cleared by resetShellHydrateGuard. */
 export const bootSettled = new Set<string>();
 export const ensureInFlight = new Map<string, Promise<void>>();
@@ -52,6 +53,9 @@ export let visibilityListenerReady = false;
 export let pendingRevalidateTables: SyncArrayTable[] | null = null;
 /** Bumped by cancel/schedule so stale idle/timeout callbacks no-op. */
 let revalidateGeneration = 0;
+
+/** Skip delayed revalidate for tables fetched within a recent window. */
+const lastNetworkFetchAt = new Map<SyncArrayTable, number>();
 
 export function setVisibilityListenerReady(value: boolean): void {
   visibilityListenerReady = value;
@@ -78,6 +82,9 @@ export async function fetchTables(tables: readonly SyncArrayTable[]): Promise<Pa
         tableFetchInFlight.set(table, pending);
       }
       const rows = await pending;
+      // Record when the network fetch actually completed for this table so we can
+      // skip cache-hit delayed revalidate overlap for the next 120s.
+      lastNetworkFetchAt.set(table, Date.now());
       return [TABLE_TO_STORE_KEY[table], rows] as const;
     })
   );
@@ -200,7 +207,19 @@ export function resolveFetchTables(
   hydrated: (t: SyncArrayTable) => boolean = isTableHydrated
 ): SyncArrayTable[] {
   const unique = [...new Set(tables)];
-  return force ? unique : unique.filter((t) => !hydrated(t));
+  if (force) return unique;
+
+  // During fast navigation / Strict Mode remount, a table may be in-flight and
+  // the second caller can run before `markTablesHydrated()` flips `hydratedTables`.
+  // Treat tables fetched very recently as effectively hydrated to avoid
+  // double-GETs.
+  const now = Date.now();
+  const RECENT_NETWORK_DEDUP_WINDOW_MS = 15_000;
+  return unique.filter((t) => {
+    if (hydrated(t)) return false;
+    const last = lastNetworkFetchAt.get(t);
+    return last == null || now - last >= RECENT_NETWORK_DEDUP_WINDOW_MS;
+  });
 }
 
 export async function fetchAndApplyTables(
@@ -253,7 +272,13 @@ export function tablesForDelayedRevalidate(
   alreadyNetworkFetched: readonly SyncArrayTable[] = []
 ): SyncArrayTable[] {
   const skip = new Set(alreadyNetworkFetched);
-  return tablesEligibleForRouteCache(tables).filter((t) => !skip.has(t));
+  const now = Date.now();
+  const RECENT_NETWORK_WINDOW_MS = 120_000;
+  return tablesEligibleForRouteCache(tables).filter((t) => {
+    if (skip.has(t)) return false;
+    const last = lastNetworkFetchAt.get(t);
+    return last == null || now - last >= RECENT_NETWORK_WINDOW_MS;
+  });
 }
 
 export function scheduleDelayedRevalidate(tables: readonly SyncArrayTable[], cacheSavedAt: number): void {
@@ -287,5 +312,6 @@ export function resetShellHydrateGuard() {
   bootPromises.clear();
   bootSettled.clear();
   tableFetchInFlight.clear();
+  lastNetworkFetchAt.clear();
   cancelDelayedRevalidate();
 }

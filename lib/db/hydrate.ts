@@ -27,6 +27,9 @@ export {
   ensureTablesLoaded,
   ensureMessagesLoaded,
   ensurePageDataLoaded,
+  routeBootSatisfied,
+  setActivePageBoot,
+  cancelPageBoot,
 } from './hydrate/page-boot';
 
 export {

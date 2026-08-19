@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
+import { usePagePermission } from '@/hooks/usePagePermission';
 import { useStore } from '@/hooks/useStore';
 
 const SALARY_BANDS = [
@@ -17,6 +18,7 @@ const SALARY_BANDS = [
 type SalTab = 'payroll' | 'structure' | 'bonus';
 
 export default function Salary() {
+  const { canWrite } = usePagePermission('salary');
   const staff = useStore((s) => s.staff);
   const [tab, setTab] = useState<SalTab>('payroll');
   const [month, setMonth] = useState('May 2026');
@@ -82,7 +84,7 @@ export default function Salary() {
             </select>
             <div style={{ flex: 1 }} />
             <div className="sal-total-badge">Total: ${fmt(payroll.grand)}/month</div>
-            <button className="btn btn-p btn-sm" type="button" onClick={exportPayroll}>
+            <button className="btn btn-p btn-sm" type="button" onClick={exportPayroll} disabled={!canWrite} title={!canWrite ? 'Read-only mode: export disabled' : undefined}>
               ⬇ Export Payroll
             </button>
           </div>

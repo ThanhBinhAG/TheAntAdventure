@@ -19,6 +19,7 @@ export type ExtendedSection = 'logistics' | 'water' | 'adventure' | 'experience'
 type Props = {
   section: ExtendedSection;
   filters: SupplierFilters;
+  canWrite?: boolean;
 };
 
 function ExtGrid({
@@ -28,9 +29,9 @@ function ExtGrid({
   onAdd,
 }: {
   items: ExtendedSupplier[];
-  onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
-  onAdd: () => void;
+  onEdit?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onAdd?: () => void;
 }) {
   const { pageSize, setPageSize } = usePageSize();
   const itemKey = useMemo(() => items.map((i) => i.id).join('|'), [items]);
@@ -46,9 +47,11 @@ function ExtGrid({
         title="No suppliers found"
         description="Add a supplier for this category to start building your partner list."
         action={
-          <button type="button" className="btn btn-p btn-sm" onClick={onAdd}>
-            + Add Supplier
-          </button>
+          onAdd && (
+            <button type="button" className="btn btn-p btn-sm" onClick={onAdd}>
+              + Add Supplier
+            </button>
+          )
         }
       />
     );
@@ -65,7 +68,7 @@ function ExtGrid({
   );
 }
 
-export default function ExtendedSupplierTab({ section, filters }: Props) {
+export default function ExtendedSupplierTab({ section, filters, canWrite }: Props) {
   const specialSuppliers = useStore((s) => s.specialSuppliers);
   const addSpecialSupplier = useStore((s) => s.addSpecialSupplier);
   const updateSpecialSupplier = useStore((s) => s.updateSpecialSupplier);
@@ -154,14 +157,20 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
               ))}
             </div>
             <div style={{ flex: 1 }} />
-            <button className="btn btn-p btn-sm" type="button" onClick={() => openAdd()}>
+            <button
+              className="btn btn-p btn-sm"
+              type="button"
+              onClick={() => openAdd()}
+              disabled={!canWrite}
+              title={!canWrite ? 'You need write permission to add a supplier' : undefined}
+            >
               {addLabel}
             </button>
           </div>
           {logSub === 'visa' && (
             <>
               <div className="info-bar">Visa partners handle E-visa applications, urgent processing (24–48hr), and business multi-entry visas for all nationalities.</div>
-              <ExtGrid onAdd={() => openAdd()} items={getExt(['visa'])} onEdit={openEdit} onDelete={deleteExt} />
+              <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['visa'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
             </>
           )}
           {logSub === 'fasttrack' && (
@@ -169,13 +178,13 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
               <div className="info-bar">
                 Airport fast track covers VIP arrival/departure lanes, immigration assistance, and lounge access — sorted by region: <b>North (HAN/HPH)</b> · <b>Central (HUI/DAD)</b> · <b>South (SGN/CXR/PQC)</b>.
               </div>
-              <ExtGrid onAdd={() => openAdd()} items={getExt(['fasttrack'])} onEdit={openEdit} onDelete={deleteExt} />
+              <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['fasttrack'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
             </>
           )}
           {logSub === 'aviation' && (
             <>
               <div className="info-bar">Covers domestic scheduled airlines and private charter operators for helicopter, seaplane, and small fixed-wing aircraft.</div>
-              <ExtGrid onAdd={() => openAdd()} items={getExt(['aviation'])} onEdit={openEdit} onDelete={deleteExt} />
+              <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['aviation'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
             </>
           )}
         </>
@@ -187,11 +196,17 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
             <div className="info-bar" style={{ margin: 0, flex: 1 }}>
               Private boat charter suppliers: river sampans, coastal speedboats, and national park boats.
             </div>
-            <button className="btn btn-p btn-sm" type="button" onClick={() => openAdd()}>
+            <button
+              className="btn btn-p btn-sm"
+              type="button"
+              onClick={() => openAdd()}
+              disabled={!canWrite}
+              title={!canWrite ? 'You need write permission to add a supplier' : undefined}
+            >
               {addLabel}
             </button>
           </div>
-          <ExtGrid onAdd={() => openAdd()} items={getExt(['river', 'coastal', 'park'])} onEdit={openEdit} onDelete={deleteExt} />
+          <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['river', 'coastal', 'park'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
         </>
       )}
 
@@ -212,7 +227,13 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
               ))}
             </div>
             <div style={{ flex: 1 }} />
-            <button className="btn btn-p btn-sm" type="button" onClick={() => openAdd()}>
+            <button
+              className="btn btn-p btn-sm"
+              type="button"
+              onClick={() => openAdd()}
+              disabled={!canWrite}
+              title={!canWrite ? 'You need write permission to add a supplier' : undefined}
+            >
               {addLabel}
             </button>
           </div>
@@ -221,7 +242,7 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
             {advSub === 'trekking' && 'Trekking & camping gear rental: tents, sleeping bags, GPS trackers, portable radios, first-aid kits.'}
             {advSub === 'wildlife' && 'Wildlife & nature experts: ornithologists, marine biologists, karst geologists, wildlife trackers.'}
           </div>
-          <ExtGrid onAdd={() => openAdd()} items={getExt([advSub])} onEdit={openEdit} onDelete={deleteExt} />
+          <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt([advSub])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
         </>
       )}
 
@@ -242,7 +263,13 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
               ))}
             </div>
             <div style={{ flex: 1 }} />
-            <button className="btn btn-p btn-sm" type="button" onClick={() => openAdd()}>
+            <button
+              className="btn btn-p btn-sm"
+              type="button"
+              onClick={() => openAdd()}
+              disabled={!canWrite}
+              title={!canWrite ? 'You need write permission to add a supplier' : undefined}
+            >
               {addLabel}
             </button>
           </div>
@@ -251,7 +278,7 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
             {expSub === 'wellness' && 'Luxury wellness partners: traditional medicine doctors, spa directors, meditation guides.'}
             {expSub === 'events' && 'Exclusive event & decor specialists: private beach dinners, floral designers, lantern lighting.'}
           </div>
-          <ExtGrid onAdd={() => openAdd()} items={getExt([expSub])} onEdit={openEdit} onDelete={deleteExt} />
+          <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt([expSub])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
         </>
       )}
 
@@ -272,7 +299,13 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
               ))}
             </div>
             <div style={{ flex: 1 }} />
-            <button className="btn btn-p btn-sm" type="button" onClick={() => openAdd()}>
+            <button
+              className="btn btn-p btn-sm"
+              type="button"
+              onClick={() => openAdd()}
+              disabled={!canWrite}
+              title={!canWrite ? 'You need write permission to add a supplier' : undefined}
+            >
               {addLabel}
             </button>
           </div>
@@ -287,7 +320,7 @@ export default function ExtendedSupplierTab({ section, filters }: Props) {
             </div>
           )}
           <div className="info-bar">Specialist guides, media production, and security & health partners — all VNAT-licensed where applicable.</div>
-          <ExtGrid onAdd={() => openAdd()} items={getExt([perSub])} onEdit={openEdit} onDelete={deleteExt} />
+          <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt([perSub])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
         </>
       )}
 

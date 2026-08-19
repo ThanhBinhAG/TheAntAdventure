@@ -235,7 +235,7 @@ export class AccessControlRpcError extends Error {
 }
 
 /** Tạo Supabase server client mang cookie của user đang gửi request. */
-function createAccessControlServerClient() {
+async function createAccessControlServerClient() {
     const url = getSupabaseUrl();
     const key = getSupabaseAnonKey();
 
@@ -243,7 +243,7 @@ function createAccessControlServerClient() {
         throw new Error('Supabase URL hoặc anon key chưa được cấu hình.');
     }
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
 
     return createServerClient(url, key, {
         ...getSupabaseGlobalFetchOptions(),
@@ -278,7 +278,7 @@ function throwRpcError(error: {
  * Tab Người dùng dùng API phân trang riêng để phù hợp khi có nhiều nhân viên.
  */
 export async function getAccessControlData() {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const [
         rolesResult,
@@ -312,7 +312,7 @@ export async function getAccessControlStaffRoles(): Promise<
     const cached = await getCachedAccessControlStaffRoles();
     if (cached !== undefined) return cached;
 
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'list_access_control_staff_roles',
@@ -348,7 +348,7 @@ export async function createAccessControlStaffRole(input: {
     description?: string;
     sortOrder?: number;
 }): Promise<void> {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'create_access_control_staff_role',
@@ -374,7 +374,7 @@ export async function updateAccessControlStaffRole(input: {
     sortOrder: number;
     isActive: boolean;
 }): Promise<void> {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'update_access_control_staff_role',
@@ -400,7 +400,7 @@ export async function updateAccessControlStaffRole(input: {
 export async function deleteAccessControlStaffRole(
     roleCode: string,
 ): Promise<void> {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'delete_access_control_staff_role',
@@ -418,7 +418,7 @@ export async function replaceAccessControlStaffRolePermissions(
     roleCode: string,
     permissionCodes: string[],
 ): Promise<void> {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'replace_access_control_staff_role_permissions',
@@ -437,7 +437,7 @@ export async function replaceAccessControlStaffRolePermissions(
 export async function getAccessControlStaffRoleResourceScopes(): Promise<
     AccessControlRoleResourceScope[]
 > {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
     const result = await supabase.rpc(
         'list_access_control_staff_role_resource_scopes',
     );
@@ -455,7 +455,7 @@ export async function replaceAccessControlStaffRoleResourceScopes(
         scope: string;
     }>,
 ): Promise<void> {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
     const result = await supabase.rpc(
         'replace_access_control_staff_role_resource_scopes',
         {
@@ -478,7 +478,7 @@ export async function setAccessControlUserRole(
     userId: string,
     roleCode: ManagedRoleCode,
 ) {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc('set_user_role', {
         target_user_id: userId,
@@ -495,7 +495,7 @@ export async function updateAccessControlUserProfile(
     userId: string,
     displayName: string,
 ) {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'update_access_control_user_profile',
@@ -513,7 +513,7 @@ export async function setAccessControlUserActive(
     userId: string,
     isActive: boolean,
 ) {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'set_access_control_user_active',
@@ -536,7 +536,7 @@ export async function setAccessControlUserActive(
 export async function restoreAccessControlUser(
     userId: string,
 ) {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'restore_access_control_user',
@@ -562,7 +562,7 @@ export async function getAccessControlUsersPage(input: {
     page: number;
     pageSize: number;
 }): Promise<AccessControlUsersPage> {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'list_access_control_users_page',
@@ -616,7 +616,7 @@ export async function getAccessControlAuditLogs(input: {
     page: number;
     pageSize: number;
 }): Promise<AccessControlAuditLogsPage> {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'list_access_control_audit_logs',
@@ -666,7 +666,7 @@ export async function getAccessControlAuditLogs(input: {
  * còn lịch sử IP/thiết bị chỉ dành cho Super Admin.
  */
 export async function isCurrentAccessControlSuperAdmin(): Promise<boolean> {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc('is_current_super_admin');
 
@@ -686,7 +686,7 @@ export async function getAuthLoginEvents(input: {
     from?: string;
     to?: string;
 }): Promise<AuthLoginEventsPage> {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'list_auth_login_events',
@@ -735,7 +735,7 @@ export async function replaceAccessControlRolePermissions(
     roleCode: EditableRoleCode,
     permissionCodes: string[],
 ) {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc('replace_role_permissions', {
         target_role_code: roleCode,
@@ -749,7 +749,7 @@ export async function replaceAccessControlRolePermissions(
 export async function createAccessControlPermission(
     input: CreateAccessControlPermissionInput,
 ): Promise<void> {
-    const supabase = createAccessControlServerClient();
+    const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc(
         'create_access_control_permission',

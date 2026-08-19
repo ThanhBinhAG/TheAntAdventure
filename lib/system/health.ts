@@ -4,7 +4,6 @@ import { checkRedisHealth, type RedisHealth } from '@/lib/redis/client';
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
 import {
   getProcessMemoryMetrics,
-  maybeReportMemoryPressure,
   type ProcessMemoryMetrics,
 } from '@/lib/system/process-memory';
 
@@ -34,7 +33,6 @@ export async function runHealthCheck(): Promise<HealthReport> {
   const ts = new Date().toISOString();
   const version = process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown';
   const memory = getProcessMemoryMetrics();
-  maybeReportMemoryPressure(memory);
 
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();

@@ -28,6 +28,7 @@ interface Props {
   onResend: () => void;
   onBack: () => void;
   onNext: () => void;
+  canWrite?: boolean;
 }
 
 const STATUS_BADGE: Record<OutlineStatus, { label: string; className: string }> = {
@@ -57,6 +58,7 @@ export default function OutlineStep({
   onResend,
   onBack,
   onNext,
+  canWrite = true,
 }: Props) {
   const [showPreview, setShowPreview] = useState(true);
   const sorted = [...outlineRows].sort((a, b) => a.dayNumber - b.dayNumber);
@@ -94,6 +96,7 @@ export default function OutlineStep({
             onApprove={onApprove}
             onRevise={onRevise}
             onResend={onResend}
+            canWrite={canWrite}
           />
         )}
 
@@ -104,80 +107,84 @@ export default function OutlineStep({
           </div>
 
           <div className="outline-table-wrap outline-editor-wrap">
-            <table className="outline-editor-table">
-              <thead>
-                <tr>
-                  <th className="outline-col-day">DAY</th>
-                  <th className="outline-col-date">DATE</th>
-                  <th className="outline-col-location">LOCATION</th>
-                  <th className="outline-col-itinerary">ITINERARY</th>
-                  <th className="outline-col-hotels">HOTELS</th>
-                  <th className="outline-col-actions" aria-label="Actions" />
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.length === 0 ? (
+            <fieldset disabled={!canWrite} style={{ border: 'none', padding: 0, margin: 0 }}>
+              <table className="outline-editor-table">
+                <thead>
                   <tr>
-                    <td colSpan={6} className="outline-empty-cell">
-                      No days yet — click <strong>+ Add day</strong> to start.
-                    </td>
+                    <th className="outline-col-day">DAY</th>
+                    <th className="outline-col-date">DATE</th>
+                    <th className="outline-col-location">LOCATION</th>
+                    <th className="outline-col-itinerary">ITINERARY</th>
+                    <th className="outline-col-hotels">HOTELS</th>
+                    <th className="outline-col-actions" aria-label="Actions" />
                   </tr>
-                ) : (
-                  sorted.map((row, i) => (
-                    <tr key={row.id} className={i % 2 === 1 ? 'outline-row-alt' : undefined}>
-                      <td className="outline-day-cell">
-                        <span className="outline-day-label">Day {row.dayNumber}</span>
-                      </td>
-                      <td>
-                        <input
-                          type="date"
-                          className="outline-cell-input outline-date-input"
-                          value={row.date || ''}
-                          title={row.date ? fmtOutlineDate(row.date) : 'Select date'}
-                          onChange={(e) => onUpdateRow(row.id, { date: e.target.value })}
-                        />
-                        {row.date && <span className="outline-date-hint">{fmtOutlineDate(row.date)}</span>}
-                      </td>
-                      <td>
-                        <textarea
-                          className="outline-cell-input outline-location-input"
-                          value={row.location || ''}
-                          placeholder="Hoian - Hue"
-                          rows={2}
-                          onChange={(e) => onUpdateRow(row.id, { location: e.target.value })}
-                        />
-                      </td>
-                      <td className="outline-rich-td">
-                        <OutlineRichCell
-                          value={row.activities || ''}
-                          placeholder="Pick up, transfer, activities, notes…"
-                          minRows={4}
-                          onChange={(html) => onUpdateRow(row.id, { activities: html })}
-                        />
-                      </td>
-                      <td className="outline-rich-td">
-                        <OutlineRichCell
-                          value={row.hotels || ''}
-                          placeholder="Hotel name - room type"
-                          minRows={4}
-                          onChange={(html) => onUpdateRow(row.id, { hotels: html })}
-                        />
-                      </td>
-                      <td className="outline-actions-cell">
-                        <button
-                          className="outline-remove-btn"
-                          type="button"
-                          title="Remove day"
-                          onClick={() => onRemoveDay(row.id)}
-                        >
-                          ✕
-                        </button>
+                </thead>
+                <tbody>
+                  {sorted.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="outline-empty-cell">
+                        No days yet — click <strong>+ Add day</strong> to start.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    sorted.map((row, i) => (
+                      <tr key={row.id} className={i % 2 === 1 ? 'outline-row-alt' : undefined}>
+                        <td className="outline-day-cell">
+                          <span className="outline-day-label">Day {row.dayNumber}</span>
+                        </td>
+                        <td>
+                          <input
+                            type="date"
+                            className="outline-cell-input outline-date-input"
+                            value={row.date || ''}
+                            title={row.date ? fmtOutlineDate(row.date) : 'Select date'}
+                            onChange={(e) => onUpdateRow(row.id, { date: e.target.value })}
+                          />
+                          {row.date && <span className="outline-date-hint">{fmtOutlineDate(row.date)}</span>}
+                        </td>
+                        <td>
+                          <textarea
+                            className="outline-cell-input outline-location-input"
+                            value={row.location || ''}
+                            placeholder="Hoian - Hue"
+                            rows={2}
+                            onChange={(e) => onUpdateRow(row.id, { location: e.target.value })}
+                          />
+                        </td>
+                        <td className="outline-rich-td">
+                          <OutlineRichCell
+                            value={row.activities || ''}
+                            placeholder="Pick up, transfer, activities, notes…"
+                            minRows={4}
+                            onChange={(html) => onUpdateRow(row.id, { activities: html })}
+                            disabled={!canWrite}
+                          />
+                        </td>
+                        <td className="outline-rich-td">
+                          <OutlineRichCell
+                            value={row.hotels || ''}
+                            placeholder="Hotel name - room type"
+                            minRows={4}
+                            onChange={(html) => onUpdateRow(row.id, { hotels: html })}
+                            disabled={!canWrite}
+                          />
+                        </td>
+                        <td className="outline-actions-cell">
+                          <button
+                            className="outline-remove-btn"
+                            type="button"
+                            title="Remove day"
+                            onClick={() => onRemoveDay(row.id)}
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </fieldset>
           </div>
         </div>
 
@@ -199,7 +206,7 @@ export default function OutlineStep({
         )}
 
         <div className="outline-actions-bar">
-          <button className="btn btn-s btn-sm" type="button" onClick={onAddDay}>
+          <button className="btn btn-s btn-sm" type="button" onClick={onAddDay} disabled={!canWrite}>
             + Add day
           </button>
           {hasRows && (

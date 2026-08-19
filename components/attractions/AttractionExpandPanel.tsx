@@ -10,7 +10,7 @@ type Props = {
   attraction: Attraction;
   photos: GalleryPhoto[];
   onPhotoClick: (index: number) => void;
-  onEdit: () => void;
+  onEdit?: () => void;
   galleryHref: string;
 };
 
@@ -61,9 +61,11 @@ export default function AttractionExpandPanel({ attraction, photos, onPhotoClick
         ) : (
           <div className="att-photo-empty">
             <div>No photos linked yet.</div>
-            <button type="button" className="btn btn-s btn-sm" onClick={onEdit}>
-              Edit to add from Gallery
-            </button>
+            {onEdit && (
+              <button type="button" className="btn btn-s btn-sm" onClick={onEdit}>
+                Edit to add from Gallery
+              </button>
+            )}
           </div>
         )}
       </div>

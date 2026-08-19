@@ -32,7 +32,11 @@ export class ProductListError extends Error {
     }
 }
 
-function createProductServerClient() {
+type ProductSupabaseClient = Awaited<
+    ReturnType<typeof createProductServerClient>
+>;
+
+async function createProductServerClient() {
     const url = getSupabaseUrl();
     const key = getSupabaseAnonKey();
 
@@ -42,7 +46,7 @@ function createProductServerClient() {
         );
     }
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
 
     return createServerClient(url, key, {
         cookies: {
@@ -75,7 +79,7 @@ function galleryPhotoFromRow(row: ProductRow): GalleryPhoto {
 }
 
 async function attachPageCoverThumbs(
-    supabase: ReturnType<typeof createProductServerClient>,
+    supabase: ProductSupabaseClient,
     rows: ProductRow[],
 ): Promise<Product[]> {
     if (rows.length === 0) return [];
@@ -132,7 +136,7 @@ async function attachPageCoverThumbs(
 export async function listProductsPage(
     input: ProductListQuery,
 ): Promise<ProductPageResponse<Product>> {
-    const supabase = createProductServerClient();
+    const supabase = await createProductServerClient();
     const result = input.view === 'modules'
         ? await supabase.rpc('list_product_modules_page', {
             p_page_number: input.page,
@@ -175,7 +179,7 @@ export async function listProductFacets(
     const cached = await getCachedProductFacets(input);
     if (cached) return cached;
 
-    const supabase = createProductServerClient();
+    const supabase = await createProductServerClient();
     const result = await supabase.rpc('list_product_facets', {
         p_search_text: input.q ?? null,
         p_filter_region: input.region ?? null,

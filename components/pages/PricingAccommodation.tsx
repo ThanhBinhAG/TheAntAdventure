@@ -10,6 +10,7 @@ import AccPropertyTable from '@/components/pricing/accommodation/AccPropertyTabl
 import AccRateSheet from '@/components/pricing/accommodation/AccRateSheet';
 import { useAccommodationCatalog } from '@/hooks/usePricingCatalog';
 import { updateCatalogRow } from '@/lib/pricing/catalog-db';
+import { usePagePermission } from '@/hooks/usePagePermission';
 import type {
   AccCruiseRate,
   AccProperty,
@@ -24,6 +25,7 @@ function tabLabel(sheet: string): string {
 }
 
 export default function PricingAccommodation() {
+  const { canWrite } = usePagePermission('pricing-accommodation');
   const { data, lastImport, loading, error, configured, reload, setData } = useAccommodationCatalog();
   const [tab, setTab] = useState('properties');
   const [importOpen, setImportOpen] = useState(false);
@@ -135,7 +137,13 @@ export default function PricingAccommodation() {
             </span>
           )}
         </div>
-        <button className="btn btn-p btn-sm" type="button" onClick={() => setImportOpen(true)}>
+        <button
+          className="btn btn-p btn-sm"
+          type="button"
+          onClick={() => setImportOpen(true)}
+          disabled={!canWrite}
+          title={!canWrite ? 'You need write permission for Accommodation to import' : undefined}
+        >
           ⭱ Import Excel
         </button>
       </div>
@@ -172,7 +180,13 @@ export default function PricingAccommodation() {
           title="No accommodation pricing yet"
           description="Import the Accommodation & Cruises workbook to populate properties, room rates and cabins."
           action={
-            <button className="btn btn-p btn-sm" type="button" onClick={() => setImportOpen(true)}>
+            <button
+              className="btn btn-p btn-sm"
+              type="button"
+              onClick={() => setImportOpen(true)}
+              disabled={!canWrite}
+              title={!canWrite ? 'You need write permission for Accommodation to import' : undefined}
+            >
               Import Excel
             </button>
           }

@@ -34,6 +34,8 @@ import { toast } from '@/lib/toast';
 
 import { confirmDialog } from '@/lib/confirm';
 
+let hydrationPendingMarked = false;
+
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const remoteEnabled = isRemoteDataEnabled();
   const [remote, setRemote] = useState(false);
@@ -66,7 +68,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       markHydrationFailed(
         'Supabase bắt buộc — bật NEXT_PUBLIC_USE_SUPABASE=true và cấu hình URL + anon key trong .env.local'
       );
-    } else {
+    } else if (!hydrationPendingMarked) {
+      hydrationPendingMarked = true;
       markHydrationPending();
     }
   }, [remoteEnabled]);
@@ -85,6 +88,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // status dot never competes with the route's own data fetches.
   useEffect(() => {
     if (!remoteEnabled) return;
+    if (hydration.phase !== 'ready') return;
     let cancelled = false;
     const run = () => {
       void (async () => {
@@ -114,7 +118,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (idleId !== undefined && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(idleId);
       if (timerId !== undefined) window.clearTimeout(timerId);
     };
-  }, [remoteEnabled]);
+  }, [remoteEnabled, hydration.phase]);
 
   const runHydrate = useCallback(async () => {
     if (!remoteEnabled) return false;

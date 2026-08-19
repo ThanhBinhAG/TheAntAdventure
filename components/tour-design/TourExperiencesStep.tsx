@@ -64,6 +64,7 @@ interface Props {
   markupPct: number;
   leadId?: string;
   onEditBrief?: () => void;
+  canWrite?: boolean;
 }
 
 export default function TourExperiencesStep({
@@ -83,6 +84,7 @@ export default function TourExperiencesStep({
   markupPct,
   leadId,
   onEditBrief,
+  canWrite = true,
 }: Props) {
   const [libTab, setLibTab] = useState<'pkg' | 'exp'>('pkg');
   const [previewPkgId, setPreviewPkgId] = useState<string | null>(null);
@@ -243,7 +245,7 @@ export default function TourExperiencesStep({
                   />
                 ) : (
                   libFiltered.slice(0, 80).map((p) => (
-                    <ExpRow key={p.code} product={p} selected={selectedCodes.includes(p.code)} pax={brief.pax} onToggle={() => onToggleProduct(p.code)} />
+                    <ExpRow key={p.code} product={p} selected={selectedCodes.includes(p.code)} pax={brief.pax} onToggle={() => onToggleProduct(p.code)} disabled={!canWrite} />
                   ))
                 )}
               </div>
@@ -267,7 +269,7 @@ export default function TourExperiencesStep({
             </div>
           )}
           {libTab === 'pkg' ? (
-            <PackagePreviewPanel pkg={activePreview} brief={brief} photos={photos} onUsePackage={openPackage} />
+            <PackagePreviewPanel pkg={activePreview} brief={brief} photos={photos} onUsePackage={openPackage} canWrite={canWrite} />
           ) : (
             <SelectedExperiencesPanel
               brief={brief}
@@ -277,6 +279,7 @@ export default function TourExperiencesStep({
               onReorderCodes={onReorderCodes}
               experienceOverrides={experienceOverrides}
               onPatchOverride={onPatchOverride}
+              canWrite={canWrite}
             />
           )}
         </div>
@@ -285,7 +288,7 @@ export default function TourExperiencesStep({
   );
 }
 
-function ExpRow({ product: p, selected, pax, onToggle }: { product: Product; selected: boolean; pax: number; onToggle: () => void }) {
+function ExpRow({ product: p, selected, pax, onToggle, disabled = false }: { product: Product; selected: boolean; pax: number; onToggle: () => void; disabled?: boolean }) {
   const [rbg, rfg] = REG_COLORS_HEX[p.region as keyof typeof REG_COLORS_HEX] || ['#f0f0ee', '#666'];
   const durVariant = getDurationPillVariant(p.dur);
   const catLabel = p.cat ? p.cat.charAt(0).toUpperCase() + p.cat.slice(1) : '';
@@ -293,7 +296,7 @@ function ExpRow({ product: p, selected, pax, onToggle }: { product: Product; sel
   const price = getLibPriceLabel(p.code, pax);
 
   return (
-    <div className={`prd-pick${selected ? ' sel' : ''}`} onClick={onToggle} role="button" tabIndex={0}>
+    <div className={`prd-pick${selected ? ' sel' : ''}${disabled ? ' prd-pick-disabled' : ''}`} onClick={disabled ? undefined : onToggle} role="button" tabIndex={disabled ? -1 : 0}>
       <div className="prd-icon">{selected ? '✓' : '+'}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3, flexWrap: 'wrap' }}>

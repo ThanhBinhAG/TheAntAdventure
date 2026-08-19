@@ -18,7 +18,7 @@ type Props = {
   todayLabel: string;
   photos: GalleryPhoto[];
   onToggle: () => void;
-  onEdit: () => void;
+  onEdit?: () => void;
   onPhotoClick: (index: number) => void;
 };
 
@@ -51,16 +51,18 @@ export default function AttractionCard({
           <div className="att-card-top-actions">
             {highlight === 'closed-today' && <span className="att-status-pill att-status-closed">Closed today</span>}
             {highlight === 'warning' && !alert && <span className="att-status-pill att-status-warn">Heads up</span>}
-            <button
-              type="button"
-              className="btn btn-s btn-sm att-card-edit"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-            >
-              Edit
-            </button>
+            {onEdit && (
+              <button
+                type="button"
+                className="btn btn-s btn-sm att-card-edit"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+              >
+                Edit
+              </button>
+            )}
           </div>
         </div>
 

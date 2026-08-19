@@ -1,10 +1,13 @@
 # The Ant Adventures CRM
 
-Next.js 14 CRM for The Ant Adventures. **Supabase (PostgreSQL v5)** is the production data store with auto-sync.
+Next.js 16 CRM for The Ant Adventures (React 19, Node 22+). **Supabase (PostgreSQL v5)** is the production data store with auto-sync.
 
 ## Quick start
 
+**Requires Node 22+** ([`.nvmrc`](.nvmrc), `engines` in [`package.json`](package.json)).
+
 ```bash
+nvm use          # Node 22 — install via nvm if needed
 npm install
 cp .env.example .env.local   # Windows: copy .env.example .env.local
 npm run dev

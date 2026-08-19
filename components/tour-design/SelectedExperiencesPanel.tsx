@@ -57,6 +57,7 @@ interface Props {
   onReorderCodes: (codes: string[]) => void;
   experienceOverrides: Record<string, ExperienceOverride>;
   onPatchOverride: (code: string, patch: OverridePatch) => void;
+  canWrite?: boolean;
 }
 
 export default function SelectedExperiencesPanel({
@@ -67,6 +68,7 @@ export default function SelectedExperiencesPanel({
   onReorderCodes,
   experienceOverrides,
   onPatchOverride,
+  canWrite = true,
 }: Props) {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiResult, setAiResult] = useState('');
@@ -136,7 +138,7 @@ export default function SelectedExperiencesPanel({
       <div className="card td-exp-right-card">
         <div className="card-hd">
           <span className="card-title">✓ Tour Selected (0) — 0D</span>
-          <button className="btn btn-pu btn-sm" type="button" onClick={aiRecommend}>
+          <button className="btn btn-pu btn-sm" type="button" onClick={aiRecommend} disabled={!canWrite}>
             ✦ AI Recommend
           </button>
         </div>
@@ -162,7 +164,7 @@ export default function SelectedExperiencesPanel({
             {selectedProducts.length} exp · {totalD}D · ${fmt(totalSell)}/pax
           </div>
         </div>
-        <button className="btn btn-pu btn-sm" type="button" onClick={aiRecommend}>
+        <button className="btn btn-pu btn-sm" type="button" onClick={aiRecommend} disabled={!canWrite}>
           ✦ AI Recommend
         </button>
       </div>
@@ -187,9 +189,11 @@ export default function SelectedExperiencesPanel({
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
             </div>
-            <button type="button" className="td-sel-remove" onClick={() => onToggleProduct(p.code)}>
-              ×
-            </button>
+            {canWrite && (
+              <button type="button" className="td-sel-remove" onClick={() => onToggleProduct(p.code)}>
+                ×
+              </button>
+            )}
           </div>
         ))}
 
@@ -202,6 +206,7 @@ export default function SelectedExperiencesPanel({
                 item={item}
                 override={experienceOverrides[item.code]}
                 onPatchOverride={onPatchOverride}
+                disabled={!canWrite}
               />
             ))}
           </>
@@ -230,6 +235,7 @@ export default function SelectedExperiencesPanel({
                   maxDayOptions={maxDayOptions}
                   override={experienceOverrides[item.code]}
                   onPatchOverride={onPatchOverride}
+                  disabled={!canWrite}
                 />
               );
             })}
@@ -248,6 +254,7 @@ function SortableTourCard({
   maxDayOptions,
   override,
   onPatchOverride,
+  disabled = false,
 }: {
   item: Product;
   brief: TourBrief;
@@ -256,6 +263,7 @@ function SortableTourCard({
   maxDayOptions: number;
   override?: ExperienceOverride;
   onPatchOverride: (code: string, patch: OverridePatch) => void;
+  disabled?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.code,
@@ -270,9 +278,13 @@ function SortableTourCard({
   return (
     <div ref={setNodeRef} style={style} className={`td-sortable-card${isDragging ? ' dragging' : ''}`}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-        <button type="button" className="td-drag-handle" aria-label="Drag to reorder" {...attributes} {...listeners}>
-          ⋮⋮
-        </button>
+        {!disabled ? (
+          <button type="button" className="td-drag-handle" aria-label="Drag to reorder" {...attributes} {...listeners}>
+            ⋮⋮
+          </button>
+        ) : (
+          <span className="td-drag-handle" style={{ cursor: 'default', opacity: 0.5 }}>⋮⋮</span>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <TourCardBody
             item={item}
@@ -283,6 +295,7 @@ function SortableTourCard({
             override={override}
             onPatchOverride={onPatchOverride}
             photos={dayPhotos}
+            disabled={disabled}
           />
         </div>
       </div>
@@ -294,10 +307,12 @@ function AddonCard({
   item,
   override,
   onPatchOverride,
+  disabled = false,
 }: {
   item: Product;
   override?: ExperienceOverride;
   onPatchOverride: (code: string, patch: OverridePatch) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="td-draft-day" style={{ marginBottom: 8 }}>
@@ -307,11 +322,13 @@ function AddonCard({
         catalogDesc={item.desc}
         overrideDesc={override?.desc}
         onPatchOverride={onPatchOverride}
+        disabled={disabled}
       />
       <ClientNotesField
         code={item.code}
         value={override?.clientNote ?? ''}
         onPatchOverride={onPatchOverride}
+        disabled={disabled}
       />
     </div>
   );
@@ -326,6 +343,7 @@ function TourCardBody({
   override,
   onPatchOverride,
   photos,
+  disabled = false,
 }: {
   item: Product;
   brief: TourBrief;
@@ -335,6 +353,7 @@ function TourCardBody({
   override?: ExperienceOverride;
   onPatchOverride: (code: string, patch: OverridePatch) => void;
   photos: ReturnType<typeof resolveProductPhotos>;
+  disabled?: boolean;
 }) {
   return (
     <div className="td-draft-day-grid td-draft-day-grid-exp">
@@ -348,6 +367,7 @@ function TourCardBody({
           maxDayOptions={maxDayOptions}
           override={override}
           onPatchOverride={onPatchOverride}
+          disabled={disabled}
         />
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t)', marginBottom: 3 }}>{item.name}</div>
         <DescEditor
@@ -355,11 +375,13 @@ function TourCardBody({
           catalogDesc={item.desc}
           overrideDesc={override?.desc}
           onPatchOverride={onPatchOverride}
+          disabled={disabled}
         />
         <ClientNotesField
           code={item.code}
           value={override?.clientNote ?? ''}
           onPatchOverride={onPatchOverride}
+          disabled={disabled}
         />
       </div>
       <PhotoStack photos={photos} productCode={item.code} height={100} />
@@ -376,6 +398,7 @@ function DayScheduleEditor({
   maxDayOptions,
   override,
   onPatchOverride,
+  disabled = false,
 }: {
   code: string;
   item: Product;
@@ -385,6 +408,7 @@ function DayScheduleEditor({
   maxDayOptions: number;
   override?: ExperienceOverride;
   onPatchOverride: (code: string, patch: OverridePatch) => void;
+  disabled?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -501,6 +525,7 @@ function DayScheduleEditor({
       className="td-day-badge td-day-badge-btn"
       title="Edit day, pace, and date"
       onClick={() => setEditing(true)}
+      disabled={disabled}
     >
       {badge}
     </button>
@@ -512,11 +537,13 @@ function DescEditor({
   catalogDesc,
   overrideDesc,
   onPatchOverride,
+  disabled = false,
 }: {
   code: string;
   catalogDesc: string;
   overrideDesc?: string;
   onPatchOverride: (code: string, patch: OverridePatch) => void;
+  disabled?: boolean;
 }) {
   const displaySource = overrideDesc !== undefined && overrideDesc !== '' ? overrideDesc : catalogDesc;
   const plain = stripMarkdown(displaySource);
@@ -567,17 +594,18 @@ function DescEditor({
     <div>
       <div
         className="td-draft-desc"
-        onClick={() => setEditing(true)}
+        onClick={disabled ? undefined : () => setEditing(true)}
         role="button"
-        tabIndex={0}
+        tabIndex={disabled ? -1 : 0}
         onKeyDown={(e) => {
+          if (disabled) return;
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             setEditing(true);
           }
         }}
-        title="Click to edit description"
-        style={{ cursor: 'text' }}
+        title={disabled ? undefined : "Click to edit description"}
+        style={{ cursor: disabled ? 'default' : 'text' }}
       >
         {shown}
       </div>
@@ -593,9 +621,11 @@ function DescEditor({
             {expanded ? 'Show less' : 'Show more'}
           </button>
         )}
-        <button type="button" onClick={() => setEditing(true)}>
-          Edit
-        </button>
+        {!disabled && (
+          <button type="button" onClick={() => setEditing(true)}>
+            Edit
+          </button>
+        )}
       </div>
     </div>
   );
@@ -605,10 +635,12 @@ function ClientNotesField({
   code,
   value,
   onPatchOverride,
+  disabled = false,
 }: {
   code: string;
   value: string;
   onPatchOverride: (code: string, patch: OverridePatch) => void;
+  disabled?: boolean;
 }) {
   const [draft, setDraft] = useState(value);
   const [previousValue, setPreviousValue] = useState(value);
@@ -629,6 +661,7 @@ function ClientNotesField({
         onBlur={() => {
           if (draft !== value) onPatchOverride(code, { clientNote: draft });
         }}
+        disabled={disabled}
       />
     </div>
   );

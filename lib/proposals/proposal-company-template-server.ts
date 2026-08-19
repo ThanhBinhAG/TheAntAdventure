@@ -32,7 +32,7 @@ async function getTemplateClient(): Promise<SupabaseClient | null> {
   const key = getSupabaseAnonKey();
   if (!url || !key) return null;
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   return createServerClient(url, key, {
     ...getSupabaseGlobalFetchOptions(),
     cookies: {

@@ -9,6 +9,7 @@ import { createInquiryLeadForCustomer } from '@/lib/customers/customer-onboardin
 import { getClientLeads, getClientPipeline, getCustomerBookings } from '@/lib/core/crm-utils';
 import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
+import { usePagePermission } from '@/hooks/usePagePermission';
 import type { Comm, Customer, Lead } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
@@ -73,6 +74,7 @@ export default function CustomerProfileModal({
   onEdit,
   onDelete,
 }: CustomerProfileModalProps) {
+  const { canWrite } = usePagePermission('customers');
   const comms = useStore((s) => s.comms);
   const leads = useStore((s) => s.leads);
   const bookings = useStore((s) => s.bookings);
@@ -181,10 +183,10 @@ The Ant Adventures`;
         </div>
 
         <div className="prof-modal-toolbar">
-          <button type="button" className="prof-toolbar-btn" onClick={onEdit}>
+          <button type="button" className="prof-toolbar-btn" onClick={onEdit} disabled={!canWrite}>
             ✎ Edit
           </button>
-          <button type="button" className="prof-toolbar-btn prof-toolbar-danger" onClick={onDelete}>
+          <button type="button" className="prof-toolbar-btn prof-toolbar-danger" onClick={onDelete} disabled={!canWrite}>
             ✕ Delete
           </button>
           <button type="button" className="prof-toolbar-btn" onClick={onClose}>
@@ -271,7 +273,7 @@ The Ant Adventures`;
                 <div className="prof-section-lbl" style={{ marginBottom: 0 }}>
                   Quotes & Pipeline ({activeLeads.length})
                 </div>
-                <button className="btn btn-p btn-sm" type="button" onClick={startNewInquiry}>
+                <button className="btn btn-p btn-sm" type="button" onClick={startNewInquiry} disabled={!canWrite}>
                   + Start New Inquiry
                 </button>
               </div>
@@ -279,7 +281,7 @@ The Ant Adventures`;
               {activeLeads.length === 0 ? (
                 <div className="prof-empty" style={{ textAlign: 'center', padding: 28 }}>
                   <div style={{ fontSize: 13, marginBottom: 12 }}>No quotes yet for this client.</div>
-                  <button className="btn btn-p btn-sm" type="button" onClick={startNewInquiry}>
+                  <button className="btn btn-p btn-sm" type="button" onClick={startNewInquiry} disabled={!canWrite}>
                     Start New Inquiry
                   </button>
                 </div>
@@ -395,7 +397,7 @@ The Ant Adventures`;
                     <textarea value={commForm.body} onChange={(e) => setCommForm({ ...commForm, body: e.target.value })} placeholder="Message content..." />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button className="btn btn-p btn-sm" type="button" onClick={logComm}>
+                    <button className="btn btn-p btn-sm" type="button" onClick={logComm} disabled={!canWrite}>
                       + Log Communication
                     </button>
                   </div>
@@ -454,7 +456,7 @@ The Ant Adventures`;
                 <label className="lbl">Internal Notes / Ghi chú nội bộ</label>
                 <textarea value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} style={{ minHeight: 140 }} />
               </div>
-              <button className="btn btn-p btn-sm" type="button" onClick={saveNotes}>
+              <button className="btn btn-p btn-sm" type="button" onClick={saveNotes} disabled={!canWrite}>
                 Save Notes
               </button>
             </div>

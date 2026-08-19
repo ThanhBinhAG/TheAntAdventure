@@ -337,10 +337,11 @@ export default function Customers() {
                           <button className="btn btn-s btn-sm" type="button" style={{ marginRight: 4 }} onClick={() => openProfile(c.id)}>
                             View
                           </button>
-                          <button
+                           <button
                             className="btn btn-s btn-sm"
                             type="button"
                             style={{ marginRight: 4 }}
+                            disabled={!canWrite}
                             onClick={() => {
                               setEditId(c.id);
                               setFormMode('edit');
@@ -351,7 +352,7 @@ export default function Customers() {
                           <button
                             className="btn btn-danger btn-sm"
                             type="button"
-                            disabled={deletingId === c.id}
+                            disabled={deletingId === c.id || !canWrite}
                             onClick={() => {
                               void handleDeleteCustomer(c.id, c.name);
                             }}

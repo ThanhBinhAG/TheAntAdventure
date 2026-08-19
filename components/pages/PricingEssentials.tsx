@@ -11,6 +11,7 @@ import EssentialsServices from '@/components/pricing/essentials/EssentialsServic
 import EssentialsTransport from '@/components/pricing/essentials/EssentialsTransport';
 import { useEssentialsCatalog } from '@/hooks/usePricingCatalog';
 import { updateCatalogRow, updateCostLine } from '@/lib/pricing/catalog-db';
+import { usePagePermission } from '@/hooks/usePagePermission';
 import type {
   EssCarRate,
   EssCostLine,
@@ -33,6 +34,7 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function PricingEssentials() {
+  const { canWrite } = usePagePermission('pricing-essentials');
   const { data, lastImport, loading, error, configured, reload, setData } = useEssentialsCatalog();
   const [tab, setTab] = useState<Tab>('products');
   const [importOpen, setImportOpen] = useState(false);
@@ -156,7 +158,13 @@ export default function PricingEssentials() {
             </span>
           )}
         </div>
-        <button className="btn btn-p btn-sm" type="button" onClick={() => setImportOpen(true)}>
+        <button
+          className="btn btn-p btn-sm"
+          type="button"
+          onClick={() => setImportOpen(true)}
+          disabled={!canWrite}
+          title={!canWrite ? 'You need write permission for Essentials to import' : undefined}
+        >
           ⭱ Import Excel
         </button>
       </div>
@@ -193,9 +201,15 @@ export default function PricingEssentials() {
           title="No Essentials pricing yet"
           description="Import the Essentials workbook to populate experiences, provider rates, hotels and guidelines."
           action={
-            <button className="btn btn-p btn-sm" type="button" onClick={() => setImportOpen(true)}>
-              Import Excel
-            </button>
+              <button
+                className="btn btn-p btn-sm"
+                type="button"
+                onClick={() => setImportOpen(true)}
+                disabled={!canWrite}
+                title={!canWrite ? 'You need write permission for Essentials to import' : undefined}
+              >
+                Import Excel
+              </button>
           }
         />
       ) : (

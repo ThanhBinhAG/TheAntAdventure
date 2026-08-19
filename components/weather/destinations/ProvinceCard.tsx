@@ -15,7 +15,7 @@ const HOVER_PREFETCH_MS = 200;
 type Props = {
   destination: WeatherDestinationMeta;
   onSelect: (id: string) => void;
-  onEdit: (id: string) => void;
+  onEdit?: (id: string) => void;
 };
 
 export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
@@ -49,7 +49,7 @@ export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
         onPointerEnter={scheduleHoverPrefetch}
         onPointerLeave={clearHoverPrefetch}
         onFocus={() => prefetchDestinationWeather(destination.id)}
-        aria-label={`Xem thời tiết ${destination.name}`}
+        aria-label={`View weather for ${destination.name}`}
       >
         {cover && inView ? (
           <StorageImage
@@ -76,22 +76,24 @@ export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
             {destination.name}
           </span>
           <span className="wg-province-card-hint">
-            {cover ? 'Nhấn để xem thời tiết' : 'Chưa có ảnh · nhấn để xem thời tiết'}
+            {cover ? 'Tap to view weather' : 'No image · tap to view weather'}
           </span>
         </div>
       </button>
-      <button
-        type="button"
-        className="wg-province-edit"
-        onClick={(e) => {
-          e.stopPropagation();
-          onEdit(destination.id);
-        }}
-        aria-label={`Sửa ${destination.name}`}
-        title="Sửa"
-      >
-        ✎
-      </button>
+      {onEdit && (
+        <button
+          type="button"
+          className="wg-province-edit"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(destination.id);
+          }}
+          aria-label={`Sửa ${destination.name}`}
+          title="Sửa"
+        >
+          ✎
+        </button>
+      )}
     </div>
   );
 }

@@ -443,6 +443,7 @@ export default function RolesPermissionsTab() {
                                 updateScope={resourceScopesHook.updateScope}
                                 discardScopeChanges={resourceScopesHook.discardScopeChanges}
                                 handleSaveResourceScopes={resourceScopesHook.handleSaveResourceScopes}
+                                selectedPermissionCodes={rolePermissionsHook.selectedPermissionCodes}
                                 language={language}
                             />
                         </div>

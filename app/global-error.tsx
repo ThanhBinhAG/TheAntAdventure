@@ -1,18 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
-import * as Sentry from '@sentry/nextjs';
-
 type GlobalErrorProps = {
   error: Error & { digest?: string };
   reset: () => void;
 };
 
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
-  useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
-
   return (
     <html lang="en">
       <body
@@ -39,7 +32,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
         >
           <h1 style={{ margin: '0 0 8px', fontSize: 20 }}>Application error</h1>
           <p style={{ margin: '0 0 16px', color: '#78716c', lineHeight: 1.5 }}>
-            The Ant Adventures CRM failed to render. The error has been reported.
+            The Ant Adventures CRM failed to render. Please try again.
           </p>
           {error.digest && (
             <p style={{ margin: '0 0 16px', fontSize: 13, color: '#a8a29e' }}>

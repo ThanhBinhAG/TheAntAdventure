@@ -9,6 +9,7 @@ import { usePageSize } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
 import { toast } from '@/lib/toast';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 type Contract = {
   id: string;
@@ -70,6 +71,7 @@ function fmtDate(d?: string) {
 }
 
 export default function Contracts() {
+  const { canWrite } = usePagePermission('contracts');
   const contracts = useStore((s) => s.contracts) as Contract[];
   const bookings = useStore((s) => s.bookings);
   const addContract = useStore((s) => s.addContract);
@@ -183,7 +185,14 @@ export default function Contracts() {
             </button>
           ))}
         </div>
-        <button className="btn btn-p btn-sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setShowNew(true)}>
+        <button
+          className="btn btn-p btn-sm"
+          type="button"
+          style={{ marginLeft: 'auto' }}
+          onClick={() => setShowNew(true)}
+          disabled={!canWrite}
+          title={!canWrite ? 'You need write permission for Contracts to create a contract' : undefined}
+        >
           ＋ New Contract
         </button>
       </div>
@@ -231,7 +240,13 @@ export default function Contracts() {
                     title="No contracts found"
                     description="Create a contract from a confirmed booking, or adjust filters if you expected results."
                     action={
-                      <button type="button" className="btn btn-p btn-sm" onClick={() => setShowNew(true)}>
+                      <button
+                        type="button"
+                        className="btn btn-p btn-sm"
+                        onClick={() => setShowNew(true)}
+                        disabled={!canWrite}
+                        title={!canWrite ? 'You need write permission for Contracts to create a contract' : undefined}
+                      >
                         ＋ New Contract
                       </button>
                     }

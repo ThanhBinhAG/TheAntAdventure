@@ -47,7 +47,7 @@ async function readPermissionCodesFromSupabase(): Promise<PermissionCode[]> {
     throw new Error('Supabase URL hoặc anon key chưa được cấu hình');
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   const supabase = createServerClient(url, key, {
     ...getSupabaseGlobalFetchOptions(),
@@ -104,7 +104,7 @@ async function readPermissionCodesWithCache(
 export async function getInitialPermissionCodesForCRMLayout(): Promise<
   PermissionCode[]
 > {
-  const breakGlassToken = cookies()
+  const breakGlassToken = (await cookies())
     .get(BG_SESSION_COOKIE)
     ?.value;
 

@@ -19,7 +19,6 @@ Every meaningful code/docs folder has an `AGENTS.md` describing **what that fold
 | [`components/`](components/AGENTS.md) | React UI — page shells, domain widgets, chrome |
 | [`lib/`](lib/AGENTS.md) | Domain logic, store helpers, Supabase sync, seeds |
 | [`hooks/`](hooks/AGENTS.md) | Shared React hooks |
-| [`env/`](env/AGENTS.md) | Committed company Supabase defaults + startup sanitize |
 | [`docs/`](docs/AGENTS.md) | Tracked product docs (schema, setup) |
 | [`scripts/`](scripts/AGENTS.md) | Ops shell helpers (weather cron, PDF deps) |
 | [`supabase/`](supabase/AGENTS.md) | PostgreSQL schema, seeds, migrations |
@@ -66,7 +65,17 @@ When answering questions or implementing tasks:
 1. **Check what's already here** — Inspect `package.json`, existing modules, and project infrastructure (e.g. Supabase) before proposing new tools.
 2. **Reuse first** — Prefer dependencies already installed and patterns already used in the codebase over adding new packages.
 3. **Free by default** — Do not recommend or integrate paid APIs, SaaS tiers, or proprietary SDKs unless the user explicitly asks or no viable free in-stack alternative exists.
-4. **Fit the stack** — Favor solutions aligned with this project: Next.js 14, React 18, Supabase, TypeScript, Chart.js, Zod, Zustand.
+4. **Fit the stack** — Favor solutions aligned with this project: Next.js 16, React 19, Node 22+, Supabase, TypeScript 5.9, Chart.js, Zod, Zustand.
 5. **Justify new deps** — If a new library is truly needed, briefly explain why existing options are insufficient before adding it.
 
 When multiple approaches work, pick the one that adds the least cost, the fewest new dependencies, and the smallest diff while meeting the requirement.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

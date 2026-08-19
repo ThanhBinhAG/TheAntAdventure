@@ -11,11 +11,13 @@ import AttractionEditModal, { type AttractionFormData } from '@/components/attra
 import AttractionPhotoLightbox from '@/components/attractions/AttractionPhotoLightbox';
 import AttractionRegionColumn from '@/components/attractions/AttractionRegionColumn';
 import AttractionTable from '@/components/attractions/AttractionTable';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 type ViewMode = 'grid' | 'columns';
 
 export default function Attractions() {
+  const { canWrite } = usePagePermission('attractions');
   const attractions = useStore((s) => s.attractions);
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
   const addAttraction = useStore((s) => s.addAttraction);
@@ -151,7 +153,13 @@ export default function Attractions() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <button type="button" className="btn btn-p btn-sm" onClick={() => openAdd()}>
+        <button
+          type="button"
+          className="btn btn-p btn-sm"
+          onClick={() => openAdd()}
+          disabled={!canWrite}
+          title={!canWrite ? 'You need write permission for Attractions to add an attraction' : undefined}
+        >
           + Add Attraction
         </button>
         <div className="att-view-toggle">
@@ -199,8 +207,8 @@ export default function Attractions() {
               ? 'No attractions match your filters in this region.'
               : 'No attractions in this region yet.',
             onToggle: toggleExpand,
-            onEdit: openEdit,
-            onAdd: () => openAdd(r as Attraction['region']),
+            onEdit: canWrite ? openEdit : undefined,
+            onAdd: canWrite ? () => openAdd(r as Attraction['region']) : undefined,
             onPhotoClick: (attractionId: string, index: number) =>
               setLightbox({ attractionId, index }),
           };

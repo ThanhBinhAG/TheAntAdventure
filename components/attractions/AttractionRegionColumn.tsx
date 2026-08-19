@@ -25,8 +25,8 @@ type Props = {
   expandedId: string | null;
   todayLabel: string;
   onToggle: (id: string) => void;
-  onEdit: (attraction: Attraction) => void;
-  onAdd: () => void;
+  onEdit?: (attraction: Attraction) => void;
+  onAdd?: () => void;
   emptyHint?: string;
   onPhotoClick: (attractionId: string, index: number) => void;
 };
@@ -53,9 +53,11 @@ export default function AttractionRegionColumn({
         </span>
         <div className="att-region-hd-actions">
           <span className="att-region-count">{attractions.length}</span>
-          <button type="button" className="btn btn-s btn-sm att-region-add" onClick={onAdd}>
-            + Add
-          </button>
+          {onAdd && (
+            <button type="button" className="btn btn-s btn-sm att-region-add" onClick={onAdd}>
+              + Add
+            </button>
+          )}
         </div>
       </header>
       {attractions.length ? (
@@ -68,7 +70,7 @@ export default function AttractionRegionColumn({
               todayLabel={todayLabel}
               photos={photos}
               onToggle={() => onToggle(a.id)}
-              onEdit={() => onEdit(a)}
+              onEdit={onEdit ? () => onEdit(a) : undefined}
               onPhotoClick={(index) => onPhotoClick(a.id, index)}
             />
           ))}
@@ -81,9 +83,11 @@ export default function AttractionRegionColumn({
           title={emptyHint.replace(/\.$/, '')}
           description="Add an attraction to this region, or clear filters if you expected matches."
           action={
-            <button type="button" className="btn btn-s btn-sm" onClick={onAdd}>
-              + Add Attraction
-            </button>
+            onAdd && (
+              <button type="button" className="btn btn-s btn-sm" onClick={onAdd}>
+                + Add Attraction
+              </button>
+            )
           }
         />
       )}

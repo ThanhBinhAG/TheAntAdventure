@@ -20,6 +20,7 @@ interface Props {
   onHotelRatesBChange: (rates: ProposalHotelRate[]) => void;
   companyTemplateActive: boolean;
   onEditTemplate: () => void;
+  canWrite?: boolean;
 }
 
 export default function ProposalExportSettings({
@@ -37,6 +38,7 @@ export default function ProposalExportSettings({
   onHotelRatesBChange,
   companyTemplateActive,
   onEditTemplate,
+  canWrite = true,
 }: Props) {
   return (
     <div className="td-export-rail">
@@ -51,7 +53,7 @@ export default function ProposalExportSettings({
         <ProposalLayoutPicker
           value={layoutId}
           onChange={onLayoutIdChange}
-          disabled={!hasContent}
+          disabled={!hasContent || !canWrite}
         />
       </section>
 
@@ -66,6 +68,7 @@ export default function ProposalExportSettings({
           onChange={(e) => onSpecialNotesChange(e.target.value)}
           placeholder={specialNotesPlaceholder}
           style={{ width: '100%', fontSize: 12.5 }}
+          disabled={!canWrite}
         />
       </section>
 
@@ -78,6 +81,7 @@ export default function ProposalExportSettings({
                 title="C. HOTELS — OPTION A (4★) — enter net rate per night"
                 rates={hotelRatesOptionA}
                 onChange={onHotelRatesAChange}
+                disabled={!canWrite}
               />
               <ProposalHotelRatesPanel
                 title="C. HOTELS — OPTION B (5★ Luxury) — enter hotel names & net rates"
@@ -85,6 +89,7 @@ export default function ProposalExportSettings({
                 onChange={onHotelRatesBChange}
                 editableHotelName
                 emptyHint="Option B rows appear once Outline hotels are detected (same stays as Option A)."
+                disabled={!canWrite}
               />
             </div>
           </details>
@@ -101,7 +106,7 @@ export default function ProposalExportSettings({
             type="button"
             className="btn btn-s btn-sm"
             onClick={onEditTemplate}
-            disabled={!hasContent}
+            disabled={!hasContent || !canWrite}
           >
             Edit Template{hasEdits ? ' •' : ''}
           </button>

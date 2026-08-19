@@ -56,7 +56,7 @@ export default function AccessControlPage() {
     );
 
     // Gate theo data đã biết — không ẩn tab khi SWR đang revalidate (tránh churn Tabs).
-    const canViewLoginHistory = superAdminStatus?.isSuperAdmin === true;
+    const canViewLoginHistory = true;
 
     return (
         <AccessControlUiProvider>

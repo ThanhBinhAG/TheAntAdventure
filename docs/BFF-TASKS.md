@@ -14,6 +14,7 @@ This first BFF delivery is intentionally limited to the following features. All 
 
 | Feature | Owner | End-to-end responsibility |
 |---|---|---|
+| Auth & Session | Developer A | Login/logout, HttpOnly CRM session, refresh/revoke, middleware, permission enforcement, tests |
 | Daily Planner | Developer A | Repository/API, authorization, UI/hook migration, tests |
 | Attraction Schedule | Developer A | Province attraction data, schedule API, UI/hook migration, tests |
 | Tour Design | Developer A | Draft/outline API, child-record writes, UI/hook migration, tests |
@@ -53,7 +54,8 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
 
 ### Developer A task list
 
-- [ ] A0. Establish BFF API conventions, error format, auth/permission middleware, and server-only Supabase client.
+- [ ] A0. Complete Auth & Session end-to-end: login/logout, HttpOnly CRM session, session validation/refresh/revocation, middleware redirects, permission enforcement, tests, and removal of browser Supabase token handling.
+- [ ] A0.1. Establish BFF API conventions, error format, auth/permission middleware, and server-only Supabase client.
 - [ ] A1. Implement the shared Redis cache wrapper and cache invalidation contract.
 - [ ] A2. Complete Tour Product end-to-end: product/pricing API/repository/cache, UI/hooks, tests, and direct-path removal.
 - [ ] A3. Complete Daily Planner end-to-end: planner API/repository, authorization, UI/hooks, tests, and direct-path removal.

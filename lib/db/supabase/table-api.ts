@@ -21,10 +21,7 @@ export function makeTableApi(table: SyncArrayTable) {
       getAll: () => getBookings(),
       syncTable: (rows: Row[], options?: SyncTableOptions) => syncBookings(rows, options),
       deleteRemote: async (id: string) => {
-        const client = supabase();
-        if (!client) return;
-        const { error } = await client.from('bookings').delete().eq('id', id);
-        if (error) throw error;
+        await executeDeleteAndVerify(supabase(), 'bookings', 'id', id);
       },
       count: () => countTable('bookings'),
     };
@@ -35,10 +32,7 @@ export function makeTableApi(table: SyncArrayTable) {
       getAll: () => getHotels(),
       syncTable: (rows: Row[], options?: SyncTableOptions) => syncHotels(rows, options),
       deleteRemote: async (id: string) => {
-        const client = supabase();
-        if (!client) return;
-        const { error } = await client.from('hotels').delete().eq('id', id);
-        if (error) throw error;
+        await executeDeleteAndVerify(supabase(), 'hotels', 'id', id);
       },
       count: () => countTable('hotels'),
     };
@@ -49,10 +43,7 @@ export function makeTableApi(table: SyncArrayTable) {
       getAll: () => getAttractions(),
       syncTable: (rows: Row[], options?: SyncTableOptions) => syncAttractions(rows, options),
       deleteRemote: async (id: string) => {
-        const client = supabase();
-        if (!client) return;
-        const { error } = await client.from('attractions').delete().eq('id', id);
-        if (error) throw error;
+        await executeDeleteAndVerify(supabase(), 'attractions', 'id', id);
       },
       count: () => countTable('attractions'),
     };
@@ -63,10 +54,7 @@ export function makeTableApi(table: SyncArrayTable) {
       getAll: () => getProducts(),
       syncTable: (rows: Row[], options?: SyncTableOptions) => syncProducts(rows, options),
       deleteRemote: async (id: string) => {
-        const client = supabase();
-        if (!client) return;
-        const { error } = await client.from('products').delete().eq('code', id);
-        if (error) throw error;
+        await executeDeleteAndVerify(supabase(), 'products', 'code', id);
       },
       count: () => countTable('products'),
     };
@@ -81,11 +69,22 @@ export function makeTableApi(table: SyncArrayTable) {
     getAll,
     syncTable,
     deleteRemote: async (id: string) => {
-      const client = supabase();
-      if (!client) return;
-      const { error } = await client.from(handler.table).delete().eq(handler.pk, id);
-      if (error) throw error;
+      await executeDeleteAndVerify(supabase(), handler.table, handler.pk, id);
     },
     count: () => countTable(handler.table),
   };
+}
+
+async function executeDeleteAndVerify(
+  client: ReturnType<typeof supabase>,
+  table: string,
+  pkName: string,
+  id: string
+): Promise<void> {
+  if (!client) return;
+  const { data, error } = await client.from(table).delete().eq(pkName, id).select(pkName);
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Bạn không có quyền thực hiện thao tác này hoặc bản ghi không tồn tại.');
+  }
 }

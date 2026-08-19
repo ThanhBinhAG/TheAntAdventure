@@ -17,8 +17,104 @@ import {
   fetchCompanyLogoUrlClient,
   getCachedCompanyLogoUrl,
 } from '@/lib/storage/company-logo-client';
+import {
+  DashboardOutlined,
+  CalendarOutlined,
+  TeamOutlined,
+  ContactsOutlined,
+  LineChartOutlined,
+  CompassOutlined,
+  AppstoreOutlined,
+  PictureOutlined,
+  PushpinOutlined,
+  CreditCardOutlined,
+  TagsOutlined,
+  HomeOutlined,
+  CloudOutlined,
+  BookOutlined,
+  FileProtectOutlined,
+  ShopOutlined,
+  FlagOutlined,
+  CommentOutlined,
+  BankOutlined,
+  PercentageOutlined,
+  PayCircleOutlined,
+  InfoCircleOutlined,
+  HeartOutlined,
+  FileTextOutlined,
+  UsergroupAddOutlined,
+  RobotOutlined,
+  CodeOutlined,
+  MessageOutlined,
+  KeyOutlined
+} from '@ant-design/icons';
 
 const DEFAULT_LOGO = '/Logo-3.svg';
+
+function getSidebarIcon(page: string) {
+  switch (page) {
+    case 'dashboard':
+      return <DashboardOutlined style={{ color: '#4ade80' }} />; // Light Green / Emerald
+    case 'planner':
+      return <CalendarOutlined style={{ color: '#fb923c' }} />; // Warm Orange
+    case 'customers':
+      return <TeamOutlined style={{ color: '#60a5fa' }} />; // Bright Blue
+    case 'agents':
+      return <ContactsOutlined style={{ color: '#facc15' }} />; // Yellow Gold
+    case 'sales':
+      return <LineChartOutlined style={{ color: '#34d399' }} />; // Mint Green
+    case 'tourdesign':
+      return <CompassOutlined style={{ color: '#c084fc' }} />; // Purple / Violet
+    case 'products':
+      return <AppstoreOutlined style={{ color: '#2dd4bf' }} />; // Teal
+    case 'gallery':
+      return <PictureOutlined style={{ color: '#f43f5e' }} />; // Rose / Red
+    case 'pricing':
+      return <CreditCardOutlined style={{ color: '#fbbf24' }} />; // Amber
+    case 'pricing-essentials':
+      return <TagsOutlined style={{ color: '#2dd4bf' }} />; // Teal
+    case 'pricing-accommodation':
+      return <HomeOutlined style={{ color: '#60a5fa' }} />; // Light Blue
+    case 'weather':
+      return <CloudOutlined style={{ color: '#38bdf8' }} />; // Sky Blue
+    case 'attractions':
+      return <PushpinOutlined style={{ color: '#f87171' }} />; // Soft Red
+    case 'bookings':
+      return <BookOutlined style={{ color: '#818cf8' }} />; // Indigo
+    case 'contracts':
+      return <FileProtectOutlined style={{ color: '#9ca3af' }} />; // Soft Gray
+    case 'suppliers':
+      return <ShopOutlined style={{ color: '#fb923c' }} />; // Orange / Shop
+    case 'guides':
+      return <FlagOutlined style={{ color: '#f87171' }} />; // Soft Red
+    case 'posttour':
+      return <CommentOutlined style={{ color: '#c084fc' }} />; // Purple
+    case 'finance':
+      return <BankOutlined style={{ color: '#34d399' }} />; // Mint
+    case 'tax':
+      return <PercentageOutlined style={{ color: '#f87171' }} />; // Red
+    case 'salary':
+      return <PayCircleOutlined style={{ color: '#fbbf24' }} />; // Gold
+    case 'about':
+      return <InfoCircleOutlined style={{ color: '#60a5fa' }} />; // Blue
+    case 'culture':
+      return <HeartOutlined style={{ color: '#f43f5e' }} />; // Rose
+    case 'regulations':
+      return <FileTextOutlined style={{ color: '#9ca3af' }} />; // Gray
+    case 'hr':
+      return <UsergroupAddOutlined style={{ color: '#2dd4bf' }} />; // Teal
+    case 'ai':
+      return <RobotOutlined style={{ color: '#c084fc' }} />; // Purple
+    case 'devnotes':
+      return <CodeOutlined style={{ color: '#34d399' }} />; // Green
+    case 'teamchat':
+      return <MessageOutlined style={{ color: '#60a5fa' }} />; // Blue
+    case 'access_control':
+      return <KeyOutlined style={{ color: '#fbbf24' }} />; // Amber
+    default:
+      return null;
+  }
+}
 
 function subscribeCompanyLogoCache() {
   return () => {};
@@ -245,7 +341,7 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
                     title={t(item.en, item.vi)}
                     onClick={onClose}
                   >
-                    <span className="sb-icon">{item.icon}</span>
+                    <span className="sb-icon">{getSidebarIcon(item.page)}</span>
                     <span className="sb-label">{t(item.en, item.vi)}</span>
                     {item.badge && item.badgeType === 'ceo' && <span className="sb-badge">{item.badge}</span>}
                     {item.badge && item.badgeType === 'new' && <span className="sb-new">{item.badge}</span>}
@@ -296,7 +392,7 @@ function NavGroup({ item, current, open, label, onToggle, onNavigate, translate 
         aria-expanded={open}
         title={label}
       >
-        <span className="sb-icon">{item.icon}</span>
+        <span className="sb-icon">{getSidebarIcon(item.page)}</span>
         <span className="sb-label">{label}</span>
         <span className={`sb-caret${open ? ' open' : ''}`}>▸</span>
       </button>
@@ -312,7 +408,7 @@ function NavGroup({ item, current, open, label, onToggle, onNavigate, translate 
               title={translate(child.en, child.vi)}
               onClick={onNavigate}
             >
-              <span className="sb-icon sb-subicon">{child.icon}</span>
+              <span className="sb-icon sb-subicon">{getSidebarIcon(child.page)}</span>
               <span className="sb-label">{translate(child.en, child.vi)}</span>
               {child.badge && child.badgeType === 'new' && <span className="sb-new">{child.badge}</span>}
             </Link>

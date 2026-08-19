@@ -671,7 +671,13 @@ export default function GalleryWorkspace() {
           )}
         </div>
         <div className="phlib-hero-actions">
-          <button type="button" className="btn btn-o" disabled={saving} onClick={handleNewFolder}>
+          <button
+            type="button"
+            className="btn btn-o"
+            disabled={saving || !canWrite}
+            onClick={handleNewFolder}
+            title={!canWrite ? 'You need write permission for Gallery to create a folder' : undefined}
+          >
             New folder
           </button>
           {!atRoot && filtered.length > 0 && (
@@ -757,10 +763,10 @@ export default function GalleryWorkspace() {
             folders={visibleFolders}
             photoCounts={photoCounts}
             onOpen={openFolder}
-            onRename={handleRenameFolder}
-            onDelete={handleDeleteFolder}
+            onRename={canWrite ? handleRenameFolder : undefined}
+            onDelete={canWrite ? handleDeleteFolder : undefined}
             onInfo={setInfoFolder}
-            acceptPhotoDrop
+            acceptPhotoDrop={canWrite}
           />
         )}
 
@@ -782,7 +788,13 @@ export default function GalleryWorkspace() {
                   </button>
                 )}
                 {!q.trim() && (
-                  <button type="button" className="btn btn-g btn-sm" onClick={handleNewFolder}>
+                  <button
+                    type="button"
+                    className="btn btn-g btn-sm"
+                    onClick={handleNewFolder}
+                    disabled={!canWrite}
+                    title={!canWrite ? 'You need write permission for Gallery to create a folder' : undefined}
+                  >
                     New folder
                   </button>
                 )}

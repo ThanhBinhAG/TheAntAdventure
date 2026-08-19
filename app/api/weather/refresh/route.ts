@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { isRefreshAuthorized } from '@/lib/weather/auth';
 import { isWeatherCacheConfigured } from '@/lib/weather/cache';
+import { invalidateWeatherCache } from '@/lib/weather/redis-cache';
+import { isRefreshAuthorized } from '@/lib/weather/auth';
 import { refreshFeaturedForecast } from '@/lib/weather/refresh';
 
 /** Warm featured destinations only (cron / manual). */
@@ -26,6 +27,8 @@ export async function POST(request: Request) {
   }
 
   const result = await refreshFeaturedForecast({ force });
+  // Invalidate Redis cache so the next GET will rebuild it.
+  await invalidateWeatherCache();
   const status = result.ok ? 200 : 500;
   return NextResponse.json(result, { status });
 }

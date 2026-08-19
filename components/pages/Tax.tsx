@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
+import { usePagePermission } from '@/hooks/usePagePermission';
 import { useStore } from '@/hooks/useStore';
 import { toast } from '@/lib/toast';
 
@@ -29,6 +30,7 @@ function downloadCsv(filename: string, rows: string[][]) {
 }
 
 export default function Tax() {
+  const { canWrite } = usePagePermission('tax');
   const tax = useStore((s) => s.tax) as TaxRow[];
   const [period, setPeriod] = useState('all');
 
@@ -124,10 +126,10 @@ export default function Tax() {
             </div>
           </div>
           <div className="tax-actions">
-            <button className="btn btn-p btn-sm" type="button" onClick={calculateQuarter}>
+            <button className="btn btn-p btn-sm" type="button" onClick={calculateQuarter} disabled={!canWrite} title={!canWrite ? 'Read-only mode: calculation disabled' : undefined}>
               📊 Calculate Quarter
             </button>
-            <button className="btn btn-s btn-sm" type="button" onClick={exportReport}>
+            <button className="btn btn-s btn-sm" type="button" onClick={exportReport} disabled={!canWrite} title={!canWrite ? 'Read-only mode: export disabled' : undefined}>
               ⬇ Export Tax Report
             </button>
           </div>

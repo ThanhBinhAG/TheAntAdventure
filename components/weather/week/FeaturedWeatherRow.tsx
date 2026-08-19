@@ -10,7 +10,7 @@ type Props = {
   destinations: WeatherDestinationMeta[];
   loading?: boolean;
   onOpenDetail: (id: string) => void;
-  onEdit: (id: string) => void;
+  onEdit?: (id: string) => void;
   cacheVersion?: number;
 };
 
@@ -22,7 +22,7 @@ function FeaturedSlot({
 }: {
   meta: WeatherDestinationMeta;
   onOpenDetail: (id: string) => void;
-  onEdit: (id: string) => void;
+  onEdit?: (id: string) => void;
   cacheVersion?: number;
 }) {
   const { data, loading, error, refresh, reload } = useDestinationWeather(meta.id, {
@@ -43,15 +43,17 @@ function FeaturedSlot({
         onOpenDetail={() => onOpenDetail(meta.id)}
         onRetry={() => void refresh()}
       />
-      <button
-        type="button"
-        className="wg-province-edit"
-        onClick={() => onEdit(meta.id)}
-        aria-label={`Sửa ${meta.name}`}
-        title="Sửa"
-      >
-        ✎
-      </button>
+      {onEdit && (
+        <button
+          type="button"
+          className="wg-province-edit"
+          onClick={() => onEdit(meta.id)}
+          aria-label={`Sửa ${meta.name}`}
+          title="Sửa"
+        >
+          ✎
+        </button>
+      )}
     </div>
   );
 }

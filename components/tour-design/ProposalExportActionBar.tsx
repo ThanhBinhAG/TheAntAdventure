@@ -9,6 +9,7 @@ interface Props {
   onDownloadWord: () => void;
   onBack: () => void;
   onReset: () => void;
+  canWrite?: boolean;
 }
 
 export default function ProposalExportActionBar({
@@ -20,6 +21,7 @@ export default function ProposalExportActionBar({
   onDownloadWord,
   onBack,
   onReset,
+  canWrite = true,
 }: Props) {
   return (
     <div className="td-export-action-bar">
@@ -33,7 +35,7 @@ export default function ProposalExportActionBar({
           <button className="btn btn-s" type="button" onClick={onBack}>
             ← Back
           </button>
-          <button className="btn btn-s" type="button" onClick={onReset}>
+          <button className="btn btn-s" type="button" onClick={onReset} disabled={!canWrite}>
             + New Design
           </button>
         </div>
@@ -42,7 +44,7 @@ export default function ProposalExportActionBar({
             className="btn btn-p"
             type="button"
             onClick={onDownloadPdf}
-            disabled={pdfLoading || !hasContent}
+            disabled={pdfLoading || !hasContent || !canWrite}
           >
             {pdfLoading ? 'Generating PDF…' : 'Download PDF'}
           </button>
@@ -50,11 +52,11 @@ export default function ProposalExportActionBar({
             className="btn btn-s"
             type="button"
             onClick={onPrintPdf}
-            disabled={pdfLoading || !hasContent}
+            disabled={pdfLoading || !hasContent || !canWrite}
           >
             Print / Save PDF
           </button>
-          <button className="btn btn-s" type="button" onClick={onDownloadWord} disabled={!hasContent}>
+          <button className="btn btn-s" type="button" onClick={onDownloadWord} disabled={!hasContent || !canWrite}>
             Download Word
           </button>
         </div>

@@ -7,6 +7,7 @@ import QuickListTab from '@/components/suppliers/QuickListTab';
 import SupplierFilterBar, { computeSupplierCounts, type SupTab } from '@/components/suppliers/SupplierFilterBar';
 import { useStore } from '@/hooks/useStore';
 import type { SupplierFilters } from '@/lib/suppliers/supplier-utils';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 const TABS: { id: SupTab; label: string }[] = [
   { id: 'hotels', label: '🏨 Hotels' },
@@ -23,6 +24,7 @@ const TABS: { id: SupTab; label: string }[] = [
 const EXTENDED_TABS: SupTab[] = ['logistics', 'water', 'adventure', 'experience', 'personnel'];
 
 export default function Suppliers() {
+  const { canWrite } = usePagePermission('suppliers');
   const hotels = useStore((s) => s.hotels);
   const transport = useStore((s) => s.transport);
   const restaurants = useStore((s) => s.restaurants);
@@ -49,12 +51,12 @@ export default function Suppliers() {
         ))}
       </div>
 
-      {tab === 'hotels' && <HotelTab filters={filters} />}
-      {tab === 'cruises' && <QuickListTab kind="cruise" filters={filters} />}
-      {tab === 'transport' && <QuickListTab kind="transport" filters={filters} />}
-      {tab === 'restaurants' && <QuickListTab kind="restaurant" filters={filters} />}
+      {tab === 'hotels' && <HotelTab filters={filters} canWrite={canWrite} />}
+      {tab === 'cruises' && <QuickListTab kind="cruise" filters={filters} canWrite={canWrite} />}
+      {tab === 'transport' && <QuickListTab kind="transport" filters={filters} canWrite={canWrite} />}
+      {tab === 'restaurants' && <QuickListTab kind="restaurant" filters={filters} canWrite={canWrite} />}
       {EXTENDED_TABS.includes(tab) && (
-        <ExtendedSupplierTab section={tab as 'logistics' | 'water' | 'adventure' | 'experience' | 'personnel'} filters={filters} />
+        <ExtendedSupplierTab section={tab as 'logistics' | 'water' | 'adventure' | 'experience' | 'personnel'} filters={filters} canWrite={canWrite} />
       )}
     </div>
   );

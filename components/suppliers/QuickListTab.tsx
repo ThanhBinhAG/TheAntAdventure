@@ -80,9 +80,10 @@ const TABLE_CONFIG: Record<
 type Props = {
   kind: QuickListKind;
   filters: SupplierFilters;
+  canWrite?: boolean;
 };
 
-export default function QuickListTab({ kind, filters }: Props) {
+export default function QuickListTab({ kind, filters, canWrite }: Props) {
   const transport = useStore((s) => s.transport);
   const restaurants = useStore((s) => s.restaurants);
   const cruises = useStore((s) => s.cruises);
@@ -162,7 +163,13 @@ export default function QuickListTab({ kind, filters }: Props) {
         <div className="info-bar" style={{ margin: 0, flex: 1 }}>
           Showing <b>{filtered.length}</b> of <b>{rows.length}</b> {cfg.title.toLowerCase()} partners
         </div>
-        <button className="btn btn-p btn-sm" type="button" onClick={openAdd}>
+        <button
+          className="btn btn-p btn-sm"
+          type="button"
+          onClick={openAdd}
+          disabled={!canWrite}
+          title={!canWrite ? `You need write permission to add ${cfg.title.toLowerCase()}` : undefined}
+        >
           ＋ Add {cfg.title}
         </button>
       </div>
@@ -192,10 +199,23 @@ export default function QuickListTab({ kind, filters }: Props) {
                     </td>
                   ))}
                   <td>
-                    <button className="btn btn-s btn-sm" type="button" onClick={() => openEdit(row.id)}>
+                    <button
+                      className="btn btn-s btn-sm"
+                      type="button"
+                      onClick={() => openEdit(row.id)}
+                      disabled={!canWrite}
+                      title={!canWrite ? 'You need write permission to edit' : undefined}
+                    >
                       ✏
                     </button>
-                    <button className="btn btn-s btn-sm" type="button" style={{ marginLeft: 4 }} onClick={() => handleDelete(row.id)}>
+                    <button
+                      className="btn btn-s btn-sm"
+                      type="button"
+                      style={{ marginLeft: 4 }}
+                      onClick={() => handleDelete(row.id)}
+                      disabled={!canWrite}
+                      title={!canWrite ? 'You need write permission to delete' : undefined}
+                    >
                       ✕
                     </button>
                   </td>
@@ -211,7 +231,13 @@ export default function QuickListTab({ kind, filters }: Props) {
                       title={`No ${cfg.title.toLowerCase()} partners found`}
                       description="Add a partner, or adjust search/region filters."
                       action={
-                        <button type="button" className="btn btn-p btn-sm" onClick={openAdd}>
+                        <button
+                          type="button"
+                          className="btn btn-p btn-sm"
+                          onClick={openAdd}
+                          disabled={!canWrite}
+                          title={!canWrite ? `You need write permission to add ${cfg.title.toLowerCase()}` : undefined}
+                        >
                           ＋ Add {cfg.title}
                         </button>
                       }

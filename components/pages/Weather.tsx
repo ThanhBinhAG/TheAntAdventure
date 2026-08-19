@@ -6,6 +6,7 @@ import FeaturedWeatherRow from '@/components/weather/week/FeaturedWeatherRow';
 import ProvinceCardGrid from '@/components/weather/destinations/ProvinceCardGrid';
 import { useWeatherPageBoot } from '@/components/weather/hooks/useWeatherPageBoot';
 import { toast } from '@/lib/toast';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 const WeatherDetailModal = dynamic(() => import('@/components/weather/week/WeatherDetailModal'), {
   ssr: false,
@@ -21,6 +22,7 @@ const FeaturedSlotsModal = dynamic(() => import('@/components/weather/destinatio
 });
 
 export default function Weather() {
+  const { canWrite } = usePagePermission('weather');
   const {
     destinations,
     featured,
@@ -80,14 +82,21 @@ export default function Weather() {
           </p>
         </div>
         <div className="wg-page-actions">
-          <button type="button" className="btn btn-s btn-sm" onClick={() => setFeaturedOpen(true)}>
+          <button
+            type="button"
+            className="btn btn-s btn-sm"
+            onClick={() => setFeaturedOpen(true)}
+            disabled={!canWrite}
+            title={!canWrite ? 'You need write permission for Weather to manage featured slots' : undefined}
+          >
             Edit featured destinations
           </button>
           <button
             type="button"
             className="btn btn-s btn-sm"
             onClick={() => void handleRefreshAll()}
-            disabled={refreshing}
+            disabled={refreshing || !canWrite}
+            title={!canWrite ? 'You need write permission for Weather to refresh cache' : undefined}
           >
             {refreshing ? 'Refreshing…' : 'Refresh cache'}
           </button>
@@ -113,7 +122,7 @@ export default function Weather() {
           destinations={featured}
           loading={loading}
           onOpenDetail={setDetailId}
-          onEdit={setEditId}
+          onEdit={canWrite ? setEditId : undefined}
           cacheVersion={cacheVersion}
         />
       </section>
@@ -129,10 +138,16 @@ export default function Weather() {
           destinations={explore}
           loading={loading}
           onSelect={setDetailId}
-          onEdit={setEditId}
+          onEdit={canWrite ? setEditId : undefined}
         />
         <div className="wg-add-row">
-          <button type="button" className="btn btn-p" onClick={() => setAddOpen(true)}>
+          <button
+            type="button"
+            className="btn btn-p"
+            onClick={() => setAddOpen(true)}
+            disabled={!canWrite}
+            title={!canWrite ? 'You need write permission for Weather to add a province' : undefined}
+          >
             + Add new province
           </button>
         </div>

@@ -309,13 +309,31 @@ export default function Pricing() {
                   Clear Filters
                 </button>
                 <div style={{ width: 1, height: 18, background: 'var(--b)', margin: '0 2px' }} />
-                <button className="btn btn-p btn-sm" type="button" onClick={handleDownloadExcel} disabled={filtered.length === 0}>
+                <button
+                  className="btn btn-p btn-sm"
+                  type="button"
+                  onClick={handleDownloadExcel}
+                  disabled={filtered.length === 0 || !canWrite}
+                  title={!canWrite ? 'You need write permission for Pricing to export Excel' : undefined}
+                >
                   Download Excel
                 </button>
-                <button className="btn btn-s btn-sm" type="button" onClick={handleDownloadPdf} disabled={pdfLoading || filtered.length === 0}>
+                <button
+                  className="btn btn-s btn-sm"
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  disabled={pdfLoading || filtered.length === 0 || !canWrite}
+                  title={!canWrite ? 'You need write permission for Pricing to export PDF' : undefined}
+                >
                   {pdfLoading ? 'Generating PDF…' : 'Download PDF'}
                 </button>
-                <button className="btn btn-s btn-sm" type="button" onClick={handlePrintPdf} disabled={filtered.length === 0}>
+                <button
+                  className="btn btn-s btn-sm"
+                  type="button"
+                  onClick={handlePrintPdf}
+                  disabled={filtered.length === 0 || !canWrite}
+                  title={!canWrite ? 'You need write permission for Pricing to print PDF' : undefined}
+                >
                   Print / Save PDF
                 </button>
               </div>

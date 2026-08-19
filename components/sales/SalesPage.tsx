@@ -429,7 +429,12 @@ export default function SalesPage() {
                       {tsf('clearFilters')}
                     </button>
                   )}
-                  <button type="button" className="btn btn-p btn-sm" onClick={() => setFormOpen(true)}>
+                  <button
+                    type="button"
+                    className="btn btn-p btn-sm"
+                    disabled={!canWrite}
+                    onClick={() => setFormOpen(true)}
+                  >
                     {tc('newClientBtn')}
                   </button>
                 </>
@@ -504,7 +509,12 @@ export default function SalesPage() {
                         {tsf('clearFilters')}
                       </button>
                     )}
-                    <button type="button" className="btn btn-p btn-sm" onClick={() => setFormOpen(true)}>
+                    <button
+                      type="button"
+                      className="btn btn-p btn-sm"
+                      disabled={!canWrite}
+                      onClick={() => setFormOpen(true)}
+                    >
                       {tc('newClientBtn')}
                     </button>
                   </>

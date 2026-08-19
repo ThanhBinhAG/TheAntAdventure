@@ -18,6 +18,7 @@ interface Props {
   onApprove: () => void;
   onRevise: () => void;
   onResend: () => void;
+  canWrite?: boolean;
 }
 
 export default function OutlineWorkflowPanel({
@@ -32,6 +33,7 @@ export default function OutlineWorkflowPanel({
   onApprove,
   onRevise,
   onResend,
+  canWrite = true,
 }: Props) {
   const canSend = outlineStatus === 'draft' && outlineRevision === 0;
   const canResend = outlineStatus === 'draft' && outlineRevision >= 1;
@@ -75,27 +77,28 @@ export default function OutlineWorkflowPanel({
           onChange={(e) => onNotesChange(e.target.value)}
           placeholder="Client feedback, revision requests, call notes…"
           style={{ width: '100%', fontSize: 12 }}
+          disabled={!canWrite}
         />
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {canSend && (
-          <button className="btn btn-p btn-sm" type="button" onClick={onMarkSent}>
+          <button className="btn btn-p btn-sm" type="button" onClick={onMarkSent} disabled={!canWrite}>
             Mark sent to client
           </button>
         )}
         {canResend && (
-          <button className="btn btn-p btn-sm" type="button" onClick={onResend}>
+          <button className="btn btn-p btn-sm" type="button" onClick={onResend} disabled={!canWrite}>
             Resend to client (v{(outlineRevision ?? 0) + 1})
           </button>
         )}
         {canApprove && (
-          <button className="btn btn-p btn-sm" type="button" onClick={onApprove}>
+          <button className="btn btn-p btn-sm" type="button" onClick={onApprove} disabled={!canWrite}>
             Client approved outline
           </button>
         )}
         {canRevise && (
-          <button className="btn btn-s btn-sm" type="button" onClick={onRevise}>
+          <button className="btn btn-s btn-sm" type="button" onClick={onRevise} disabled={!canWrite}>
             Revise outline
           </button>
         )}

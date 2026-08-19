@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
 import EmptyState from '@/components/EmptyState';
+import { usePagePermission } from '@/hooks/usePagePermission';
 
 const CHANNEL_META: Record<string, { title: string; desc: string }> = {
   general: { title: '# general', desc: 'General team conversation' },
@@ -37,6 +38,7 @@ function initials(name: string) {
 }
 
 export default function TeamChat() {
+  const { canWrite } = usePagePermission('teamchat');
   const seedMessages = useStore((s) => s.messages) as Record<string, Message[]>;
   const [channel, setChannel] = useState('general');
   const [draft, setDraft] = useState('');
@@ -56,6 +58,7 @@ export default function TeamChat() {
   const meta = CHANNEL_META[channel] || { title: `# ${channel}`, desc: '' };
 
   const sendMessage = () => {
+    if (!canWrite) return; // read‑only users cannot send
     if (!draft.trim()) return;
     const msg: Message = {
       id: `local-${Date.now()}`,
@@ -179,6 +182,8 @@ export default function TeamChat() {
                 placeholder={`Message ${meta.title}…`}
                 rows={1}
                 value={draft}
+                disabled={!canWrite}
+                title={!canWrite ? 'Read-only mode: cannot send messages' : undefined}
                 onChange={(e) => {
                   setDraft(e.target.value);
                   autoresize(e.target);
@@ -191,7 +196,7 @@ export default function TeamChat() {
                 }}
               />
             </div>
-            <button className="chat-send-btn" type="button" onClick={sendMessage} disabled={!draft.trim()} aria-label="Send">
+            <button className="chat-send-btn" type="button" onClick={sendMessage} disabled={!draft.trim() || !canWrite} title={!canWrite ? 'Read-only mode: cannot send messages' : undefined} aria-label="Send">
               ↑
             </button>
           </div>

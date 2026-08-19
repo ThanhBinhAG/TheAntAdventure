@@ -13,9 +13,10 @@ interface Props {
   brief: TourBrief;
   photos: GalleryPhoto[];
   onUsePackage: (pkg: TourPackage) => void;
+  canWrite?: boolean;
 }
 
-export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage }: Props) {
+export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, canWrite = true }: Props) {
   const heroPhoto = useMemo(() => {
     if (!pkg?.days?.length) return null;
     const day = pkg.days[0];
@@ -118,7 +119,7 @@ export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage }
             <div style={{ fontSize: 11, color: 'var(--m)' }}>Indicative price (4 pax, peak)</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--g)' }}>{pkg.price4pax}</div>
           </div>
-          <button className="btn btn-p" type="button" onClick={() => onUsePackage(pkg)}>
+          <button className="btn btn-p" type="button" onClick={() => onUsePackage(pkg)} disabled={!canWrite}>
             Use This Package →
           </button>
         </div>

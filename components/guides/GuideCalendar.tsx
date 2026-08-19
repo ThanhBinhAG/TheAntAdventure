@@ -28,7 +28,7 @@ const emptyEvent = {
   notes: '',
 };
 
-export default function GuideCalendar() {
+export default function GuideCalendar({ canWrite }: { canWrite?: boolean }) {
   const guides = useStore((s) => s.guides);
   const calEvents = useStore((s) => s.calEvents) as CalEvent[];
   const addCalEvent = useStore((s) => s.addCalEvent);
@@ -82,6 +82,10 @@ export default function GuideCalendar() {
   };
 
   const editEvent = (ev: CalEvent) => {
+    if (!canWrite) {
+      toast.warning('You need write permission to manage calendar events');
+      return;
+    }
     void (async () => {
       const g = guides.find((x) => x.id === ev.guideId);
       const st = CAL_STATUS[ev.status] || CAL_STATUS.ontour;
@@ -121,7 +125,13 @@ export default function GuideCalendar() {
           ))}
         </select>
         <div style={{ flex: 1 }} />
-        <button className="btn btn-p btn-sm" type="button" onClick={openAdd}>
+        <button 
+          className="btn btn-p btn-sm" 
+          type="button" 
+          onClick={openAdd}
+          disabled={!canWrite}
+          title={!canWrite ? 'You need write permission to log tours/bookings' : undefined}
+        >
           + Log Tour / Booking
         </button>
       </div>

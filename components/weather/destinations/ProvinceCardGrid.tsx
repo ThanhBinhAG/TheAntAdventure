@@ -8,7 +8,7 @@ type Props = {
   destinations: WeatherDestinationMeta[];
   loading?: boolean;
   onSelect: (id: string) => void;
-  onEdit: (id: string) => void;
+  onEdit?: (id: string) => void;
 };
 
 export default function ProvinceCardGrid({

@@ -1,5 +1,6 @@
 import { getRedisClient } from '@/lib/redis/client';
 import type { WeatherPageBoot } from './boot';
+import type { DestinationCurrentWeather, WeatherDayForecast } from './types';
 
 /**
  * Key used for storing the entire weather guide payload in Redis.
@@ -46,8 +47,8 @@ export async function invalidateWeatherCache(): Promise<void> {
 
 export type DestinationCachePayload = {
   payload: {
-    current: any;
-    days: any[];
+    current: DestinationCurrentWeather;
+    days: WeatherDayForecast[];
   };
   fetchedAt: string;
   expiresAt: string;
@@ -71,7 +72,7 @@ export async function getDestinationWeatherCache(destinationId: string): Promise
 
 export async function setDestinationWeatherCache(
   destinationId: string,
-  payload: { current: any; days: any[] },
+  payload: { current: DestinationCurrentWeather; days: WeatherDayForecast[] },
   fetchedAt: string,
   expiresAt: string
 ): Promise<void> {

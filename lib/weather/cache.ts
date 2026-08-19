@@ -3,7 +3,7 @@ import { localIsoDate } from '../core/date-utils';
 import { WEATHER_DESTINATIONS, getDestinationsByRegion } from './coordinates';
 import { FEATURED_WEEKLY_IDS } from './coordinates';
 import { getWeatherAdminClient } from './supabase-admin';
-import { getWeatherCache } from './redis-cache';
+import { getWeatherCache, getDestinationWeatherCache, setDestinationWeatherCache, invalidateDestinationWeatherCache, setLastFetchSuccessRedis, hasRecentFetchSuccessRedis } from './redis-cache';
 import type {
   DestinationCurrentWeather,
   DestinationWeatherDetail,
@@ -43,6 +43,12 @@ export async function isCacheStale(): Promise<boolean> {
 }
 
 export async function isDestinationCacheStale(destinationId: string): Promise<boolean> {
+  if (isWeatherCacheConfigured()) {
+    const cached = await getDestinationWeatherCache(destinationId);
+    if (!cached) return true;
+    return new Date(cached.expiresAt).getTime() <= Date.now();
+  }
+
   const client = getWeatherAdminClient();
   if (!client) return true;
 
@@ -69,6 +75,10 @@ export async function isDestinationCacheStale(destinationId: string): Promise<bo
 }
 
 export async function upsertWeeklyCache(rows: WeatherForecastCacheRow[]): Promise<number> {
+  if (isWeatherCacheConfigured()) {
+    return rows.length;
+  }
+
   const client = getWeatherAdminClient();
   if (!client) throw new Error('Supabase service role not configured');
 
@@ -88,6 +98,11 @@ export async function upsertCurrentCache(
   fetchedAt: string,
   expiresAt: string
 ): Promise<void> {
+  if (isWeatherCacheConfigured()) {
+    await setDestinationWeatherCache(destinationId, payload, fetchedAt, expiresAt);
+    return;
+  }
+
   const client = getWeatherAdminClient();
   if (!client) throw new Error('Supabase service role not configured');
 
@@ -104,6 +119,11 @@ export async function upsertCurrentCache(
 }
 
 export async function invalidateDestinationCache(destinationId: string): Promise<void> {
+  if (isWeatherCacheConfigured()) {
+    await invalidateDestinationWeatherCache(destinationId);
+    return;
+  }
+
   const client = getWeatherAdminClient();
   if (!client) return;
 
@@ -116,6 +136,7 @@ export async function invalidateDestinationCache(destinationId: string): Promise
 
 /** Drop forecast rows before today (VN) so the cache stays a rolling window. */
 export async function prunePastForecastDates(todayVn = getTodayVnDate()): Promise<number> {
+  if (isWeatherCacheConfigured()) return 0;
   const client = getWeatherAdminClient();
   if (!client) return 0;
 
@@ -135,6 +156,13 @@ export async function logWeatherFetch(entry: {
   durationMs: number;
   errorMessage?: string;
 }): Promise<void> {
+  if (isWeatherCacheConfigured()) {
+    if (entry.status === 'ok') {
+      await setLastFetchSuccessRedis();
+    }
+    return;
+  }
+
   const client = getWeatherAdminClient();
   if (!client) return;
 
@@ -147,6 +175,10 @@ export async function logWeatherFetch(entry: {
 }
 
 export async function getLastSuccessfulFetchWithin(minutes: number): Promise<boolean> {
+  if (isWeatherCacheConfigured()) {
+    return hasRecentFetchSuccessRedis();
+  }
+
   const client = getWeatherAdminClient();
   if (!client) return false;
 
@@ -173,6 +205,24 @@ export async function readDestinationDetailCache(
     coverUrl: string | null;
   }
 ): Promise<DestinationWeatherDetail | null> {
+  if (isWeatherCacheConfigured()) {
+    const cached = await getDestinationWeatherCache(destinationId);
+    if (!cached) return null;
+    return {
+      id: meta.id,
+      name: meta.name,
+      region: meta.region,
+      emoji: meta.emoji,
+      description: meta.description,
+      coverPhotoId: meta.coverPhotoId,
+      coverUrl: meta.coverUrl,
+      current: cached.payload.current,
+      days: cached.payload.days,
+      fetchedAt: cached.fetchedAt,
+      expiresAt: cached.expiresAt,
+    };
+  }
+
   const client = getWeatherAdminClient();
   if (!client) return null;
 

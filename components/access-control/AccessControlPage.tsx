@@ -43,7 +43,7 @@ export default function AccessControlPage() {
     const [hasOpenedLoginHistory, setHasOpenedLoginHistory] =
         useState(false);
 
-    const { data: superAdminStatus } = useSWR(
+    useSWR(
         'access-control/super-admin-status',
         fetchAccessControlSuperAdminStatus,
         {

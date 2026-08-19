@@ -16,3 +16,4 @@ Weather destination catalog CRUD and lazy per-destination Open-Meteo forecasts.
 ## Boundaries
 - Fetch/cache/rating/CRUD logic: `lib/weather`.
 - Page paint uses `boot/`; explore/detail still `destination/?id=`.
+- API 503 “service role” means `SUPABASE_SERVICE_ROLE_KEY` is missing. Redis (`REDIS_URL`) is optional cache.

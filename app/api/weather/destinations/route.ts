@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/session';
 import { isRefreshAuthorized } from '@/lib/weather/auth';
-import { isWeatherCacheConfigured } from '@/lib/weather/cache';
+import { isWeatherBackendConfigured } from '@/lib/weather/supabase-admin';
 import {
   createDestination,
   ensureDestinationsSeeded,
@@ -11,7 +11,7 @@ import {
 import type { WeatherRegion } from '@/lib/weather/coordinates';
 
 export async function GET() {
-  if (!isWeatherCacheConfigured()) {
+  if (!isWeatherBackendConfigured()) {
     return NextResponse.json(
       { error: 'Weather requires SUPABASE_SERVICE_ROLE_KEY on the server.' },
       { status: 503 }
@@ -37,7 +37,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!isWeatherCacheConfigured()) {
+  if (!isWeatherBackendConfigured()) {
     return NextResponse.json(
       { error: 'Weather requires SUPABASE_SERVICE_ROLE_KEY on the server.' },
       { status: 503 }

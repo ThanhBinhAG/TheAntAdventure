@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/session';
 import { getWeatherPageBoot } from '@/lib/weather/boot';
-import { isWeatherCacheConfigured } from '@/lib/weather/cache';
 import { getWeatherCache, setWeatherCache } from '@/lib/weather/redis-cache';
+import { isWeatherBackendConfigured } from '@/lib/weather/supabase-admin';
 
 export async function GET() {
-  if (!isWeatherCacheConfigured()) {
-    // When Redis is not configured we keep the previous error message for compatibility.
+  if (!isWeatherBackendConfigured()) {
     return NextResponse.json(
       { error: 'Weather requires SUPABASE_SERVICE_ROLE_KEY on the server.' },
       { status: 503 }

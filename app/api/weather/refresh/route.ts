@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { isWeatherCacheConfigured } from '@/lib/weather/cache';
+import { isWeatherBackendConfigured } from '@/lib/weather/supabase-admin';
 import { invalidateWeatherCache } from '@/lib/weather/redis-cache';
 import { isRefreshAuthorized } from '@/lib/weather/auth';
 import { refreshFeaturedForecast } from '@/lib/weather/refresh';
 
 /** Warm featured destinations only (cron / manual). */
 export async function POST(request: Request) {
-  if (!isWeatherCacheConfigured()) {
+  if (!isWeatherBackendConfigured()) {
     return NextResponse.json(
       { error: 'Weather refresh requires SUPABASE_SERVICE_ROLE_KEY on the server.' },
       { status: 503 }

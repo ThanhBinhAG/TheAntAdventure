@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/session';
-import { isWeatherCacheConfigured } from '@/lib/weather/cache';
+import { isWeatherBackendConfigured } from '@/lib/weather/supabase-admin';
 import { getDestinationWeather } from '@/lib/weather/refresh';
 
 const CACHE_CONTROL = 'private, max-age=60, stale-while-revalidate=300';
 
 export async function GET(request: Request) {
-  if (!isWeatherCacheConfigured()) {
+  if (!isWeatherBackendConfigured()) {
     return NextResponse.json(
       { error: 'Weather cache requires SUPABASE_SERVICE_ROLE_KEY on the server.' },
       { status: 503 }

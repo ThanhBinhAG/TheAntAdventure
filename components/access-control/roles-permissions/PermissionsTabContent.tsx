@@ -1,8 +1,42 @@
 import React, { useMemo } from 'react';
-import { Card, Checkbox, Input, Empty, Alert, Button } from 'antd';
-import { SearchOutlined, SaveOutlined } from '@ant-design/icons';
+import { Checkbox, Input, Empty, Alert, Button } from 'antd';
+import {
+    SearchOutlined,
+    SaveOutlined,
+    DownOutlined,
+    DashboardOutlined,
+    CalendarOutlined,
+    TeamOutlined,
+    AppstoreOutlined,
+    PictureOutlined,
+    CompassOutlined,
+    HomeOutlined,
+    CloudOutlined,
+    FileTextOutlined,
+    ShopOutlined,
+    SafetyCertificateOutlined,
+    RobotOutlined,
+    PercentageOutlined,
+    HeartOutlined,
+    ContactsOutlined,
+    LineChartOutlined,
+    PushpinOutlined,
+    CreditCardOutlined,
+    TagsOutlined,
+    BookOutlined,
+    FileProtectOutlined,
+    FlagOutlined,
+    CommentOutlined,
+    BankOutlined,
+    PayCircleOutlined,
+    InfoCircleOutlined,
+    UsergroupAddOutlined,
+    CodeOutlined,
+    MessageOutlined,
+    KeyOutlined
+} from '@ant-design/icons';
 import type { AccessControlPermission, AccessControlStaffRole } from '../access-control-api';
-import { tac, tacTemplate } from '@/lib/i18n/pages/access-control';
+import { tac } from '@/lib/i18n/pages/access-control';
 import { formatPermissionAssignmentSummary } from '../role-permission-ui';
 import styles from '../AccessControlPage.module.css';
 
@@ -21,6 +55,81 @@ interface PermissionGroupCardProps {
     updateDraft: (update: (current: string[]) => string[]) => void;
 }
 
+function getGroupIcon(groupCode: string) {
+    switch (groupCode) {
+        case 'dashboard':
+            return <DashboardOutlined />;
+        case 'planner':
+            return <CalendarOutlined />;
+        case 'customers':
+            return <TeamOutlined />;
+        case 'agents':
+            return <ContactsOutlined />;
+        case 'sales':
+            return <LineChartOutlined />;
+        case 'tour_design':
+            return <CompassOutlined />;
+        case 'products':
+            return <AppstoreOutlined />;
+        case 'gallery':
+            return <PictureOutlined />;
+        case 'attractions':
+            return <PushpinOutlined />;
+        case 'pricing':
+            return <CreditCardOutlined />;
+        case 'pricing_essentials':
+            return <TagsOutlined />;
+        case 'pricing_accommodation':
+            return <HomeOutlined />;
+        case 'weather':
+            return <CloudOutlined />;
+        case 'bookings':
+            return <BookOutlined />;
+        case 'contracts':
+            return <FileProtectOutlined />;
+        case 'suppliers':
+            return <ShopOutlined />;
+        case 'guides':
+            return <FlagOutlined />;
+        case 'posttour':
+            return <CommentOutlined />;
+        case 'finance':
+            return <BankOutlined />;
+        case 'tax':
+            return <PercentageOutlined />;
+        case 'salary':
+            return <PayCircleOutlined />;
+        case 'about':
+            return <InfoCircleOutlined />;
+        case 'culture':
+            return <HeartOutlined />;
+        case 'regulations':
+            return <FileTextOutlined />;
+        case 'hr':
+            return <UsergroupAddOutlined />;
+        case 'ai':
+            return <RobotOutlined />;
+        case 'devnotes':
+            return <CodeOutlined />;
+        case 'teamchat':
+            return <MessageOutlined />;
+        case 'access_control':
+            return <KeyOutlined />;
+        default:
+            return <SafetyCertificateOutlined />;
+    }
+}
+
+function getPermissionBadge(code: string, language: 'vi' | 'en') {
+    if (code.endsWith('.read')) {
+        return language === 'vi' ? 'Xem' : 'View';
+    }
+    if (code.endsWith('.write')) {
+        return language === 'vi' ? 'Sửa' : 'Edit';
+    }
+    return '';
+}
+
 const PermissionGroupCard = React.memo(
     function PermissionGroupCard({
         group,
@@ -33,49 +142,78 @@ const PermissionGroupCard = React.memo(
         const codes = group.items.map((item) => item.permission_code);
         const selectedCount = codes.filter((code) => selectedSet.has(code)).length;
 
+        // Trạng thái sập/mở mặc định là đóng (true)
+        const [isCollapsed, setIsCollapsed] = React.useState(true);
+
+        // Tự động mở nếu có tìm kiếm
+        const isExpanded = !isCollapsed || permissionSearch.trim().length > 0;
+
         return (
-            <Card size="small" className={styles.permissionGroup}>
-                <div className={styles.permissionGroupHeader}>
+            <div
+                className={`${styles.permissionGroup} ${
+                    isExpanded ? styles.permissionGroupExpanded : ''
+                }`}
+            >
+                <div
+                    className={`${styles.permissionGroupHeader} ${
+                        isExpanded ? styles.permissionGroupHeaderExpanded : ''
+                    }`}
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                >
                     <div className={styles.permissionGroupTitle}>
-                        <strong>{group.label}</strong>
-                        <span>{selectedCount}/{codes.length} {tac('permissionCount', language)}</span>
+                        <span className={styles.resourceScopeIcon} aria-hidden="true">
+                            {getGroupIcon(group.code)}
+                        </span>
+                        <div className={styles.permissionGroupTitleText}>
+                            <strong>{group.label}</strong>
+                            <span>
+                                ({selectedCount}/{codes.length})
+                            </span>
+                        </div>
                     </div>
-                    {codes.length > 1 && !permissionSearch.trim() && (
-                        <Checkbox
-                            aria-label={tacTemplate('selectAllGroupPermissions', language, { group: group.label })}
-                            checked={selectedCount === codes.length}
-                            indeterminate={selectedCount > 0 && selectedCount < codes.length}
-                            disabled={saving}
-                            onChange={(event) =>
-                                updateDraft((current) =>
-                                    event.target.checked
-                                        ? [...new Set([...current, ...codes])]
-                                        : current.filter((code) => !codes.includes(code))
-                                )
-                            }
-                        />
-                    )}
+
+                    <span
+                        className={`${styles.permissionGroupChevron} ${
+                            isExpanded ? styles.permissionGroupChevronExpanded : ''
+                        }`}
+                    >
+                        <DownOutlined />
+                    </span>
                 </div>
-                <div className={styles.permissionRows}>
-                    {group.items.map((permission) => (
-                        <Checkbox
-                            key={permission.permission_code}
-                            checked={selectedSet.has(permission.permission_code)}
-                            disabled={saving}
-                            className={styles.permissionRow}
-                            onChange={(event) =>
-                                updateDraft((current) =>
-                                    event.target.checked
-                                        ? [...new Set([...current, permission.permission_code])]
-                                        : current.filter((code) => code !== permission.permission_code)
-                                )
-                            }
-                        >
-                            <span className={styles.permissionText}>{permission.permission_description}</span>
-                        </Checkbox>
-                    ))}
-                </div>
-            </Card>
+
+                {isExpanded && (
+                    <div className={styles.permissionRows}>
+                        {group.items.map((permission) => {
+                            const badgeText = getPermissionBadge(permission.permission_code, language);
+                            return (
+                                <div key={permission.permission_code} className={styles.permissionRow}>
+                                    <Checkbox
+                                        checked={selectedSet.has(permission.permission_code)}
+                                        disabled={saving}
+                                        onChange={(event) =>
+                                            updateDraft((current) =>
+                                                event.target.checked
+                                                    ? [...new Set([...current, permission.permission_code])]
+                                                    : current.filter((code) => code !== permission.permission_code)
+                                            )
+                                        }
+                                    >
+                                        <span className={styles.permissionText}>
+                                            {permission.permission_description}
+                                        </span>
+                                    </Checkbox>
+
+                                    {badgeText && (
+                                        <span className={styles.permissionBadge}>
+                                            {badgeText}
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
         );
     },
     (prevProps, nextProps) => {

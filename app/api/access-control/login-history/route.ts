@@ -2,13 +2,16 @@ import { NextResponse } from 'next/server';
 import {
     AccessControlRpcError,
     getAuthLoginEvents,
-    isCurrentAccessControlSuperAdmin,
 } from '@/lib/access-control/server';
 import { getAuthContext } from '@/lib/auth/session';
 import {
     parseAuthLoginHistoryQuery,
 } from '@/lib/access-control/login-history-input';
-import { accessControlError } from '@/lib/access-control/api-error';
+import {
+    accessControlError,
+    accessControlPermissionError,
+} from '@/lib/access-control/api-error';
+import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +23,7 @@ function errorResponse(error: unknown) {
         return NextResponse.json(
             accessControlError(
                 'LOGIN_HISTORY_FORBIDDEN',
-                'Chỉ Super Admin được xem lịch sử đăng nhập.',
+                'Bạn không có quyền xem lịch sử đăng nhập.',
             ),
             { status: 403 },
         );
@@ -60,15 +63,12 @@ export async function GET(request: Request) {
 
     try {
         // API kiểm tra trước để trả 403 rõ ràng; RPC kiểm tra lại trong DB.
-        const isSuperAdmin = await isCurrentAccessControlSuperAdmin();
+        const permission = await checkPermissionForRequest('users.manage');
 
-        if (!isSuperAdmin) {
+        if (!permission.allowed) {
             return NextResponse.json(
-                accessControlError(
-                    'LOGIN_HISTORY_FORBIDDEN',
-                    'Chỉ Super Admin được xem lịch sử đăng nhập.',
-                ),
-                { status: 403 },
+                accessControlPermissionError(permission.status),
+                { status: permission.status },
             );
         }
     } catch (error) {

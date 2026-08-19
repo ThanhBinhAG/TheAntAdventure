@@ -124,9 +124,6 @@ export default function UserActionsMenu({
                 void handleChangeActiveStatus();
             },
         },
-        {
-            type: 'divider',
-        },
     ];
 
     return (

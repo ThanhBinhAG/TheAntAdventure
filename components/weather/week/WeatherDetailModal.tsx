@@ -43,9 +43,9 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
         <div className="modal-hd modal-hd-green wg-detail-hd">
           <div>
             <p className="wg-detail-region">{meta ? regionLabel(meta.region) : ''}</p>
-            <h2 id="wg-detail-title">{meta?.name || data?.name || 'Chi tiết thời tiết'}</h2>
+            <h2 id="wg-detail-title">{meta?.name || data?.name || 'Weather details'}</h2>
           </div>
-          <button type="button" className="gallery-modal-close" onClick={onClose} aria-label="Đóng">
+          <button type="button" className="gallery-modal-close" onClick={onClose} aria-label="Close">
             ×
           </button>
         </div>
@@ -55,13 +55,13 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
         ) : (
           <div className="wg-detail-hero wg-detail-hero--ph" aria-hidden>
             <span className="wg-cover-ph-name">{meta?.name || data?.name || ''}</span>
-            <span className="wg-cover-ph-hint">Chưa có ảnh — chỉnh sửa để thêm</span>
+            <span className="wg-cover-ph-hint">No image — edit to add</span>
           </div>
         )}
 
         <div className="wg-detail-body">
           {loading && !data ? (
-            <div className="wg-detail-loading" aria-busy aria-label="Đang tải thời tiết">
+            <div className="wg-detail-loading" aria-busy aria-label="Loading weather">
               <div className="wg-detail-current">
                 <div className="wg-skel wg-skel-icon" aria-hidden />
                 <div className="wg-skel-stack">
@@ -78,7 +78,7 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
                   </div>
                 ))}
               </dl>
-              <h3 className="wg-section-heading">Dự báo 7 ngày</h3>
+              <h3 className="wg-section-heading">7-day forecast</h3>
               <div className="wg-skel wg-skel-forecast" aria-hidden />
             </div>
           ) : null}
@@ -86,7 +86,7 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
             <div className="wg-main-card-error">
               <p>{error}</p>
               <button type="button" className="btn btn-s btn-sm" onClick={() => void refresh()}>
-                Thử lại
+                Try again
               </button>
             </div>
           ) : null}
@@ -102,32 +102,32 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
                 <div>
                   <p className="wg-detail-temp">{Math.round(current.tempC)}°C</p>
                   <p className="wg-detail-condition">{weatherLabelVi(current.weatherCode)}</p>
-                  <p className="wg-muted">Cập nhật {formatUpdatedAt(data?.fetchedAt)}</p>
+                  <p className="wg-muted">Updated {formatUpdatedAt(data?.fetchedAt)}</p>
                 </div>
               </div>
 
               <dl className="wg-main-stats wg-main-stats--modal">
                 <div>
-                  <dt>Độ ẩm</dt>
+                  <dt>Humidity</dt>
                   <dd>{current.humidity != null ? `${Math.round(current.humidity)}%` : '—'}</dd>
                 </div>
                 <div>
-                  <dt>Gió</dt>
+                  <dt>Wind</dt>
                   <dd>{current.windKmh != null ? `${Math.round(current.windKmh)} km/h` : '—'}</dd>
                 </div>
                 <div>
-                  <dt>Cảm giác</dt>
+                  <dt>Feels like</dt>
                   <dd>{current.feelsLikeC != null ? `${Math.round(current.feelsLikeC)}°` : '—'}</dd>
                 </div>
                 <div>
-                  <dt>UV hôm nay</dt>
+                  <dt>UV today</dt>
                   <dd>
                     {days[0]?.uvIndexMax != null ? Math.round(days[0].uvIndexMax) : '—'}
                   </dd>
                 </div>
               </dl>
 
-              <h3 className="wg-section-heading">Dự báo 7 ngày</h3>
+              <h3 className="wg-section-heading">7-day forecast</h3>
               <div className="wg-detail-forecast">
                 {days.map((day) => (
                   <div key={day.date} className="wg-detail-day">
@@ -137,7 +137,7 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
                       {Math.round(day.tempMax)}° / {Math.round(day.tempMin)}°
                     </span>
                     <span className="wg-detail-day-extra">
-                      {day.precipMm > 0 ? `${day.precipMm.toFixed(1)} mm` : 'Khô'}
+                      {day.precipMm > 0 ? `${day.precipMm.toFixed(1)} mm` : 'No rain'}
                       {day.uvIndexMax != null ? ` · UV ${Math.round(day.uvIndexMax)}` : ''}
                     </span>
                   </div>
@@ -149,10 +149,10 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
 
         <div className="wg-detail-ft">
           <button type="button" className="btn btn-s" onClick={onClose}>
-            Đóng
+            Close
           </button>
           <button type="button" className="btn btn-p" onClick={() => void refresh()}>
-            Làm mới
+            Refresh
           </button>
         </div>
       </div>

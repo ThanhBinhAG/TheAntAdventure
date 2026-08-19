@@ -5,7 +5,7 @@ React UI: CRM chrome at root, page shells in `pages/`, and domain widgets in sib
 
 ## Contents
 - Root: `Sidebar`, `Topbar`, `CRMShell`, `StoreProvider`, `PageDataGate`, `ToastHost`, `ConfirmHost`, `EmptyState` (shared empty lists), `AiCopilot*`, `AutoSyncListener`, `PaginationBar`, …
-- `Sidebar` — calls `useSidebarBadgeBoot` so Tour Design / Planner badges work after F5 on any route
+- `Sidebar` — `useSidebarBadges` (count API when tables not hydrated; `prefetch={false}` on nav links)
 - `sidebar/` — company logo editor (gallery pick + crop)
 - `pages/` — slug → page components for `(crm)/[page]`
 - `tour-design/` — Tour Design wizard (`TourDesignPage` + steps; URL slug still `tourdesign`)

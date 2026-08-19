@@ -66,7 +66,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
     setError(null);
 
     if (captchaRequired && !captchaToken) {
-      setError('Vui lòng hoàn thành xác minh CAPTCHA.');
+      setError('Please complete the CAPTCHA.');
       return;
     }
 
@@ -95,7 +95,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
       };
 
       if (!res.ok || !data.ok) {
-        const msg = authErrorMessage(data.error || 'Đăng nhập thất bại.');
+        const msg = authErrorMessage(data.error || 'Login failed.');
         logAuthEvent(
           'signIn failed',
           { status: res.status, mode: data.mode },
@@ -115,7 +115,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
       // Không gọi router.refresh() vì có thể tạo thêm một lượt tải dữ liệu không cần thiết.
       router.push(safeNext);
     } catch (err) {
-      const raw = err instanceof Error ? err.message : 'Đăng nhập thất bại.';
+      const raw = err instanceof Error ? err.message : 'Login failed.';
       logAuthEvent('signIn exception', { error: raw }, 'error');
       setError(authErrorMessage(raw));
     } finally {
@@ -128,7 +128,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
       <div className="login-card">
         <div className="login-brand">
           <div className="login-title">The Ant Adventures</div>
-          <div className="login-subtitle">CRM — Đăng nhập</div>
+          <div className="login-subtitle">CRM — Login</div>
         </div>
 
         <form
@@ -152,7 +152,7 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
           />
 
           <label className="login-label" htmlFor="login-password">
-            Mật khẩu
+            Password
           </label>
           <input
             id="login-password"
@@ -184,15 +184,15 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
                   <span className="dot" />
                   <span className="dot" />
                 </span>
-                Đang đăng nhập…
+                Logging in…
               </>
             ) : (
-              'Đăng nhập'
+              'Login'
             )}
           </button>
         </form>
 
-        <p className="login-hint">Tài khoản do quản trị viên cấp. Không có đăng ký công khai.</p>
+        <p className="login-hint">Account is assigned by administrator. No public registration.</p>
 
         {showDebugLink && (
           <p className="login-hint debug-login-link">

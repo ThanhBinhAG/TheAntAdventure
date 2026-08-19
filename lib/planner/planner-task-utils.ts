@@ -4,16 +4,16 @@ import { daysAgoIso } from '../core/date-utils';
 const TITLE_MAX = 80;
 
 export const TASK_STATUSES = [
-  { value: 'todo', label: 'Chưa làm' },
-  { value: 'inprogress', label: 'Đang làm' },
-  { value: 'review', label: 'Cần xem lại' },
-  { value: 'done', label: 'Hoàn thành' },
+  { value: 'todo', label: 'Not started' },
+  { value: 'inprogress', label: 'In progress' },
+  { value: 'review', label: 'Needs review' },
+  { value: 'done', label: 'Completed' },
 ] as const;
 
 export type TaskStatusValue = (typeof TASK_STATUSES)[number]['value'];
 
 export function getTaskStatusLabel(status?: string): string {
-  return TASK_STATUSES.find((s) => s.value === status)?.label ?? 'Chưa làm';
+  return TASK_STATUSES.find((s) => s.value === status)?.label ?? 'Not started';
 }
 
 export function isTaskComplete(status?: string): boolean {
@@ -29,12 +29,12 @@ export function getCompletedTasks(tasks: Task[]): Task[] {
 }
 
 export const COMPLETED_TIME_FILTERS = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'today', label: 'Hôm nay' },
-  { value: '7d', label: '7 ngày qua' },
-  { value: '30d', label: '30 ngày qua' },
-  { value: 'month', label: 'Tháng này' },
-  { value: 'custom', label: 'Chọn ngày' },
+  { value: 'all', label: 'All' },
+  { value: 'today', label: 'Today' },
+  { value: '7d', label: '7 days ago' },
+  { value: '30d', label: '30 days ago' },
+  { value: 'month', label: 'This month' },
+  { value: 'custom', label: 'Select date' },
 ] as const;
 
 export type CompletedTimeFilter = (typeof COMPLETED_TIME_FILTERS)[number]['value'];

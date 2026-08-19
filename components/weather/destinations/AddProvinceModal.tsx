@@ -72,21 +72,21 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
   async function handleSave() {
     const name = form.name.trim();
     if (!name) {
-      toast.warning('Tên tỉnh thành là bắt buộc.');
+      toast.warning('Province name is required.');
       return;
     }
     const lat = Number(form.latitude);
     const lng = Number(form.longitude);
     if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-      toast.warning('Latitude phải trong khoảng -90 đến 90.');
+      toast.warning('Latitude must be between -90 and 90.');
       return;
     }
     if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
-      toast.warning('Longitude phải trong khoảng -180 đến 180.');
+      toast.warning('Longitude must be between -180 and 180.');
       return;
     }
     if (form.isFeatured && featuredFull) {
-      toast.warning('Đã có 2 điểm nổi bật. Dùng “Chỉnh 2 điểm nổi bật” để đổi slot.');
+      toast.warning('Already have 2 featured destinations. Use “Edit featured destinations” to change the slot.');
       return;
     }
 
@@ -103,10 +103,10 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
         coverPhotoId: form.coverPhotoId || null,
         isFeatured: form.isFeatured,
       });
-      toast.success('Đã thêm tỉnh thành.');
+      toast.success('The province has been added.');
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Không thể lưu.');
+      toast.error(err instanceof Error ? err.message : 'Failed to save.');
     } finally {
       setSaving(false);
     }
@@ -123,7 +123,7 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
           aria-labelledby="wg-add-title"
         >
           <div className="modal-hd modal-hd-green">
-            <h2 id="wg-add-title">Thêm tỉnh thành mới</h2>
+            <h2 id="wg-add-title">Add new province</h2>
             <button type="button" className="gallery-modal-close" onClick={onClose} aria-label="Đóng">
               ×
             </button>
@@ -131,35 +131,35 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
 
           <div className="wg-province-form">
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Thông tin</h3>
+              <h3 className="wg-form-section-title">Information</h3>
               <div className="fg">
                 <label className="lbl" htmlFor="wg-add-name">
-                  Tên tỉnh thành *
+                  Province name *
                 </label>
                 <input
                   id="wg-add-name"
                   value={form.name}
                   onChange={(e) => set('name', e.target.value)}
-                  placeholder="Ví dụ: Đà Lạt"
+                  placeholder="Example: Da Lat"
                 />
               </div>
               <div className="fg">
                 <label className="lbl" htmlFor="wg-add-region">
-                  Vùng
+                  Region
                 </label>
                 <select
                   id="wg-add-region"
                   value={form.region}
                   onChange={(e) => set('region', e.target.value as WeatherRegion)}
                 >
-                  <option value="north">Miền Bắc</option>
-                  <option value="central">Miền Trung</option>
-                  <option value="south">Miền Nam</option>
+                  <option value="north">North</option>
+                  <option value="central">Central</option>
+                  <option value="south">South</option>
                 </select>
               </div>
               <div className="fg">
                 <label className="lbl" htmlFor="wg-add-desc">
-                  Mô tả ngắn
+                  Short description
                 </label>
                 <input
                   id="wg-add-desc"
@@ -170,7 +170,7 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
             </section>
 
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Tọa độ (Open-Meteo)</h3>
+              <h3 className="wg-form-section-title">Coordinates (Open-Meteo)</h3>
               <div className="wg-coord-row">
                 <div className="fg">
                   <label className="lbl" htmlFor="wg-add-lat">
@@ -200,30 +200,30 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
             </section>
 
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Ảnh đại diện</h3>
+              <h3 className="wg-form-section-title">Cover image</h3>
               <div className="wg-cover-pick">
                 {coverThumb ? (
                   <div className="wg-cover-preview">
                     <StorageImage src={coverThumb} alt="" fill sizes="120px" className="phlib-img" />
                   </div>
                 ) : (
-                  <div className="wg-cover-empty">Chưa có ảnh — thêm sau được</div>
+                  <div className="wg-cover-empty">No image yet — add later</div>
                 )}
                 <button type="button" className="btn btn-s btn-sm" onClick={() => setPickerOpen(true)}>
-                  Chọn từ thư viện
+                  Select from library
                 </button>
               </div>
             </section>
 
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Ghi chú</h3>
+              <h3 className="wg-form-section-title">Notes</h3>
               <div className="fg">
                 <textarea
                   id="wg-add-notes"
                   rows={3}
                   value={form.notes}
                   onChange={(e) => set('notes', e.target.value)}
-                  placeholder="Ghi chú nội bộ…"
+                  placeholder="Internal notes…"
                 />
               </div>
               <label className="wg-check">
@@ -234,11 +234,11 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
                   onChange={(e) => set('isFeatured', e.target.checked)}
                 />
                 <span>
-                  Hiển thị nổi bật (featured)
+                  Display featured
                   <span className="wg-check-hint">
                     {featuredFull
-                      ? 'Đã đủ 2 slot — dùng “Chỉnh 2 điểm nổi bật” trên trang.'
-                      : `Còn ${2 - featuredCount} slot trống.`}
+                      ? 'Already have 2 slots — use “Edit featured destinations” on the page.'
+                      : `Still ${2 - featuredCount} slots available.`}
                   </span>
                 </span>
               </label>
@@ -247,10 +247,10 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
 
           <div className="wg-detail-ft">
             <button type="button" className="btn btn-s" onClick={onClose} disabled={saving}>
-              Hủy
+              Cancel
             </button>
             <button type="button" className="btn btn-p" onClick={() => void handleSave()} disabled={saving}>
-              {saving ? 'Đang lưu…' : 'Lưu'}
+              {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </div>
@@ -260,7 +260,7 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
         variant="modal"
         mode="single"
         open={pickerOpen}
-        title="Chọn ảnh đại diện"
+        title="Select cover image"
         photos={photos}
         folders={folders}
         linkedPhotoIds={form.coverPhotoId ? [form.coverPhotoId] : []}

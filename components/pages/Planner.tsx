@@ -228,13 +228,13 @@ export default function Planner() {
               className="planner-note-textarea planner-note-textarea-inline"
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Ghi công việc hôm nay..."
+              placeholder="Add today's tasks..."
               rows={6}
             />
             <div className="planner-note-board-actions">
               <TaskStatusSelect value={newTaskStatus} onChange={setNewTaskStatus} />
               <button className="btn btn-p btn-sm" type="button" onClick={saveNoteTask} disabled={!noteText.trim()}>
-                Thêm công việc
+                Add task
               </button>
             </div>
           </div>
@@ -254,7 +254,7 @@ export default function Planner() {
               ))
             ) : (
               <div style={{ padding: 16, color: 'var(--m)', fontSize: 12.5 }}>
-                Chưa có công việc hôm nay. Ghi vào bảng trắng phía trên — việc chưa hoàn thành sẽ tự chuyển sang ngày mai.
+                No tasks today. Add tasks to the white board above — tasks that are not completed will automatically move to tomorrow.
               </div>
             )}
           </div>
@@ -293,7 +293,7 @@ export default function Planner() {
                     </div>
                   ))
               ) : (
-                <div style={{ fontSize: 12, color: 'var(--m)' }}>Chưa có deadline.</div>
+                <div style={{ fontSize: 12, color: 'var(--m)' }}>No deadlines.</div>
               )}
             </div>
           </div>

@@ -13,9 +13,9 @@ type Props = {
 };
 
 const REGION_LABEL: Record<string, string> = {
-  north: 'Miền Bắc',
-  central: 'Miền Trung',
-  south: 'Miền Nam',
+  north: 'North',
+  central: 'Central',
+  south: 'South',
 };
 
 export default function FeaturedSlotsModal({
@@ -42,21 +42,21 @@ export default function FeaturedSlotsModal({
 
   async function handleSave() {
     if (!slot1) {
-      toast.warning('Chọn điểm nổi bật thứ nhất.');
+      toast.warning('Select the first featured destination.');
       return;
     }
     if (slot2 && slot2 === slot1) {
-      toast.warning('Hai slot không được trùng nhau.');
+      toast.warning('Two slots cannot be the same.');
       return;
     }
     const ids = slot2 ? [slot1, slot2] : [slot1];
     setSaving(true);
     try {
       await onSave(ids);
-      toast.success('Đã cập nhật điểm nổi bật.');
+      toast.success('Featured destinations updated.');
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Không thể lưu.');
+      toast.error(err instanceof Error ? err.message : 'Cannot save.');
     } finally {
       setSaving(false);
     }
@@ -80,16 +80,16 @@ export default function FeaturedSlotsModal({
       >
         <div className="modal-hd modal-hd-green">
           <div>
-            <h2 id="wg-featured-title">Chỉnh 2 điểm nổi bật</h2>
-            <p className="wg-featured-modal-sub">Hai điểm lớn trên đầu trang Weather Guide</p>
+            <h2 id="wg-featured-title">Adjust featured destinations</h2>
+            <p className="wg-featured-modal-sub">Two major destinations at the top of the Weather Guide page</p>
           </div>
-          <button type="button" className="gallery-modal-close" onClick={onClose} aria-label="Đóng">
+          <button type="button" className="gallery-modal-close" onClick={onClose} aria-label="Close">
             ×
           </button>
         </div>
 
         <p className="wg-featured-hint">
-          Slot 1 bắt buộc. Slot 2 có thể để trống nếu chỉ muốn một điểm nổi bật.
+          Slot 1 is required. Slot 2 can be empty if you only want one featured destination.
         </p>
 
         <div className="wg-featured-slots">
@@ -99,12 +99,12 @@ export default function FeaturedSlotsModal({
                 1
               </span>
               <span>
-                Điểm chính
-                <span className="wg-featured-slot-hint"> · bắt buộc</span>
+                Main destination
+                <span className="wg-featured-slot-hint"> · required</span>
               </span>
             </label>
             <select id="wg-feat-1" value={slot1} onChange={(e) => setSlot1(e.target.value)}>
-              <option value="">— Chọn điểm đến —</option>
+              <option value="">— Select destination —</option>
               {options.map((d) => (
                 <option key={d.id} value={d.id} disabled={d.id === slot2}>
                   {optionLabel(d)}
@@ -118,12 +118,12 @@ export default function FeaturedSlotsModal({
                 2
               </span>
               <span>
-                Điểm phụ
-                <span className="wg-featured-slot-hint"> · tùy chọn</span>
+                Secondary destination
+                <span className="wg-featured-slot-hint"> · optional</span>
               </span>
             </label>
             <select id="wg-feat-2" value={slot2} onChange={(e) => setSlot2(e.target.value)}>
-              <option value="">— Không chọn —</option>
+              <option value="">— Select destination —</option>
               {options.map((d) => (
                 <option key={d.id} value={d.id} disabled={d.id === slot1}>
                   {optionLabel(d)}
@@ -135,10 +135,10 @@ export default function FeaturedSlotsModal({
 
         <div className="wg-detail-ft">
           <button type="button" className="btn btn-s" onClick={onClose} disabled={saving}>
-            Hủy
+            Cancel
           </button>
           <button type="button" className="btn btn-p" onClick={() => void handleSave()} disabled={saving}>
-            {saving ? 'Đang lưu…' : 'Lưu'}
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>

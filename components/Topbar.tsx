@@ -268,6 +268,7 @@ export function QuickNav() {
         <Link
           key={p}
           href={`/${p}`}
+          prefetch={false}
           id={`qnav-${p}`}
           className={`qnav-btn${current === p ? ' active' : ''}`}
         >

@@ -38,8 +38,8 @@ export type SyncArrayTable = (typeof SYNC_ARRAY_TABLES)[number];
 export const PROFILE_LAZY_TABLES: readonly SyncArrayTable[] = ['comms', 'bookings'] as const;
 
 /**
- * Tables used for global sidebar badges (see sidebarBadgeTablesForPermissions).
- * Loaded from Sidebar — subset depends on page permissions.
+ * Tables mirrored by route boot when visiting Tour Design / Planner / Sales.
+ * Sidebar badges no longer global-fetch these — see `hooks/useSidebarBadges` + `/api/sidebar/badges`.
  */
 export const SIDEBAR_BADGE_TABLES: readonly SyncArrayTable[] = [
   'leads',

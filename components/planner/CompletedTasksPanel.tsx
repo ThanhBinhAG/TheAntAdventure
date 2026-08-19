@@ -28,7 +28,7 @@ function TaskStatusSelect({
       className="planner-status-select planner-status-select-sm"
       value={value || 'todo'}
       onChange={(e) => onChange(e.target.value as TaskStatusValue)}
-      aria-label="Tiến độ công việc"
+      aria-label="Task progress"
     >
       {TASK_STATUSES.map((s) => (
         <option key={s.value} value={s.value}>
@@ -125,7 +125,7 @@ export default function CompletedTasksPanel({ tasks, onStatusChange }: Completed
         aria-expanded={open}
       >
         <span>
-          📁 Công việc đã hoàn thành ({completedTasks.length})
+          📁 Completed tasks ({completedTasks.length})
         </span>
         <span className="planner-completed-chevron">{open ? '▾' : '▸'}</span>
       </button>
@@ -135,12 +135,12 @@ export default function CompletedTasksPanel({ tasks, onStatusChange }: Completed
           <input
             type="search"
             className="planner-completed-search"
-            placeholder="🔍 Tìm công việc, người phụ trách, bộ phận..."
+            placeholder="🔍 Search tasks, assignees, departments..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
 
-          <div className="planner-completed-filters" role="group" aria-label="Lọc theo thời gian">
+          <div className="planner-completed-filters" role="group" aria-label="Filter by time">
             {COMPLETED_TIME_FILTERS.map((f) => {
               const count =
                 f.value === 'custom'
@@ -176,7 +176,7 @@ export default function CompletedTasksPanel({ tasks, onStatusChange }: Completed
           {timeFilter === 'custom' && (
             <div className="planner-completed-custom-range">
               <label className="planner-completed-date-field">
-                <span>Từ ngày</span>
+                <span>From date</span>
                 <input
                   type="date"
                   value={customFrom}
@@ -185,7 +185,7 @@ export default function CompletedTasksPanel({ tasks, onStatusChange }: Completed
                 />
               </label>
               <label className="planner-completed-date-field">
-                <span>Đến ngày</span>
+                <span>To date</span>
                 <input
                   type="date"
                   value={customTo}
@@ -200,12 +200,12 @@ export default function CompletedTasksPanel({ tasks, onStatusChange }: Completed
             <div className="planner-completed-filter-summary">
               {timeFilter === 'custom' && customRange ? (
                 <>
-                  Hiển thị {filteredTasks.length} / {completedTasks.length} công việc
+                  Display {filteredTasks.length} / {completedTasks.length} tasks
                   {' · '}
                   {formatShortDate(customRange.from)} – {formatShortDate(customRange.to)}
                 </>
               ) : (
-                <>Hiển thị {filteredTasks.length} / {completedTasks.length} công việc</>
+                <>Display {filteredTasks.length} / {completedTasks.length} tasks</>
               )}
             </div>
           )}
@@ -217,24 +217,24 @@ export default function CompletedTasksPanel({ tasks, onStatusChange }: Completed
               variant="tasks"
               title={
                 completedTasks.length === 0
-                  ? 'Chưa có công việc hoàn thành'
+                  ? 'No completed tasks'
                   : timeFilter !== 'all' && !search.trim()
                     ? timeFilter === 'custom' && (!customFrom || !customTo)
-                      ? 'Chọn khoảng ngày để xem công việc'
-                      : 'Không có công việc trong khoảng này'
-                    : 'Không tìm thấy công việc phù hợp'
+                      ? 'Select a date range to view tasks'
+                      : 'No tasks in this range'
+                    : 'No tasks found'
               }
               description={
                 completedTasks.length === 0
-                  ? 'Hoàn thành task trên Daily Planner để chúng xuất hiện tại đây.'
-                  : 'Thử đổi bộ lọc thời gian hoặc từ khóa tìm kiếm.'
+                  ? 'Complete tasks on the Daily Planner to appear here.'
+                  : 'Try changing the time filter or search keywords.'
               }
             />
           ) : (
             groupedByDate.map(([date, dateTasks]) => (
               <div key={date} className="planner-completed-group">
                 <div className="planner-completed-group-hd">
-                  {date === 'unknown' ? 'Không có ngày' : formatGroupDate(date)}
+                  {date === 'unknown' ? 'No date' : formatGroupDate(date)}
                 </div>
                 {dateTasks.map((t, i) => (
                   <div

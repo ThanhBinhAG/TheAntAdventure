@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getRedisClient } from '@/lib/redis/client';
+import { cacheGet, cacheSet, cacheDel } from './cache-helper';
 
 const COMPANY_LOGO_CACHE_KEY = 'cache:branding:logo';
 const COMPANY_LOGO_CACHE_TTL_SECONDS = 60 * 60;
@@ -11,50 +11,25 @@ const COMPANY_LOGO_CACHE_TTL_SECONDS = 60 * 60;
  * string: URL logo tùy chỉnh.
  */
 export async function getCachedCompanyLogo(): Promise<string | null | undefined> {
-    const client = await getRedisClient();
+    const value = await cacheGet<unknown>(COMPANY_LOGO_CACHE_KEY);
 
-    if (!client) return undefined;
+    if (value === null) return undefined;
 
-    try {
-        const raw = await client.get(COMPANY_LOGO_CACHE_KEY);
-
-        if (raw === null) return undefined;
-
-        const value: unknown = JSON.parse(raw);
-
-        if (value === null || typeof value === 'string') return value;
-
-        return undefined;
-    } catch {
-        return undefined;
+    if (value === null || typeof value === 'string') {
+        return value;
     }
+
+    return undefined;
 }
 
 export async function setCachedCompanyLogo(logoUrl: string | null): Promise<void> {
-    const client = await getRedisClient();
-
-    if (!client) return;
-
-    try {
-        await client.set(
-            COMPANY_LOGO_CACHE_KEY,
-            JSON.stringify(logoUrl),
-            { EX: COMPANY_LOGO_CACHE_TTL_SECONDS },
-        );
-    } catch {
-        // Redis cache lỗi không được làm lỗi API logo.
-    }
+    await cacheSet(
+        COMPANY_LOGO_CACHE_KEY,
+        logoUrl,
+        COMPANY_LOGO_CACHE_TTL_SECONDS,
+    );
 }
 
 export async function invalidateCompanyLogoCache(): Promise<void> {
-    const client = await getRedisClient();
-
-    if (!client) return;
-
-    try {
-        await client.del(COMPANY_LOGO_CACHE_KEY);
-    } catch {
-        // Redis cache lỗi không được làm lỗi thao tác đổi/xóa logo.
-    }
+    await cacheDel(COMPANY_LOGO_CACHE_KEY);
 }
-

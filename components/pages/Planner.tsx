@@ -15,6 +15,7 @@ import type { Task } from '@/lib/types';
 import { addDays, localTodayIso, mondayOfWeek } from '@/lib/core/date-utils';
 import { useStore } from '@/hooks/useStore';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { toast } from '@/lib/toast';
 
 const TEAM = ['Tai Pham', 'Linh N.', 'Minh T.', 'Huong L.', 'Khoa V.'];
 
@@ -78,16 +79,54 @@ export default function Planner() {
     noteBoardRef.current?.querySelector('textarea')?.focus();
   }
 
-  function saveNoteTask() {
+  async function saveNoteTask() {
     if (!noteText.trim()) return;
-    addTask(buildNoteTask(noteText, today, newTaskStatus) as Record<string, unknown>);
-    setNoteText('');
-    setNewTaskStatus('todo');
+    const newTask = buildNoteTask(noteText, today, newTaskStatus);
+    try {
+      const res = await fetch('/api/planner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task: newTask }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Không thể tạo task mới.');
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? 'Không thể tạo task mới.');
+      }
+
+      addTask(newTask as Record<string, unknown>);
+      setNoteText('');
+      setNewTaskStatus('todo');
+      toast.success('Đã thêm công việc.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Thêm công việc thất bại.');
+    }
   }
 
-  function changeTaskStatus(id: string, status: TaskStatusValue) {
-    updateTask(id, { status });
-    if (status === 'done' && expandedTaskId === id) setExpandedTaskId(null);
+  async function changeTaskStatus(id: string, status: TaskStatusValue) {
+    try {
+      const res = await fetch('/api/planner', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, patch: { status } }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Không thể cập nhật trạng thái.');
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? 'Không thể cập nhật trạng thái.');
+      }
+
+      updateTask(id, { status });
+      if (status === 'done' && expandedTaskId === id) setExpandedTaskId(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Cập nhật trạng thái thất bại.');
+    }
   }
 
   function toggleTaskExpand(id: string | undefined) {

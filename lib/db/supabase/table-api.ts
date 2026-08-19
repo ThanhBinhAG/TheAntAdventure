@@ -89,6 +89,27 @@ export function makeTableApi(table: SyncArrayTable) {
     };
   }
 
+  if (table === 'tasks') {
+    return {
+      getAll: async () => {
+        try {
+          const res = await fetch('/api/planner/all', { credentials: 'same-origin' });
+          if (!res.ok) throw new Error('BFF tasks load failed');
+          const json = await res.json();
+          return json.ok ? json.data : [];
+        } catch (e) {
+          console.error(e);
+          return [];
+        }
+      },
+      syncTable: async () => {
+        return { skippedOrphanDelete: true };
+      },
+      deleteRemote: async () => {},
+      count: async () => 0,
+    };
+  }
+
   const getAll = handler.tagTable ? () => getTaggedRows(handler) : () => getSimpleRows(handler);
   const syncTable = handler.tagTable
     ? (rows: Row[], options?: SyncTableOptions) => syncTaggedTable(table, handler, rows, options)

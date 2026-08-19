@@ -8,7 +8,8 @@ Next.js Route Handlers for server-side auth, media, exports, weather, and diagno
 - `access-control/` — users, staff-roles, audit-logs, login-history, super-admin-status
 - `branding/` — company logo (`logo/route.ts`)
 - `photos/` — gallery pipeline: `upload/{init,chunk,complete}`, `delete`
-- `products/` — paginated catalogue list + `facets/` filter payload
+- `products/` — paginated catalogue, hydration routes, facets, pricing, and XLSX imports
+- `planner/` — daily planner (tasks) CRUD and hydration endpoints
 - `pricing/` — pricing PDF export (`export/`)
 - `proposals/` — proposal PDF export (`export/`) + company templates (`templates/`)
 - `weather/` — boot, weekly, refresh, destination(s), featured

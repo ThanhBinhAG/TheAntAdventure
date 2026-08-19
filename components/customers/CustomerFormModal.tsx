@@ -183,7 +183,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
         </div>
         <div className="nc-modal-body">
           <div className="nc-section nc-section-type">
-            <div className="nc-section-title">Client Type & Assignment / Loại khách & Phân công</div>
+            <div className="nc-section-title">Client Type & Assignment</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 11 }}>
               <div className="fg">
                 <label className="lbl">Client Type</label>
@@ -225,7 +225,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             </div>
           </div>
 
-          <div className="nc-section-title">Contact / Liên hệ</div>
+          <div className="nc-section-title">Contact</div>
           <div className="nc-grid-3" style={{ marginBottom: 16 }}>
             <div className="fg" style={{ gridColumn: '1 / 3' }}>
               <label className="lbl">
@@ -261,7 +261,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
                 style={emailBlocked ? { borderColor: '#C0392B', boxShadow: '0 0 0 1px #C0392B' } : undefined}
               />
               {emailCheck === 'checking' && form.email.trim() && (
-                <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>Checking email… / Đang kiểm tra email…</div>
+                <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>Checking email…</div>
               )}
               {emailBlocked && duplicateCustomer && (
                 <div style={{ fontSize: 11, color: '#C0392B', marginTop: 4, lineHeight: 1.45 }}>
@@ -269,7 +269,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
                 </div>
               )}
               {emailCheck === 'available' && form.email.trim() && (
-                <div style={{ fontSize: 11, color: 'var(--g)', marginTop: 4 }}>Email available / Email hợp lệ</div>
+                <div style={{ fontSize: 11, color: 'var(--g)', marginTop: 4 }}>Email available</div>
               )}
             </div>
             <div className="fg">
@@ -325,7 +325,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             </div>
           </div>
 
-          <div className="nc-section-title">Travel Profile / Hồ sơ du lịch</div>
+          <div className="nc-section-title">Travel Profile</div>
           <div className="nc-grid-3" style={{ marginBottom: 16 }}>
             <div className="fg">
               <label className="lbl">Travel Style</label>
@@ -382,7 +382,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             </div>
           </div>
 
-          <div className="nc-section-title">Travel Logistics / Hậu cần</div>
+          <div className="nc-section-title">Travel Logistics</div>
           <div className="nc-grid-3" style={{ marginBottom: 16 }}>
             <div className="fg">
               <label className="lbl">Domestic Flights</label>
@@ -424,7 +424,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
 
           <div className="nc-section nc-section-children">
             <div className="nc-section-title" style={{ color: 'var(--amb)' }}>
-              👧 Children / Trẻ em
+              👧 Children
             </div>
             <div className="nc-grid-3">
               <div className="fg">
@@ -468,7 +468,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             )}
           </div>
 
-          <div className="nc-section-title">Notes / Ghi chú</div>
+          <div className="nc-section-title">Notes</div>
           <div className="fg" style={{ marginBottom: 18 }}>
             <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} style={{ minHeight: 80 }} placeholder="Dietary restrictions, mobility, anniversaries..." />
           </div>
@@ -477,17 +477,17 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             <label className="fg" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, cursor: 'pointer' }}>
               <input type="checkbox" checked={logInquiry} onChange={(e) => setLogInquiry(e.target.checked)} />
               <span style={{ fontSize: 12.5 }}>
-                Log initial inquiry in Communications / Ghi nhận inquiry ban đầu
+                Log initial inquiry in Communications
               </span>
             </label>
           )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
             <button className="btn btn-s" type="button" onClick={onClose}>
-              Cancel / Hủy
+              Cancel
             </button>
             <button className="btn btn-p" type="button" onClick={handleSave} disabled={saveDisabled}>
-              ✓ {mode === 'edit' ? 'Save Changes' : 'Add Customer / Thêm khách'}
+              ✓ {mode === 'edit' ? 'Save Changes' : 'Add Customer'}
             </button>
           </div>
         </div>

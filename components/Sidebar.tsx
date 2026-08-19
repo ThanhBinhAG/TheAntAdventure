@@ -6,11 +6,9 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { NAV_SECTIONS, type NavItem } from '@/lib/constants';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useSidebarBadgeBoot } from '@/hooks/useSidebarBadgeBoot';
+import { useSidebarBadges } from '@/hooks/useSidebarBadges';
 import { useStore } from '@/hooks/useStore';
-import { countActiveTasks } from '@/lib/planner/planner-task-utils';
-import { countTourDesignAttention } from '@/lib/tour-design/tour-design-leads';
-import type { Lead, PageSlug, Task, TourDraft } from '@/lib/types';
+import type { PageSlug } from '@/lib/types';
 import { canReadPage, canWritePage } from '@/lib/auth/permissions';
 import { usePermissions } from '@/components/PermissionsProvider';
 import CompanyLogoEditor from '@/components/sidebar/CompanyLogoEditor';
@@ -42,9 +40,6 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
   const { language, t } = useLanguage();
   const { permissionCodes, loading, error } = usePermissions();
   const current = (pathname.split('/').pop() || 'dashboard') as PageSlug;
-  const tasks = useStore((s) => s.tasks) as Task[];
-  const leads = useStore((s) => s.leads) as Lead[];
-  const tourDrafts = useStore((s) => s.tourDrafts) as TourDraft[];
   const messages = useStore((s) => s.messages);
   /**
    * undefined = unknown; null = default SVG; string = custom Storage URL.
@@ -71,14 +66,8 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
     };
   }, []);
 
-  useSidebarBadgeBoot(permissionCodes);
-
-  // Badge counts hydrate via useSidebarBadgeBoot (permission-scoped tables).
-  const activeTaskCount = useMemo(() => countActiveTasks(tasks), [tasks]);
-  const pendingTourDesign = useMemo(
-    () => countTourDesignAttention(leads, tourDrafts),
-    [leads, tourDrafts]
-  );
+  const { activeTasks: activeTaskCount, tourDesignAttention: pendingTourDesign } =
+    useSidebarBadges(permissionCodes);
 
   // Chỉ giữ các menu mà user có quyền xem.
   const visibleSections = useMemo(
@@ -155,9 +144,9 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
             <button
               type="button"
               className={`sb-pin-btn${pinned ? ' is-pinned' : ''}`}
-              title={pinned ? 'Bỏ ghim cột (ẩn sidebar)' : 'Ghim cột (luôn hiện)'}
+              title={pinned ? 'Unpin column (hide sidebar)' : 'Pin column (always show)'}
               aria-pressed={pinned}
-              aria-label={pinned ? 'Bỏ ghim cột điều hướng' : 'Ghim cột điều hướng'}
+              aria-label={pinned ? 'Unpin column (hide sidebar)' : 'Pin column (always show)'}
               onClick={() => onPinnedChange(!pinned)}
             >
               {pinned ? '📌' : '📍'}
@@ -223,14 +212,14 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
             Where Authentic Adventure Begins
           </div>
           <div className="sb-sub" style={{ textAlign: 'center' }}>
-            CRM System · v4.3
+            CRM System
           </div>
         </div>
 
         {loading ? (
-          <div className="sb-sec">Đang tải quyền…</div>
+          <div className="sb-sec">Loading permissions…</div>
         ) : error ? (
-          <div className="sb-sec">Không thể tải quyền</div>
+          <div className="sb-sec">Cannot load permissions</div>
         ) : (
           visibleSections.map((section) => (
             <div key={section.en}>
@@ -251,6 +240,7 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
                   <Link
                     key={item.page}
                     href={`/${item.page}`}
+                    prefetch={false}
                     className={`sbi${current === item.page ? ' on' : ''}`}
                     title={t(item.en, item.vi)}
                     onClick={onClose}
@@ -317,6 +307,7 @@ function NavGroup({ item, current, open, label, onToggle, onNavigate, translate 
             <Link
               key={child.page}
               href={`/${child.page}`}
+              prefetch={false}
               className={`sbi sb-subitem${current === child.page ? ' on' : ''}`}
               title={translate(child.en, child.vi)}
               onClick={onNavigate}

@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import PageRouteLoading from '@/components/PageRouteLoading';
-import { cancelDelayedRevalidate, ensurePageDataLoaded } from '@/lib/db/hydrate';
+import {
+  cancelDelayedRevalidate,
+  cancelPageBoot,
+  ensurePageDataLoaded,
+  routeBootSatisfied,
+  setActivePageBoot,
+} from '@/lib/db/hydrate';
 import type { PageSlug } from '@/lib/types';
 
 /**
@@ -28,13 +34,21 @@ export default function PageDataGate({
 
   useEffect(() => {
     let cancelled = false;
+    const generation = setActivePageBoot(page);
     cancelDelayedRevalidate();
 
     void (async () => {
       try {
-        const ok = await ensurePageDataLoaded(page);
+        const ok = await ensurePageDataLoaded(page, generation);
         if (cancelled) return;
         if (!ok) {
+          // Strict Mode cancellations can invalidate generation promises even when
+          // the route boot tables are already hydrated by another in-flight boot.
+          if (routeBootSatisfied(page)) {
+            setReady(true);
+            return;
+          }
+
           setError('Không tải được dữ liệu từ Supabase');
           setReady(true);
           return;
@@ -49,6 +63,7 @@ export default function PageDataGate({
 
     return () => {
       cancelled = true;
+      cancelPageBoot(page);
       cancelDelayedRevalidate();
     };
   }, [page]);

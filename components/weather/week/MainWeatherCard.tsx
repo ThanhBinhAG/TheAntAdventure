@@ -48,7 +48,7 @@ export default function MainWeatherCard({
       ) : (
         <div className="wg-main-card-bg wg-main-card-bg--ph" aria-hidden>
           <span className="wg-cover-ph-name">{meta.name}</span>
-          <span className="wg-cover-ph-hint">Chưa có ảnh — chỉnh sửa để thêm</span>
+          <span className="wg-cover-ph-hint">No image — edit to add</span>
         </div>
       )}
       <div className="wg-main-card-scrim" aria-hidden />
@@ -75,7 +75,7 @@ export default function MainWeatherCard({
             <p>{error}</p>
             {onRetry ? (
               <button type="button" className="btn btn-s btn-sm" onClick={onRetry}>
-                Thử lại
+                Try again
               </button>
             ) : null}
           </div>
@@ -91,29 +91,29 @@ export default function MainWeatherCard({
               <div className="wg-main-card-temp-meta">
                 <p className="wg-main-card-condition">{weatherLabelVi(current.weatherCode)}</p>
                 {detail?.fetchedAt ? (
-                  <p className="wg-main-card-updated">Cập nhật {formatUpdatedAt(detail.fetchedAt)}</p>
+                  <p className="wg-main-card-updated">Updated {formatUpdatedAt(detail.fetchedAt)}</p>
                 ) : null}
               </div>
             </>
           ) : loading ? (
             <div className="wg-skel wg-skel-temp" aria-hidden />
           ) : (
-            <p className="wg-muted">Chưa có dữ liệu thời tiết</p>
+            <p className="wg-muted">No weather data</p>
           )}
         </div>
 
         {current ? (
           <dl className="wg-main-stats">
             <div>
-              <dt>Độ ẩm</dt>
+              <dt>Humidity</dt>
               <dd>{current.humidity != null ? `${Math.round(current.humidity)}%` : '—'}</dd>
             </div>
             <div>
-              <dt>Gió</dt>
+              <dt>Wind</dt>
               <dd>{current.windKmh != null ? `${Math.round(current.windKmh)} km/h` : '—'}</dd>
             </div>
             <div>
-              <dt>Cảm giác</dt>
+              <dt>Feels like</dt>
               <dd>{current.feelsLikeC != null ? `${Math.round(current.feelsLikeC)}°` : '—'}</dd>
             </div>
             <div>
@@ -126,7 +126,7 @@ export default function MainWeatherCard({
         ) : null}
 
         {days.length > 0 ? (
-          <div className="wg-mini-forecast" aria-label="Dự báo ngắn hạn">
+          <div className="wg-mini-forecast" aria-label="Short-term forecast">
             {days.map((day) => (
               <div key={day.date} className="wg-mini-day">
                 <span className="wg-mini-day-label">{formatDayLabel(day.date)}</span>
@@ -143,7 +143,7 @@ export default function MainWeatherCard({
 
         <div className="wg-main-card-actions">
           <button type="button" className="btn btn-p" onClick={onOpenDetail} disabled={!detail && !loading}>
-            Xem chi tiết
+            View details
           </button>
         </div>
       </div>

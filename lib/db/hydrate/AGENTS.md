@@ -7,7 +7,7 @@ Internal modules for route boot, table ensure, connection ping, and full hydrate
 - `connection.ts` — `checkSupabaseConnection` / `quickSupabasePing` (inflight + 15s memory cache + 5 min sessionStorage cache for successful pings) / `readCachedConnectionStatus` / `resetQuickSupabasePingCache` / `ConnectionStatus`
 - `route-persist.ts` — session route-cache write helpers
 - `shared.ts` — fetch/apply helpers (`resolveFetchTables` / `force` revalidate), table-level fetch inflight, `bootSettled`, `tablesForDelayedRevalidate`, `cancelDelayedRevalidate`, `resetShellHydrateGuard`
-- `page-boot.ts` — `ensurePageBootLoaded` (session memo after success; soft pending on nav), ensure tables/messages, route-first `ensurePageDataLoaded`
+- `page-boot.ts` — `ensurePageBootLoaded`, `setActivePageBoot` / `cancelPageBoot` (stale nav guard), ensure tables/messages, route-first `ensurePageDataLoaded`
 - `full-hydrate.ts` — full hydrate, verify, clear, migration
 
 ## Boundaries

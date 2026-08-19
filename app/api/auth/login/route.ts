@@ -175,7 +175,8 @@ export async function POST(request: Request) {
   await clearLoginFailures(ip);
 
   if (data.user) {
-    await recordSuccessfulLoginSafely({
+    // Chạy ngầm ghi lịch sử để không chặn luồng trả về kết quả cho người dùng
+    void recordSuccessfulLoginSafely({
       userId: data.user.id,
       authMethod: 'password',
       request,

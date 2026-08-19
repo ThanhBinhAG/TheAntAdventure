@@ -38,9 +38,8 @@ export async function POST(request: Request) {
         },
       },
     });
-    await supabase.auth.signOut();
-    // signOut may Set-Cookie empty values; re-clear any leftover chunks by name.
-    clearSupabaseAuthCookies(response, cookieHeader);
+    // Gọi signOut ngầm để không chặn phản hồi đăng xuất trả về trình duyệt
+    void supabase.auth.signOut();
   }
 
   return response;

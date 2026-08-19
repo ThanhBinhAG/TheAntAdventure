@@ -9,11 +9,12 @@ Open-Meteo fetch, Supabase cache, ratings, destination catalog CRUD, and weather
 - `boot.ts` — page boot: catalog + featured forecasts only (passes meta into `getDestinationWeather` — no get-by-id N+1)
 - `open-meteo.ts` — batch weekly + **single-destination** current/daily (+ UV)
 - `refresh.ts` — per-destination cache-first fetch (`string | WeatherDestinationMeta`); cron warms featured only
-- `cache.ts` — forecast + `weather_current_cache` helpers
+- `cache.ts` — forecast + `weather_current_cache` helpers (Redis when `REDIS_URL` is set, else Supabase tables)
 - `redis-cache.ts` — Redis wrapper for weather guide, single destination, and rate limit caching
+- `supabase-admin.ts` — service-role client; `isWeatherBackendConfigured` gates APIs (not Redis)
 - `client-cache.ts` — browser localStorage per destination (TTL on read/write prune, max 24 keys)
 - `resolve-cover.ts` — resolve cover URLs from gallery store / API (ignores stale denormalized `coverUrl`)
-- `rating.ts`, `auth.ts`, `supabase-admin.ts`, `types.ts`
+- `rating.ts`, `auth.ts`, `types.ts`
 
 ## Adding a destination
 Prefer UI **Thêm tỉnh thành** (writes DB). Or seed via `coordinates.ts` then refresh; covers/descriptions set in UI.

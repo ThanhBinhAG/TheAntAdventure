@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isRefreshAuthorized } from '@/lib/weather/auth';
-import { isWeatherCacheConfigured } from '@/lib/weather/cache';
+import { isWeatherBackendConfigured } from '@/lib/weather/supabase-admin';
 import {
   softDeleteDestination,
   updateDestination,
@@ -11,7 +11,7 @@ import type { WeatherRegion } from '@/lib/weather/coordinates';
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, ctx: Ctx) {
-  if (!isWeatherCacheConfigured()) {
+  if (!isWeatherBackendConfigured()) {
     return NextResponse.json(
       { error: 'Weather requires SUPABASE_SERVICE_ROLE_KEY on the server.' },
       { status: 503 }
@@ -55,7 +55,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
 }
 
 export async function DELETE(request: Request, ctx: Ctx) {
-  if (!isWeatherCacheConfigured()) {
+  if (!isWeatherBackendConfigured()) {
     return NextResponse.json(
       { error: 'Weather requires SUPABASE_SERVICE_ROLE_KEY on the server.' },
       { status: 503 }

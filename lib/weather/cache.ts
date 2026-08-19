@@ -23,9 +23,9 @@ export function getTodayVnDate(now = new Date()): string {
   return localIsoDate(now);
 }
 
+/** True when REDIS_URL is set — weather then prefers Redis over Supabase cache tables. */
 export function isWeatherCacheConfigured(): boolean {
-  // Cache is configured when REDIS_URL is present.
-  return !!process.env.REDIS_URL;
+  return Boolean((process.env.REDIS_URL ?? '').trim());
 }
 
 export async function isCacheStale(): Promise<boolean> {
@@ -99,8 +99,8 @@ export async function upsertCurrentCache(
   expiresAt: string
 ): Promise<void> {
   if (isWeatherCacheConfigured()) {
-    await setDestinationWeatherCache(destinationId, payload, fetchedAt, expiresAt);
-    return;
+    const written = await setDestinationWeatherCache(destinationId, payload, fetchedAt, expiresAt);
+    if (written) return;
   }
 
   const client = getWeatherAdminClient();

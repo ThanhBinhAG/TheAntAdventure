@@ -31,11 +31,16 @@ export async function getWeatherCache(): Promise<WeatherPageBoot | null> {
 /**
  * Store the weather guide payload in Redis with a 24‑hour expiration.
  */
-export async function setWeatherCache(payload: WeatherPageBoot): Promise<void> {
+export async function setWeatherCache(payload: WeatherPageBoot): Promise<boolean> {
   const client = await getRedisClient();
-  if (!client) throw new Error('Redis unavailable');
-  const value = JSON.stringify(payload);
-  await client.set(WEATHER_GUIDE_KEY, value, { EX: WEATHER_TTL_SECONDS });
+  if (!client) return false;
+  try {
+    const value = JSON.stringify(payload);
+    await client.set(WEATHER_GUIDE_KEY, value, { EX: WEATHER_TTL_SECONDS });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Invalidate the cache (used by the refresh endpoint). */
@@ -75,19 +80,23 @@ export async function setDestinationWeatherCache(
   payload: { current: DestinationCurrentWeather; days: WeatherDayForecast[] },
   fetchedAt: string,
   expiresAt: string
-): Promise<void> {
+): Promise<boolean> {
   const client = await getRedisClient();
-  if (!client) throw new Error('Redis unavailable');
-  const cacheData: DestinationCachePayload = {
-    payload,
-    fetchedAt,
-    expiresAt,
-  };
-  const value = JSON.stringify(cacheData);
-  // Calculate TTL based on expiresAt or default to 24h
-  const ttl = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
-  const finalTtl = ttl > 0 ? ttl : WEATHER_TTL_SECONDS;
-  await client.set(getDestinationKey(destinationId), value, { EX: finalTtl });
+  if (!client) return false;
+  try {
+    const cacheData: DestinationCachePayload = {
+      payload,
+      fetchedAt,
+      expiresAt,
+    };
+    const value = JSON.stringify(cacheData);
+    const ttl = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
+    const finalTtl = ttl > 0 ? ttl : WEATHER_TTL_SECONDS;
+    await client.set(getDestinationKey(destinationId), value, { EX: finalTtl });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function invalidateDestinationWeatherCache(destinationId: string): Promise<void> {

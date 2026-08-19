@@ -5,6 +5,11 @@ import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 let adminClient: SupabaseClient | null = null;
 
+/** Catalog + forecast persist in Supabase. Redis is optional cache only. */
+export function isWeatherBackendConfigured(): boolean {
+  return getWeatherAdminClient() != null;
+}
+
 export function getWeatherAdminClient(): SupabaseClient | null {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceRoleKey();

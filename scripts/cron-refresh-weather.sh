@@ -7,6 +7,14 @@
 
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [[ -f "$ROOT/.env.local" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/.env.local"
+  set +a
+fi
+
 APP_URL="${APP_URL:-http://localhost:3006}"
 SECRET="${WEATHER_CRON_SECRET:-}"
 

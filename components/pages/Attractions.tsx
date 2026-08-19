@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import PaginationBar from '@/components/PaginationBar';
 import { usePagination } from '@/hooks/usePagination';
@@ -7,13 +8,21 @@ import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
 import { nextAttractionId, photosForAttraction } from '@/lib/attractions/attractions-helpers';
 import type { Attraction } from '@/lib/types';
-import AttractionEditModal, { type AttractionFormData } from '@/components/attractions/AttractionEditModal';
-import AttractionPhotoLightbox from '@/components/attractions/AttractionPhotoLightbox';
+import type { AttractionFormData } from '@/components/attractions/AttractionEditModal';
 import AttractionRegionColumn from '@/components/attractions/AttractionRegionColumn';
 import AttractionTable from '@/components/attractions/AttractionTable';
 import { usePagePermission } from '@/hooks/usePagePermission';
 
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
+
+const AttractionEditModal = dynamic(
+  () => import('@/components/attractions/AttractionEditModal'),
+  { ssr: false }
+);
+const AttractionPhotoLightbox = dynamic(
+  () => import('@/components/attractions/AttractionPhotoLightbox'),
+  { ssr: false }
+);
 type ViewMode = 'grid' | 'columns';
 
 export default function Attractions() {
@@ -223,26 +232,30 @@ export default function Attractions() {
 
       <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
 
-      <AttractionEditModal
-        open={formMode !== null}
-        mode={formMode === 'edit' ? 'edit' : 'add'}
-        attraction={editTarget}
-        attractions={attractions}
-        photos={photos}
-        defaultRegion={addRegion}
-        nextId={formMode === 'add' ? nextAttractionId(attractions, addRegion) : undefined}
-        onClose={closeForm}
-        onSave={handleSave}
-        onDelete={handleDelete}
-      />
+      {formMode !== null ? (
+        <AttractionEditModal
+          open
+          mode={formMode === 'edit' ? 'edit' : 'add'}
+          attraction={editTarget}
+          attractions={attractions}
+          photos={photos}
+          defaultRegion={addRegion}
+          nextId={formMode === 'add' ? nextAttractionId(attractions, addRegion) : undefined}
+          onClose={closeForm}
+          onSave={handleSave}
+          onDelete={handleDelete}
+        />
+      ) : null}
 
-      <AttractionPhotoLightbox
-        open={Boolean(lightbox)}
-        photos={lightboxPhotos}
-        index={lightbox?.index ?? 0}
-        onClose={() => setLightbox(null)}
-        onNavigate={(index) => lightbox && setLightbox({ ...lightbox, index })}
-      />
+      {lightbox ? (
+        <AttractionPhotoLightbox
+          open
+          photos={lightboxPhotos}
+          index={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onNavigate={(index) => setLightbox({ ...lightbox, index })}
+        />
+      ) : null}
     </div>
   );
 }

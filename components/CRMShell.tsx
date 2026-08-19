@@ -1,10 +1,10 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Topbar, { QuickNav } from '@/components/Topbar';
-import AiCopilot from '@/components/AiCopilot';
-import { AiCopilotProvider } from '@/components/AiCopilotContext';
+import { AiCopilotProvider, useAiCopilot } from '@/components/AiCopilotContext';
 import { StoreProvider } from '@/components/StoreProvider';
 import { PermissionsProvider } from '@/components/PermissionsProvider';
 import ToastHost from '@/components/ToastHost';
@@ -12,6 +12,15 @@ import ConfirmHost from '@/components/ConfirmHost';
 import type { PermissionCode } from '@/lib/auth/permissions';
 
 const PIN_KEY = 'crm.sidebarPinned';
+
+const AiCopilotPanel = dynamic(() => import('@/components/AiCopilot'), { ssr: false });
+
+/** Load co-pilot chunk only after the user opens the panel. */
+function AiCopilotLazy() {
+  const { open } = useAiCopilot();
+  if (!open) return null;
+  return <AiCopilotPanel />;
+}
 
 function readPinned(): boolean {
   if (typeof window === 'undefined') return true;
@@ -96,7 +105,7 @@ export default function CRMShell({
               <QuickNav />
               <div id="content">{children}</div>
             </div>
-            <AiCopilot />
+            <AiCopilotLazy />
             <ToastHost />
             <ConfirmHost />
           </div>

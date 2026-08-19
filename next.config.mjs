@@ -48,6 +48,9 @@ const nextConfig = {
   // Smaller production image via `node server.js` (see Dockerfile).
   output: 'standalone',
   serverExternalPackages: SERVER_EXTERNAL_PACKAGES,
+  experimental: {
+    optimizePackageImports: ['antd', '@ant-design/icons'],
+  },
   images: {
     remotePatterns: buildImageRemotePatterns(),
   },

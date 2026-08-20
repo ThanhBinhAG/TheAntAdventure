@@ -4,6 +4,7 @@
 #
 # Runner: shell executor on vm06 (host Docker, no DinD).
 # Secrets: $MNT_FDATA/sharing/.env.local
+# Supabase secrets: share-supabase app-env ant-crm --show-secrets
 
 stages:
   - verify
@@ -63,13 +64,71 @@ docker:
     - if: $CI_COMMIT_BRANCH == "main"
     - when: never
   script:
-    - docker info
-    - export ENV_FILE="$(sh scripts/docker-with-env.sh print)"
-    - echo "Building with ENV_FILE=$ENV_FILE"
-    - sh scripts/docker-with-env.sh build
-    - docker tag the-ant-adventures-crm:local "$IMAGE_TAG"
-    - docker tag the-ant-adventures-crm:local "$IMAGE_LATEST"
     - |
+      set -eu
+      docker info
+
+      BASE_ENV_FILE="$(sh scripts/docker-with-env.sh print)"
+      DEPLOY_ENV_FILE="$(mktemp)"
+      trap 'rm -f "$DEPLOY_ENV_FILE"' EXIT
+      cp "$BASE_ENV_FILE" "$DEPLOY_ENV_FILE"
+
+      # Fetch app-specific keys at deploy time; never print the returned secrets.
+      share-supabase app-env ant-crm --show-secrets >> "$DEPLOY_ENV_FILE"
+      printf '\nNEXT_PUBLIC_SUPABASE_URL=http://supabase-ant-crm-gateway:8000\n' >> "$DEPLOY_ENV_FILE"
+
+      # Use VM06's persistent shared Redis, rather than creating a per-CRM Redis.
+      # The marker is permanent: it records the logical DB allocated to this app.
+      redis_cli() {
+        docker exec shared_redis sh -c '
+          REDISCLI_AUTH="$(cat /run/secrets/redis_password)"
+          export REDISCLI_AUTH
+          exec redis-cli --raw -n "$@"
+        ' redis-cli "$@"
+      }
+
+      REDIS_DB=""
+      for candidate in $(seq 1 15); do
+        if [ -n "$(redis_cli "$candidate" --scan --pattern 'ant_crm*' | head -n 1)" ]; then
+          REDIS_DB="$candidate"
+          break
+        fi
+      done
+
+      if [ -z "$REDIS_DB" ]; then
+        for candidate in $(seq 1 15); do
+          if [ "$(redis_cli "$candidate" DBSIZE)" = "0" ] \
+            && [ "$(redis_cli "$candidate" SET ant_crm:registry the-ant-adventures-crm NX)" = "OK" ]; then
+            REDIS_DB="$candidate"
+            echo "Allocated Redis DB $REDIS_DB for ant_crm"
+            break
+          fi
+        done
+      else
+        echo "Using registered Redis DB $REDIS_DB for ant_crm"
+      fi
+
+      if [ -z "$REDIS_DB" ]; then
+        echo "ERROR: No empty shared Redis logical database is available for ant_crm." >&2
+        exit 1
+      fi
+
+      # Persist the allocated DB number in the shared app env (without the Redis password).
+      if grep -q '^REDIS_DB=' "$BASE_ENV_FILE"; then
+        sed -i "s/^REDIS_DB=.*/REDIS_DB=$REDIS_DB/" "$BASE_ENV_FILE"
+      else
+        printf '\nREDIS_DB=%s\n' "$REDIS_DB" >> "$BASE_ENV_FILE"
+      fi
+
+      REDIS_PASSWORD="$(docker exec shared_redis sh -c 'cat /run/secrets/redis_password')"
+      printf 'REDIS_URL=redis://:%s@shared_redis:6379/%s\n' "$REDIS_PASSWORD" "$REDIS_DB" >> "$DEPLOY_ENV_FILE"
+      unset REDIS_PASSWORD
+
+      export ENV_FILE="$DEPLOY_ENV_FILE"
+      echo "Building with generated deployment environment"
+      sh scripts/docker-with-env.sh build
+      docker tag the-ant-adventures-crm:local "$IMAGE_TAG"
+      docker tag the-ant-adventures-crm:local "$IMAGE_LATEST"
       if [ -n "${CI_REGISTRY:-}" ]; then
         docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
         docker push "$IMAGE_TAG"
@@ -77,6 +136,6 @@ docker:
       else
         echo "CI_REGISTRY not set — image kept on server Docker only."
       fi
-    - echo "Deploying container on server..."
-    - sh scripts/docker-with-env.sh deploy
-    - sh scripts/docker-with-env.sh status
+      echo "Deploying container on server..."
+      sh scripts/docker-with-env.sh deploy
+      sh scripts/docker-with-env.sh status

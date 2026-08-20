@@ -13,7 +13,7 @@ interface Props {
   outlineRevision?: number;
   outlineNotes: string;
   onNotesChange: (notes: string) => void;
-  saveState: 'idle' | 'saving' | 'saved';
+  saveState: 'idle' | 'saving' | 'saved' | 'error';
   onMarkSent: () => void;
   onApprove: () => void;
   onRevise: () => void;
@@ -49,6 +49,7 @@ export default function OutlineWorkflowPanel({
         <span style={{ fontSize: 11, color: 'var(--m)' }}>
           {saveState === 'saving' && 'Saving…'}
           {saveState === 'saved' && 'Saved'}
+          {saveState === 'error' && 'Save failed'}
         </span>
       </div>
 

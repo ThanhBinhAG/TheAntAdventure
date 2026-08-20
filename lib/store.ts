@@ -1,5 +1,4 @@
 import { create, type StateCreator } from 'zustand';
-import { deleteProductFromRemote, deleteProductPricingFromRemote } from './db/remote-delete';
 import { applyLocalCustomerDelete } from './customers/customer-delete';
 import { appLog } from './system/app-logger';
 import { rolloverTasks } from './planner/planner-task-utils';
@@ -275,7 +274,6 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           products: s.products.filter((p) => p.code !== code),
           productPricing: s.productPricing.filter((p) => p.productCode !== code),
         }));
-        void deleteProductFromRemote(code);
       },
       setProductPricing: (productPricing) => set({ productPricing }),
       upsertProductPricing: (row, syncProductPrice = true) =>
@@ -295,7 +293,6 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         set((s) => ({
           productPricing: s.productPricing.filter((p) => p.productCode !== productCode),
         }));
-        void deleteProductPricingFromRemote(productCode);
       },
       addContract: (contract) => set((s) => ({ contracts: [contract, ...s.contracts] })),
       updateContract: (id, data) =>

@@ -15,7 +15,7 @@ interface Props {
   outlineRevision?: number;
   outlineNotes: string;
   onOutlineNotesChange: (notes: string) => void;
-  saveState: 'idle' | 'saving' | 'saved';
+  saveState: 'idle' | 'saving' | 'saved' | 'error';
   experiencesBlocked: boolean;
   clientName?: string;
   onUpdateRow: (id: string, patch: Partial<TourOutlineDay>) => void;

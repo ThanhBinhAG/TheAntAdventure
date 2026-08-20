@@ -21,6 +21,7 @@ import {
 import { db as supabaseDb } from './supabase';
 import { upsertSimpleRows } from './supabase/generic-sync';
 import { HANDLERS, type Row } from './supabase/shared';
+import { filterBffManagedTables } from './bff-managed-tables';
 
 export type StoreRowPatch = {
   customers?: Customer[];
@@ -94,8 +95,9 @@ export async function pushTablesToSupabase(
   try {
     const backup = useStore.getState().exportBackup();
     // Never push unhydrated tables (empty local arrays would wipe remote).
-    const target =
-      tables !== undefined ? filterHydratedTables(tables) : getHydratedTables();
+    const target = filterBffManagedTables(
+      tables !== undefined ? filterHydratedTables(tables) : getHydratedTables()
+    );
     if (!target.length && !(includeMessages && isMessagesHydrated())) {
       return { ok: false, error: 'No hydrated tables to push' };
     }

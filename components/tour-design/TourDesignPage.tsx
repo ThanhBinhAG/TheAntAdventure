@@ -92,7 +92,7 @@ export default function TourDesignPage() {
   const [outlineApprovedAt, setOutlineApprovedAt] = useState<string | undefined>();
   const [outlineRevision, setOutlineRevision] = useState(0);
   const [outlineRows, setOutlineRows] = useState<TourOutlineDay[]>([]);
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [readError, setReadError] = useState<string | null>(null);
 
   const urlInitRef = useRef<string | null>(null);
@@ -142,7 +142,7 @@ export default function TourDesignPage() {
   }, []);
 
   const persistDraft = useCallback(
-    (
+    async (
       patch?: {
         step?: number;
         outlineStatus?: OutlineStatus;
@@ -197,19 +197,25 @@ export default function TourDesignPage() {
       });
       const fingerprint = JSON.stringify({ draft, rows });
       if (lastDraftFingerprintRef.current === fingerprint) return true;
-      lastDraftFingerprintRef.current = fingerprint;
-      upsertTourDraft(draft);
-      replaceOutlineDaysForDraft(draft.id, rows);
+      try {
+        const response = await fetch('/api/tour-design/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draft, outlineDays: rows }),
+        });
+        const result = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+        if (!response.ok || !result?.ok) {
+          throw new Error(result?.error ?? 'Không thể lưu thiết kế tour.');
+        }
 
-      fetch('/api/tour-design/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ draft, outlineDays: rows }),
-      }).catch((err) => {
-        console.error('Failed to save tour design:', err);
-      });
-
-      return true;
+        lastDraftFingerprintRef.current = fingerprint;
+        upsertTourDraft(draft);
+        replaceOutlineDaysForDraft(draft.id, rows);
+        return true;
+      } catch (error) {
+        console.error('Failed to save tour design:', error);
+        return false;
+      }
     },
     [
       leadId,
@@ -339,12 +345,17 @@ export default function TourDesignPage() {
 
   useEffect(() => {
     if (!leadId || !custId) return;
+    let active = true;
     const timer = setTimeout(() => {
       setSaveState('saving');
-      persistDraft();
-      setTimeout(() => setSaveState('saved'), 0);
+      void persistDraft().then((saved) => {
+        if (active) setSaveState(saved ? 'saved' : 'error');
+      });
     }, 800);
-    return () => clearTimeout(timer);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [
     leadId,
     custId,
@@ -451,7 +462,7 @@ export default function TourDesignPage() {
     setClientType(c.clientType || 'b2c');
   }
 
-  function goToStep(next: number) {
+  async function goToStep(next: number) {
     if (next === 1) {
       if (!custId) {
         toast.warning('Please select a customer before building the outline.');
@@ -459,7 +470,7 @@ export default function TourDesignPage() {
       }
       const lid = ensureLeadSession();
       if (!lid) return;
-      const saved = persistDraft({ step: next }, lid);
+      const saved = await persistDraft({ step: next }, lid);
       if (!saved) {
         toast.warning('Could not save the client brief.');
         return;
@@ -471,7 +482,7 @@ export default function TourDesignPage() {
     }
     setStep(next);
     if (leadId && custId) {
-      persistDraft({ step: next });
+      void persistDraft({ step: next });
       syncUrl(leadId, custId, next);
     }
   }

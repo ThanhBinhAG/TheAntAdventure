@@ -4,7 +4,7 @@
 Tour Design wizard UI (brief → experiences → outline → pricing → proposal). Folder is kebab-case to match `lib/tour-design`; URL slug remains `tourdesign`.
 
 ## Contents
-- `TourDesignPage.tsx` — wizard orchestration (URL slug still `tourdesign`); gallery tables lazy-load on experiences / proposal steps
+- `TourDesignPage.tsx` — wizard orchestration (URL slug still `tourdesign`); product, draft, outline, and gallery reads use BFF endpoints and saves use the Tour Design BFF
 - Step components: ClientBrief, TourExperiences, Outline*, Pricing, Proposal*
 - `ProposalExportStep.tsx` — Step 5 shell (state + assemble + export actions)
 - `ProposalExportSettings.tsx` — inspector rail (layout cards, notes, hotel rates, template); rail stays fixed while preview scrolls

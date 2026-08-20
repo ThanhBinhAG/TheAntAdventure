@@ -11,7 +11,6 @@ import {
 } from '@/lib/attractions/attractions-helpers';
 import { photoThumbUrl } from '@/lib/gallery/gallery-helpers';
 import { saveNewLoosePhoto, saveNewLoosePhotosBatch } from '@/lib/gallery/gallery-loose-save';
-import { pushTablesToSupabase } from '@/lib/db/hydrate';
 import { deletePhotoViaApi } from '@/lib/gallery/photo-api';
 import GalleryPhotoModal, { type GalleryPhotoSavePayload } from '@/components/gallery/GalleryPhotoModal';
 import { toast } from '@/lib/toast';
@@ -260,14 +259,6 @@ export default function AttractionEditModal({
       setSelectedRemoveIds([]);
       setQuickRemoveMode(false);
 
-      const photosResult = await pushTablesToSupabase(['photos'], false);
-      if (!photosResult.ok) {
-        throw new Error(photosResult.error ?? 'Không lưu được metadata ảnh lên Supabase');
-      }
-      const attractionsResult = await pushTablesToSupabase(['attractions'], false);
-      if (!attractionsResult.ok) {
-        throw new Error(attractionsResult.error ?? 'Không lưu được liên kết attraction lên Supabase');
-      }
     } catch (err) {
       setQuickAddStatus(err instanceof Error ? err.message : 'Failed to sync photo removal');
     } finally {

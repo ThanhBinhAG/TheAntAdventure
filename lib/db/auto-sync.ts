@@ -9,6 +9,7 @@ import {
   subscribeHydration,
 } from './sync-lifecycle';
 import { pushStoreRowsToSupabase, pushTablesToSupabase, type StoreRowPatch } from './sync-push';
+import { filterBffManagedTables } from './bff-managed-tables';
 
 export type ScheduleAutoSyncOptions = {
   /** Skip the 2.5s debounce and push queued tables immediately. */
@@ -113,12 +114,12 @@ export function scheduleAutoSync(
   if (suppressCount > 0) return;
 
   if (changed?.tables) {
-    for (const t of filterHydratedTables(changed.tables)) pendingTables.add(t);
+    for (const t of filterBffManagedTables(filterHydratedTables(changed.tables))) pendingTables.add(t);
   }
   if (changed?.messages && isMessagesHydrated()) pendingMessages = true;
   if (!changed) {
     // Never push unhydrated empty arrays — only tables already in the store.
-    pendingTables = new Set(getHydratedTables());
+    pendingTables = new Set(filterBffManagedTables(getHydratedTables()));
     pendingMessages = isMessagesHydrated();
   }
 
@@ -158,7 +159,7 @@ export async function flushAutoSync() {
   setSyncState({ status: 'syncing', lastError: null });
 
   const rawTables = pendingTables.size ? [...pendingTables] : getHydratedTables();
-  const tables = filterHydratedTables(rawTables);
+  const tables = filterBffManagedTables(filterHydratedTables(rawTables));
   const messages = pendingMessages && isMessagesHydrated();
   pendingTables = new Set();
   pendingMessages = false;
@@ -204,7 +205,7 @@ export function detectChangedTables(
 ): { tables: SyncArrayTable[]; messages: boolean } {
   const tables: SyncArrayTable[] = [];
 
-  for (const table of SYNC_ARRAY_TABLES) {
+  for (const table of filterBffManagedTables(SYNC_ARRAY_TABLES)) {
     const key = TABLE_TO_STORE_KEY[table];
     if (state[key] !== prev[key]) tables.push(table);
   }

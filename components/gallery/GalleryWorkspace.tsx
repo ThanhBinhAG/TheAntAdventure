@@ -423,32 +423,6 @@ export default function GalleryWorkspace() {
     }
   }
 
-  function photoLinkedInCatalogue(photoId: string): boolean {
-    const state = useStore.getState();
-    const inAttractions = state.attractions.some(
-      (a) => (a.photoIds ?? []).includes(photoId) || (a.linkedPhotoIds ?? []).includes(photoId)
-    );
-    const inProducts = state.products.some(
-      (p) => (p.photoIds ?? []).includes(photoId) || (p.linkedPhotoIds ?? []).includes(photoId)
-    );
-    return inAttractions || inProducts;
-  }
-
-  function photosLinkedInCatalogue(photoIds: Set<string>): boolean {
-    const state = useStore.getState();
-    const inAttractions = state.attractions.some(
-      (a) =>
-        (a.photoIds ?? []).some((id) => photoIds.has(id)) ||
-        (a.linkedPhotoIds ?? []).some((id) => photoIds.has(id))
-    );
-    const inProducts = state.products.some(
-      (p) =>
-        (p.photoIds ?? []).some((id) => photoIds.has(id)) ||
-        (p.linkedPhotoIds ?? []).some((id) => photoIds.has(id))
-    );
-    return inAttractions || inProducts;
-  }
-
   async function handleDelete(id: string) {
     const photo = photos.find((p) => p.id === id);
     if (!photo) return;
@@ -456,26 +430,11 @@ export default function GalleryWorkspace() {
     setError(null);
     try {
       setSaveStatus('Deleting…');
-      await ensureTablesLoaded(['attractions', 'products']);
-      const needsCataloguePush = photoLinkedInCatalogue(id);
       await deletePhotoViaApi(id, photo.storagePath);
       await withoutAutoSyncAsync(async () => {
         useStore.setState({
           photos: (useStore.getState().photos as GalleryPhoto[]).filter((p) => p.id !== id),
-          attractions: useStore.getState().attractions.map((a) => ({
-            ...a,
-            photoIds: (a.photoIds ?? []).filter((x) => x !== id),
-            linkedPhotoIds: (a.linkedPhotoIds ?? []).filter((x) => x !== id),
-          })),
-          products: useStore.getState().products.map((p) => ({
-            ...p,
-            photoIds: (p.photoIds ?? []).filter((x) => x !== id),
-            linkedPhotoIds: (p.linkedPhotoIds ?? []).filter((x) => x !== id),
-          })),
         });
-        if (needsCataloguePush) {
-          await pushTablesToSupabase(['attractions', 'products'], false);
-        }
       });
       setModalOpen(false);
       setDismissedPhotoFilter(photoFilter);
@@ -504,8 +463,6 @@ export default function GalleryWorkspace() {
     setError(null);
     try {
       const remove = new Set(selected);
-      await ensureTablesLoaded(['attractions', 'products']);
-      const needsCataloguePush = photosLinkedInCatalogue(remove);
       const toDelete = [...remove]
         .map((id) => photos.find((p) => p.id === id))
         .filter((p): p is GalleryPhoto => Boolean(p));
@@ -517,20 +474,7 @@ export default function GalleryWorkspace() {
       await withoutAutoSyncAsync(async () => {
         useStore.setState({
           photos: (useStore.getState().photos as GalleryPhoto[]).filter((p) => !remove.has(p.id)),
-          attractions: useStore.getState().attractions.map((a) => ({
-            ...a,
-            photoIds: (a.photoIds ?? []).filter((x) => !remove.has(x)),
-            linkedPhotoIds: (a.linkedPhotoIds ?? []).filter((x) => !remove.has(x)),
-          })),
-          products: useStore.getState().products.map((p) => ({
-            ...p,
-            photoIds: (p.photoIds ?? []).filter((x) => !remove.has(x)),
-            linkedPhotoIds: (p.linkedPhotoIds ?? []).filter((x) => !remove.has(x)),
-          })),
         });
-        if (needsCataloguePush) {
-          await pushTablesToSupabase(['attractions', 'products'], false);
-        }
       });
       setSelected(new Set());
       toast.success('Photos deleted.');

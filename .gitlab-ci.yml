@@ -77,6 +77,22 @@ docker:
       share-supabase app-env ant-crm --show-secrets >> "$DEPLOY_ENV_FILE"
       printf '\nNEXT_PUBLIC_SUPABASE_URL=http://supabase-ant-crm-gateway:8000\n' >> "$DEPLOY_ENV_FILE"
 
+      # Apply committed SQL migrations before replacing the running CRM container.
+      # Run the CLI in a disposable Node image so the shell runner does not need a
+      # project-local node_modules directory. The DB URL stays in the env file.
+      if ! grep -q '^SUPABASE_DB_URL=' "$DEPLOY_ENV_FILE"; then
+        echo "ERROR: SUPABASE_DB_URL is required to apply Supabase migrations." >&2
+        exit 1
+      fi
+      echo "Applying pending Supabase migrations..."
+      docker run --rm \
+        --network ss_ant_crm_app \
+        --env-file "$DEPLOY_ENV_FILE" \
+        -v "$CI_PROJECT_DIR:/work:ro" \
+        -w /work \
+        node:22-bookworm-slim \
+        sh -ec 'npm ci --ignore-scripts && npx --no-install supabase db push --db-url "$SUPABASE_DB_URL"'
+
       # Use VM06's persistent shared Redis, rather than creating a per-CRM Redis.
       # The marker is permanent: it records the logical DB allocated to this app.
       redis_cli() {

@@ -99,7 +99,7 @@ export function bffRoute<
       if (options.bodySchema) {
         let bodyObj: unknown;
         try {
-          bodyObj = await request.json();
+          bodyObj = await nextRequest.json();
         } catch {
           return NextResponse.json(
             { ok: false, error: 'Yêu cầu phải có body dạng JSON.' },

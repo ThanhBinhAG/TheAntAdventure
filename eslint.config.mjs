@@ -23,4 +23,10 @@ export default defineConfig([
     files: ["**/*.cjs"],
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
+  {
+    files: ["tests/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
 ]);

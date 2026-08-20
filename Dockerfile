@@ -37,7 +37,11 @@ ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
     NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME \
     NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION
 
-RUN npm run build
+RUN npm run lint && npm run typecheck && npm run build
+
+# Explicit CI target: keeps verification on the same Node version and dependency
+# graph that produces the runtime image.
+FROM builder AS verifier
 
 # --- Runtime ---
 FROM base AS runner

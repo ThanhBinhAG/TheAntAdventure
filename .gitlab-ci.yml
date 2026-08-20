@@ -1,6 +1,6 @@
 # GitLab CI
-# - main: build Docker image on the runner host + deploy (compose up)
-# - other branches: lint + Next build (verify only)
+# - every branch: verify with the production Docker toolchain
+# - main: package, migrate, deploy, and wait for the container healthcheck
 #
 # Runner: shell executor on vm06 (host Docker, no DinD).
 # Secrets: $MNT_FDATA/sharing/.env.local
@@ -11,55 +11,27 @@ stages:
   - package
 
 variables:
-  npm_config_cache: '$CI_PROJECT_DIR/.npm'
   NEXT_TELEMETRY_DISABLED: '1'
+  DOCKER_BUILDKIT: '1'
   IMAGE_TAG: 'the-ant-adventures-crm:$CI_COMMIT_SHORT_SHA'
   IMAGE_LATEST: 'the-ant-adventures-crm:latest'
   MNT_FDATA: '/mnt/fdata/the_ant_adventures_crm'
   COMPOSE_PROJECT_NAME: 'the-ant-adventures-crm'
 
-cache:
-  key:
-    files:
-      - package-lock.json
-  paths:
-    - .npm/
-
-lint:
+verify:
   stage: verify
-  image: node:22-alpine
   tags:
     - vm06-deploy-ant-admin
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      when: never
-    - when: on_success
+  interruptible: true
   script:
-    - node --version
-    - npm --version
-    - npm ci
-    - npm run lint
-
-build:
-  stage: verify
-  image: node:22-alpine
-  tags:
-    - vm06-deploy-ant-admin
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      when: never
-    - when: on_success
-  script:
-    - node --version
-    - npm --version
-    - npm ci
-    - npm run build
+    - docker build --target verifier -t the-ant-adventures-crm:verify .
 
 # Build image + run container on server Docker daemon — main only.
 docker:
   stage: package
   tags:
     - vm06-deploy-ant-admin
+  resource_group: crm-production
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - when: never
@@ -76,22 +48,6 @@ docker:
       # Fetch app-specific keys at deploy time; never print the returned secrets.
       share-supabase app-env ant-crm --show-secrets >> "$DEPLOY_ENV_FILE"
       printf '\nNEXT_PUBLIC_SUPABASE_URL=http://supabase-ant-crm-gateway:8000\n' >> "$DEPLOY_ENV_FILE"
-
-      # Apply committed SQL migrations before replacing the running CRM container.
-      # Run the CLI in a disposable Node image so the shell runner does not need a
-      # project-local node_modules directory. The DB URL stays in the env file.
-      if ! grep -q '^SUPABASE_DB_URL=' "$DEPLOY_ENV_FILE"; then
-        echo "ERROR: SUPABASE_DB_URL is required to apply Supabase migrations." >&2
-        exit 1
-      fi
-      echo "Applying pending Supabase migrations..."
-      docker run --rm \
-        --network ss_ant_crm_app \
-        --env-file "$DEPLOY_ENV_FILE" \
-        -v "$CI_PROJECT_DIR:/work:ro" \
-        -w /work \
-        node:22-bookworm-slim \
-        sh -ec 'npm ci --ignore-scripts && npx --no-install supabase db push --db-url "$SUPABASE_DB_URL"'
 
       # Use VM06's persistent shared Redis, rather than creating a per-CRM Redis.
       # The marker is permanent: it records the logical DB allocated to this app.
@@ -152,6 +108,55 @@ docker:
       else
         echo "CI_REGISTRY not set — image kept on server Docker only."
       fi
+
+      # Do not mutate the database until the new image has built successfully.
+      # The CLI runs in an isolated Node image so the shell runner needs no Node install.
+      if ! grep -q '^SUPABASE_DB_URL=' "$DEPLOY_ENV_FILE"; then
+        echo "ERROR: SUPABASE_DB_URL is required to apply Supabase migrations." >&2
+        exit 1
+      fi
+      echo "Applying pending Supabase migrations..."
+      docker run --rm \
+        --network ss_ant_crm_app \
+        --env-file "$DEPLOY_ENV_FILE" \
+        -v "$CI_PROJECT_DIR:/work:ro" \
+        -w /work \
+        node:22-bookworm-slim \
+        sh -ec 'npm ci --ignore-scripts && npx --no-install supabase db push --db-url "$SUPABASE_DB_URL"'
+
       echo "Deploying container on server..."
+      PREVIOUS_IMAGE_ID=""
+      PREVIOUS_APP_ID="$(docker compose --env-file "$DEPLOY_ENV_FILE" ps -q app || true)"
+      if [ -n "$PREVIOUS_APP_ID" ]; then
+        PREVIOUS_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$PREVIOUS_APP_ID")"
+      fi
+      rollback() {
+        if [ -z "$PREVIOUS_IMAGE_ID" ]; then
+          echo "No previous CRM image is available for rollback." >&2
+          return 1
+        fi
+        echo "Rolling back CRM to image $PREVIOUS_IMAGE_ID..." >&2
+        docker tag "$PREVIOUS_IMAGE_ID" the-ant-adventures-crm:local
+        sh scripts/docker-with-env.sh deploy
+      }
       sh scripts/docker-with-env.sh deploy
-      sh scripts/docker-with-env.sh status
+      echo "Waiting for CRM healthcheck..."
+      APP_ID="$(docker compose --env-file "$DEPLOY_ENV_FILE" ps -q app)"
+      for attempt in $(seq 1 30); do
+        STATUS="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}starting{{end}}' "$APP_ID")"
+        if [ "$STATUS" = "healthy" ]; then
+          echo "CRM is healthy."
+          docker image prune -f || true
+          exit 0
+        fi
+        if [ "$STATUS" = "unhealthy" ] || [ "$STATUS" = "exited" ]; then
+          docker logs "$APP_ID" --tail 100 || true
+          rollback || true
+          exit 1
+        fi
+        sleep 2
+      done
+      docker logs "$APP_ID" --tail 100 || true
+      echo "ERROR: CRM did not become healthy within 60 seconds." >&2
+      rollback || true
+      exit 1

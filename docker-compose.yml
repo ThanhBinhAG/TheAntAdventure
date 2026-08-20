@@ -33,13 +33,12 @@ services:
       NODE_ENV: production
       PORT: 3006
       HOSTNAME: 0.0.0.0
-      REDIS_URL: redis://redis:6379
       # Keep V8 heap under mem_limit so OOM is controllable (not host-wide kill).
       NODE_OPTIONS: --max-old-space-size=1536
 
-    depends_on:
-      redis:
-        condition: service_healthy
+    networks:
+      - ss_ant_crm_app
+      - shared-services
 
     # Caps the app at 2 GB so a runaway request is killed inside the container instead of
     # letting the kernel pick a victim host-wide. Measured peak for image processing is
@@ -59,25 +58,10 @@ services:
       start_period: 40s
     restart: unless-stopped
 
-  redis:
-    image: redis:7.4-alpine
-    command:
-      - redis-server
-      - --appendonly
-      - "yes"
-      - --maxmemory
-      - 256mb
-      - --maxmemory-policy
-      - noeviction
-    ports:
-      - "127.0.0.1:6379:6379"
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
-volumes:
-  redis-data:
+networks:
+  # Supabase ant-crm stack network; resolves supabase-ant-crm-gateway.
+  ss_ant_crm_app:
+    external: true
+  # VM06 shared Redis network; resolves shared_redis.
+  shared-services:
+    external: true

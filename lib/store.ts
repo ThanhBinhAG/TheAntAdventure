@@ -128,7 +128,9 @@ interface CRMState {
   removeCruise: (id: string) => void;
   addCalEvent: (event: Record<string, unknown>) => void;
   removeCalEvent: (id: string) => void;
+  setPhotos: (photos: Record<string, unknown>[]) => void;
   addTask: (task: Record<string, unknown>) => void;
+  setTasks: (tasks: Task[]) => void;
   updateTask: (id: string, data: Record<string, unknown>) => void;
   rolloverIncompleteTasks: () => void;
 
@@ -351,7 +353,9 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         set((s) => ({
           calEvents: s.calEvents.filter((x) => (x as { id?: string }).id !== id),
         })),
+      setPhotos: (photos) => set({ photos }),
       addTask: (task) => set((s) => ({ tasks: [...s.tasks, task] })),
+      setTasks: (tasks) => set({ tasks }),
       updateTask: (id, data) =>
         set((s) => ({
           tasks: s.tasks.map((t) => {

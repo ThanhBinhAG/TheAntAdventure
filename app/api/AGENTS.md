@@ -7,7 +7,7 @@ Next.js Route Handlers for server-side auth, media, exports, weather, and diagno
 - `auth/` — login, logout, users, permissions (parent `AGENTS.md`; leaf folders may omit AGENTS)
 - `access-control/` — users, staff-roles, audit-logs, login-history, super-admin-status
 - `branding/` — company logo (`logo/route.ts`)
-- `photos/` — gallery pipeline: `upload/{init,chunk,complete}`, `delete`
+- `photos/` — gallery pipeline: `all`, `upload/{init,chunk,complete}`, `delete`
 - `products/` — paginated catalogue, hydration routes, facets, pricing, and XLSX imports
 - `planner/` — daily planner (tasks) CRUD and hydration endpoints
 - `attractions/` — province attractions CRUD and hydration endpoints

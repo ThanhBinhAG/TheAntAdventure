@@ -53,17 +53,14 @@ export const SIDEBAR_BADGE_TABLES: readonly SyncArrayTable[] = [
  */
 export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[]>> = {
   dashboard: ['customers', 'leads', 'bookings', 'agents', 'feedback'],
-  planner: ['tasks', 'cal_events'],
+  planner: ['cal_events'],
   customers: ['customers', 'leads', 'feedback'],
   agents: ['agents', 'customers', 'leads'],
   sales: ['leads', 'customers', 'comms', 'tour_drafts', 'bookings'],
-  /** photos / photo_folders lazy on experiences (step 2) and proposal (step 4). */
+  /** Customer, lead, hotel, and comm data are still owned by their existing loaders. */
   tourdesign: [
-    'products',
     'customers',
     'leads',
-    'tour_drafts',
-    'tour_outline_days',
     'hotels',
     'comms',
   ],
@@ -77,7 +74,7 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   contracts: ['contracts', 'bookings'],
   suppliers: ['hotels', 'transport', 'restaurants', 'cruises', 'suppliers'],
   guides: ['guides'],
-  attractions: ['attractions', 'photos', 'photo_folders'],
+  attractions: ['photos', 'photo_folders'],
   /** Covers come from destinations API; no gallery hydrate on this route. */
   weather: [],
   posttour: ['feedback'],

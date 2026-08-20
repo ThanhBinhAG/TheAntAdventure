@@ -12,14 +12,15 @@ import type { Attraction } from '@/lib/types';
 /**
  * Lấy toàn bộ danh sách địa điểm tham quan kèm ảnh từ server.
  */
-export async function getAllAttractionsServer(): Promise<Attraction[]> {
+export async function getAllAttractionsServer(region?: Attraction['region']): Promise<Attraction[]> {
   const supabase = await getServerSupabaseClient();
 
-  // 1. Lấy tất cả hàng trong bảng attractions
-  const { data: baseRows, error: attError } = await supabase
+  let query = supabase
     .from('attractions')
     .select('*')
     .order('name');
+  if (region) query = query.eq('region', region);
+  const { data: baseRows, error: attError } = await query;
   if (attError) throw attError;
 
   // 2. Lấy liên kết ảnh trong bảng attraction_photos

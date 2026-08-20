@@ -7,11 +7,11 @@ import PortfolioImportModal from '@/components/products/PortfolioImportModal';
 import ProductDetailDrawer from '@/components/products/ProductDetailDrawer';
 import ProductEditPanel from '@/components/products/ProductEditPanel';
 import ProductLibrary from '@/components/products/ProductLibrary';
-import { ensureTablesLoaded } from '@/lib/db/hydrate';
+import { getBffArray } from '@/lib/bff/client';
 import { validateProductCodeInput } from '@/lib/products/product-code';
 import type { PricingStatusFilter } from '@/lib/products/product-pricing-helpers';
 import { useStore } from '@/hooks/useStore';
-import type { Product } from '@/lib/types';
+import type { Product, ProductPricing } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
 
@@ -25,6 +25,8 @@ export default function Products() {
   const updateProduct = useStore((s) => s.updateProduct);
   const deleteProduct = useStore((s) => s.deleteProduct);
   const upsertProductPricing = useStore((s) => s.upsertProductPricing);
+  const setProducts = useStore((s) => s.setProducts);
+  const setProductPricing = useStore((s) => s.setProductPricing);
 
   const [viewTab, setViewTab] = useState<ViewTab>('library');
   const [pickMode, setPickMode] = useState(false);
@@ -77,7 +79,12 @@ export default function Products() {
   const loadCatalogueForInteraction = useCallback(async () => {
     setCatalogueLoading(true);
     try {
-      await ensureTablesLoaded(['products', 'product_pricing']);
+      const [catalogue, pricing] = await Promise.all([
+        getBffArray<Product>('/api/products/all', 'Không thể tải catalogue product.'),
+        getBffArray<ProductPricing>('/api/products/pricing/all', 'Không thể tải pricing product.'),
+      ]);
+      setProducts(catalogue);
+      setProductPricing(pricing);
       return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không thể tải catalogue product.');
@@ -85,7 +92,7 @@ export default function Products() {
     } finally {
       setCatalogueLoading(false);
     }
-  }, []);
+  }, [setProductPricing, setProducts]);
 
   const setShellMode = (mode: ShellMode) => {
     if (formOpen) closeForm();

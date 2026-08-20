@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PaginationBar from '@/components/PaginationBar';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
@@ -13,6 +13,7 @@ import AttractionRegionColumn from '@/components/attractions/AttractionRegionCol
 import AttractionTable from '@/components/attractions/AttractionTable';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import { toast } from '@/lib/toast';
+import { getBffArray } from '@/lib/bff/client';
 
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 
@@ -33,6 +34,7 @@ export default function Attractions() {
   const addAttraction = useStore((s) => s.addAttraction);
   const updateAttraction = useStore((s) => s.updateAttraction);
   const deleteAttraction = useStore((s) => s.deleteAttraction);
+  const setAttractions = useStore((s) => s.setAttractions);
 
   const [region, setRegion] = useState('');
   const [typeF, setTypeF] = useState('');
@@ -43,6 +45,25 @@ export default function Attractions() {
   const [addRegionPref, setAddRegionPref] = useState<Attraction['region'] | null>(null);
   const [lightbox, setLightbox] = useState<{ attractionId: string; index: number } | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const query = region ? `?region=${encodeURIComponent(region)}` : '';
+    void getBffArray<Attraction>(`/api/attractions/all${query}`, 'Không thể tải địa điểm tham quan.')
+      .then((rows) => {
+        if (active) {
+          setAttractions(rows);
+          setLoadError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) setLoadError(error instanceof Error ? error.message : 'Không thể tải địa điểm tham quan.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [region, setAttractions]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -182,6 +203,7 @@ export default function Attractions() {
 
   return (
     <div className="att-page">
+      {loadError && <div className="crm-page-hydrate-error" role="alert">{loadError}</div>}
       <div className="att-toolbar">
         <select value={region} onChange={(e) => setRegion(e.target.value)}>
           <option value="">All Regions</option>

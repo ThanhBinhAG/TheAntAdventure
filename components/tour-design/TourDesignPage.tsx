@@ -40,10 +40,10 @@ import {
   tourDraftIdForLead,
 } from '@/lib/tour-design/tour-draft-utils';
 import { outlineDocFromRows, printOutline } from '@/lib/outline/outline-html';
-import { ensureTablesLoaded } from '@/lib/db/hydrate';
+import { getBffArray } from '@/lib/bff/client';
 import type { ProposalTemplateOverrides } from '@/lib/proposals/proposal-content-overrides';
 import { DEFAULT_PROPOSAL_LAYOUT_ID, type ProposalLayoutId } from '@/lib/proposals/proposal-layouts';
-import type { ExperienceOverride, OutlineStatus, Product, TourOutlineDay } from '@/lib/types';
+import type { ExperienceOverride, OutlineStatus, Product, TourDraft, TourOutlineDay } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import { TourDesignQueueCards } from '@/components/tour-design/TourDesignQueueCards';
@@ -65,6 +65,10 @@ export default function TourDesignPage() {
   const addComm = useStore((s) => s.addComm);
   const upsertTourDraft = useStore((s) => s.upsertTourDraft);
   const replaceOutlineDaysForDraft = useStore((s) => s.replaceOutlineDaysForDraft);
+  const setProducts = useStore((s) => s.setProducts);
+  const setTourDrafts = useStore((s) => s.setTourDrafts);
+  const setTourOutlineDays = useStore((s) => s.setTourOutlineDays);
+  const setPhotos = useStore((s) => s.setPhotos);
   const { saveFromForm } = useRegisterCustomer();
 
   const [step, setStep] = useState(0);
@@ -89,14 +93,32 @@ export default function TourDesignPage() {
   const [outlineRevision, setOutlineRevision] = useState(0);
   const [outlineRows, setOutlineRows] = useState<TourOutlineDay[]>([]);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [readError, setReadError] = useState<string | null>(null);
 
   const urlInitRef = useRef<string | null>(null);
   const lastDraftFingerprintRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (step !== 2 && step !== 4) return;
-    void ensureTablesLoaded(['photos', 'photo_folders']);
-  }, [step]);
+    let active = true;
+    void Promise.all([
+      getBffArray<Product>('/api/products/all', 'Không thể tải catalogue product.'),
+      getBffArray<TourDraft>('/api/tour-design/drafts/all', 'Không thể tải bản nháp tour.'),
+      getBffArray<TourOutlineDay>('/api/tour-design/outlines/all', 'Không thể tải hành trình tour.'),
+      getBffArray<GalleryPhoto>('/api/photos/all', 'Không thể tải thư viện ảnh.'),
+    ]).then(([catalogue, drafts, outlineDays, galleryPhotos]) => {
+      if (!active) return;
+      setProducts(catalogue);
+      setTourDrafts(drafts);
+      setTourOutlineDays(outlineDays);
+      setPhotos(galleryPhotos);
+      setReadError(null);
+    }).catch((error: unknown) => {
+      if (active) setReadError(error instanceof Error ? error.message : 'Không thể tải dữ liệu Tour Design.');
+    });
+    return () => {
+      active = false;
+    };
+  }, [setPhotos, setProducts, setTourDrafts, setTourOutlineDays]);
 
   const experiencesBlocked = isExperiencesBlocked(leadId, outlineRows.length, outlineStatus);
   const pendingLeads = useMemo(() => getPendingTourDesignLeads(leads), [leads]);
@@ -609,6 +631,7 @@ export default function TourDesignPage() {
 
   return (
     <div>
+      {readError && <div className="crm-page-hydrate-error" role="alert">{readError}</div>}
       <TourDesignQueueCards
         pendingLeads={pendingLeads}
         awaitingOutline={awaitingOutline}

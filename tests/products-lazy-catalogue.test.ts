@@ -8,5 +8,7 @@ test('products route defers the full catalogue until detail or manage is needed'
   const page = readFileSync(join(process.cwd(), 'components/products/ProductsPage.tsx'), 'utf8');
 
   assert.match(config, /products:\s*\[\]/);
-  assert.match(page, /ensureTablesLoaded\(\['products', 'product_pricing'\]\)/);
+  assert.doesNotMatch(page, /ensureTablesLoaded/);
+  assert.match(page, /getBffArray<Product>\('\/api\/products\/all'/);
+  assert.match(page, /getBffArray<ProductPricing>\('\/api\/products\/pricing\/all'/);
 });

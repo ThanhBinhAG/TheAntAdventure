@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CompletedTasksPanel from '@/components/planner/CompletedTasksPanel';
 import {
   buildNoteTask,
@@ -16,6 +16,7 @@ import { addDays, localTodayIso, mondayOfWeek } from '@/lib/core/date-utils';
 import { useStore } from '@/hooks/useStore';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import { toast } from '@/lib/toast';
+import { getBffArray } from '@/lib/bff/client';
 
 const TEAM = ['Tai Pham', 'Linh N.', 'Minh T.', 'Huong L.', 'Khoa V.'];
 
@@ -48,6 +49,7 @@ export default function Planner() {
   const { canWrite } = usePagePermission('planner');
   const tasks = useStore((s) => s.tasks) as Task[];
   const addTask = useStore((s) => s.addTask);
+  const setTasks = useStore((s) => s.setTasks);
   const updateTask = useStore((s) => s.updateTask);
 
   const [weekOffset, setWeekOffset] = useState(0);
@@ -56,7 +58,22 @@ export default function Planner() {
   const [noteText, setNoteText] = useState('');
   const [newTaskStatus, setNewTaskStatus] = useState<TaskStatusValue>('todo');
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const noteBoardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getBffArray<Task>('/api/planner/all', 'Không thể tải danh sách công việc.')
+      .then((rows) => {
+        if (active) setTasks(rows);
+      })
+      .catch((error: unknown) => {
+        if (active) setLoadError(error instanceof Error ? error.message : 'Không thể tải danh sách công việc.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [setTasks]);
 
   const today = localTodayIso();
   const allTasks = tasks as Task[];
@@ -163,6 +180,7 @@ export default function Planner() {
 
   return (
     <div>
+      {loadError && <div className="crm-page-hydrate-error" role="alert">{loadError}</div>}
       <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--m)', marginBottom: 12 }}>
         📆 Task Calendar & Team Planner
       </div>

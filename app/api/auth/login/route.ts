@@ -1,9 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import {
+  checkBreakGlassCredentials,
   mintBreakGlassSession,
   setBreakGlassCookie,
-  verifyBreakGlassCredentials,
 } from '@/lib/auth/break-glass';
 import { attachBreakGlassSupabaseSession } from '@/lib/auth/break-glass-supabase';
 import {
@@ -14,8 +14,9 @@ import {
 } from '@/lib/auth/rate-limit';
 import { getLoginClientMetadata } from '@/lib/auth/login-history';
 import { recordSuccessfulLogin } from '@/lib/auth/login-history-store';
-import { getSupabaseAnonKey, getSupabaseUrl, isBreakGlassConfigured } from '@/lib/env';
+import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { debugLog } from '@/lib/system/debug-logger';
 
 type LoginBody = {
   identity?: string;
@@ -94,8 +95,17 @@ export async function POST(request: Request) {
     return fail(400, 'Vui lòng nhập tài khoản và mật khẩu.');
   }
 
-  // Break-glass first (timing-safe compare); never log the username.
-  if (isBreakGlassConfigured() && verifyBreakGlassCredentials(identity, password)) {
+  // Break-glass first (timing-safe compare). Debug metadata is boolean-only and
+  // emitted exclusively while SYSTEM_DEBUG is enabled; credentials are never logged.
+  const breakGlass = checkBreakGlassCredentials(identity, password);
+  debugLog('auth', 'break-glass credential check', {
+    meta: {
+      configured: breakGlass.configured,
+      usernameMatches: breakGlass.usernameMatches,
+      passwordMatches: breakGlass.passwordMatches,
+    },
+  });
+  if (breakGlass.configured && breakGlass.usernameMatches && breakGlass.passwordMatches) {
     await clearLoginFailures(ip);
     try {
       const { token, maxAge } = await mintBreakGlassSession();

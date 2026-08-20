@@ -37,37 +37,15 @@ export async function getAllTourOutlineDaysServer(): Promise<TourOutlineDay[]> {
   return (data || []).map((row) => rowToTourOutlineDay(row));
 }
 
-/**
- * Lưu thông tin tour draft và các ngày hành trình (outlines) tuần tự trên server.
- */
+/** Save the draft and replacement outline as one PostgreSQL transaction. */
 export async function saveTourDesignServer(
   supabase: SupabaseClient,
   draft: TourDraft,
   outlineDays: TourOutlineDay[]
 ): Promise<void> {
-  // 1. Upsert tour draft
-  const draftRow = tourDraftToRow(draft);
-  const { error: draftError } = await supabase
-    .from('tour_drafts')
-    .upsert(draftRow);
-
-  if (draftError) throw draftError;
-
-  // 2. Xóa các outline days cũ liên quan đến draftId
-  const { error: deleteError } = await supabase
-    .from('tour_outline_days')
-    .delete()
-    .eq('draft_id', draft.id);
-
-  if (deleteError) throw deleteError;
-
-  // 3. Chèn các outline days mới (nếu có)
-  if (outlineDays.length > 0) {
-    const rows = outlineDays.map((day) => tourOutlineDayToRow(day));
-    const { error: insertError } = await supabase
-      .from('tour_outline_days')
-      .insert(rows);
-
-    if (insertError) throw insertError;
-  }
+  const { error } = await supabase.rpc('save_tour_design_transaction', {
+    p_draft: tourDraftToRow(draft),
+    p_outline_days: outlineDays.map((day) => tourOutlineDayToRow(day)),
+  });
+  if (error) throw error;
 }

@@ -14,6 +14,7 @@ require.cache[serverOnlyPath] = {
 
 // State mocks to verify database calls
 let supabaseCalls: { method: string; table: string; data?: any; eqCode?: string }[] = [];
+let tourSaveRpcError: { message: string } | null = null;
 
 // Mock dependencies
 mock.module(require.resolve('../lib/auth/session'), {
@@ -46,6 +47,10 @@ mock.module(require.resolve('../lib/supabase/server'), {
   namedExports: {
     getServerSupabaseClient: async () => {
       return {
+        rpc: (name: string, data: any) => {
+          supabaseCalls.push({ method: 'rpc', table: name, data });
+          return Promise.resolve({ data: null, error: tourSaveRpcError });
+        },
         from: (table: string) => ({
           select: () => {
             supabaseCalls.push({ method: 'select', table });
@@ -114,6 +119,7 @@ test('Tour Design BFF APIs - Tests', async (t) => {
 
   await t.beforeEach(() => {
     supabaseCalls = [];
+    tourSaveRpcError = null;
   });
 
   await t.test('GET /api/tour-design/drafts/all - lists all drafts with mapping', async () => {
@@ -189,21 +195,29 @@ test('Tour Design BFF APIs - Tests', async (t) => {
     const json = await response.json();
     assert.equal(json.ok, true);
 
-    // Verify sequence: upsert draft -> delete old outlines -> insert new outlines
-    assert.equal(supabaseCalls.length, 3);
-    
-    assert.equal(supabaseCalls[0].method, 'upsert');
-    assert.equal(supabaseCalls[0].table, 'tour_drafts');
-    assert.equal(supabaseCalls[0].data.id, 'TD-002');
-    assert.equal(supabaseCalls[0].data.lead_id, 'L-002');
+    assert.equal(supabaseCalls.length, 1);
+    assert.equal(supabaseCalls[0].method, 'rpc');
+    assert.equal(supabaseCalls[0].table, 'save_tour_design_transaction');
+    assert.equal(supabaseCalls[0].data.p_draft.id, 'TD-002');
+    assert.equal(supabaseCalls[0].data.p_draft.lead_id, 'L-002');
+    assert.equal(supabaseCalls[0].data.p_outline_days[0].id, 'TOD-002');
+    assert.equal(supabaseCalls[0].data.p_outline_days[0].outline_date, '2026-08-21');
+  });
 
-    assert.equal(supabaseCalls[1].method, 'delete');
-    assert.equal(supabaseCalls[1].table, 'tour_outline_days');
-    assert.equal(supabaseCalls[1].eqCode, 'TD-002');
+  await t.test('POST /api/tour-design/save fails atomically when the transaction rejects', async () => {
+    tourSaveRpcError = { message: 'outline insert failed' };
+    const req = new Request('http://localhost/api/tour-design/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        draft: { id: 'TD-003', leadId: 'L-003', custId: 'C-003' },
+        outlineDays: [],
+      }),
+    });
 
-    assert.equal(supabaseCalls[2].method, 'insert');
-    assert.equal(supabaseCalls[2].table, 'tour_outline_days');
-    assert.equal(supabaseCalls[2].data[0].id, 'TOD-002');
-    assert.equal(supabaseCalls[2].data[0].outline_date, '2026-08-21');
+    const response = await saveRoute.POST(req);
+    assert.equal(response.status, 500);
+    assert.equal(supabaseCalls.length, 1);
+    assert.equal(supabaseCalls[0].method, 'rpc');
   });
 });

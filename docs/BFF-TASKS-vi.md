@@ -20,6 +20,7 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 
 | Feature | Owner | Deliverable trọn vẹn |
 |---|---|---|
+| Auth & Session | Developer A | Login/logout, CRM HttpOnly session, refresh/revoke, middleware, permission enforcement, test |
 | Daily Planner | Developer A | Repository/API, quyền, UI/hook, test, gỡ direct Supabase path |
 | Attraction Schedule | Developer A | Địa điểm theo tỉnh, API lịch/địa điểm, UI/hook, test, gỡ direct path |
 | Tour Design | Developer A | Draft/outline API, ghi dữ liệu con an toàn, UI/hook, test, gỡ direct path |
@@ -52,6 +53,13 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 | CI leakage check | B | Build fail nếu browser bundle có hostname/key/path Supabase |
 
 ## Developer A — feature end-to-end
+
+### A0 — Auth & Session
+
+- [ ] Hoàn thiện login/logout, CRM HttpOnly session, session validation, refresh và revoke.
+- [ ] Chuyển middleware redirect và permission enforcement hoàn toàn về CRM BFF.
+- [ ] Browser không giữ Supabase access/refresh token; không gọi Supabase Auth trực tiếp.
+- [ ] Test unauthenticated, login fail/success, logout, session expiry, revoke và forbidden permission.
 
 ### A1 — Tour Product
 

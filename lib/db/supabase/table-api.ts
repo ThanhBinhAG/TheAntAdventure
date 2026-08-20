@@ -2,10 +2,8 @@ import { type SyncArrayTable } from '../sync-config';
 import { type SyncTableOptions } from '../sync-policy';
 import { getSimpleRows, getTaggedRows, syncSimpleTable, syncTaggedTable } from './generic-sync';
 import {
-  getAttractions,
   getBookings,
   getHotels,
-  syncAttractions,
   syncBookings,
   syncHotels,
 } from './nested-sync';
@@ -38,12 +36,22 @@ export function makeTableApi(table: SyncArrayTable) {
 
   if (table === 'attractions') {
     return {
-      getAll: () => getAttractions(),
-      syncTable: (rows: Row[], options?: SyncTableOptions) => syncAttractions(rows, options),
-      deleteRemote: async (id: string) => {
-        await executeDeleteAndVerify(supabase(), 'attractions', 'id', id);
+      getAll: async () => {
+        try {
+          const res = await fetch('/api/attractions/all', { credentials: 'same-origin' });
+          if (!res.ok) throw new Error('BFF attractions load failed');
+          const json = await res.json();
+          return json.ok ? json.data : [];
+        } catch (e) {
+          console.error(e);
+          return [];
+        }
       },
-      count: () => countTable('attractions'),
+      syncTable: async () => {
+        return { skippedOrphanDelete: true };
+      },
+      deleteRemote: async () => {},
+      count: async () => 0,
     };
   }
 
@@ -95,6 +103,48 @@ export function makeTableApi(table: SyncArrayTable) {
         try {
           const res = await fetch('/api/planner/all', { credentials: 'same-origin' });
           if (!res.ok) throw new Error('BFF tasks load failed');
+          const json = await res.json();
+          return json.ok ? json.data : [];
+        } catch (e) {
+          console.error(e);
+          return [];
+        }
+      },
+      syncTable: async () => {
+        return { skippedOrphanDelete: true };
+      },
+      deleteRemote: async () => {},
+      count: async () => 0,
+    };
+  }
+
+  if (table === 'tour_drafts') {
+    return {
+      getAll: async () => {
+        try {
+          const res = await fetch('/api/tour-design/drafts/all', { credentials: 'same-origin' });
+          if (!res.ok) throw new Error('BFF tour_drafts load failed');
+          const json = await res.json();
+          return json.ok ? json.data : [];
+        } catch (e) {
+          console.error(e);
+          return [];
+        }
+      },
+      syncTable: async () => {
+        return { skippedOrphanDelete: true };
+      },
+      deleteRemote: async () => {},
+      count: async () => 0,
+    };
+  }
+
+  if (table === 'tour_outline_days') {
+    return {
+      getAll: async () => {
+        try {
+          const res = await fetch('/api/tour-design/outlines/all', { credentials: 'same-origin' });
+          if (!res.ok) throw new Error('BFF tour_outline_days load failed');
           const json = await res.json();
           return json.ok ? json.data : [];
         } catch (e) {

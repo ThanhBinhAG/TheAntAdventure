@@ -12,7 +12,7 @@
     "start": "next start -p 3006",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test $(find Personal/tests -name '*.test.ts' 2>/dev/null | sort)",
+    "test": "node --experimental-test-module-mocks --import tsx --test $(find Personal/tests -name '*.test.ts' 2>/dev/null | sort)",
     "db:link": "supabase link",
     "db:login": "supabase login",
     "db:migration:new": "supabase migration new",

@@ -55,7 +55,14 @@ async function syncTableFromBackup(
   backup: BackupData,
   options: SyncTableOptions
 ): Promise<SyncTableResult> {
-  if (table === 'products' || table === 'product_pricing' || table === 'tasks') {
+  if (
+    table === 'products' ||
+    table === 'product_pricing' ||
+    table === 'tasks' ||
+    table === 'attractions' ||
+    table === 'tour_drafts' ||
+    table === 'tour_outline_days'
+  ) {
     return { skippedOrphanDelete: false };
   }
   const key = TABLE_TO_STORE_KEY[table];

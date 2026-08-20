@@ -178,6 +178,15 @@ export default function TourDesignPage() {
       lastDraftFingerprintRef.current = fingerprint;
       upsertTourDraft(draft);
       replaceOutlineDaysForDraft(draft.id, rows);
+
+      fetch('/api/tour-design/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draft, outlineDays: rows }),
+      }).catch((err) => {
+        console.error('Failed to save tour design:', err);
+      });
+
       return true;
     },
     [

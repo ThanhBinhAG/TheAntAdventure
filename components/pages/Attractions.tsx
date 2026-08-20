@@ -12,6 +12,7 @@ import type { AttractionFormData } from '@/components/attractions/AttractionEdit
 import AttractionRegionColumn from '@/components/attractions/AttractionRegionColumn';
 import AttractionTable from '@/components/attractions/AttractionTable';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { toast } from '@/lib/toast';
 
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 
@@ -100,13 +101,32 @@ export default function Attractions() {
     setFormMode('edit');
   }
 
-  function handleDelete(id: string) {
-    deleteAttraction(id);
-    if (expandedId === id) setExpandedId(null);
-    closeForm();
+  async function handleDelete(id: string) {
+    try {
+      const res = await fetch('/api/attractions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Không thể xóa địa điểm.');
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? 'Không thể xóa địa điểm.');
+      }
+
+      deleteAttraction(id);
+      if (expandedId === id) setExpandedId(null);
+      closeForm();
+      toast.success('Đã xóa địa điểm.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Xóa địa điểm thất bại.');
+    }
   }
 
-  function handleSave(form: AttractionFormData) {
+  async function handleSave(form: AttractionFormData) {
     const payload: Attraction = {
       id: form.id,
       region: form.region,
@@ -128,15 +148,36 @@ export default function Attractions() {
       linkedPhotoIds: [...form.linkedPhotoIds],
     };
 
-    if (formMode === 'edit') {
-      updateAttraction(payload.id, payload);
-    } else {
-      addAttraction(payload);
-      setRegion('');
-      setSearch('');
-      setExpandedId(payload.id);
+    try {
+      const isEdit = formMode === 'edit';
+      const res = await fetch('/api/attractions', {
+        method: isEdit ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attraction: payload }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Không thể lưu địa điểm.');
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? 'Không thể lưu địa điểm.');
+      }
+
+      if (isEdit) {
+        updateAttraction(payload.id, payload);
+        toast.success('Đã cập nhật địa điểm.');
+      } else {
+        addAttraction(payload);
+        setRegion('');
+        setSearch('');
+        setExpandedId(payload.id);
+        toast.success('Đã tạo địa điểm mới.');
+      }
+      closeForm();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Lưu địa điểm thất bại.');
     }
-    closeForm();
   }
 
   return (

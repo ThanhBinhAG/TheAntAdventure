@@ -126,42 +126,37 @@ docker:
         echo "CI_REGISTRY not set — image kept on server Docker only."
       fi
 
-      # Only a commit that changes migrations needs the direct Postgres URL.
-      MIGRATIONS_CHANGED=1
-      case "${CI_COMMIT_BEFORE_SHA:-}" in
-        *[!0]*)
-          if git diff --quiet "$CI_COMMIT_BEFORE_SHA" "$CI_COMMIT_SHA" -- supabase/migrations; then
-            MIGRATIONS_CHANGED=0
-          fi
-          ;;
-      esac
-      if [ "$MIGRATIONS_CHANGED" -eq 1 ]; then
-        # Do not mutate the database until the new image has built successfully.
-        if ! grep -q '^SUPABASE_DB_URL=' "$DEPLOY_ENV_FILE"; then
-          echo "ERROR: This commit changes supabase/migrations, but SUPABASE_DB_URL is not configured in ant-crm deploy secrets." >&2
-          exit 1
-        fi
-        echo "Applying pending Supabase migrations..."
-        MIGRATOR_IMAGE="the-ant-adventures-crm:migrator-$CI_COMMIT_SHORT_SHA"
-        DB_CONTAINER="$(docker ps --format '{{.ID}} {{.Names}}' | awk '$2 ~ /^supabase-ant-crm-db(-[0-9]+)?$/ { print $1; exit }')"
-        if [ -z "$DB_CONTAINER" ]; then
-          echo "ERROR: Could not find the Supabase Postgres container (expected supabase-ant-crm-db)." >&2
-          exit 1
-        fi
-        DB_NETWORK="$(docker inspect --format '{{range $network, $_ := .NetworkSettings.Networks}}{{$network}}{{"\n"}}{{end}}' "$DB_CONTAINER" | head -n 1)"
-        if [ -z "$DB_NETWORK" ]; then
-          echo "ERROR: Could not determine the Supabase Postgres network." >&2
-          exit 1
-        fi
-        docker build --target migrator -t "$MIGRATOR_IMAGE" .
-        docker run --rm \
-          --network "$DB_NETWORK" \
-          --env-file "$DEPLOY_ENV_FILE" \
-          "$MIGRATOR_IMAGE" \
-          sh -ec 'npx --no-install supabase db push --db-url "$SUPABASE_DB_URL"'
-      else
-        echo "No migration files changed; skipping database migration."
+      # `supabase db push` owns version tracking. It applies every migration on a
+      # fresh database and exits without changes when the recorded versions match.
+      # Do not mutate the database until the new image has built successfully.
+      if ! grep -q '^SUPABASE_DB_URL=' "$DEPLOY_ENV_FILE"; then
+        echo "ERROR: SUPABASE_DB_URL is required to apply Supabase migrations." >&2
+        exit 1
       fi
+      echo "Checking and applying pending Supabase migrations..."
+      MIGRATOR_IMAGE="the-ant-adventures-crm:migrator-$CI_COMMIT_SHORT_SHA"
+      DB_CONTAINER="$(docker ps -q \
+        --filter 'label=com.docker.compose.project=ss_ant_crm' \
+        --filter 'label=com.docker.compose.service=db')"
+      if [ -z "$DB_CONTAINER" ]; then
+        DB_CONTAINER="$(docker ps --format '{{.ID}} {{.Names}}' \
+          | awk '$2 ~ /^(supabase-ant-crm|ss_ant_crm)-db(-[0-9]+)?$/ { print $1; exit }')"
+      fi
+      if [ -z "$DB_CONTAINER" ]; then
+        echo "ERROR: Could not find the Supabase Postgres container for ss_ant_crm." >&2
+        exit 1
+      fi
+      DB_NETWORK="$(docker inspect --format '{{range $network, $_ := .NetworkSettings.Networks}}{{$network}}{{"\n"}}{{end}}' "$DB_CONTAINER" | head -n 1)"
+      if [ -z "$DB_NETWORK" ]; then
+        echo "ERROR: Could not determine the Supabase Postgres network." >&2
+        exit 1
+      fi
+      docker build --target migrator -t "$MIGRATOR_IMAGE" .
+      docker run --rm \
+        --network "$DB_NETWORK" \
+        --env-file "$DEPLOY_ENV_FILE" \
+        "$MIGRATOR_IMAGE" \
+        sh -ec 'npx --no-install supabase db push --db-url "$SUPABASE_DB_URL"'
 
       echo "Deploying container on server..."
       PREVIOUS_IMAGE_ID=""

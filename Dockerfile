@@ -13,6 +13,11 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# --- Database migrations ---
+# Reuse the locked project CLI dependencies without compiling the application.
+FROM deps AS migrator
+COPY supabase ./supabase
+
 # --- Build ---
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules

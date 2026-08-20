@@ -1,17 +1,23 @@
 import 'server-only';
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 import {
   getServerSupabaseUrl,
   getServerSupabaseAnonKey,
   getSupabaseServiceRoleKey,
 } from '@/lib/env';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import {
+  CRM_SESSION_COOKIE,
+  getCrmSession,
+  refreshCrmSessionIfNeeded,
+} from '@/lib/auth/crm-session';
+import { cookies } from 'next/headers';
 
 /**
  * Tạo user-scoped Supabase client trên server.
- * Tự động chuyển tiếp cookies để kế thừa quyền (RLS) của user hiện tại.
+ * Access token Supabase chỉ được lấy từ Redis sau khi CRM session đã xác thực.
+ * Browser không nhận hoặc gửi Supabase Auth cookie.
  */
 export async function getServerSupabaseClient() {
   const url = getServerSupabaseUrl();
@@ -22,23 +28,14 @@ export async function getServerSupabaseClient() {
   }
 
   const cookieStore = await cookies();
+  const storedSession = await getCrmSession(cookieStore.get(CRM_SESSION_COOKIE)?.value);
+  const session = storedSession && await refreshCrmSessionIfNeeded(storedSession);
+  if (!session) throw new Error('CRM session không hợp lệ hoặc đã hết hạn.');
 
-  return createServerClient(url, key, {
+  return createClient(url, key, {
     ...getSupabaseGlobalFetchOptions(),
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        } catch {
-          // Bỏ qua lỗi nếu hàm được gọi từ Server Component (chỉ đọc)
-        }
-      },
-    },
+    accessToken: async () => session.supabaseAccessToken,
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 }
 
@@ -55,15 +52,8 @@ export function getAdminSupabaseClient() {
     throw new Error('Supabase URL hoặc Service Role Key chưa được cấu hình ở phía server.');
   }
 
-  return createServerClient(url, serviceRoleKey, {
+  return createClient(url, serviceRoleKey, {
     ...getSupabaseGlobalFetchOptions(),
-    cookies: {
-      getAll() {
-        return [];
-      },
-      setAll() {
-        // Admin client không thiết lập cookies của người dùng
-      },
-    },
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 }

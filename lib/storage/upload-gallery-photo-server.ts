@@ -1,9 +1,8 @@
 import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { getSupabaseAnonKey, getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/env';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { getServerSupabaseClient } from '@/lib/supabase/server';
 import { pickGalleryProfile } from '@/lib/image-pipeline/profiles';
 import {
   processGalleryAssetFromPath,
@@ -39,22 +38,7 @@ export async function getPhotoStorageClient(): Promise<SupabaseClient | null> {
   const service = getServiceClient();
   if (service) return service;
 
-  const url = getSupabaseUrl();
-  const key = getSupabaseAnonKey();
-  if (!url || !key) return null;
-
-  const cookieStore = await cookies();
-  return createServerClient(url, key, {
-    ...getSupabaseGlobalFetchOptions(),
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll() {
-        /* read-only in route handlers that don't mutate cookies */
-      },
-    },
-  });
+  return getServerSupabaseClient();
 }
 
 function publicUrl(client: SupabaseClient, path: string): string {

@@ -40,6 +40,11 @@ export function getAuthCaptchaSiteKey() {
   return (process.env.NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY ?? '').trim();
 }
 
+/** Server-only — HMAC key for the opaque CRM session cookie. */
+export function getCrmSessionSecret() {
+  return (process.env.CRM_SESSION_SECRET ?? '').trim();
+}
+
 /** Auto push app → Supabase after edits (default: on when Supabase enabled) */
 export function isAutoSyncEnabled() {
   const v = (process.env.NEXT_PUBLIC_SUPABASE_AUTO_SYNC ?? '').trim().toLowerCase();

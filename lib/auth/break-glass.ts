@@ -91,11 +91,26 @@ function randomSid(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export function verifyBreakGlassCredentials(username: string, password: string): boolean {
-  if (!isBreakGlassConfigured()) return false;
+export function checkBreakGlassCredentials(username: string, password: string): {
+  configured: boolean;
+  usernameMatches: boolean;
+  passwordMatches: boolean;
+} {
+  if (!isBreakGlassConfigured()) {
+    return { configured: false, usernameMatches: false, passwordMatches: false };
+  }
   const expectedUser = getBreakGlassUsername();
   const expectedPass = getBreakGlassPassword();
-  return safeEqualStr(username, expectedUser) && safeEqualStr(password, expectedPass);
+  return {
+    configured: true,
+    usernameMatches: safeEqualStr(username, expectedUser),
+    passwordMatches: safeEqualStr(password, expectedPass),
+  };
+}
+
+export function verifyBreakGlassCredentials(username: string, password: string): boolean {
+  const check = checkBreakGlassCredentials(username, password);
+  return check.configured && check.usernameMatches && check.passwordMatches;
 }
 
 export async function mintBreakGlassSession(): Promise<{ token: string; maxAge: number }> {

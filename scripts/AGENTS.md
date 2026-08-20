@@ -8,6 +8,7 @@ Ops shell helpers (not npm package scripts). Separate from `Personal/scripts` on
 - `setup-pdf-deps-wsl.sh` — WSL PDF dependency setup
 - `supabase-db.sh` — Supabase CLI wrapper (`db:push`, `db:bootstrap`, …)
 - `docker-with-env.sh` — resolve env then compose `print|build|up|deploy|down|status` (CI uses print → build → deploy)
+- `scan-leakage.sh` — fails a build when browser assets contain Supabase URLs, anon keys, or service paths
 
 ## Boundaries
 - App domain logic stays in `lib/`. Legacy migrate tools: `Personal/scripts`.

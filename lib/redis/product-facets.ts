@@ -30,8 +30,18 @@ function getFacetsCacheKey(input: ProductListFilters) {
 export async function getCachedProductFacets(
     input: ProductListFilters,
 ): Promise<ProductListFacets | undefined> {
-    const cached = await cacheGet<ProductListFacets>(getFacetsCacheKey(input));
-    return cached ?? undefined;
+    const cached = await cacheGet<unknown>(getFacetsCacheKey(input));
+    if (!cached || typeof cached !== 'object') return undefined;
+    const facets = cached as Partial<ProductListFacets>;
+    if (
+        !Array.isArray(facets.categories) ||
+        !facets.categories.every((category) => typeof category === 'string') ||
+        !facets.destinations ||
+        !facets.pricingPulse
+    ) {
+        return undefined;
+    }
+    return facets as ProductListFacets;
 }
 
 export async function setCachedProductFacets(
@@ -42,5 +52,5 @@ export async function setCachedProductFacets(
 }
 
 export async function invalidateProductFacetsCache(): Promise<void> {
-    await cacheInvalidatePattern('cache:products:facets:v1:*');
+    await cacheInvalidatePattern('cache:products:*:v1:*');
 }

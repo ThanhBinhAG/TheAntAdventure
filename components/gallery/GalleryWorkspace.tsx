@@ -13,7 +13,6 @@ import {
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/hooks/useStore';
 import {
-  ensureTablesLoaded,
   persistRouteCacheFromStore,
   pushTablesToSupabase,
 } from '@/lib/db/hydrate';
@@ -58,6 +57,8 @@ import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { confirmDialog } from '@/lib/confirm';
 import { DraggablePhotoCard } from '@/components/gallery/GalleryDraggablePhotoCard';
+import { getBffArray } from '@/lib/bff/client';
+import type { Attraction } from '@/lib/types';
 
 /** One Sharp/upload at a time to avoid RAM spikes on heavy originals. */
 const GALLERY_UPLOAD_CONCURRENCY = 1;
@@ -104,6 +105,7 @@ export default function GalleryWorkspace() {
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
   const rawFolders = useStore((s) => s.photoFolders) as PhotoFolder[];
   const attractions = useStore((s) => s.attractions);
+  const setAttractions = useStore((s) => s.setAttractions);
 
   const folders = useMemo(() => ensureUnsortedFolder(rawFolders), [rawFolders]);
 
@@ -135,11 +137,21 @@ export default function GalleryWorkspace() {
     }
   }, [rawFolders.length, folders]);
 
-  /** Attractions are not in gallery boot — load only when filtering by attraction. */
+  /** Attractions are not in gallery boot — fetch their BFF data only for this filter. */
   useEffect(() => {
     if (!attractionFilter) return;
-    void ensureTablesLoaded(['attractions']);
-  }, [attractionFilter]);
+    let active = true;
+    void getBffArray<Attraction>('/api/attractions/all', 'Không thể tải địa điểm tham quan.')
+      .then((rows) => {
+        if (active) setAttractions(rows);
+      })
+      .catch((loadError: unknown) => {
+        if (active) setError(loadError instanceof Error ? loadError.message : 'Không thể tải địa điểm tham quan.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [attractionFilter, setAttractions]);
 
   const filteredPhotoLightbox =
     photoFilter && dismissedPhotoFilter !== photoFilter

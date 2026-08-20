@@ -69,7 +69,8 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   products: [],
   /** attractions deferred — Gallery lazy-loads for ?attraction= filter / delete unlink */
   gallery: ['photos', 'photo_folders'],
-  pricing: ['products', 'product_pricing'],
+  /** Pricing loads its catalogue through Product/Pricing BFF routes. */
+  pricing: [],
   bookings: ['bookings', 'customers'],
   contracts: ['contracts', 'bookings'],
   suppliers: ['hotels', 'transport', 'restaurants', 'cruises', 'suppliers'],

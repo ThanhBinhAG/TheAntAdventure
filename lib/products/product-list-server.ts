@@ -15,6 +15,10 @@ import {
     getCachedProductFacets,
     setCachedProductFacets,
 } from '@/lib/redis/product-facets';
+import {
+    getCachedProductPage,
+    setCachedProductPage,
+} from '@/lib/redis/product-list';
 
 
 type ProductRow = Record<string, unknown>;
@@ -108,6 +112,9 @@ async function attachPageCoverThumbs(
 export async function listProductsPage(
     input: ProductListQuery,
 ): Promise<ProductPageResponse<Product>> {
+    const cached = await getCachedProductPage(input);
+    if (cached) return cached;
+
     const supabase = await getServerSupabaseClient();
     const result = input.view === 'modules'
         ? await supabase.rpc('list_product_modules_page', {
@@ -134,7 +141,7 @@ export async function listProductsPage(
         throw new ProductListError('RPC danh sách product trả dữ liệu không hợp lệ.');
     }
 
-    return {
+    const productPage = {
         items: await attachPageCoverThumbs(supabase, page.items),
         page: page.page,
         pageSize: page.pageSize,
@@ -143,6 +150,8 @@ export async function listProductsPage(
         hasPreviousPage: page.hasPreviousPage,
         hasNextPage: page.hasNextPage,
     };
+    await setCachedProductPage(input, productPage);
+    return productPage;
 }
 
 export async function listProductFacets(

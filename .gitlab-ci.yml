@@ -42,11 +42,28 @@ docker:
 
       BASE_ENV_FILE="$(sh scripts/docker-with-env.sh print)"
       DEPLOY_ENV_FILE="$(mktemp)"
-      trap 'rm -f "$DEPLOY_ENV_FILE"' EXIT
+      SUPABASE_ENV_FILE="$(mktemp)"
+      trap 'rm -f "$DEPLOY_ENV_FILE" "$SUPABASE_ENV_FILE"' EXIT
       cp "$BASE_ENV_FILE" "$DEPLOY_ENV_FILE"
 
       # Fetch app-specific keys at deploy time; never print the returned secrets.
-      share-supabase app-env ant-crm --show-secrets >> "$DEPLOY_ENV_FILE"
+      # Remove canonical values inherited from the shared env so a stale key can
+      # never win over the secret-manager values generated below.
+      sed -i \
+        -e '/^NEXT_PUBLIC_SUPABASE_ANON_KEY=/d' \
+        -e '/^SUPABASE_SERVICE_ROLE_KEY=/d' \
+        "$DEPLOY_ENV_FILE"
+      share-supabase app-env ant-crm --show-secrets > "$SUPABASE_ENV_FILE"
+      cat "$SUPABASE_ENV_FILE" >> "$DEPLOY_ENV_FILE"
+      ANON_KEY="$(sed -n 's/^ANON_KEY=//p' "$SUPABASE_ENV_FILE" | tail -n 1)"
+      SERVICE_ROLE_KEY="$(sed -n 's/^SERVICE_ROLE_KEY=//p' "$SUPABASE_ENV_FILE" | tail -n 1)"
+      if [ -z "$ANON_KEY" ] || [ -z "$SERVICE_ROLE_KEY" ]; then
+        echo "ERROR: ant-crm secrets must include ANON_KEY and SERVICE_ROLE_KEY." >&2
+        exit 1
+      fi
+      printf '\nNEXT_PUBLIC_SUPABASE_ANON_KEY=%s\nSUPABASE_SERVICE_ROLE_KEY=%s\n' \
+        "$ANON_KEY" "$SERVICE_ROLE_KEY" >> "$DEPLOY_ENV_FILE"
+      unset ANON_KEY SERVICE_ROLE_KEY
       printf '\nNEXT_PUBLIC_SUPABASE_URL=http://supabase-ant-crm-gateway:8000\n' >> "$DEPLOY_ENV_FILE"
 
       # Use VM06's persistent shared Redis, rather than creating a per-CRM Redis.
@@ -122,7 +139,7 @@ docker:
           --network ss_ant_crm_app \
           --env-file "$DEPLOY_ENV_FILE" \
           "$MIGRATOR_IMAGE" \
-          npx --no-install supabase db push --db-url "$SUPABASE_DB_URL"
+          sh -ec 'npx --no-install supabase db push --db-url "$SUPABASE_DB_URL"'
 
       echo "Deploying container on server..."
       PREVIOUS_IMAGE_ID=""

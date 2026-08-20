@@ -61,9 +61,21 @@ docker:
         echo "ERROR: ant-crm secrets must include ANON_KEY and SERVICE_ROLE_KEY." >&2
         exit 1
       fi
+      DB_URL="$(sed -n 's/^SUPABASE_DB_URL=//p' "$SUPABASE_ENV_FILE" | tail -n 1)"
+      if [ -n "$DB_URL" ]; then
+        # VM06's Postgres service is an internal non-TLS Docker endpoint. Preserve
+        # an explicit SSL policy if ops later supplies one, otherwise disable TLS.
+        case "$DB_URL" in
+          *sslmode=*) ;;
+          *\?*) DB_URL="${DB_URL}&sslmode=disable" ;;
+          *) DB_URL="${DB_URL}?sslmode=disable" ;;
+        esac
+        sed -i '/^SUPABASE_DB_URL=/d' "$DEPLOY_ENV_FILE"
+        printf 'SUPABASE_DB_URL=%s\n' "$DB_URL" >> "$DEPLOY_ENV_FILE"
+      fi
       printf '\nNEXT_PUBLIC_SUPABASE_ANON_KEY=%s\nSUPABASE_SERVICE_ROLE_KEY=%s\n' \
         "$ANON_KEY" "$SERVICE_ROLE_KEY" >> "$DEPLOY_ENV_FILE"
-      unset ANON_KEY SERVICE_ROLE_KEY
+      unset ANON_KEY SERVICE_ROLE_KEY DB_URL
       printf '\nNEXT_PUBLIC_SUPABASE_URL=http://supabase-ant-crm-gateway:8000\n' >> "$DEPLOY_ENV_FILE"
 
       # Use VM06's persistent shared Redis, rather than creating a per-CRM Redis.

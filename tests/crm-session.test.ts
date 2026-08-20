@@ -80,4 +80,21 @@ test('CRM session store', async (t) => {
     await sessions.revokeCrmSession(cookieValue);
     assert.equal(await sessions.getCrmSession(cookieValue), null);
   });
+
+  await t.test('removes an expired session', async () => {
+    const { session, cookieValue } = await sessions.createCrmSession({
+      userId: 'user-1',
+      email: null,
+      isBreakGlass: false,
+      supabaseAccessToken: 'access-token',
+      supabaseRefreshToken: 'refresh-token',
+      supabaseAccessTokenExpiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+
+    await sessions.updateCrmSession({
+      ...session,
+      expiresAt: Math.floor(Date.now() / 1000) - 1,
+    });
+    assert.equal(await sessions.getCrmSession(cookieValue), null);
+  });
 });

@@ -114,15 +114,15 @@ docker:
       if ! grep -q '^SUPABASE_DB_URL=' "$DEPLOY_ENV_FILE"; then
         echo "ERROR: SUPABASE_DB_URL is required to apply Supabase migrations." >&2
         exit 1
-      fi
-      echo "Applying pending Supabase migrations..."
-      docker run --rm \
-        --network ss_ant_crm_app \
-        --env-file "$DEPLOY_ENV_FILE" \
-        -v "$CI_PROJECT_DIR:/work:ro" \
-        -w /work \
-        node:22-bookworm-slim \
-        sh -ec 'npm ci --ignore-scripts && npx --no-install supabase db push --db-url "$SUPABASE_DB_URL"'
+        fi
+        echo "Applying pending Supabase migrations..."
+        MIGRATOR_IMAGE="the-ant-adventures-crm:migrator-$CI_COMMIT_SHORT_SHA"
+        docker build --target migrator -t "$MIGRATOR_IMAGE" .
+        docker run --rm \
+          --network ss_ant_crm_app \
+          --env-file "$DEPLOY_ENV_FILE" \
+          "$MIGRATOR_IMAGE" \
+          npx --no-install supabase db push --db-url "$SUPABASE_DB_URL"
 
       echo "Deploying container on server..."
       PREVIOUS_IMAGE_ID=""

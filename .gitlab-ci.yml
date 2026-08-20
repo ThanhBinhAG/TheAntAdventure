@@ -126,20 +126,42 @@ docker:
         echo "CI_REGISTRY not set — image kept on server Docker only."
       fi
 
-      # Do not mutate the database until the new image has built successfully.
-      # The CLI runs in an isolated Node image so the shell runner needs no Node install.
-      if ! grep -q '^SUPABASE_DB_URL=' "$DEPLOY_ENV_FILE"; then
-        echo "ERROR: SUPABASE_DB_URL is required to apply Supabase migrations." >&2
-        exit 1
+      # Only a commit that changes migrations needs the direct Postgres URL.
+      MIGRATIONS_CHANGED=1
+      case "${CI_COMMIT_BEFORE_SHA:-}" in
+        *[!0]*)
+          if git diff --quiet "$CI_COMMIT_BEFORE_SHA" "$CI_COMMIT_SHA" -- supabase/migrations; then
+            MIGRATIONS_CHANGED=0
+          fi
+          ;;
+      esac
+      if [ "$MIGRATIONS_CHANGED" -eq 1 ]; then
+        # Do not mutate the database until the new image has built successfully.
+        if ! grep -q '^SUPABASE_DB_URL=' "$DEPLOY_ENV_FILE"; then
+          echo "ERROR: This commit changes supabase/migrations, but SUPABASE_DB_URL is not configured in ant-crm deploy secrets." >&2
+          exit 1
         fi
         echo "Applying pending Supabase migrations..."
         MIGRATOR_IMAGE="the-ant-adventures-crm:migrator-$CI_COMMIT_SHORT_SHA"
+        DB_CONTAINER="$(docker ps --format '{{.ID}} {{.Names}}' | awk '$2 ~ /^supabase-ant-crm-db(-[0-9]+)?$/ { print $1; exit }')"
+        if [ -z "$DB_CONTAINER" ]; then
+          echo "ERROR: Could not find the Supabase Postgres container (expected supabase-ant-crm-db)." >&2
+          exit 1
+        fi
+        DB_NETWORK="$(docker inspect --format '{{range $network, $_ := .NetworkSettings.Networks}}{{$network}}{{"\n"}}{{end}}' "$DB_CONTAINER" | head -n 1)"
+        if [ -z "$DB_NETWORK" ]; then
+          echo "ERROR: Could not determine the Supabase Postgres network." >&2
+          exit 1
+        fi
         docker build --target migrator -t "$MIGRATOR_IMAGE" .
         docker run --rm \
-          --network ss_ant_crm_app \
+          --network "$DB_NETWORK" \
           --env-file "$DEPLOY_ENV_FILE" \
           "$MIGRATOR_IMAGE" \
           sh -ec 'npx --no-install supabase db push --db-url "$SUPABASE_DB_URL"'
+      else
+        echo "No migration files changed; skipping database migration."
+      fi
 
       echo "Deploying container on server..."
       PREVIOUS_IMAGE_ID=""

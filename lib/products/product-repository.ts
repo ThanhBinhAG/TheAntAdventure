@@ -47,6 +47,19 @@ export async function getAllProductPricingServer(): Promise<ProductPricing[]> {
   return (data || []).map(rowToProductPricing);
 }
 
+/** Replace the full catalogue and its required pricing stubs in one database transaction. */
+export async function replaceProductCatalogueServer(
+  supabase: SupabaseClient,
+  products: Product[],
+  pricingStubs: ProductPricing[]
+): Promise<void> {
+  const { error } = await supabase.rpc('replace_product_catalogue_transaction', {
+    p_products: products.map(productToRow),
+    p_pricing_stubs: pricingStubs.map(productPricingToRow),
+  });
+  if (error) throw error;
+}
+
 /**
  * Thêm sản phẩm mới và default pricing row.
  */

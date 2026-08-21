@@ -15,6 +15,7 @@ require.cache[serverOnlyPath] = {
 // State mocks to verify database calls
 let supabaseCalls: { method: string; table: string; data?: any; eqCode?: string }[] = [];
 let cacheInvalidated = false;
+let productImportRpcError: { message: string } | null = null;
 
 // Mock dependencies
 mock.module(require.resolve('../lib/auth/session'), {
@@ -49,6 +50,10 @@ mock.module(require.resolve('../lib/supabase/server'), {
   namedExports: {
     getServerSupabaseClient: async () => {
       return {
+        rpc: (name: string, data: any) => {
+          supabaseCalls.push({ method: 'rpc', table: name, data });
+          return Promise.resolve({ error: name === 'replace_product_catalogue_transaction' ? productImportRpcError : null });
+        },
         from: (table: string) => ({
           select: () => {
             supabaseCalls.push({ method: 'select', table });
@@ -125,6 +130,7 @@ test('Tour Product BFF APIs - Tests', async (t) => {
   await t.beforeEach(() => {
     supabaseCalls = [];
     cacheInvalidated = false;
+    productImportRpcError = null;
   });
 
   await t.test('GET /api/products - paginated page', async () => {
@@ -288,7 +294,7 @@ test('Tour Product BFF APIs - Tests', async (t) => {
     assert.equal(cacheInvalidated, true);
   });
 
-  await t.test('POST /api/products/import - replaces full catalog', async () => {
+  await t.test('POST /api/products/import - replaces full catalog through one transaction', async () => {
     const draft = {
       region: 'north',
       duration: '1 day',
@@ -309,16 +315,34 @@ test('Tour Product BFF APIs - Tests', async (t) => {
     const json = await response.json();
     assert.equal(json.ok, true);
 
-    // Verify it wipes remote products
-    const delAlls = supabaseCalls.filter((c) => c.method === 'delete_all');
-    assert.equal(delAlls.length, 1);
-    assert.equal(delAlls[0].table, 'products');
-
-    // Verify it inserts products and pricing stubs
-    const inserts = supabaseCalls.filter((c) => c.method === 'insert');
-    assert.equal(inserts.length, 2);
-    assert.equal(inserts[0].table, 'products');
-    assert.equal(inserts[1].table, 'product_pricing');
+    assert.equal(supabaseCalls.length, 1);
+    assert.equal(supabaseCalls[0].method, 'rpc');
+    assert.equal(supabaseCalls[0].table, 'replace_product_catalogue_transaction');
+    assert.equal(
+      supabaseCalls[0].data.p_products.some((product: { code: string }) => product.code === 'AA-NV-TEST-01'),
+      true
+    );
+    assert.equal(
+      supabaseCalls[0].data.p_pricing_stubs.some((pricing: { product_code: string }) => pricing.product_code === 'AA-NV-TEST-01'),
+      true
+    );
     assert.equal(cacheInvalidated, true);
+  });
+
+  await t.test('POST /api/products/import - preserves the current catalogue when transaction fails', async () => {
+    productImportRpcError = { message: 'pricing insert failed' };
+    const req = new Request('http://localhost/api/products/import', {
+      method: 'POST',
+      body: JSON.stringify({
+        drafts: [{ region: 'north', duration: '1 day', category: 'Adventure', code: 'AA-NV-FAIL-01', name: 'Failed Import' }],
+      }),
+    });
+
+    const response = await importRoute.POST(req);
+    assert.equal(response.status, 500);
+    assert.equal(supabaseCalls.length, 1);
+    assert.equal(supabaseCalls[0].method, 'rpc');
+    assert.equal(supabaseCalls[0].table, 'replace_product_catalogue_transaction');
+    assert.equal(cacheInvalidated, false);
   });
 });

@@ -1,168 +1,150 @@
-# Báo cáo Review Migration Developer A - 2026-08-21
+# Bao cao review migration Dev A - 2026-08-21
 
-## Phạm vi và phương pháp
+> Day la file bao cao hop nhat cho Dev A. No thay the cac bao cao acceptance, E2E va build/leakage rieng le. `SESSION-AVAILABILITY.md` van duoc giu rieng vi la tai lieu quyet dinh van hanh cho Owner-Ops.
 
-- **Khoảng commit review:** `f230535..5539d1a` trên nhánh `feat/refacter_plan_a`.
-- **Mốc hệ thống cũ:** `f230535`, là commit ngay trước chuỗi migration BFF này.
-- **Phương pháp:** đọc lịch sử theo từng commit; trace code hiện tại từ UI -> BFF -> repository/RLS; tìm call-site cutover; chạy các test gate của dự án.
-- **Không thuộc phạm vi:** triển khai feature của Dev B, hạ tầng private network và kiểm thử thâm nhập bảo mật.
+## 1. Ket luan hien tai
 
-## Tóm tắt điều hành
+Dev A da hoan thanh luong moi cho pham vi A0-A5: browser dung BFF cho cac thao tac nghiep vu, mutation di qua server, Product/Attraction/Tour Design co transaction PostgreSQL, va session CRM co persistent store PostgreSQL de Redis-down khong lam mat dang nhap.
 
-Developer A đã hoàn thành phần lớn migration feature trong code: CRM session, BFF primitives, Product/Pricing, Planner, Attractions và Tour Design đều đã đi qua BFF server. Browser auto-sync đã loại trừ sáu bảng Dev A, và Tour Design đã lưu aggregate bằng PostgreSQL transaction.
+Tuy nhien, **chua du dieu kien dong migration/A6**. Hai gate he thong van fail do cac dependency dung chung chua migration:
 
-Tuy nhiên, migration **chưa sẵn sàng để final cutover**. Có một lỗi toàn vẹn dữ liệu mức Critical ở Product import, hai vấn đề độ tin cậy mức High ở ghi nhiều bảng và Redis-backed session, và build production chưa chạy tới leakage gate do dependency Chromium local không hợp lệ.
+| Pham vi | Trang thai | Y nghia |
+|---|---|---|
+| Feature API va mutation Dev A (A0-A5) | Pass acceptance | Code va test da chung minh cac luong nghiep vu chinh hoat dong dung. |
+| Transaction va availability Dev A | Pass acceptance | Import/aggregate rollback; Redis khong con la session store bat buoc. |
+| Browser "CRM origin only" | Fail | Cac man Dev A van keo legacy hydrate dung chung, nen browser goi Supabase truc tiep. |
+| Production leakage gate | Fail | Bundle browser con Supabase URL, publishable key va `createBrowserClient`. |
+| A6 final cutover | Chua bat dau | Chi lam sau khi Dev B/shared va Owner-Ops hoan tat phan phu thuoc. |
 
-| Mức độ | Số lượng | Điều kiện release |
-|---|---:|---|
-| Critical | 1 | Phải sửa trước khi dùng Product import ở production |
-| High | 2 | Phải sửa trước khi xác nhận Dev A feature acceptance hoàn tất |
-| Medium | 3 | Cần xử lý hoặc chấp nhận rõ ràng trước final BFF cutover |
-| Low | 0 | - |
+Khong con finding Critical dang mo trong pham vi mutation/session Dev A. Hai finding High dang mo la gate cutover chung, khong phai viec sua nghiep vu doc lap cua Dev A.
 
-## Hệ thống trước và sau thay đổi
+## 2. Doi chieu ke hoach va phan da lam
 
-| Hạng mục | Trước `f230535` | Hiện tại `5539d1a` | Trạng thái |
+| Task | Muc tieu luong moi | Da thuc hien | Trang thai |
 |---|---|---|---|
-| Đọc dữ liệu ở browser | Generic hydrate và browser Supabase client | Màn Dev A gọi business BFF endpoint | Đã migration cho Dev A |
-| Ghi dữ liệu ở browser | Auto-sync snapshot/table helper | Mutation qua BFF; `BFF_MANAGED_TABLES` chặn Dev A table push | Đã migration cho Dev A |
-| Xác thực | Supabase cookie/token tham gia luồng browser | CRM cookie opaque có chữ ký; Supabase token nằm trong Redis session | Đã migration, còn gap availability |
-| Product list | Có server pagination nhưng cache policy chưa đầy đủ | Server RPC + cache-aside list/facets + invalidation | Đã migration |
-| Lưu Tour Design | Ghi nhiều bước | Một PostgreSQL RPC transaction | Đã migration |
-| Legacy dùng chung | Generic hydrate/auto-sync sở hữu toàn bộ bảng | Giữ lại cho Dev B/shared consumer, chặn ghi bảng Dev A | Transitional có chủ đích |
-| Public Supabase config | Còn tồn tại | Vẫn còn cho domain chưa migration | A6 chưa làm |
+| A0 Auth & Session | Cookie CRM HttpOnly, server xac thuc session; browser khong dung Supabase token | Login/logout, middleware va permission dung CRM session; session duoc ma hoa va luu PostgreSQL; Redis chi la tombstone revoke tuy chon | Hoan thanh |
+| A0.1 BFF primitives | UI chi goi CRM API, server xu ly auth/validation/RLS | Server Supabase client, Zod validation, permission boundary va API route pattern | Hoan thanh |
+| A1 Product cache | Cache-aside, TTL/invalidation, Redis-down fallback | Product list/facet cache TTL 60 giay; invalidate sau mutation/import; fallback Supabase khi Redis loi | Hoan thanh |
+| A2 Tour Product/Pricing | Product/Pricing read-write qua BFF, import atomic | Repository/API BFF; import dung `replace_product_catalogue`; create/update dung aggregate RPC | Hoan thanh |
+| A3 Daily Planner | CRUD qua BFF, state chi cap nhat sau response thanh cong | Planner API/repository/UI va validation/failure coverage | Hoan thanh |
+| A4 Attraction Schedule | Read/filter va mutation qua BFF, aggregate atomic | Attraction API/repository/UI; filter region chi tai photo link cua Attraction da loc; aggregate RPC | Hoan thanh |
+| A5 Tour Design | Draft/outline luu all-or-nothing | Save RPC transaction; UI giu draft khi save that bai | Hoan thanh |
+| A6 Final public-Supabase cutover | Khong con browser Supabase/public config | Chua lam theo dung thu tu; dang cho dependency migration va ha tang private | Chua bat dau |
 
-## Timeline commit và phần đã thực hiện
+## 3. Cac bang chung theo commit
 
-| Commit | Thời gian UTC+7 | Nội dung đã làm | Kết luận review |
+| Commit | Noi dung | Gia tri voi luong moi |
+|---|---|---|
+| `98bd0f7` | BFF wrapper, validation, server Supabase client | Dat ranh gioi server cho API CRM. |
+| `0551f3b` | Redis helper | Nen cho cache-aside co fallback. |
+| `e404077` | Product/Pricing BFF va UI | Dua Product/Pricing vao API CRM. |
+| `81a2b36` | Planner BFF va UI | Dua Daily Planner vao API CRM. |
+| `434e9de` | Attractions, Tour Design BFF | Dua hai feature nay vao BFF. |
+| `fa75f51`, `72433bb` | CRM session, middleware, expiry test | Tach session CRM khoi Supabase cookie browser. |
+| `ef7689a`, `77430a4`, `5539d1a` | Bo browser push/read cu cua Dev A, cache va leakage gate | Zustand chi con la UI cache; Dev A tables khong auto-sync len Supabase. |
+| `ee342e4` | Tour Design save transaction | Tranh draft/outline nua voi. |
+| `f09076b` | Product import transaction | Import loi khong xoa/nua voi catalogue cu. |
+| `feb8066` | Product/Attraction aggregate transaction va durable session | Dong product/pricing/photo, attraction/photo va Redis-down session gap. |
+
+Khoang baseline ban dau la `f230535..5539d1a`; cac commit sau ngay 2026-08-21 bo sung cac finding ma review ban dau da phat hien. Vi vay khong nen dung bao cao cu de ket luan CRIT-01, HIGH-01 hay HIGH-02 con mo.
+
+## 4. Giai thich cac phan Dev A da bo sung
+
+### Session CRM va Redis-down
+
+- Cookie `crm_session` chi mang dinh danh session opaque; browser khong can doc Supabase access token.
+- `lib/auth/crm-session-store.ts` dung PostgreSQL server-only lam source of truth va ma hoa payload AES-GCM.
+- Redis chi giu revoke tombstone de tang toc. Redis loi van cho login, validate session da co, logout va revoke theo PostgreSQL.
+- Migration can co o moi moi truong: `20260821113000_add_durable_crm_sessions.sql`; `SUPABASE_SERVICE_ROLE_KEY` va `CRM_SESSION_SECRET` la bat buoc cho durable session.
+
+### Product, Pricing va cache
+
+- List/filter/pagination va facets dung `/api/products` va `/api/products/facets`, khong hydrate Product/Pricing vao browser.
+- Cache Product la cache-aside 60 giay; cache miss, entry hong hoac Redis-down thi repository doc Supabase binh thuong.
+- `replace_product_catalogue` validate payload, thay catalogue va Pricing stub trong mot transaction. Loi o bat ky buoc nao deu rollback catalogue cu.
+- Product create/update va Pricing/photo link cung dung aggregate RPC, khong ghi bang theo chuoi statement tach roi.
+
+### Planner, Attractions va Tour Design
+
+- Planner CRUD va validation di qua endpoint BFF; UI cap nhat store sau response thanh cong.
+- Attraction create/update cung dung aggregate transaction. Read theo region chi query photo links cua nhung Attraction da duoc loc.
+- Tour Design upsert draft, thay outline va validate duplicate day trong mot PostgreSQL RPC. Khi save loi, UI giu du lieu nhap va database giu aggregate cu.
+
+## 5. Ket qua kiem thu da chay
+
+| Gate | Ket qua | Ghi chu |
+|---|---|---|
+| `npm run lint` | Pass | Khong co error/warning. |
+| `npm run typecheck` | Pass | Khong co TypeScript error. |
+| `npm test` | Pass | 96 pass, 0 fail, 5 skip integration opt-in. Log loi BFF/Redis trong negative test la co chu dich. |
+| PostgreSQL session integration | Pass | Tat Redis va xac nhan session doc/revoke duoc tu PostgreSQL that. |
+| Browser BFF acceptance | Pass | 7 scenario dung browser that va database assertion that. |
+| Chromium dependency | Pass | `@sparticuz/chromium@149.0.0` hop le; Next da compile production. |
+| Browser CRM-origin audit | Fail | Ca 4 man Dev A co request Supabase truc tiep. |
+| `npm run build` | Fail gate | Compile thanh cong, nhung `npm run leakage:check` fail sau build. |
+
+Browser acceptance da cover: login/logout, expiry/revoke, `401`/`403`, Product CRUD/Pricing/import-fail, Planner CRUD/validation, Attraction region/filter/mutation-fail, va Tour Design rollback.
+
+## 6. Hai finding con mo va owner phu hop
+
+### HIGH-01: Browser van goi Supabase truc tiep
+
+`e2e/network-origin.spec.ts` fail tren `/products`, `/planner`, `/attractions` va `/tourdesign`, ghi nhan origin Supabase local. Nguyen nhan la `PageDataGate` va `lib/db/hydrate` dung chung van khoi tao du lieu legacy bang browser Supabase client. Tour Design con phu thuoc Customer, Lead, Communication va Hotel; day la feature dependency cua Dev B.
+
+- **Tac dong:** Feature mutation Dev A dung BFF, nhung ca man chua dat tieu chi browser chi goi CRM origin.
+- **Owner chinh:** Dev B/nhom shared migration cho Customer, Lead, Communication, Hotel, Photo Gallery va boot data con lai.
+- **Hanh dong sau do:** go `PageDataGate`, legacy hydrate va browser Supabase client khi co BFF thay the; rerun E2E network audit den khi khong con origin ngoai CRM.
+
+### HIGH-02: Browser bundle con leakage Supabase
+
+Production build sinh bundle thanh cong, nhung scanner tim thay Supabase URL, publishable key va `createBrowserClient` trong bundle. Day la he qua truc tiep cua HIGH-01 va cac feature ngoai scope Dev A con can browser Supabase.
+
+- **Khong sua bang cach tat scan hoac xoa env som:** se lam legacy feature loi va che giau finding that.
+- **Owner phoi hop:** Dev B/nhom shared go consumer; Owner-Ops ban giao topology private (khong public Supabase/Redis/Postgres) va rotate publishable key sau cutover.
+- **Dieu kien dat:** `npm run build` pass ca leakage check va network audit tra ve object rong.
+
+## 7. Viec Dev A con can lam va viec khong nen tu lam
+
+| Uu tien | Viec | Owner | Dieu kien xong |
 |---|---|---|---|
-| `98bd0f7` | 2026-08-19 20:14 | BFF wrapper server-only, Zod validation, server Supabase client | Nền tảng chung đúng hướng; API route có permission check |
-| `0551f3b` | 2026-08-19 20:27 | Shared Redis cache helper | Cache caller có fallback khi Redis lỗi |
-| `e404077` | 2026-08-19 21:11 | Product/Pricing route, repository và UI | BFF migration hoàn tất; ghi/import chưa atomic |
-| `81a2b36` | 2026-08-19 21:24 | Planner repository, CRUD route và UI | BFF migration hoàn tất |
-| `434e9de` | 2026-08-20 09:33 | Attractions và Tour Design repository/route | BFF migration hoàn tất; Attraction aggregate write chưa atomic |
-| `e29f60a` | 2026-08-20 16:31 | Test BFF, cache và RLS | Có unit/API baseline tốt; chưa có browser E2E |
-| `fa75f51` | 2026-08-20 21:41 | CRM session, middleware, server client migration | Browser token đã bỏ; Redis thành session dependency |
-| `68a77a9`, `72433bb` | 2026-08-20 21:45-22:01 | Lint cleanup và session expiry test | Hoàn tất regression cơ bản cho session |
-| `ef7689a`, `77430a4` | 2026-08-20 22:14-22:26 | Planner/Attractions UI BFF read; bỏ Dev A browser push | Hướng cutover đúng |
-| `ee342e4` | 2026-08-20 22:53 | Transactional Tour Design RPC | Đạt yêu cầu lưu aggregate atomic |
-| `5539d1a` | 2026-08-20 23:13 | Pricing/Gallery BFF read, cache-aside list, full-hydrate cleanup, leakage script | Dev A legacy cleanup hoàn tất; chưa chứng minh được bundle thật |
+| P0 | Ho tro Dev B trace dependency boot data tren cac man Dev A | Dev A + Dev B | Moi dependency co endpoint BFF hoac duoc tach khoi page boot. |
+| P1 | Chay lai acceptance sau merge shared migration | Dev A | E2E business, network audit, lint, typecheck, test va build deu pass. |
+| P1 | Xac nhan migration durable session/import/aggregate da apply vao database muc tieu | Dev A + Owner-Ops | RPC/table ton tai, service role va secret duoc cau hinh. |
+| P1 | Ban giao private topology va rotate key sau cutover | Owner-Ops | Khong con public Supabase config trong browser bundle. |
+| P2 | A6 final cleanup | Nhom | Chi bat dau khi tat ca feature scope pass hai gate tren. |
 
-Khoảng review thay đổi 131 files, thêm 5.591 dòng và xóa 1.001 dòng.
+Dev A **khong nen** tu xoa `NEXT_PUBLIC_SUPABASE_*`, `lib/supabase/client.ts`, `PageDataGate` hoac shared hydrate ngay luc nay: cac feature Dev B chua migration se bi gay. Day la ly do A6 duoc de sau.
 
-## Trạng thái theo feature Dev A
+## 8. Cach chay va doc acceptance
 
-| Feature | Luồng hiện tại | Bằng chứng auto test | Trạng thái acceptance |
-|---|---|---|---|
-| Auth & Session | Login -> CRM HttpOnly cookie -> Redis session -> server user-scoped Supabase client | `auth-session-routes`, `crm-session`, BFF primitive test | Code hoàn tất; cần xử lý Redis outage |
-| Tour Product/Pricing | UI -> `/api/products*` -> repository/RPC -> Redis cache -> Supabase | Product route, cache, pagination, mutation test | BFF path hoàn tất; phải sửa atomicity |
-| Daily Planner | UI -> `/api/planner*` -> repository -> Supabase | Planner CRUD và cutover test | Code hoàn tất; còn browser acceptance |
-| Attraction Schedule | UI -> `/api/attractions*` -> repository -> Supabase | Attraction CRUD và cutover test | BFF path hoàn tất; còn atomicity và hiệu năng read theo vùng |
-| Tour Design | UI -> `/api/tour-design/*` -> repository -> transaction RPC | Read/save/failed-RPC test | Hoàn tất aggregate draft/outline |
+```bash
+npm run lint
+npm run typecheck
+npm test
+CRM_SESSION_POSTGRES_INTEGRATION=1 node --experimental-test-module-mocks --import tsx --test tests/crm-session-postgres.integration.test.ts
+E2E_ALLOW_DATABASE_MUTATION=1 npm run test:e2e
+npm run build
+```
 
-## Findings
+E2E can Redis, Supabase local, migration hien tai va `.env.local` co local Supabase URL, anon key, service-role key, `CRM_SESSION_SECRET`. Test tu choi database remote mac dinh; tuyet doi khong dat `E2E_ALLOW_DATABASE_MUTATION=1` cho production.
 
-### Critical
+Kiem tra thu cong gate con mo:
 
-#### CRIT-01: Product import có thể xóa catalogue hiện tại trước khi dữ liệu mới được lưu an toàn
+1. Mo DevTools Network, bat `Preserve log`, loc `Fetch/XHR`.
+2. Login va mo lan luot Tour Products, Daily Planner, Attraction Schedule, Tour Design.
+3. Ket qua dat chi co request cung CRM origin, vi du `/api/...`; khong co Supabase host, `/rest/v1`, `/auth/v1`, `/storage/v1` hoac Realtime WebSocket.
+4. Hien tai buoc 3 se that bai dung nhu E2E da bao cao; dung no lam evidence khi phoi hop Dev B/shared.
 
-Trạng thái theo dõi: **đã xử lý trong workspace ngày 2026-08-21** bằng migration `20260821100600_add_product_catalogue_import_transaction.sql`; cần áp dụng migration ở từng môi trường trước khi deploy route mới.
+## 9. Thu tu doc code de review lai
 
-- **Bằng chứng:** [app/api/products/import/route.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/app/api/products/import/route.ts#L23) xóa toàn bộ Product, sau đó chèn Product và Pricing bằng các statement riêng ở dòng 31-45.
-- **Ảnh hưởng:** nếu insert lỗi, timeout, validation hoặc database lỗi sau delete, catalogue sẽ rỗng hoặc chỉ được khôi phục một phần. API trả lỗi nhưng dữ liệu cũ không thể tự khôi phục.
-- **Vì sao test chưa bắt được:** [tour-product-bff.test.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/tests/tour-product-bff.test.ts) chỉ test import thành công, không test lỗi giữa delete và insert dữ liệu thay thế.
-- **Cần sửa:** thay chuỗi delete/insert bằng một PostgreSQL RPC transaction có permission scope. Validate payload trước transaction. Thêm test ép Product hoặc Pricing insert lỗi và xác nhận catalogue cũ vẫn nguyên vẹn.
+1. Doc `docs/BFF-TASKS.md` va `docs/BFF-TASKS-vi.md` de nam scope va acceptance criteria.
+2. Xem nen tang: `git show 98bd0f7 -- lib/bff lib/auth lib/supabase`.
+3. Xem Product/Pricing: `git show e404077 f09076b feb8066 -- app/api/products lib/products supabase/migrations`.
+4. Xem Planner: `git show 81a2b36 -- app/api/planner lib/planner components/pages/Planner.tsx`.
+5. Xem Attractions/Tour Design: `git show 434e9de ee342e4 feb8066 -- app/api/attractions app/api/tour-design lib/attractions lib/tour-design supabase/migrations`.
+6. Xem session: `git show fa75f51 72433bb feb8066 -- app/api/auth lib/auth tests/crm-session*`.
+7. Xem cutover va evidence: `git show ef7689a 77430a4 5539d1a -- lib/db components tests` va doc `e2e/` cung `scripts/scan-leakage.sh`.
 
-### High
+## 10. Ket luan de bao cao truong nhom
 
-#### HIGH-01: Product và Attraction ghi aggregate nhiều bước có thể để lại dữ liệu nửa vời
-
-Trạng thái theo dõi: **đã xử lý trong workspace ngày 2026-08-21** bằng migration `20260821110000_add_catalogue_aggregate_transactions.sql`; cần áp dụng migration ở từng môi trường trước khi deploy route mới.
-
-- **Bằng chứng:** [product-repository.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/products/product-repository.ts#L60) tạo Product, Pricing và photo link qua các statement riêng. Update Product thay đổi parent, xóa photo link rồi insert lại ở [dòng 102-120](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/products/product-repository.ts#L102). [attraction-repository.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/attractions/attraction-repository.ts#L43) có cùng pattern; update xóa link cũ ở [dòng 76-87](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/attractions/attraction-repository.ts#L76).
-- **Ảnh hưởng:** lỗi ở statement thứ hai/thứ ba có thể tạo Product không có Pricing, Product/Attraction mất toàn bộ ảnh liên kết, hoặc Attraction mới tạo không có ảnh đã chọn. UI báo lỗi nhưng aggregate trong database đã bị thay đổi.
-- **Cần sửa:** tạo transactional RPC riêng cho từng aggregate, theo pattern Tour Design trong [20260820223000_add_tour_design_save_transaction.sql](/home/ngon/Du_an_CRM/crm-the-ants_02/supabase/migrations/20260820223000_add_tour_design_save_transaction.sql). Thêm rollback test cho lỗi create/update photo link.
-
-#### HIGH-02: Redis outage làm mọi CRM session trở thành không xác thực
-
-Trạng thái theo dõi: **đã xử lý trong workspace ngày 2026-08-21** bằng migration `20260821113000_add_durable_crm_sessions.sql` và quyết định vận hành tại [SESSION-AVAILABILITY.md](/home/ngon/Du_an_CRM/crm-the-ants_02/docs/SESSION-AVAILABILITY.md). Cần áp dụng migration và cấu hình service-role trên từng môi trường trước khi deploy.
-
-- **Bằng chứng:** [crm-session.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/auth/crm-session.ts#L111) trả `null` khi `getRedisClient()` không khả dụng. [session.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/auth/session.ts#L16) coi request là chưa đăng nhập. Login cũng trả `503` nếu không tạo được Redis session tại [login route dòng 173-184](/home/ngon/Du_an_CRM/crm-the-ants_02/app/api/auth/login/route.ts#L173).
-- **Ảnh hưởng:** Redis outage làm người dùng mất effective access, trái với definition of done yêu cầu CRM vẫn dùng được khi Redis không khả dụng. Khác với Product cache, Redis ở đây không chỉ là cache miss.
-- **Cần sửa:** thống nhất availability design với Owner-Ops: ví dụ session store durable ở server, Redis chỉ tăng tốc/revoke cache, hoặc session backend active/passive được vận hành rõ ràng. Thêm outage integration test cho user đã đăng nhập và luồng login.
-
-### Medium
-
-#### MED-01: Attraction filter theo vùng vẫn lấy toàn bộ photo link
-
-Trạng thái theo dõi: **đã xử lý trong workspace ngày 2026-08-21**; read path nay chỉ lấy photo link theo danh sách Attraction đã lọc ở server.
-
-- **Bằng chứng:** parent query có filter `region` tại [attraction-repository.ts dòng 22](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/attractions/attraction-repository.ts#L22), nhưng query sau vẫn `select` toàn bộ `attraction_photos` ở [dòng 26-30](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/attractions/attraction-repository.ts#L26).
-- **Ảnh hưởng:** dữ liệu và xử lý của màn theo vùng tăng theo toàn bộ photo-link table, không theo vùng đã chọn.
-- **Khuyến nghị:** lấy danh sách attraction ID rồi query `.in('attraction_id', ids)`; return sớm nếu vùng không có Attraction.
-
-#### MED-02: Test acceptance hiện chủ yếu là mock/static contract, chưa phải browser E2E
-
-- **Bằng chứng:** [dev-a-read-bff-cutover.test.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/tests/dev-a-read-bff-cutover.test.ts) và [dev-a-ui-state-contract.test.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/tests/dev-a-ui-state-contract.test.ts) kiểm tra source string. Domain route test mock session/Supabase. [package.json](/home/ngon/Du_an_CRM/crm-the-ants_02/package.json#L61) chưa có browser E2E runner.
-- **Ảnh hưởng:** chưa chứng minh được redirect thật, cookie attribute, Network traffic, permission matrix thực, transaction trên PostgreSQL thật, hay state sau failed request thật.
-- **Khuyến nghị:** thêm Playwright hoặc runner tương đương cho login/logout, Product mutation/import fail, Planner mutation, Attraction filter/update fail và Tour Design save fail. Chạy test Supabase/Redis stack trong CI cho transaction/outage.
-
-#### MED-03: Leakage gate đã có nhưng chưa chạy trên bundle production hợp lệ
-
-Trạng thái theo dõi: Chromium dependency **đã được khôi phục**, production bundle đã build được, nhưng leakage gate **phát hiện rò rỉ thật** từ legacy browser-Supabase paths ngoài phạm vi Dev A. Xem [BUILD-LEAKAGE-REPORT-2026-08-21.md](/home/ngon/Du_an_CRM/crm-the-ants_02/docs/BUILD-LEAKAGE-REPORT-2026-08-21.md).
-
-- **Bằng chứng:** [package.json](/home/ngon/Du_an_CRM/crm-the-ants_02/package.json#L10) đã chain `next build --webpack && npm run leakage:check`, nhưng `npm run build` dừng vì không resolve được `@sparticuz/chromium` từ [pricing PDF](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/pricing/pricing-pdf.ts) và [proposal PDF](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/proposals/proposal-pdf.ts).
-- **Ảnh hưởng:** scanner có unit test nhưng chưa scan production browser bundle thật. Chưa thể khẳng định không leakage.
-- **Khuyến nghị:** sửa dependency local/CI, xác nhận `npm ls @sparticuz/chromium --depth=0` hợp lệ, rồi chạy build đầy đủ và lưu kết quả leakage trong CI.
-
-## Phần còn transitional có chủ đích
-
-Các mục sau chưa phải lỗi Dev A; cần giữ cho tới khi feature owner tương ứng migration xong.
-
-- Browser Supabase client và `NEXT_PUBLIC_SUPABASE_*` vẫn tồn tại cho domain chưa migration.
-- Generic hydrate/auto-sync còn dùng cho Dev B/shared consumer; bảng Dev A bị chặn bởi [bff-managed-tables.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/db/bff-managed-tables.ts).
-- Sales/sidebar compatibility còn đọc `tour_drafts` và `tasks` qua BFF bridge trong [table-api.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/db/supabase/table-api.ts).
-
-## Xác nhận kỹ thuật đã chạy
-
-| Lệnh | Kết quả |
-|---|---|
-| `npm run lint` | Pass |
-| `npm run typecheck` | Pass |
-| `npm test` | 89 pass, 4 skip do chưa cấu hình `REDIS_URL` |
-| `npm run build` | Bị chặn trước leakage scan do local `@sparticuz/chromium` invalid |
-
-Test suite có expected mocked-error log từ BFF và Redis fallback test, nhưng process kết thúc thành công.
-
-## Đối chiếu task
-
-| Task | Checklist | Kết quả review | Việc tiếp theo |
-|---|---|---|---|
-| A0 Auth & Session | Đã tick | Acceptance một phần: session hoạt động nhưng Redis outage trái mục tiêu availability | Xử lý HIGH-02, thêm outage test thật |
-| A0.1 BFF primitives | Đã tick | Hoàn tất trong code | Giữ làm shared boundary |
-| A1 Redis cache contract | Đã tick | Hoàn tất cho Product cache path | Chạy integration test với Redis thật |
-| A2 Tour Product | Đã tick | BFF path hoàn tất, còn blocker toàn vẹn dữ liệu | Sửa CRIT-01 và HIGH-01 |
-| A3 Daily Planner | Đã tick | Code hoàn tất | Thêm browser/permission acceptance test |
-| A4 Attraction Schedule | Đã tick | BFF path hoàn tất một phần | Sửa HIGH-01 và MED-01 |
-| A5 Tour Design | Đã tick | Aggregate draft/outline hoàn tất | Thêm PostgreSQL-backed E2E transaction proof |
-| A6 Final public-Supabase cutover | Chưa tick | Chưa bắt đầu theo thiết kế | Chờ Dev B, Owner-Ops topology và final acceptance |
-
-## Thứ tự thực hiện khuyến nghị
-
-1. Sửa CRIT-01 bằng Product import RPC transaction và failure test.
-2. Thêm Product/Attraction aggregate transaction cùng rollback test cho HIGH-01.
-3. Chốt và triển khai Redis/session availability design với Owner-Ops cho HIGH-02.
-4. Sửa `@sparticuz/chromium`, chạy production build và leakage scan bundle thật.
-5. Thêm browser E2E và Redis/PostgreSQL integration coverage.
-6. Tiếp tục migration Dev B. Chỉ bắt đầu A6 sau khi chín feature scoped pass acceptance và hạ tầng private được bàn giao.
-
-## Hướng dẫn đọc code theo lịch sử commit
-
-1. Đọc [BFF-TASKS.md](/home/ngon/Du_an_CRM/crm-the-ants_02/docs/BFF-TASKS.md) để nắm ownership và acceptance criteria.
-2. Chạy `git diff f230535..5539d1a -- lib/bff lib/auth lib/supabase` để xem nền tảng.
-3. Chạy `git show e404077 -- app/api/products lib/products components/products components/pricing` để xem Product/Pricing.
-4. Chạy `git show 81a2b36 -- app/api/planner lib/planner components/pages/Planner.tsx` để xem Planner.
-5. Chạy `git show 434e9de -- app/api/attractions app/api/tour-design lib/attractions lib/tour-design` để xem Attractions/Tour Design.
-6. Chạy `git show fa75f51 -- app/api/auth lib/auth lib/supabase` để xem session.
-7. Chạy `git show ef7689a 77430a4 ee342e4 5539d1a` để xem cutover cuối, Tour Design transaction và test gate.
-8. Đọc các test trong bảng feature status, sau đó chạy các lệnh xác nhận kỹ thuật ở trên.
+Dev A da chuyen cac feature duoc giao sang luong BFF moi va da dong cac loi atomicity/session availability da phat hien trong review dau tien. Cac unit, integration va browser business scenario deu pass. Cong viec chua dong la final system cutover, bi chan boi browser Supabase dependency dung chung cua Dev B va handoff ha tang private/rotate key cua Owner-Ops. De tranh gay feature chua migration, Dev A can giu legacy shared layer cho den khi cac dependency co BFF thay the, sau do chay lai hai gate network-origin va production leakage truoc A6.

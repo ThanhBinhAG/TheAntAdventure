@@ -12,9 +12,7 @@ Tracked product documentation: database schema reference and Supabase setup. Sou
 - `GRAPHRAG-MEMORY.md` — verified codebase retrieval and flow map
 - `SUPABASE-SETUP.md` — install & connect steps
 - `SESSION-AVAILABILITY.md` — CRM session durability and Redis outage operating decision
-- `BUILD-LEAKAGE-REPORT-2026-08-21.md` — production build and browser leakage-gate evidence
-- `E2E-DEV-A-ACCEPTANCE.md` — opt-in browser and real-service acceptance test runbook
-- `DEV-A-ACCEPTANCE-2026-08-21.md` — acceptance evidence, findings, and cutover status for A0-A5
+- `DEV-A-MIGRATION-REVIEW-2026-08-21.md` — consolidated Dev A implementation, acceptance, build, and remaining-cutover report
 
 ## Boundaries
 - Do not move these into `Personal/`. Owner-only notes stay under `Personal/`.

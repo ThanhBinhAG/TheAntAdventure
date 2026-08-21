@@ -12,6 +12,7 @@ Tracked product documentation: database schema reference and Supabase setup. Sou
 - `GRAPHRAG-MEMORY.md` — verified codebase retrieval and flow map
 - `SUPABASE-SETUP.md` — install & connect steps
 - `SESSION-AVAILABILITY.md` — CRM session durability and Redis outage operating decision
+- `BUILD-LEAKAGE-REPORT-2026-08-21.md` — production build and browser leakage-gate evidence
 
 ## Boundaries
 - Do not move these into `Personal/`. Owner-only notes stay under `Personal/`.

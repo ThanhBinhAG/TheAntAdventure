@@ -109,6 +109,8 @@ Trạng thái theo dõi: **đã xử lý trong workspace ngày 2026-08-21**; rea
 
 #### MED-03: Leakage gate đã có nhưng chưa chạy trên bundle production hợp lệ
 
+Trạng thái theo dõi: Chromium dependency **đã được khôi phục**, production bundle đã build được, nhưng leakage gate **phát hiện rò rỉ thật** từ legacy browser-Supabase paths ngoài phạm vi Dev A. Xem [BUILD-LEAKAGE-REPORT-2026-08-21.md](/home/ngon/Du_an_CRM/crm-the-ants_02/docs/BUILD-LEAKAGE-REPORT-2026-08-21.md).
+
 - **Bằng chứng:** [package.json](/home/ngon/Du_an_CRM/crm-the-ants_02/package.json#L10) đã chain `next build --webpack && npm run leakage:check`, nhưng `npm run build` dừng vì không resolve được `@sparticuz/chromium` từ [pricing PDF](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/pricing/pricing-pdf.ts) và [proposal PDF](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/proposals/proposal-pdf.ts).
 - **Ảnh hưởng:** scanner có unit test nhưng chưa scan production browser bundle thật. Chưa thể khẳng định không leakage.
 - **Khuyến nghị:** sửa dependency local/CI, xác nhận `npm ls @sparticuz/chromium --depth=0` hợp lệ, rồi chạy build đầy đủ và lưu kết quả leakage trong CI.

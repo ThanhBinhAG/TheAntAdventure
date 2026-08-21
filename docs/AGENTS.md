@@ -13,6 +13,8 @@ Tracked product documentation: database schema reference and Supabase setup. Sou
 - `SUPABASE-SETUP.md` — install & connect steps
 - `SESSION-AVAILABILITY.md` — CRM session durability and Redis outage operating decision
 - `BUILD-LEAKAGE-REPORT-2026-08-21.md` — production build and browser leakage-gate evidence
+- `E2E-DEV-A-ACCEPTANCE.md` — opt-in browser and real-service acceptance test runbook
+- `DEV-A-ACCEPTANCE-2026-08-21.md` — acceptance evidence, findings, and cutover status for A0-A5
 
 ## Boundaries
 - Do not move these into `Personal/`. Owner-only notes stay under `Personal/`.

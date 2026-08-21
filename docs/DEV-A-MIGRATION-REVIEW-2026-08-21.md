@@ -77,11 +77,15 @@ Trạng thái theo dõi: **đã xử lý trong workspace ngày 2026-08-21** bằ
 
 #### HIGH-01: Product và Attraction ghi aggregate nhiều bước có thể để lại dữ liệu nửa vời
 
+Trạng thái theo dõi: **đã xử lý trong workspace ngày 2026-08-21** bằng migration `20260821110000_add_catalogue_aggregate_transactions.sql`; cần áp dụng migration ở từng môi trường trước khi deploy route mới.
+
 - **Bằng chứng:** [product-repository.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/products/product-repository.ts#L60) tạo Product, Pricing và photo link qua các statement riêng. Update Product thay đổi parent, xóa photo link rồi insert lại ở [dòng 102-120](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/products/product-repository.ts#L102). [attraction-repository.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/attractions/attraction-repository.ts#L43) có cùng pattern; update xóa link cũ ở [dòng 76-87](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/attractions/attraction-repository.ts#L76).
 - **Ảnh hưởng:** lỗi ở statement thứ hai/thứ ba có thể tạo Product không có Pricing, Product/Attraction mất toàn bộ ảnh liên kết, hoặc Attraction mới tạo không có ảnh đã chọn. UI báo lỗi nhưng aggregate trong database đã bị thay đổi.
 - **Cần sửa:** tạo transactional RPC riêng cho từng aggregate, theo pattern Tour Design trong [20260820223000_add_tour_design_save_transaction.sql](/home/ngon/Du_an_CRM/crm-the-ants_02/supabase/migrations/20260820223000_add_tour_design_save_transaction.sql). Thêm rollback test cho lỗi create/update photo link.
 
 #### HIGH-02: Redis outage làm mọi CRM session trở thành không xác thực
+
+Trạng thái theo dõi: **đã xử lý trong workspace ngày 2026-08-21** bằng migration `20260821113000_add_durable_crm_sessions.sql` và quyết định vận hành tại [SESSION-AVAILABILITY.md](/home/ngon/Du_an_CRM/crm-the-ants_02/docs/SESSION-AVAILABILITY.md). Cần áp dụng migration và cấu hình service-role trên từng môi trường trước khi deploy.
 
 - **Bằng chứng:** [crm-session.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/auth/crm-session.ts#L111) trả `null` khi `getRedisClient()` không khả dụng. [session.ts](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/auth/session.ts#L16) coi request là chưa đăng nhập. Login cũng trả `503` nếu không tạo được Redis session tại [login route dòng 173-184](/home/ngon/Du_an_CRM/crm-the-ants_02/app/api/auth/login/route.ts#L173).
 - **Ảnh hưởng:** Redis outage làm người dùng mất effective access, trái với definition of done yêu cầu CRM vẫn dùng được khi Redis không khả dụng. Khác với Product cache, Redis ở đây không chỉ là cache miss.
@@ -90,6 +94,8 @@ Trạng thái theo dõi: **đã xử lý trong workspace ngày 2026-08-21** bằ
 ### Medium
 
 #### MED-01: Attraction filter theo vùng vẫn lấy toàn bộ photo link
+
+Trạng thái theo dõi: **đã xử lý trong workspace ngày 2026-08-21**; read path nay chỉ lấy photo link theo danh sách Attraction đã lọc ở server.
 
 - **Bằng chứng:** parent query có filter `region` tại [attraction-repository.ts dòng 22](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/attractions/attraction-repository.ts#L22), nhưng query sau vẫn `select` toàn bộ `attraction_photos` ở [dòng 26-30](/home/ngon/Du_an_CRM/crm-the-ants_02/lib/attractions/attraction-repository.ts#L26).
 - **Ảnh hưởng:** dữ liệu và xử lý của màn theo vùng tăng theo toàn bộ photo-link table, không theo vùng đã chọn.

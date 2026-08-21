@@ -11,18 +11,47 @@ require.cache[serverOnlyPath] = {
   exports: {},
 } as NodeModule;
 
-const records = new Map<string, string>();
+type DurableRecord = {
+  sid: string;
+  payloadCiphertext: string;
+  expiresAt: string;
+  revokedAt: string | null;
+};
+
+const durableRecords = new Map<string, DurableRecord>();
+const redisRecords = new Map<string, string>();
+let redisAvailable = true;
+
 mock.module(require.resolve('../lib/redis/client'), {
   namedExports: {
-    getRedisClient: async () => ({
-      get: async (key: string) => records.get(key) ?? null,
+    getRedisClient: async () => redisAvailable ? ({
+      get: async (key: string) => redisRecords.get(key) ?? null,
       set: async (key: string, value: string) => {
-        records.set(key, value);
+        redisRecords.set(key, value);
       },
       del: async (key: string) => {
-        records.delete(key);
+        redisRecords.delete(key);
       },
-    }),
+    }) : null,
+  },
+});
+
+mock.module(require.resolve('../lib/auth/crm-session-store'), {
+  namedExports: {
+    createDurableCrmSession: async (record: DurableRecord) => {
+      durableRecords.set(record.sid, record);
+    },
+    findDurableCrmSession: async (sid: string) => durableRecords.get(sid) ?? null,
+    updateDurableCrmSession: async (record: DurableRecord) => {
+      const existing = durableRecords.get(record.sid);
+      if (existing && !existing.revokedAt) durableRecords.set(record.sid, record);
+    },
+    revokeDurableCrmSession: async (sid: string) => {
+      const existing = durableRecords.get(sid);
+      if (existing && !existing.revokedAt) {
+        durableRecords.set(sid, { ...existing, revokedAt: new Date().toISOString() });
+      }
+    },
   },
 });
 
@@ -32,7 +61,9 @@ test('CRM session store', async (t) => {
   const sessions = await import('../lib/auth/crm-session');
 
   await t.beforeEach(() => {
-    records.clear();
+    durableRecords.clear();
+    redisRecords.clear();
+    redisAvailable = true;
   });
 
   await t.test('creates a server-side session and accepts its signed cookie', async () => {
@@ -47,7 +78,9 @@ test('CRM session store', async (t) => {
 
     assert.ok(cookieValue.startsWith(`${session.sid}.`));
     assert.ok(!cookieValue.includes('access-token'));
-    assert.equal(records.size, 1);
+    assert.equal(durableRecords.size, 1);
+    assert.ok(!durableRecords.get(session.sid)?.payloadCiphertext.includes('access-token'));
+    assert.equal(redisRecords.size, 0);
 
     const restored = await sessions.getCrmSession(cookieValue);
     assert.equal(restored?.userId, 'user-1');
@@ -67,7 +100,7 @@ test('CRM session store', async (t) => {
     assert.equal(await sessions.getCrmSession(`${cookieValue}x`), null);
   });
 
-  await t.test('revokes the Redis session immediately', async () => {
+  await t.test('keeps an existing session valid when Redis is unavailable', async () => {
     const { cookieValue } = await sessions.createCrmSession({
       userId: 'user-1',
       email: null,
@@ -77,6 +110,36 @@ test('CRM session store', async (t) => {
       supabaseAccessTokenExpiresAt: Math.floor(Date.now() / 1000) + 3600,
     });
 
+    redisAvailable = false;
+    assert.equal((await sessions.getCrmSession(cookieValue))?.userId, 'user-1');
+  });
+
+  await t.test('creates a new durable session when Redis is unavailable', async () => {
+    redisAvailable = false;
+    const { session, cookieValue } = await sessions.createCrmSession({
+      userId: 'user-1',
+      email: null,
+      isBreakGlass: false,
+      supabaseAccessToken: 'access-token',
+      supabaseRefreshToken: 'refresh-token',
+      supabaseAccessTokenExpiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+
+    assert.equal(durableRecords.has(session.sid), true);
+    assert.equal((await sessions.getCrmSession(cookieValue))?.userId, 'user-1');
+  });
+
+  await t.test('revokes the durable session when Redis is unavailable', async () => {
+    const { cookieValue } = await sessions.createCrmSession({
+      userId: 'user-1',
+      email: null,
+      isBreakGlass: false,
+      supabaseAccessToken: 'access-token',
+      supabaseRefreshToken: 'refresh-token',
+      supabaseAccessTokenExpiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+
+    redisAvailable = false;
     await sessions.revokeCrmSession(cookieValue);
     assert.equal(await sessions.getCrmSession(cookieValue), null);
   });

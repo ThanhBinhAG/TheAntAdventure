@@ -16,6 +16,7 @@ require.cache[serverOnlyPath] = {
 let supabaseCalls: { method: string; table: string; data?: any; eqCode?: string }[] = [];
 let cacheInvalidated = false;
 let productImportRpcError: { message: string } | null = null;
+let productAggregateRpcError: { message: string } | null = null;
 
 // Mock dependencies
 mock.module(require.resolve('../lib/auth/session'), {
@@ -52,7 +53,13 @@ mock.module(require.resolve('../lib/supabase/server'), {
       return {
         rpc: (name: string, data: any) => {
           supabaseCalls.push({ method: 'rpc', table: name, data });
-          return Promise.resolve({ error: name === 'replace_product_catalogue_transaction' ? productImportRpcError : null });
+          return Promise.resolve({
+            error: name === 'replace_product_catalogue_transaction'
+              ? productImportRpcError
+              : name === 'save_product_aggregate'
+                ? productAggregateRpcError
+                : null,
+          });
         },
         from: (table: string) => ({
           select: () => {
@@ -131,6 +138,7 @@ test('Tour Product BFF APIs - Tests', async (t) => {
     supabaseCalls = [];
     cacheInvalidated = false;
     productImportRpcError = null;
+    productAggregateRpcError = null;
   });
 
   await t.test('GET /api/products - paginated page', async () => {
@@ -169,12 +177,10 @@ test('Tour Product BFF APIs - Tests', async (t) => {
     const json = await response.json();
     assert.equal(json.ok, true);
 
-    // Verify repository inserted product, pricing stub, and linked photos
-    const inserts = supabaseCalls.filter((c) => c.method === 'insert');
-    assert.equal(inserts.length, 2); // 1 for products, 1 for product_pricing (photos empty)
-    assert.equal(inserts[0].table, 'products');
-    assert.equal(inserts[1].table, 'product_pricing');
-    assert.equal(inserts[1].data.product_code, 'AA-NV-TEST-01');
+    assert.equal(supabaseCalls.length, 1);
+    assert.equal(supabaseCalls[0].method, 'rpc');
+    assert.equal(supabaseCalls[0].table, 'save_product_aggregate');
+    assert.equal(supabaseCalls[0].data.p_pricing_stub.product_code, 'AA-NV-TEST-01');
     assert.equal(cacheInvalidated, true);
   });
 
@@ -206,22 +212,27 @@ test('Tour Product BFF APIs - Tests', async (t) => {
     const json = await response.json();
     assert.equal(json.ok, true);
 
-    // Verify base product update
-    const updates = supabaseCalls.filter((c) => c.method === 'update');
-    assert.equal(updates.length, 1);
-    assert.equal(updates[0].table, 'products');
-    assert.equal(updates[0].eqCode, 'AA-NV-TEST-01');
-
-    // Verify photo links deletes and re-inserts
-    const deletes = supabaseCalls.filter((c) => c.method === 'delete');
-    assert.equal(deletes.length, 1);
-    assert.equal(deletes[0].table, 'product_photos');
-    assert.equal(deletes[0].eqCode, 'AA-NV-TEST-01');
-
-    const inserts = supabaseCalls.filter((c) => c.method === 'insert');
-    assert.equal(inserts.length, 1);
-    assert.equal(inserts[0].table, 'product_photos');
+    assert.equal(supabaseCalls.length, 1);
+    assert.equal(supabaseCalls[0].method, 'rpc');
+    assert.equal(supabaseCalls[0].table, 'save_product_aggregate');
+    assert.equal(supabaseCalls[0].data.p_photo_links.length, 2);
     assert.equal(cacheInvalidated, true);
+  });
+
+  await t.test('PATCH /api/products - preserves cache state when aggregate transaction fails', async () => {
+    productAggregateRpcError = { message: 'photo link insert failed' };
+    const req = new Request('http://localhost/api/products', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        product: { code: 'AA-NV-TEST-01', name: 'Failed Product', region: 'north' },
+      }),
+    });
+
+    const response = await productsRoute.PATCH(req);
+    assert.equal(response.status, 500);
+    assert.equal(supabaseCalls.length, 1);
+    assert.equal(supabaseCalls[0].table, 'save_product_aggregate');
+    assert.equal(cacheInvalidated, false);
   });
 
   await t.test('DELETE /api/products - deletes a product', async () => {

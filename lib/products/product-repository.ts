@@ -67,38 +67,31 @@ export async function createProductServer(
   supabase: SupabaseClient,
   product: Product
 ): Promise<Product> {
-  const prodRow = productToRow(product);
+  await saveProductAggregateServer(supabase, product);
+  return product;
+}
 
-  // 1. Insert product
-  const { error: prodErr } = await supabase
-    .from('products')
-    .insert(prodRow);
-  if (prodErr) throw prodErr;
-
-  // 2. Insert default empty pricing stub
-  const pricingStub: ProductPricing = {
-    productCode: product.code,
+function defaultProductPricing(productCode: string): ProductPricing {
+  return {
+    productCode,
     stdCost: 0,
     p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0, p7: 0, p8: 0, p9: 0, p10: 0,
     c1: 0, c2: 0, c3: 0, c4: 0, c5: 0, c6: 0, c7: 0, c8: 0, c9: 0, c10: 0,
     incl: { g: false, tr: false, tk: false, w: false, m: false },
   };
-  const pricingRow = productPricingToRow(pricingStub);
-  const { error: pricingErr } = await supabase
-    .from('product_pricing')
-    .insert(pricingRow);
-  if (pricingErr) throw pricingErr;
+}
 
-  // 3. Insert photo links
-  const photoLinks = productPhotoRows(product);
-  if (photoLinks.length > 0) {
-    const { error: photoErr } = await supabase
-      .from('product_photos')
-      .insert(photoLinks);
-    if (photoErr) throw photoErr;
-  }
-
-  return product;
+/** Save Product, create its default Pricing when missing, and replace photo links atomically. */
+async function saveProductAggregateServer(
+  supabase: SupabaseClient,
+  product: Product
+): Promise<void> {
+  const { error } = await supabase.rpc('save_product_aggregate', {
+    p_product: productToRow(product),
+    p_pricing_stub: productPricingToRow(defaultProductPricing(product.code)),
+    p_photo_links: productPhotoRows(product),
+  });
+  if (error) throw error;
 }
 
 /**
@@ -109,29 +102,10 @@ export async function updateProductServer(
   code: string,
   product: Product
 ): Promise<Product> {
-  const prodRow = productToRow(product);
-
-  // 1. Update product base data
-  const { error: prodErr } = await supabase
-    .from('products')
-    .update(prodRow)
-    .eq('code', code);
-  if (prodErr) throw prodErr;
-
-  // 2. Sync photo links: Xóa ảnh cũ và insert ảnh mới
-  const { error: delErr } = await supabase
-    .from('product_photos')
-    .delete()
-    .eq('product_code', code);
-  if (delErr) throw delErr;
-
-  const photoLinks = productPhotoRows(product);
-  if (photoLinks.length > 0) {
-    const { error: photoErr } = await supabase
-      .from('product_photos')
-      .insert(photoLinks);
-    if (photoErr) throw photoErr;
+  if (code !== product.code) {
+    throw new Error('Product code cannot change during update');
   }
+  await saveProductAggregateServer(supabase, product);
 
   return product;
 }

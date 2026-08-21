@@ -14,6 +14,7 @@ require.cache[serverOnlyPath] = {
 
 // State mocks to verify database calls
 let supabaseCalls: { method: string; table: string; data?: any; eqCode?: string }[] = [];
+let attractionAggregateRpcError: { message: string } | null = null;
 
 // Mock dependencies
 mock.module(require.resolve('../lib/auth/session'), {
@@ -46,38 +47,37 @@ mock.module(require.resolve('../lib/supabase/server'), {
   namedExports: {
     getServerSupabaseClient: async () => {
       return {
+        rpc: (name: string, data: any) => {
+          supabaseCalls.push({ method: 'rpc', table: name, data });
+          return Promise.resolve({ error: name === 'save_attraction_aggregate' ? attractionAggregateRpcError : null });
+        },
         from: (table: string) => ({
           select: () => {
             supabaseCalls.push({ method: 'select', table });
             if (table === 'attractions') {
+              const result = Promise.resolve({
+                data: [
+                  {
+                    id: 'ATT-001', region: 'north', type: 'museum', name: 'Ethnology Museum',
+                    dest: 'Hanoi', hours: '08:30-17:30', closed: 'Monday',
+                    admission: '40,000 VND', duration: 90, best_time: 'Morning', crowd: 'Light',
+                    book_req: false, seasonal: 'None', notes: 'Some notes', alert: 'None', phone: '+84',
+                  },
+                ],
+                error: null,
+              });
               return {
-                order: () => Promise.resolve({
-                  data: [
-                    {
-                      id: 'ATT-001',
-                      region: 'north',
-                      type: 'museum',
-                      name: 'Ethnology Museum',
-                      dest: 'Hanoi',
-                      hours: '08:30-17:30',
-                      closed: 'Monday',
-                      admission: '40,000 VND',
-                      duration: 90,
-                      best_time: 'Morning',
-                      crowd: 'Light',
-                      book_req: false,
-                      seasonal: 'None',
-                      notes: 'Some notes',
-                      alert: 'None',
-                      phone: '+84',
-                    },
-                  ],
-                  error: null,
+                order: () => ({
+                  eq: (field: string, value: string) => {
+                    supabaseCalls.push({ method: 'filter', table, eqCode: value });
+                    return result;
+                  },
+                  then: result.then.bind(result),
                 }),
               };
             }
             if (table === 'attraction_photos') {
-              return Promise.resolve({
+              const result = Promise.resolve({
                 data: [
                   {
                     attraction_id: 'ATT-001',
@@ -88,6 +88,12 @@ mock.module(require.resolve('../lib/supabase/server'), {
                 ],
                 error: null,
               });
+              return {
+                in: (field: string, values: string[]) => {
+                  supabaseCalls.push({ method: 'in', table, data: values });
+                  return result;
+                },
+              };
             }
             return Promise.resolve({ data: [], error: null });
           },
@@ -124,10 +130,11 @@ test('Attractions BFF APIs - Tests', async (t) => {
 
   await t.beforeEach(() => {
     supabaseCalls = [];
+    attractionAggregateRpcError = null;
   });
 
   await t.test('GET /api/attractions/all - lists all attractions with assembled photos', async () => {
-    const req = new Request('http://localhost/api/attractions/all');
+    const req = new Request('http://localhost/api/attractions/all?region=north');
     const response = await attractionsAllRoute.GET(req);
     assert.equal(response.status, 200);
 
@@ -143,11 +150,15 @@ test('Attractions BFF APIs - Tests', async (t) => {
     assert.deepEqual(att.photoIds, ['photo-001']);
     assert.deepEqual(att.linkedPhotoIds, ['photo-001']);
 
-    assert.equal(supabaseCalls.length, 2);
+    assert.equal(supabaseCalls.length, 4);
     assert.equal(supabaseCalls[0].method, 'select');
     assert.equal(supabaseCalls[0].table, 'attractions');
-    assert.equal(supabaseCalls[1].method, 'select');
-    assert.equal(supabaseCalls[1].table, 'attraction_photos');
+    assert.equal(supabaseCalls[1].method, 'filter');
+    assert.equal(supabaseCalls[1].eqCode, 'north');
+    assert.equal(supabaseCalls[2].method, 'select');
+    assert.equal(supabaseCalls[2].table, 'attraction_photos');
+    assert.equal(supabaseCalls[3].method, 'in');
+    assert.deepEqual(supabaseCalls[3].data, ['ATT-001']);
   });
 
   await t.test('POST /api/attractions - creates a new attraction and photo links', async () => {
@@ -185,19 +196,12 @@ test('Attractions BFF APIs - Tests', async (t) => {
     assert.equal(json.ok, true);
     assert.equal(json.data.id, 'ATT-002');
 
-    // 1 select (to check exist or not inside helper seeds maybe, but here we do base insert + photo insert)
-    assert.equal(supabaseCalls.length, 2);
-    assert.equal(supabaseCalls[0].method, 'insert');
-    assert.equal(supabaseCalls[0].table, 'attractions');
-    assert.equal(supabaseCalls[1].method, 'insert');
-    assert.equal(supabaseCalls[1].table, 'attraction_photos');
-
-    // Verify junction rows data
-    const insertedJunctions = supabaseCalls[1].data;
-    assert.equal(insertedJunctions.length, 1);
-    assert.equal(insertedJunctions[0].attraction_id, 'ATT-002');
-    assert.equal(insertedJunctions[0].photo_id, 'photo-002');
-    assert.equal(insertedJunctions[0].is_featured, true);
+    assert.equal(supabaseCalls.length, 1);
+    assert.equal(supabaseCalls[0].method, 'rpc');
+    assert.equal(supabaseCalls[0].table, 'save_attraction_aggregate');
+    assert.equal(supabaseCalls[0].data.p_photo_links[0].attraction_id, 'ATT-002');
+    assert.equal(supabaseCalls[0].data.p_photo_links[0].photo_id, 'photo-002');
+    assert.equal(supabaseCalls[0].data.p_photo_links[0].is_featured, true);
   });
 
   await t.test('PATCH /api/attractions - updates an existing attraction and photo links', async () => {
@@ -234,17 +238,26 @@ test('Attractions BFF APIs - Tests', async (t) => {
     const json = await response.json();
     assert.equal(json.ok, true);
 
-    assert.equal(supabaseCalls.length, 3);
-    assert.equal(supabaseCalls[0].method, 'update');
-    assert.equal(supabaseCalls[0].table, 'attractions');
-    assert.equal(supabaseCalls[0].eqCode, 'ATT-001');
+    assert.equal(supabaseCalls.length, 1);
+    assert.equal(supabaseCalls[0].method, 'rpc');
+    assert.equal(supabaseCalls[0].table, 'save_attraction_aggregate');
+    assert.equal(supabaseCalls[0].data.p_photo_links[0].attraction_id, 'ATT-001');
+  });
 
-    assert.equal(supabaseCalls[1].method, 'delete');
-    assert.equal(supabaseCalls[1].table, 'attraction_photos');
-    assert.equal(supabaseCalls[1].eqCode, 'ATT-001');
+  await t.test('PATCH /api/attractions - leaves the aggregate untouched when photo transaction fails', async () => {
+    attractionAggregateRpcError = { message: 'photo link insert failed' };
+    const req = new Request('http://localhost/api/attractions', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        attraction: { id: 'ATT-001', region: 'north', type: 'museum', name: 'Failed update', dest: 'Hanoi' },
+      }),
+    });
 
-    assert.equal(supabaseCalls[2].method, 'insert');
-    assert.equal(supabaseCalls[2].table, 'attraction_photos');
+    const response = await attractionsRoute.PATCH(req);
+    assert.equal(response.status, 500);
+    assert.equal(supabaseCalls.length, 1);
+    assert.equal(supabaseCalls[0].method, 'rpc');
+    assert.equal(supabaseCalls[0].table, 'save_attraction_aggregate');
   });
 
   await t.test('DELETE /api/attractions - deletes an existing attraction', async () => {

@@ -1,16 +1,29 @@
 import 'server-only';
 
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto';
 import type { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getServerSupabaseAnonKey, getServerSupabaseUrl } from '@/lib/env';
 import { getRedisClient } from '@/lib/redis/client';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import {
+  createDurableCrmSession,
+  findDurableCrmSession,
+  revokeDurableCrmSession,
+  updateDurableCrmSession,
+} from '@/lib/auth/crm-session-store';
 
 export const CRM_SESSION_COOKIE = 'crm_session';
 
 const SESSION_TTL_SEC = 7 * 24 * 60 * 60;
-const SESSION_PREFIX = 'crm:session:';
+const REVOKED_SESSION_PREFIX = 'crm:session:revoked:';
 const REFRESH_WHEN_REMAINING_SEC = 2 * 60;
 
 export type CrmSession = {
@@ -53,8 +66,8 @@ function decodeCookieValue(value: string | undefined): string | null {
   return sid;
 }
 
-function keyFor(sid: string): string {
-  return `${SESSION_PREFIX}${sid}`;
+function revokedKeyFor(sid: string): string {
+  return `${REVOKED_SESSION_PREFIX}${sid}`;
 }
 
 function cookieOptions(maxAge: number) {
@@ -67,8 +80,30 @@ function cookieOptions(maxAge: number) {
   };
 }
 
-function parseSession(raw: string, sid: string): CrmSession | null {
+function encryptionKey(): Buffer {
+  return createHash('sha256')
+    .update('crm-session-encryption:')
+    .update(getSessionSecret())
+    .digest();
+}
+
+function encryptSession(session: CrmSession): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', encryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(session), 'utf8'), cipher.final()]);
+  return `v1.${iv.toString('base64url')}.${cipher.getAuthTag().toString('base64url')}.${encrypted.toString('base64url')}`;
+}
+
+function parseSession(ciphertext: string, sid: string): CrmSession | null {
   try {
+    const [version, iv, authTag, encrypted, ...extra] = ciphertext.split('.');
+    if (version !== 'v1' || !iv || !authTag || !encrypted || extra.length) return null;
+    const decipher = createDecipheriv('aes-256-gcm', encryptionKey(), Buffer.from(iv, 'base64url'));
+    decipher.setAuthTag(Buffer.from(authTag, 'base64url'));
+    const raw = Buffer.concat([
+      decipher.update(Buffer.from(encrypted, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8');
     const session = JSON.parse(raw) as CrmSession;
     if (
       session.sid !== sid ||
@@ -86,20 +121,46 @@ function parseSession(raw: string, sid: string): CrmSession | null {
   }
 }
 
+function expiresAtIso(expiresAt: number): string {
+  return new Date(expiresAt * 1000).toISOString();
+}
+
+async function isRevokedInRedis(sid: string): Promise<boolean> {
+  try {
+    const redis = await getRedisClient();
+    return Boolean(redis && await redis.get(revokedKeyFor(sid)));
+  } catch {
+    return false;
+  }
+}
+
+async function cacheRevocationInRedis(sid: string, expiresAt: number): Promise<void> {
+  const ttl = expiresAt - Math.floor(Date.now() / 1000);
+  if (ttl <= 0) return;
+  try {
+    const redis = await getRedisClient();
+    if (redis) await redis.set(revokedKeyFor(sid), '1', { EX: ttl });
+  } catch {
+    // PostgreSQL remains authoritative when Redis is unavailable.
+  }
+}
+
 export async function createCrmSession(input: NewCrmSession): Promise<{
   session: CrmSession;
   cookieValue: string;
 }> {
-  const redis = await getRedisClient();
-  if (!redis) throw new Error('CRM session store không khả dụng.');
-
   const now = Math.floor(Date.now() / 1000);
   const session: CrmSession = {
     ...input,
     sid: randomBytes(32).toString('base64url'),
     expiresAt: now + SESSION_TTL_SEC,
   };
-  await redis.set(keyFor(session.sid), JSON.stringify(session), { EX: SESSION_TTL_SEC });
+  await createDurableCrmSession({
+    sid: session.sid,
+    payloadCiphertext: encryptSession(session),
+    expiresAt: expiresAtIso(session.expiresAt),
+    revokedAt: null,
+  });
   return { session, cookieValue: encodeCookieValue(session.sid) };
 }
 
@@ -112,28 +173,32 @@ export async function getCrmSession(cookieValue: string | undefined): Promise<Cr
   }
   if (!sid) return null;
 
-  const redis = await getRedisClient();
-  if (!redis) return null;
-  const raw = await redis.get(keyFor(sid));
-  if (!raw) return null;
+  if (await isRevokedInRedis(sid)) return null;
 
-  const session = parseSession(raw, sid);
-  if (!session) {
-    await redis.del(keyFor(sid));
+  try {
+    const stored = await findDurableCrmSession(sid);
+    if (!stored || stored.revokedAt || Date.parse(stored.expiresAt) <= Date.now()) return null;
+    const session = parseSession(stored.payloadCiphertext, sid);
+    if (!session || session.expiresAt !== Math.floor(Date.parse(stored.expiresAt) / 1000)) return null;
+    return session;
+  } catch {
     return null;
   }
-  return session;
 }
 
 export async function updateCrmSession(session: CrmSession): Promise<void> {
-  const redis = await getRedisClient();
-  if (!redis) throw new Error('CRM session store không khả dụng.');
   const ttl = session.expiresAt - Math.floor(Date.now() / 1000);
   if (ttl <= 0) {
-    await redis.del(keyFor(session.sid));
+    await revokeDurableCrmSession(session.sid);
+    await cacheRevocationInRedis(session.sid, session.expiresAt);
     return;
   }
-  await redis.set(keyFor(session.sid), JSON.stringify(session), { EX: ttl });
+  await updateDurableCrmSession({
+    sid: session.sid,
+    payloadCiphertext: encryptSession(session),
+    expiresAt: expiresAtIso(session.expiresAt),
+    revokedAt: null,
+  });
 }
 
 /** Refresh Supabase credentials server-side while the CRM session remains valid. */
@@ -176,8 +241,15 @@ export async function revokeCrmSession(cookieValue: string | undefined): Promise
     return;
   }
   if (!sid) return;
-  const redis = await getRedisClient();
-  if (redis) await redis.del(keyFor(sid));
+  let expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SEC;
+  try {
+    const stored = await findDurableCrmSession(sid);
+    if (stored) expiresAt = Math.floor(Date.parse(stored.expiresAt) / 1000);
+  } catch {
+    // Revoke below remains the source-of-truth operation and will surface a durable store failure.
+  }
+  await revokeDurableCrmSession(sid);
+  await cacheRevocationInRedis(sid, expiresAt);
 }
 
 export function setCrmSessionCookie(response: NextResponse, cookieValue: string): void {

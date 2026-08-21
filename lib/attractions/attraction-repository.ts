@@ -23,10 +23,14 @@ export async function getAllAttractionsServer(region?: Attraction['region']): Pr
   const { data: baseRows, error: attError } = await query;
   if (attError) throw attError;
 
-  // 2. Lấy liên kết ảnh trong bảng attraction_photos
+  const attractionIds = (baseRows || []).map((row) => String(row.id));
+  if (attractionIds.length === 0) return [];
+
+  // Only fetch links for the attractions selected by the server-side region filter.
   const { data: linkRows, error: photoError } = await supabase
     .from('attraction_photos')
-    .select('*');
+    .select('*')
+    .in('attraction_id', attractionIds);
   if (photoError) throw photoError;
 
   return assembleAttractions(baseRows || [], linkRows || []) as unknown as Attraction[];
@@ -40,19 +44,7 @@ export async function createAttractionServer(
   attraction: Attraction
 ): Promise<Attraction> {
   const row = attractionToRow(attraction as unknown as Record<string, unknown>);
-  const { error: attError } = await supabase
-    .from('attractions')
-    .insert(row);
-  if (attError) throw attError;
-
-  // Chèn liên kết ảnh
-  const photos = attractionPhotoRows(attraction);
-  if (photos.length > 0) {
-    const { error: photoError } = await supabase
-      .from('attraction_photos')
-      .insert(photos);
-    if (photoError) throw photoError;
-  }
+  await saveAttractionAggregateServer(supabase, row, attractionPhotoRows(attraction));
 
   return attraction;
 }
@@ -65,27 +57,23 @@ export async function updateAttractionServer(
   id: string,
   attraction: Attraction
 ): Promise<void> {
-  const row = attractionToRow(attraction as unknown as Record<string, unknown>);
-  const { error: attError } = await supabase
-    .from('attractions')
-    .update(row)
-    .eq('id', id);
-  if (attError) throw attError;
-
-  // Cập nhật liên kết ảnh: Xóa liên kết cũ và chèn lại liên kết mới
-  const { error: deleteError } = await supabase
-    .from('attraction_photos')
-    .delete()
-    .eq('attraction_id', id);
-  if (deleteError) throw deleteError;
-
-  const photos = attractionPhotoRows(attraction);
-  if (photos.length > 0) {
-    const { error: photoError } = await supabase
-      .from('attraction_photos')
-      .insert(photos);
-    if (photoError) throw photoError;
+  if (id !== attraction.id) {
+    throw new Error('Attraction ID cannot change during update');
   }
+  const row = attractionToRow(attraction as unknown as Record<string, unknown>);
+  await saveAttractionAggregateServer(supabase, row, attractionPhotoRows(attraction));
+}
+
+async function saveAttractionAggregateServer(
+  supabase: SupabaseClient,
+  attractionRow: Record<string, unknown>,
+  photoLinks: Record<string, unknown>[]
+): Promise<void> {
+  const { error } = await supabase.rpc('save_attraction_aggregate', {
+    p_attraction: attractionRow,
+    p_photo_links: photoLinks,
+  });
+  if (error) throw error;
 }
 
 /**

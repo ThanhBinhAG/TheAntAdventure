@@ -188,7 +188,7 @@ export async function POST(request: Request) {
       supabaseAccessTokenExpiresAt: data.session.expires_at ?? Math.floor(Date.now() / 1000) + data.session.expires_in,
     }));
   } catch {
-    return fail(503, 'CRM session store không khả dụng. Vui lòng thử lại.');
+    return fail(503, 'Không thể tạo CRM session. Vui lòng thử lại.');
   }
 
   const response = NextResponse.json({ ok: true, mode: 'crm' });

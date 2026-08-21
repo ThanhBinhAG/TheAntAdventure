@@ -11,6 +11,9 @@ export default defineConfig([
     "out/**",
     "build/**",
     "coverage/**",
+    // Playwright trace viewer bundles are generated test artefacts, not CRM source.
+    "playwright-report/**",
+    "test-results/**",
     "next-env.d.ts",
     "supabase/.temp/**",
     // Local scratch / notes (gitignored); do not lint as app code.

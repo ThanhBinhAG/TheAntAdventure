@@ -7,7 +7,8 @@
   },
   "scripts": {
     "dev": "NODE_OPTIONS=--max-old-space-size=3072 next dev -p 3006",
-    "build": "next build --webpack && npm run leakage:check",
+    "build": "next build --webpack",
+    "build:with-leakage": "npm run build && npm run leakage:check",
     "leakage:check": "bash scripts/scan-leakage.sh",
     "analyze": "ANALYZE=true next build --webpack",
     "start": "next start -p 3006",

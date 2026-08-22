@@ -173,7 +173,7 @@ async function loadAgentsMap(
 async function resolveStageCustomerIds(
   supabase: CustomerSupabaseClient,
   stage: string,
-): Promise<string[] | null> {
+): Promise<string[]> {
   if (stage === 'none') {
     const { data: allCustomers, error: custErr } = await supabase
       .from('customers')
@@ -226,21 +226,19 @@ export async function listCustomersPage(
 ): Promise<CustomerPageResponse> {
   const supabase = await createCustomerServerClient();
 
-  let stageIds: string[] | null = null;
-  if (input.stage) {
-    const resolvedStageIds = await resolveStageCustomerIds(supabase, input.stage);
-    if (resolvedStageIds.length === 0) {
-      return {
-        items: [],
-        page: input.page,
-        pageSize: input.pageSize,
-        totalCount: 0,
-        totalPages: 0,
-        hasPreviousPage: false,
-        hasNextPage: false,
-      };
-    }
-    stageIds = resolvedStageIds;
+  const stageIds = input.stage
+    ? await resolveStageCustomerIds(supabase, input.stage)
+    : undefined;
+  if (stageIds && stageIds.length === 0) {
+    return {
+      items: [],
+      page: input.page,
+      pageSize: input.pageSize,
+      totalCount: 0,
+      totalPages: 0,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    };
   }
 
   let query = supabase.from('customers').select('*', { count: 'exact' });

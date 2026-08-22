@@ -1,13 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
 import { SALES_PEOPLE } from '@/lib/customers/customer-form';
-import { customerMatchesSearch, getClientPipeline } from '@/lib/core/crm-utils';
 import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
-import { usePagination } from '@/hooks/usePagination';
-import { usePageSize } from '@/hooks/usePageSize';
+import { usePageSize, type PageSizeOption } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
 import { usePagePermission } from '@/hooks/usePagePermission';
@@ -15,8 +13,10 @@ import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import CustomerProfileModal from '@/components/customers/CustomerProfileModal';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
 import { useDeleteCustomer } from '@/hooks/useDeleteCustomer';
+import { useCustomerPage } from '@/hooks/useCustomerPage';
+import type { CustomerListItem } from '@/lib/customers/customer-list-input';
+import type { CustomerPipelineStageFilter } from '@/lib/customers/customer-list-input';
 import { toast } from '@/lib/toast';
-
 import { confirmDialog } from '@/lib/confirm';
 
 const TYPE_FILTERS: { value: string; label: string; style?: React.CSSProperties }[] = [
@@ -25,7 +25,11 @@ const TYPE_FILTERS: { value: string; label: string; style?: React.CSSProperties 
   { value: 'b2c', label: 'B2C', style: { borderColor: '#1565C0', color: '#1565C0' } },
 ];
 
-const STAGE_FILTERS: { value: string; label: string; style?: React.CSSProperties }[] = [
+const STAGE_FILTERS: {
+  value: '' | CustomerPipelineStageFilter;
+  label: string;
+  style?: React.CSSProperties;
+}[] = [
   { value: '', label: 'All Clients' },
   { value: 'Inquiry', label: 'Inquiry', style: { borderColor: '#1565C0', color: '#1565C0' } },
   { value: 'Designing', label: 'Designing', style: { borderColor: '#D97706', color: '#D97706' } },
@@ -40,9 +44,7 @@ const STAGE_FILTERS: { value: string; label: string; style?: React.CSSProperties
 
 export default function Customers() {
   const { canWrite } = usePagePermission('customers');
-  const customers = useStore((s) => s.customers);
-  const leads = useStore((s) => s.leads);
-  const feedback = useStore((s) => s.feedback) as { custId?: string; nps?: number }[];
+  const storeCustomers = useStore((s) => s.customers);
   const { saveFromForm } = useRegisterCustomer();
   const { deleteCustomer } = useDeleteCustomer();
 
@@ -51,33 +53,39 @@ export default function Customers() {
   const [countryF, setCountryF] = useState('');
   const [salesF, setSalesF] = useState('');
   const [typeF, setTypeF] = useState('');
-  const [stageF, setStageF] = useState('');
+  const [stageF, setStageF] = useState<'' | CustomerPipelineStageFilter>('');
+  const [page, setPage] = useState(1);
   const [formMode, setFormMode] = useState<'add' | 'edit' | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profileInitialTab, setProfileInitialTab] = useState<'overview' | 'pipeline'>('overview');
   const [editId, setEditId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    let list = customers.filter(
-      (c) =>
-        customerMatchesSearch(c, search) &&
-        (!sourceF || c.source === sourceF) &&
-        (!countryF || c.country === countryF) &&
-        (!salesF || c.salesperson === salesF) &&
-        (!typeF || (c.clientType ?? 'b2c') === typeF)
-    );
-    if (stageF === 'none') {
-      list = list.filter((c) => leads.filter((l) => l.custId === c.id && l.stage !== 'Lost').length === 0);
-    } else if (stageF) {
-      list = list.filter((c) => getClientPipeline(c.id, leads).stage === stageF);
-    }
-    return list;
-  }, [customers, leads, search, sourceF, countryF, salesF, typeF, stageF]);
-
   const { pageSize, setPageSize } = usePageSize();
-  const pagination = usePagination(filtered, pageSize, [search, sourceF, countryF, salesF, typeF, stageF, pageSize]);
-  const { paginatedItems } = pagination;
+  const pageSizeOption = pageSize as PageSizeOption;
+
+  function goToFirstPage() {
+    setPage(1);
+  }
+
+  const {
+    items,
+    totalCount,
+    totalPages,
+    error,
+    isLoading,
+    retry,
+    refresh,
+  } = useCustomerPage({
+    page,
+    pageSize: pageSizeOption,
+    q: search.trim() || undefined,
+    source: sourceF || undefined,
+    country: countryF || undefined,
+    salesperson: salesF || undefined,
+    clientType: typeF === 'b2b' || typeF === 'b2c' ? typeF : undefined,
+    stage: stageF || undefined,
+  });
 
   const filtersActive = !!(search || sourceF || countryF || salesF || typeF || stageF);
 
@@ -88,10 +96,22 @@ export default function Customers() {
     setSalesF('');
     setTypeF('');
     setStageF('');
+    goToFirstPage();
   }
 
-  const profileCustomer = profileId ? customers.find((c) => c.id === profileId) : null;
-  const editCustomer = editId ? customers.find((c) => c.id === editId) : null;
+  function changePageSize(size: number) {
+    setPageSize(size);
+    goToFirstPage();
+  }
+
+  const profileCustomer =
+    (profileId && items.find((c) => c.id === profileId)) ||
+    (profileId ? storeCustomers.find((c) => c.id === profileId) : null) ||
+    null;
+  const editCustomer =
+    (editId && items.find((c) => c.id === editId)) ||
+    (editId ? storeCustomers.find((c) => c.id === editId) : null) ||
+    null;
 
   function openProfile(id: string, tab: 'overview' | 'pipeline' = 'overview') {
     setProfileInitialTab(tab);
@@ -103,13 +123,21 @@ export default function Customers() {
     setProfileInitialTab('overview');
   }
 
-  function handleSave(payload: Parameters<typeof saveFromForm>[0]): boolean {
-    const result = saveFromForm(payload);
-    if (!result.ok) return false;
-    if (result.message) toast.success(result.message);
-    setFormMode(null);
-    setEditId(null);
-    return true;
+  async function handleSave(
+    payload: Parameters<typeof saveFromForm>[0],
+  ): Promise<boolean> {
+    try {
+      const result = await saveFromForm(payload);
+      if (!result.ok) return false;
+      if (result.message) toast.success(result.message);
+      setFormMode(null);
+      setEditId(null);
+      refresh();
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Không thể lưu khách hàng.');
+      return false;
+    }
   }
 
   async function handleDeleteCustomer(id: string, name: string, onSuccess?: () => void) {
@@ -127,10 +155,15 @@ export default function Customers() {
       }
       onSuccess?.();
       toast.success('Customer deleted.');
+      refresh();
     } finally {
       setDeletingId(null);
     }
   }
+
+  const rangeStart =
+    totalCount === 0 ? 0 : (page - 1) * pageSizeOption + 1;
+  const rangeEnd = Math.min(page * pageSizeOption, totalCount);
 
   return (
     <div>
@@ -139,9 +172,18 @@ export default function Customers() {
           type="text"
           placeholder="Search name, email, phone, ID, agent…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            goToFirstPage();
+          }}
         />
-        <select value={sourceF} onChange={(e) => setSourceF(e.target.value)}>
+        <select
+          value={sourceF}
+          onChange={(e) => {
+            setSourceF(e.target.value);
+            goToFirstPage();
+          }}
+        >
           <option value="">All Sources</option>
           <option>Referral</option>
           <option>Website</option>
@@ -150,7 +192,13 @@ export default function Customers() {
           <option>Abercrombie</option>
           <option>Direct</option>
         </select>
-        <select value={countryF} onChange={(e) => setCountryF(e.target.value)}>
+        <select
+          value={countryF}
+          onChange={(e) => {
+            setCountryF(e.target.value);
+            goToFirstPage();
+          }}
+        >
           <option value="">All Countries</option>
           <option>USA</option>
           <option>Australia</option>
@@ -159,7 +207,13 @@ export default function Customers() {
           <option>Germany</option>
           <option>Japan</option>
         </select>
-        <select value={salesF} onChange={(e) => setSalesF(e.target.value)}>
+        <select
+          value={salesF}
+          onChange={(e) => {
+            setSalesF(e.target.value);
+            goToFirstPage();
+          }}
+        >
           <option value="">All Sales People</option>
           {SALES_PEOPLE.map((s) => (
             <option key={s} value={s}>
@@ -186,7 +240,10 @@ export default function Customers() {
             key={t.value || 'all-type'}
             className={`csf-btn${typeF === t.value ? ' csf-active' : ''}`}
             style={typeF !== t.value ? t.style : undefined}
-            onClick={() => setTypeF(t.value)}
+            onClick={() => {
+              setTypeF(t.value);
+              goToFirstPage();
+            }}
             type="button"
           >
             {t.label}
@@ -201,20 +258,40 @@ export default function Customers() {
             key={s.value || 'all'}
             className={`csf-btn${stageF === s.value ? ' csf-active' : ''}`}
             style={stageF !== s.value ? s.style : undefined}
-            onClick={() => setStageF(s.value)}
+            onClick={() => {
+              setStageF(s.value);
+              goToFirstPage();
+            }}
             type="button"
           >
             {s.label}
           </button>
         ))}
         <span style={{ marginLeft: 4, fontSize: 11, color: 'var(--m)' }}>
-          {filtered.length} client{filtered.length !== 1 ? 's' : ''}
+          {isLoading ? '…' : `${totalCount} client${totalCount !== 1 ? 's' : ''}`}
         </span>
+        {error && (
+          <button type="button" className="btn btn-s btn-sm" style={{ marginLeft: 8 }} onClick={retry}>
+            Retry
+          </button>
+        )}
       </div>
 
       <div className="card">
         <div className="card-body" style={{ padding: 0 }}>
-          {filtered.length === 0 ? (
+          {error && !isLoading && items.length === 0 ? (
+            <EmptyState
+              className="crm-empty-state--table"
+              variant="clients"
+              title="Could not load clients"
+              description={error}
+              action={
+                <button type="button" className="btn btn-p btn-sm" onClick={retry}>
+                  Retry
+                </button>
+              }
+            />
+          ) : !isLoading && totalCount === 0 ? (
             <EmptyState
               className="crm-empty-state--table"
               variant="clients"
@@ -262,11 +339,12 @@ export default function Customers() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedItems.map((c) => {
-                    const p = getClientPipeline(c.id, leads);
+                  {(isLoading && items.length === 0
+                    ? []
+                    : items
+                  ).map((c: CustomerListItem) => {
                     const isB2B = c.clientType === 'b2b';
-                    const cfb = feedback.filter((f) => f.custId === c.id);
-                    const avgNps = cfb.length ? cfb.reduce((s, f) => s + (f.nps || 0), 0) / cfb.length : null;
+                    const avgNps = c.avgNps;
 
                     return (
                       <tr key={c.id}>
@@ -287,14 +365,14 @@ export default function Customers() {
                           <span className={`bdg ${SRC_COLORS[c.source] || 'bdg-w'}`}>{c.source}</span>
                         </td>
                         <td>
-                          {p.stage ? (
+                          {c.pipelineStage ? (
                             <button
                               type="button"
-                              className={`bdg ${STAGE_COLORS[p.stage] || 'bdg-w'}`}
+                              className={`bdg ${STAGE_COLORS[c.pipelineStage] || 'bdg-w'}`}
                               style={{ fontSize: 10, border: 'none', cursor: 'pointer' }}
                               onClick={() => openProfile(c.id, 'pipeline')}
                             >
-                              {p.stage}
+                              {c.pipelineStage}
                             </button>
                           ) : (
                             <button
@@ -308,17 +386,17 @@ export default function Customers() {
                           )}
                         </td>
                         <td style={{ fontWeight: 600, color: 'var(--g)' }}>
-                          {p.value > 0 ? `$${fmt(p.value)}` : <span style={{ color: 'var(--m)' }}>—</span>}
+                          {c.pipelineValue > 0 ? `$${fmt(c.pipelineValue)}` : <span style={{ color: 'var(--m)' }}>—</span>}
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          {p.count ? (
+                          {c.pipelineLeadCount ? (
                             <button
                               type="button"
                               className="btn btn-s btn-sm"
                               style={{ minWidth: 28, padding: '2px 8px' }}
                               onClick={() => openProfile(c.id, 'pipeline')}
                             >
-                              {p.count}
+                              {c.pipelineLeadCount}
                             </button>
                           ) : (
                             <span style={{ color: 'var(--m)' }}>0</span>
@@ -337,7 +415,7 @@ export default function Customers() {
                           <button className="btn btn-s btn-sm" type="button" style={{ marginRight: 4 }} onClick={() => openProfile(c.id)}>
                             View
                           </button>
-                           <button
+                          <button
                             className="btn btn-s btn-sm"
                             type="button"
                             style={{ marginRight: 4 }}
@@ -365,7 +443,21 @@ export default function Customers() {
                   })}
                 </tbody>
               </table>
-              <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
+              {isLoading && items.length === 0 && (
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--m)', fontSize: 13 }}>
+                  Loading clients…
+                </div>
+              )}
+              <PaginationBar
+                page={page}
+                setPage={setPage}
+                totalPages={Math.max(totalPages, 1)}
+                total={totalCount}
+                pageSize={pageSizeOption}
+                rangeStart={rangeStart}
+                rangeEnd={rangeEnd}
+                onPageSizeChange={changePageSize}
+              />
             </>
           )}
         </div>
@@ -375,7 +467,7 @@ export default function Customers() {
         open={formMode !== null}
         mode={formMode === 'edit' ? 'edit' : 'add'}
         customer={editCustomer}
-        customers={customers}
+        customers={storeCustomers}
         onClose={() => {
           setFormMode(null);
           setEditId(null);

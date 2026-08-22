@@ -42,7 +42,7 @@ interface CustomerFormModalProps {
   customer?: Customer | null;
   customers: Customer[];
   onClose: () => void;
-  onSave: (payload: CustomerFormSavePayload) => boolean;
+  onSave: (payload: CustomerFormSavePayload) => boolean | Promise<boolean>;
 }
 
 function initialForm(mode: CustomerFormModalProps['mode'], customer: CustomerFormModalProps['customer']) {
@@ -112,7 +112,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     set('childAges', form.childAges ? `${form.childAges}, ${tag}` : tag);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form.name.trim()) {
       toast.warning('Please enter client name.');
       return;
@@ -156,7 +156,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
       nat: form.nat.trim() ? normalizeNationality(form.nat) : '',
     };
 
-    const saved = onSave({
+    const saved = await onSave({
       form: normalized,
       mode,
       logInquiry: mode === 'add' ? logInquiry : false,
@@ -486,7 +486,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             <button className="btn btn-s" type="button" onClick={onClose}>
               Cancel
             </button>
-            <button className="btn btn-p" type="button" onClick={handleSave} disabled={saveDisabled}>
+            <button className="btn btn-p" type="button" onClick={() => void handleSave()} disabled={saveDisabled}>
               ✓ {mode === 'edit' ? 'Save Changes' : 'Add Customer'}
             </button>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CompletedTasksPanel from '@/components/planner/CompletedTasksPanel';
 import {
   buildNoteTask,
@@ -15,6 +15,8 @@ import type { Task } from '@/lib/types';
 import { addDays, localTodayIso, mondayOfWeek } from '@/lib/core/date-utils';
 import { useStore } from '@/hooks/useStore';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { toast } from '@/lib/toast';
+import { getBffArray } from '@/lib/bff/client';
 
 const TEAM = ['Tai Pham', 'Linh N.', 'Minh T.', 'Huong L.', 'Khoa V.'];
 
@@ -47,6 +49,7 @@ export default function Planner() {
   const { canWrite } = usePagePermission('planner');
   const tasks = useStore((s) => s.tasks) as Task[];
   const addTask = useStore((s) => s.addTask);
+  const setTasks = useStore((s) => s.setTasks);
   const updateTask = useStore((s) => s.updateTask);
 
   const [weekOffset, setWeekOffset] = useState(0);
@@ -55,7 +58,22 @@ export default function Planner() {
   const [noteText, setNoteText] = useState('');
   const [newTaskStatus, setNewTaskStatus] = useState<TaskStatusValue>('todo');
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const noteBoardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getBffArray<Task>('/api/planner/all', 'Không thể tải danh sách công việc.')
+      .then((rows) => {
+        if (active) setTasks(rows);
+      })
+      .catch((error: unknown) => {
+        if (active) setLoadError(error instanceof Error ? error.message : 'Không thể tải danh sách công việc.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [setTasks]);
 
   const today = localTodayIso();
   const allTasks = tasks as Task[];
@@ -78,16 +96,54 @@ export default function Planner() {
     noteBoardRef.current?.querySelector('textarea')?.focus();
   }
 
-  function saveNoteTask() {
+  async function saveNoteTask() {
     if (!noteText.trim()) return;
-    addTask(buildNoteTask(noteText, today, newTaskStatus) as Record<string, unknown>);
-    setNoteText('');
-    setNewTaskStatus('todo');
+    const newTask = buildNoteTask(noteText, today, newTaskStatus);
+    try {
+      const res = await fetch('/api/planner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task: newTask }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Không thể tạo task mới.');
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? 'Không thể tạo task mới.');
+      }
+
+      addTask(newTask as Record<string, unknown>);
+      setNoteText('');
+      setNewTaskStatus('todo');
+      toast.success('Đã thêm công việc.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Thêm công việc thất bại.');
+    }
   }
 
-  function changeTaskStatus(id: string, status: TaskStatusValue) {
-    updateTask(id, { status });
-    if (status === 'done' && expandedTaskId === id) setExpandedTaskId(null);
+  async function changeTaskStatus(id: string, status: TaskStatusValue) {
+    try {
+      const res = await fetch('/api/planner', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, patch: { status } }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Không thể cập nhật trạng thái.');
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? 'Không thể cập nhật trạng thái.');
+      }
+
+      updateTask(id, { status });
+      if (status === 'done' && expandedTaskId === id) setExpandedTaskId(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Cập nhật trạng thái thất bại.');
+    }
   }
 
   function toggleTaskExpand(id: string | undefined) {
@@ -124,6 +180,7 @@ export default function Planner() {
 
   return (
     <div>
+      {loadError && <div className="crm-page-hydrate-error" role="alert">{loadError}</div>}
       <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--m)', marginBottom: 12 }}>
         📆 Task Calendar & Team Planner
       </div>

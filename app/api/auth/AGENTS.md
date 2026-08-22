@@ -8,3 +8,4 @@ Auth API: session login/logout and user listing (Supabase + break-glass).
 
 ## Boundaries
 - Rate limiting and session helpers live in `lib/auth`.
+- Login depends on the durable PostgreSQL CRM session store, not Redis availability.

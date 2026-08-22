@@ -12,8 +12,9 @@ Supabase hydrate, push, auto-sync, mappers, and timeouts.
 - `sync-config.ts` — `PAGE_BOOT_TABLES`, `SIDEBAR_BADGE_TABLES`, `PROFILE_LAZY_TABLES`, push waves, store key map
 - `sidebar-badge-tables.ts` — permission-scoped subset for sidebar badge hydrate
 - `sync-lifecycle.ts` — phase + `hydratedTables` / messages flags; hard `markHydrationPending` (wipe) vs soft `markHydrationSoftPending` (nav); auto-sync only pushes hydrated
-- `sync-push.ts` — full-table push + `pushStoreRowsToSupabase` (row upsert for create/edit); successful product/pricing sync invalidates the Product facet cache through the authenticated API
-- `auto-sync.ts` — debounce (2.5s) + `{ immediate: true }` + `persistCustomerRowsNow`; ignores store writes while `withoutAutoSyncAsync` is active
+- `sync-push.ts` — full-table push + `pushStoreRowsToSupabase` (row upsert for create/edit); excludes BFF-managed Dev A tables
+- `auto-sync.ts` — debounce (2.5s) + `{ immediate: true }` + `persistCustomerRowsNow`; ignores store writes while `withoutAutoSyncAsync` is active and excludes BFF-managed tables
+- `bff-managed-tables.ts` — blocks Product, Pricing, Planner, Attractions, and Tour Design tables from browser snapshot pushes
 - `mappers.ts` (barrel → [`mappers/`](mappers/AGENTS.md)), `supabase.ts` (thin re-export of `db` → [`supabase/`](supabase/AGENTS.md)), …
 
 ## Boundaries

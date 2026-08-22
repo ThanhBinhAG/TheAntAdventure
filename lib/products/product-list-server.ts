@@ -1,9 +1,7 @@
 import 'server-only';
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { assembleProducts, rowToPhoto } from '@/lib/db/mappers';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
+import { getServerSupabaseClient } from '@/lib/supabase/server';
 import { photoDisplayUrl, photoThumbUrl } from '@/lib/gallery/gallery-helpers';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import type { Product } from '@/lib/types';
@@ -17,6 +15,10 @@ import {
     getCachedProductFacets,
     setCachedProductFacets,
 } from '@/lib/redis/product-facets';
+import {
+    getCachedProductPage,
+    setCachedProductPage,
+} from '@/lib/redis/product-list';
 
 
 type ProductRow = Record<string, unknown>;
@@ -32,33 +34,7 @@ export class ProductListError extends Error {
     }
 }
 
-type ProductSupabaseClient = Awaited<
-    ReturnType<typeof createProductServerClient>
->;
-
-async function createProductServerClient() {
-    const url = getSupabaseUrl();
-    const key = getSupabaseAnonKey();
-
-    if (!url || !key) {
-        throw new ProductListError(
-            'Supabase URL hoặc anon key chưa được cấu hình.',
-        );
-    }
-
-    const cookieStore = await cookies();
-
-    return createServerClient(url, key, {
-        cookies: {
-            getAll() {
-                return cookieStore.getAll();
-            },
-            setAll() {
-                // Danh sách product chỉ đọc, không cần ghi cookie.
-            },
-        },
-    });
-}
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 function galleryPhotoFromRow(row: ProductRow): GalleryPhoto {
     const mapped = rowToPhoto(row);
@@ -79,7 +55,7 @@ function galleryPhotoFromRow(row: ProductRow): GalleryPhoto {
 }
 
 async function attachPageCoverThumbs(
-    supabase: ProductSupabaseClient,
+    supabase: SupabaseClient,
     rows: ProductRow[],
 ): Promise<Product[]> {
     if (rows.length === 0) return [];
@@ -136,7 +112,10 @@ async function attachPageCoverThumbs(
 export async function listProductsPage(
     input: ProductListQuery,
 ): Promise<ProductPageResponse<Product>> {
-    const supabase = await createProductServerClient();
+    const cached = await getCachedProductPage(input);
+    if (cached) return cached;
+
+    const supabase = await getServerSupabaseClient();
     const result = input.view === 'modules'
         ? await supabase.rpc('list_product_modules_page', {
             p_page_number: input.page,
@@ -162,7 +141,7 @@ export async function listProductsPage(
         throw new ProductListError('RPC danh sách product trả dữ liệu không hợp lệ.');
     }
 
-    return {
+    const productPage = {
         items: await attachPageCoverThumbs(supabase, page.items),
         page: page.page,
         pageSize: page.pageSize,
@@ -171,6 +150,8 @@ export async function listProductsPage(
         hasPreviousPage: page.hasPreviousPage,
         hasNextPage: page.hasNextPage,
     };
+    await setCachedProductPage(input, productPage);
+    return productPage;
 }
 
 export async function listProductFacets(
@@ -179,7 +160,7 @@ export async function listProductFacets(
     const cached = await getCachedProductFacets(input);
     if (cached) return cached;
 
-    const supabase = await createProductServerClient();
+    const supabase = await getServerSupabaseClient();
     const result = await supabase.rpc('list_product_facets', {
         p_search_text: input.q ?? null,
         p_filter_region: input.region ?? null,

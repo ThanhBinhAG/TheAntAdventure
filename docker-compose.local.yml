@@ -1,0 +1,67 @@
+# Local / VM packaging for The Ant Adventures CRM.
+# Env resolution (see scripts/docker-with-env.sh):
+#   1) ENV_FILE if set
+#   2) $MNT_FDATA/sharing/.env.local  (or env.local)
+#   3) ./.env.local
+#
+#   npm run docker:up       # build + run
+#   npm run docker:deploy   # recreate from existing image (CI)
+#   npm run docker:status
+#
+# COMPOSE_PROJECT_NAME defaults to the-ant-adventures-crm (set in script / CI).
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_USE_SUPABASE: ${NEXT_PUBLIC_USE_SUPABASE:-true}
+        NEXT_PUBLIC_SUPABASE_AUTO_SYNC: ${NEXT_PUBLIC_SUPABASE_AUTO_SYNC:-true}
+        NEXT_PUBLIC_SUPABASE_READ_ONLY: ${NEXT_PUBLIC_SUPABASE_READ_ONLY:-false}
+        NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY: ${NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY:-}
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-The Ant Adventures CRM}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-4.3}
+    image: the-ant-adventures-crm:local
+    ports:
+      - "${APP_PORT:-3006}:3006"
+    env_file:
+      - ${ENV_FILE:-/mnt/fdata/sharing/.env.local}
+    environment:
+      NODE_ENV: production
+      PORT: 3006
+      HOSTNAME: 0.0.0.0
+      # Keep V8 heap under mem_limit so OOM is controllable (not host-wide kill).
+      NODE_OPTIONS: --max-old-space-size=1536
+
+    networks:
+      - ss_ant_crm_app
+      - shared-services
+
+    # Caps the app at 2 GB so a runaway request is killed inside the container instead of
+    # letting the kernel pick a victim host-wide. Measured peak for image processing is
+    # ~130 MB (Sharp runs in a short-lived child worker), so this is generous headroom.
+    mem_limit: 2g
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3006/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+networks:
+  # Supabase ant-crm stack network; resolves supabase-ant-crm-gateway.
+  ss_ant_crm_app:
+    external: true
+  # VM06 shared Redis network; resolves shared_redis.
+  shared-services:
+    external: true

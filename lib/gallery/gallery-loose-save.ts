@@ -1,7 +1,6 @@
 import { useStore } from '@/hooks/useStore';
-import { pushTablesToSupabase } from '@/lib/db/hydrate';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
-import { linkPhotoToAttractionWithFeatured } from '@/lib/attractions/attractions-helpers';
+import type { Attraction } from '@/lib/types';
 import { nextPhotoId } from '@/lib/gallery/gallery-helpers';
 import { uploadPhotoViaApi } from '@/lib/gallery/photo-api';
 import { UNSORTED_FOLDER_ID } from '@/lib/gallery/photo-folders';
@@ -24,6 +23,32 @@ export type SaveLoosePhotosBatchResult = {
   photoIds: string[];
   records: GalleryPhoto[];
 };
+
+async function linkPhotoToAttractionViaApi(attractionId: string, photoId: string): Promise<void> {
+  const attraction = useStore.getState().attractions.find((item) => item.id === attractionId);
+  if (!attraction) throw new Error('Không tìm thấy địa điểm để liên kết ảnh.');
+
+  const linked = attraction.linkedPhotoIds?.length ? attraction.linkedPhotoIds : (attraction.photoIds ?? []);
+  const next: Attraction = {
+    ...attraction,
+    linkedPhotoIds: linked.includes(photoId) ? linked : [...linked, photoId],
+    photoIds:
+      attraction.photoIds?.length && attraction.photoIds.length >= 4
+        ? attraction.photoIds
+        : [...(attraction.photoIds ?? []), photoId].filter((id, index, ids) => ids.indexOf(id) === index),
+  };
+  const response = await fetch('/api/attractions', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ attraction: next }),
+  });
+  const result = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+  if (!response.ok || !result?.ok) {
+    throw new Error(result?.error ?? 'Không thể lưu liên kết ảnh địa điểm.');
+  }
+
+  useStore.getState().updateAttraction(attractionId, next);
+}
 
 /** Upload multiple library photos via chunked API (server Sharp); optionally link to an attraction. */
 export async function saveNewLoosePhotosBatch(
@@ -59,17 +84,11 @@ export async function saveNewLoosePhotosBatch(
     useStore.setState({ photos });
     records.push(record);
 
-    if (opts?.attractionId) {
-      linkPhotoToAttractionWithFeatured(opts.attractionId, photoId);
-    }
   }
 
   if (opts?.attractionId) {
     opts?.onStatus?.('Saving attraction links…');
-    const attractionsResult = await pushTablesToSupabase(['attractions'], false);
-    if (!attractionsResult.ok) {
-      throw new Error(attractionsResult.error ?? 'Không lưu được liên kết attraction lên Supabase');
-    }
+    for (const photo of records) await linkPhotoToAttractionViaApi(opts.attractionId, photo.id);
   }
 
   return { photoIds: records.map((r) => r.id), records };
@@ -115,12 +134,8 @@ export async function saveNewLoosePhoto(
   useStore.setState({ photos: [...photos, record] });
 
   if (opts?.attractionId) {
-    linkPhotoToAttractionWithFeatured(opts.attractionId, photoId);
     opts?.onStatus?.('Saving attraction links…');
-    const attractionsResult = await pushTablesToSupabase(['attractions'], false);
-    if (!attractionsResult.ok) {
-      throw new Error(attractionsResult.error ?? 'Không lưu được liên kết attraction lên Supabase');
-    }
+    await linkPhotoToAttractionViaApi(opts.attractionId, photoId);
   }
 
   return { photoId, record };

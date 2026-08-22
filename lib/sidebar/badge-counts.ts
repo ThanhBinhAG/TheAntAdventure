@@ -1,10 +1,7 @@
 import 'server-only';
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { sidebarBadgeTablesForPermissions } from '@/lib/db/sidebar-badge-tables';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
-import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { getServerSupabaseClient } from '@/lib/supabase/server';
 
 export type SidebarBadgeCounts = {
   tourDesignAttention?: number;
@@ -13,28 +10,7 @@ export type SidebarBadgeCounts = {
 
 const INACTIVE_STAGES = '("Lost","Completed")';
 
-type SessionSupabaseClient = NonNullable<
-  Awaited<ReturnType<typeof createSessionSupabase>>
->;
-
-async function createSessionSupabase() {
-  const url = getSupabaseUrl();
-  const key = getSupabaseAnonKey();
-  if (!url || !key) return null;
-
-  const cookieStore = await cookies();
-  return createServerClient(url, key, {
-    ...getSupabaseGlobalFetchOptions(),
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll() {
-        /* read-only */
-      },
-    },
-  });
-}
+type SessionSupabaseClient = Awaited<ReturnType<typeof getServerSupabaseClient>>;
 
 async function countPendingTourDesignLeads(
   client: SessionSupabaseClient
@@ -94,8 +70,7 @@ export async function getSidebarBadgeCounts(
   const tables = sidebarBadgeTablesForPermissions(permissionCodes);
   if (!tables.length) return {};
 
-  const client = await createSessionSupabase();
-  if (!client) return {};
+  const client = await getServerSupabaseClient();
 
   const needsTourDesign = tables.includes('leads') || tables.includes('tour_drafts');
   const needsTasks = tables.includes('tasks');

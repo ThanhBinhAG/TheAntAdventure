@@ -54,13 +54,13 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
 
 ### Developer A task list
 
-- [ ] A0. Complete Auth & Session end-to-end: login/logout, HttpOnly CRM session, session validation/refresh/revocation, middleware redirects, permission enforcement, tests, and removal of browser Supabase token handling.
-- [ ] A0.1. Establish BFF API conventions, error format, auth/permission middleware, and server-only Supabase client.
-- [ ] A1. Implement the shared Redis cache wrapper and cache invalidation contract.
-- [ ] A2. Complete Tour Product end-to-end: product/pricing API/repository/cache, UI/hooks, tests, and direct-path removal.
-- [ ] A3. Complete Daily Planner end-to-end: planner API/repository, authorization, UI/hooks, tests, and direct-path removal.
-- [ ] A4. Complete Attraction Schedule end-to-end: province-attraction/schedule API/repository, UI/hooks, tests, and direct-path removal.
-- [ ] A5. Complete Tour Design end-to-end: draft/outline API/repository, child-record write safety, UI/hooks, tests, and direct-path removal.
+- [x] A0. Complete Auth & Session end-to-end: login/logout, HttpOnly CRM session, session validation/refresh/revocation, middleware redirects, permission enforcement, tests, and removal of browser Supabase token handling.
+- [x] A0.1. Establish BFF API conventions, error format, auth/permission middleware, and server-only Supabase client.
+- [x] A1. Implement the shared Redis cache wrapper and cache invalidation contract.
+- [x] A2. Complete Tour Product end-to-end: product/pricing API/repository/cache, UI/hooks, tests, and direct-path removal.
+- [x] A3. Complete Daily Planner end-to-end: planner API/repository, authorization, UI/hooks, tests, and direct-path removal.
+- [x] A4. Complete Attraction Schedule end-to-end: province-attraction/schedule API/repository, UI/hooks, tests, and direct-path removal.
+- [x] A5. Complete Tour Design end-to-end: draft/outline API/repository, child-record write safety, UI/hooks, tests, and direct-path removal.
 - [ ] A6. Coordinate final removal of public Supabase runtime/build configuration with Owner-Ops after all nine scoped features pass acceptance.
 
 ### Developer B task list

@@ -12,10 +12,7 @@
  */
 import 'server-only';
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
-import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { getServerSupabaseClient } from '@/lib/supabase/server';
 import { invalidatePermissionCache } from '@/lib/redis/permissions';
 import {
     getCachedAccessControlStaffRoles,
@@ -234,28 +231,9 @@ export class AccessControlRpcError extends Error {
     }
 }
 
-/** Tạo Supabase server client mang cookie của user đang gửi request. */
+/** Tạo Supabase server client mang access token từ CRM session hiện tại. */
 async function createAccessControlServerClient() {
-    const url = getSupabaseUrl();
-    const key = getSupabaseAnonKey();
-
-    if (!url || !key) {
-        throw new Error('Supabase URL hoặc anon key chưa được cấu hình.');
-    }
-
-    const cookieStore = await cookies();
-
-    return createServerClient(url, key, {
-        ...getSupabaseGlobalFetchOptions(),
-        cookies: {
-            getAll() {
-                return cookieStore.getAll();
-            },
-            setAll() {
-                // API này không cần ghi hoặc refresh cookie.
-            },
-        },
-    });
+    return getServerSupabaseClient();
 }
 
 /** Ném lỗi có mã PostgreSQL để Route Handler xử lý đúng HTTP status. */

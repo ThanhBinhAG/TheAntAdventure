@@ -1,11 +1,9 @@
-import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import {
-  checkBreakGlassCredentials,
-  mintBreakGlassSession,
-  setBreakGlassCookie,
-} from '@/lib/auth/break-glass';
-import { attachBreakGlassSupabaseSession } from '@/lib/auth/break-glass-supabase';
+import { checkBreakGlassCredentials } from '@/lib/auth/break-glass';
+import { getBreakGlassSupabaseSession } from '@/lib/auth/break-glass-supabase';
+import { createCrmSession, setCrmSessionCookie } from '@/lib/auth/crm-session';
+import { clearSupabaseAuthCookies } from '@/lib/auth/cookie-hygiene';
 import {
   checkLoginRateLimit,
   clearLoginFailures,
@@ -108,11 +106,19 @@ export async function POST(request: Request) {
   if (breakGlass.configured && breakGlass.usernameMatches && breakGlass.passwordMatches) {
     await clearLoginFailures(ip);
     try {
-      const { token, maxAge } = await mintBreakGlassSession();
+      const supabaseSession = await getBreakGlassSupabaseSession();
+      if (!supabaseSession) return fail(500, 'Break-glass session is not available.');
+      const { cookieValue } = await createCrmSession({
+        userId: null,
+        email: null,
+        isBreakGlass: true,
+        supabaseAccessToken: supabaseSession.access_token,
+        supabaseRefreshToken: supabaseSession.refresh_token,
+        supabaseAccessTokenExpiresAt: supabaseSession.expires_at ?? Math.floor(Date.now() / 1000) + supabaseSession.expires_in,
+      });
       const response = NextResponse.json({ ok: true, mode: 'break_glass' });
-      setBreakGlassCookie(response, token, maxAge);
-      // Best-effort Supabase session for RLS; bg_session alone still unlocks recovery APIs.
-      await attachBreakGlassSupabaseSession(request, response);
+      setCrmSessionCookie(response, cookieValue);
+      clearSupabaseAuthCookies(response, request.headers.get('cookie'));
       await recordSuccessfulLoginSafely({
         userId: null,
         authMethod: 'break_glass',
@@ -137,26 +143,9 @@ export async function POST(request: Request) {
     return fail(401, 'Tài khoản hoặc mật khẩu không đúng.');
   }
 
-  const response = NextResponse.json({ ok: true, mode: 'supabase' });
-  const supabase = createServerClient(url, key, {
+  const supabase = createClient(url, key, {
     ...getSupabaseGlobalFetchOptions(),
-    cookies: {
-      getAll() {
-        return request.headers
-          .get('cookie')
-          ?.split(';')
-          .map((c) => {
-            const [name, ...rest] = c.trim().split('=');
-            return { name, value: rest.join('=') };
-          })
-          .filter((c) => c.name) ?? [];
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
-        });
-      },
-    },
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -184,14 +173,34 @@ export async function POST(request: Request) {
 
   await clearLoginFailures(ip);
 
-  if (data.user) {
-    // Chạy ngầm ghi lịch sử để không chặn luồng trả về kết quả cho người dùng
-    void recordSuccessfulLoginSafely({
-      userId: data.user.id,
-      authMethod: 'password',
-      request,
-    });
+  if (!data.user || !data.session) {
+    return fail(401, 'Không thể tạo phiên đăng nhập.');
   }
+
+  let cookieValue: string;
+  try {
+    ({ cookieValue } = await createCrmSession({
+      userId: data.user.id,
+      email: data.user.email ?? null,
+      isBreakGlass: false,
+      supabaseAccessToken: data.session.access_token,
+      supabaseRefreshToken: data.session.refresh_token,
+      supabaseAccessTokenExpiresAt: data.session.expires_at ?? Math.floor(Date.now() / 1000) + data.session.expires_in,
+    }));
+  } catch {
+    return fail(503, 'Không thể tạo CRM session. Vui lòng thử lại.');
+  }
+
+  const response = NextResponse.json({ ok: true, mode: 'crm' });
+  setCrmSessionCookie(response, cookieValue);
+  clearSupabaseAuthCookies(response, request.headers.get('cookie'));
+
+  // Chạy ngầm ghi lịch sử để không chặn luồng trả về kết quả cho người dùng
+  void recordSuccessfulLoginSafely({
+    userId: data.user.id,
+    authMethod: 'password',
+    request,
+  });
 
   return response;
 }

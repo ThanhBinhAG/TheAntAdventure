@@ -1,8 +1,6 @@
 import 'server-only';
-import { createServerClient } from '@supabase/ssr';
 import { randomBytes } from 'crypto';
-import type { NextResponse } from 'next/server';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAnonKey, getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/env';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
@@ -48,57 +46,38 @@ async function ensureShadowUser(admin: SupabaseClient): Promise<string | null> {
 }
 
 /**
- * Attach a real Supabase session (cookies) for the shadow user so CRM RLS works.
- * Privilege (isSuperAdmin) still comes only from bg_session.
+ * Create a real Supabase session for the shadow user so CRM RLS works.
+ * The caller stores its tokens only in the server-side CRM session.
  */
-export async function attachBreakGlassSupabaseSession(
-  request: Request,
-  response: NextResponse,
-): Promise<boolean> {
+export async function getBreakGlassSupabaseSession(): Promise<Session | null> {
   const admin = getAdminClient();
   const url = getSupabaseUrl();
   const anon = getSupabaseAnonKey();
-  if (!admin || !url || !anon) return false;
+  if (!admin || !url || !anon) return null;
 
   const userId = await ensureShadowUser(admin);
-  if (!userId) return false;
+  if (!userId) return null;
 
   const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email: BREAK_GLASS_SHADOW_EMAIL,
   });
-  if (linkError) return false;
+  if (linkError) return null;
 
   const tokenHash = linkData.properties?.hashed_token;
-  if (!tokenHash) return false;
+  if (!tokenHash) return null;
 
-  const supabase = createServerClient(url, anon, {
+  const supabase = createClient(url, anon, {
     ...getSupabaseGlobalFetchOptions(),
-    cookies: {
-      getAll() {
-        return request.headers
-          .get('cookie')
-          ?.split(';')
-          .map((c) => {
-            const [name, ...rest] = c.trim().split('=');
-            return { name, value: rest.join('=') };
-          })
-          .filter((c) => c.name) ?? [];
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
-        });
-      },
-    },
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { error: otpError } = await supabase.auth.verifyOtp({
+  const { data, error: otpError } = await supabase.auth.verifyOtp({
     type: 'email',
     token_hash: tokenHash,
   });
 
-  return !otpError;
+  return otpError ? null : data.session;
 }
 
 export function isBreakGlassShadowEmail(email: string | null | undefined): boolean {

@@ -1,11 +1,10 @@
 # tests/ — Agent overview
 
 ## Role
-Tracked pointer only. Unit tests live in gitignored [`Personal/tests/`](../Personal/tests/) (`tsx --test`). Do not commit `*.test.ts` here or to GitLab.
+Unit tests live here (`tsx --test`).
 
 ## Contents
-- This `AGENTS.md` — points agents at `Personal/tests/`
+- `*.test.ts` — test suites for controllers, utilities, and helper modules.
 
 ## Boundaries
 - Prefer testing `lib/` pure functions; avoid brittle UI snapshots unless needed.
-- `npm test` runs `Personal/tests` when present; no-ops if that folder is missing (clone without local archive).

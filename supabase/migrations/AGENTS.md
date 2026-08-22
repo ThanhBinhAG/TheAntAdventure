@@ -16,6 +16,9 @@ CLI migrations (`db:push`). Incremental SQL dated; do not paste bootstrap copies
 - `20260805133000_drop_photo_gallery_assets.sql` — drop `photo_gallery_assets` (gộp về một pipeline ảnh trên bảng `photos`)
 - `20260811062000_add_proposal_templates.sql` — `proposal_templates` (b2c/b2b company copy)
 - `20260817110000_slim_product_list_facets_rpc.sql` — `list_product_facets` selects filter columns only (no `p.*`)
+- `20260821100600_add_product_catalogue_import_transaction.sql` — transactional Product/Pricing catalogue replacement RPC
+- `20260821110000_add_catalogue_aggregate_transactions.sql` — atomic Product/Attraction aggregate mutation RPCs
+- `20260821113000_add_durable_crm_sessions.sql` — private encrypted PostgreSQL session persistence
 
 ## Boundaries
 - Role helpers / gán user: `supabase/snippets/`.

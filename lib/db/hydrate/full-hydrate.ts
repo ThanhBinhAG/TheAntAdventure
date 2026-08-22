@@ -2,6 +2,7 @@ import { appLog } from '../../system/app-logger';
 import { isRemoteDataEnabled as remoteEnabled } from '../../env';
 import { useStore } from '../../store';
 import { clearRouteCache } from '../route-cache';
+import { filterBffManagedTables } from '../bff-managed-tables';
 import {
   countBackupRows,
   MESSAGES_TABLE,
@@ -45,10 +46,11 @@ export async function ensureAllTablesLoaded(): Promise<boolean> {
   if (!ok) markHydrationPending();
 
   for (const wave of SYNC_HYDRATE_WAVES) {
-    const need = wave.filter((t) => !isTableHydrated(t));
+    const legacyWave = filterBffManagedTables(wave);
+    const need = legacyWave.filter((t) => !isTableHydrated(t));
     if (need.length) await ensureTablesLoaded(need);
   }
-  const stillMissing = SYNC_ARRAY_TABLES.filter((t) => !isTableHydrated(t));
+  const stillMissing = filterBffManagedTables(SYNC_ARRAY_TABLES).filter((t) => !isTableHydrated(t));
   if (stillMissing.length) await ensureTablesLoaded(stillMissing);
 
   await ensureMessagesLoaded();
@@ -66,7 +68,8 @@ export async function hydrateFromSupabase(): Promise<boolean> {
 
   try {
     for (const wave of SYNC_HYDRATE_WAVES) {
-      const need = wave.filter((t) => !isTableHydrated(t));
+      const legacyWave = filterBffManagedTables(wave);
+      const need = legacyWave.filter((t) => !isTableHydrated(t));
       if (need.length) await ensureTablesLoaded(need);
     }
     await ensureMessagesLoaded();

@@ -56,35 +56,35 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 
 ### A0 — Auth & Session
 
-- [ ] Hoàn thiện login/logout, CRM HttpOnly session, session validation, refresh và revoke.
-- [ ] Chuyển middleware redirect và permission enforcement hoàn toàn về CRM BFF.
-- [ ] Browser không giữ Supabase access/refresh token; không gọi Supabase Auth trực tiếp.
-- [ ] Test unauthenticated, login fail/success, logout, session expiry, revoke và forbidden permission.
+- [x] Hoàn thiện login/logout, CRM HttpOnly session, session validation, refresh và revoke.
+- [x] Chuyển middleware redirect và permission enforcement hoàn toàn về CRM BFF.
+- [x] Browser không giữ Supabase access/refresh token; không gọi Supabase Auth trực tiếp.
+- [x] Test unauthenticated, login fail/success, logout, session expiry, revoke và forbidden permission.
 
 ### A1 — Tour Product
 
-- [ ] API/repository Products và Pricing; filter, sort, pagination ở server.
-- [ ] Redis cache Product list/facets; invalidate sau product/pricing mutation.
-- [ ] Chuyển UI/hook sang CRM API, optimistic update và error state.
-- [ ] Test quyền, cache invalidation, UI parity; gỡ direct browser-Supabase path.
+- [x] API/repository Products và Pricing; filter, sort, pagination ở server.
+- [x] Redis cache Product list/facets; invalidate sau product/pricing mutation.
+- [x] Chuyển UI/hook sang CRM API, optimistic update và error state.
+- [x] Test quyền, cache invalidation, UI parity; gỡ direct browser-Supabase path.
 
 ### A2 — Daily Planner
 
-- [ ] API/repository dữ liệu planner và mutation liên quan.
-- [ ] Chuyển UI/hook sang CRM API; kiểm tra quyền và rollback khi mutation lỗi.
-- [ ] Test parity; gỡ direct browser-Supabase path.
+- [x] API/repository dữ liệu planner và mutation liên quan.
+- [x] Chuyển UI/hook sang CRM API; kiểm tra quyền và rollback khi mutation lỗi.
+- [x] Test parity; gỡ direct browser-Supabase path.
 
 ### A3 — Attraction Schedule
 
-- [ ] API/repository địa điểm tham quan và lịch theo tỉnh.
-- [ ] Chuyển UI/hook, filter theo tỉnh và mutation sang CRM API.
-- [ ] Test quyền, dữ liệu theo tỉnh, UI parity; gỡ direct browser-Supabase path.
+- [x] API/repository địa điểm tham quan và lịch theo tỉnh.
+- [x] Chuyển UI/hook, filter theo tỉnh và mutation sang CRM API.
+- [x] Test quyền, dữ liệu theo tỉnh, UI parity; gỡ direct browser-Supabase path.
 
 ### A4 — Tour Design
 
-- [ ] API/repository aggregate cho Tour Draft, Outline và child records.
-- [ ] Đảm bảo ghi nhiều bảng transaction hoặc rollback an toàn.
-- [ ] Chuyển UI/hook, test permission/mutation rollback; gỡ direct browser-Supabase path.
+- [x] API/repository aggregate cho Tour Draft, Outline và child records.
+- [x] Đảm bảo ghi nhiều bảng transaction hoặc rollback an toàn.
+- [x] Chuyển UI/hook, test permission/mutation rollback; gỡ direct browser-Supabase path.
 
 ## Developer B — feature end-to-end
 

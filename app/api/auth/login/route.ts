@@ -108,14 +108,23 @@ export async function POST(request: Request) {
     try {
       const supabaseSession = await getBreakGlassSupabaseSession();
       if (!supabaseSession) return fail(500, 'Break-glass session is not available.');
-      const { cookieValue } = await createCrmSession({
-        userId: null,
-        email: null,
-        isBreakGlass: true,
-        supabaseAccessToken: supabaseSession.access_token,
-        supabaseRefreshToken: supabaseSession.refresh_token,
-        supabaseAccessTokenExpiresAt: supabaseSession.expires_at ?? Math.floor(Date.now() / 1000) + supabaseSession.expires_in,
-      });
+      let cookieValue: string;
+      try {
+        ({ cookieValue } = await createCrmSession({
+          userId: null,
+          email: null,
+          isBreakGlass: true,
+          supabaseAccessToken: supabaseSession.access_token,
+          supabaseRefreshToken: supabaseSession.refresh_token,
+          supabaseAccessTokenExpiresAt: supabaseSession.expires_at ?? Math.floor(Date.now() / 1000) + supabaseSession.expires_in,
+        }));
+      } catch (error) {
+        debugLog('auth', 'break-glass CRM session create failed', {
+          level: 'error',
+          meta: { message: error instanceof Error ? error.message : 'unknown' },
+        });
+        return fail(503, 'Không thể tạo CRM session. Vui lòng thử lại.');
+      }
       const response = NextResponse.json({ ok: true, mode: 'break_glass' });
       setCrmSessionCookie(response, cookieValue);
       clearSupabaseAuthCookies(response, request.headers.get('cookie'));
@@ -125,7 +134,11 @@ export async function POST(request: Request) {
         request,
       });
       return response;
-    } catch {
+    } catch (error) {
+      debugLog('auth', 'break-glass login failed', {
+        level: 'error',
+        meta: { message: error instanceof Error ? error.message : 'unknown' },
+      });
       return fail(500, 'Break-glass session is not available.');
     }
   }

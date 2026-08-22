@@ -3,6 +3,12 @@ import { randomBytes } from 'crypto';
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAnonKey, getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/env';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { debugLog } from '@/lib/system/debug-logger';
+
+function publicError(error: { message?: string; code?: string; status?: number } | null | undefined) {
+  if (!error) return undefined;
+  return { message: error.message, code: error.code, status: error.status };
+}
 
 /**
  * Hidden Auth user so break-glass gets a real JWT for RLS/RPC.
@@ -30,10 +36,16 @@ async function findShadowUserId(admin: SupabaseClient): Promise<string | null> {
 
   if (profile?.id) return profile.id;
 
-  const { data: linkData } = await admin.auth.admin.generateLink({
+  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email: BREAK_GLASS_SHADOW_EMAIL,
   });
+  if (linkError) {
+    debugLog('auth', 'break-glass shadow lookup failed', {
+      level: 'warn',
+      meta: { step: 'generateLink', error: publicError(linkError) },
+    });
+  }
 
   return linkData?.user?.id ?? null;
 }
@@ -47,7 +59,13 @@ async function grantBreakGlassPrivileges(
     app_metadata: { break_glass_shadow: true },
     user_metadata: { break_glass_shadow: true },
   });
-  if (authError) return false;
+  if (authError) {
+    debugLog('auth', 'break-glass privilege grant failed', {
+      level: 'warn',
+      meta: { step: 'updateUserById', error: publicError(authError) },
+    });
+    return false;
+  }
 
   const { error: profileError } = await admin.from('profiles').upsert(
     {
@@ -59,7 +77,13 @@ async function grantBreakGlassPrivileges(
     },
     { onConflict: 'id' },
   );
-  if (profileError) return false;
+  if (profileError) {
+    debugLog('auth', 'break-glass privilege grant failed', {
+      level: 'warn',
+      meta: { step: 'profiles.upsert', error: publicError(profileError) },
+    });
+    return false;
+  }
 
   const { error: roleError } = await admin.from('user_roles').upsert(
     {
@@ -68,7 +92,13 @@ async function grantBreakGlassPrivileges(
     },
     { onConflict: 'user_id' },
   );
-  if (roleError) return false;
+  if (roleError) {
+    debugLog('auth', 'break-glass privilege grant failed', {
+      level: 'warn',
+      meta: { step: 'user_roles.upsert', error: publicError(roleError) },
+    });
+    return false;
+  }
 
   return true;
 }
@@ -93,8 +123,8 @@ async function ensureShadowUser(admin: SupabaseClient): Promise<string | null> {
   }
 
   if (!userId) return null;
-  const granted = await grantBreakGlassPrivileges(admin, userId);
-  return granted ? userId : null;
+  await grantBreakGlassPrivileges(admin, userId);
+  return userId;
 }
 
 /** Ensure the shadow Auth user exists, is active, and holds `super_admin`. */
@@ -133,19 +163,37 @@ export async function getBreakGlassSupabaseSession(): Promise<Session | null> {
   const admin = getAdminClient();
   const url = getSupabaseUrl();
   const anon = getSupabaseAnonKey();
-  if (!admin || !url || !anon) return null;
+  if (!admin || !url || !anon) {
+    debugLog('auth', 'break-glass supabase session missing config', {
+      level: 'error',
+      meta: { hasAdmin: Boolean(admin), hasUrl: Boolean(url), hasAnon: Boolean(anon) },
+    });
+    return null;
+  }
 
   const userId = await ensureShadowUser(admin);
-  if (!userId) return null;
+  if (!userId) {
+    debugLog('auth', 'break-glass shadow user missing', { level: 'error' });
+    return null;
+  }
 
   const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email: BREAK_GLASS_SHADOW_EMAIL,
   });
-  if (linkError) return null;
+  if (linkError) {
+    debugLog('auth', 'break-glass magic link failed', {
+      level: 'error',
+      meta: { error: publicError(linkError) },
+    });
+    return null;
+  }
 
   const tokenHash = linkData.properties?.hashed_token;
-  if (!tokenHash) return null;
+  if (!tokenHash) {
+    debugLog('auth', 'break-glass magic link missing token hash', { level: 'error' });
+    return null;
+  }
 
   const supabase = createClient(url, anon, {
     ...getSupabaseGlobalFetchOptions(),
@@ -157,7 +205,15 @@ export async function getBreakGlassSupabaseSession(): Promise<Session | null> {
     token_hash: tokenHash,
   });
 
-  return otpError ? null : data.session;
+  if (otpError || !data.session) {
+    debugLog('auth', 'break-glass verifyOtp failed', {
+      level: 'error',
+      meta: { error: publicError(otpError), hasSession: Boolean(data.session) },
+    });
+    return null;
+  }
+
+  return data.session;
 }
 
 export function isBreakGlassShadowEmail(email: string | null | undefined): boolean {

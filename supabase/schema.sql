@@ -780,7 +780,7 @@ begin
   end if;
 
   perform pg_advisory_xact_lock(hashtext('replace_product_catalogue_transaction'));
-  delete from public.products;
+  delete from public.products where code is not null;
   insert into public.products (code, name, logic, duration, category, destination, level, description, usp, notes_to_sales, price_from, region)
   select product.code, product.name, product.logic, product.duration, product.category, product.destination, product.level, product.description, product.usp, product.notes_to_sales, product.price_from, product.region
   from jsonb_to_recordset(p_products) as product(code text, name text, logic text, duration text, category text, destination text, level text, description text, usp text, notes_to_sales text, price_from text, region text);

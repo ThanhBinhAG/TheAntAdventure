@@ -1,5 +1,15 @@
 import { expect, test } from '@playwright/test';
+import { createClient } from 'redis';
 import { assertRow, browserJson, login, readE2eState } from './support';
+
+async function productCacheKeys(redis: ReturnType<typeof createClient>): Promise<string[]> {
+  const keys: string[] = [];
+  for await (const batch of redis.scanIterator({ MATCH: 'cache:products:*:v1:*', COUNT: 100 })) {
+    const scannedKeys = Array.isArray(batch) ? batch : [batch];
+    keys.push(...scannedKeys.map((key) => String(key)));
+  }
+  return keys;
+}
 
 test.describe.serial('Product, pricing, planner, and attraction acceptance', () => {
   test('Product CRUD, pricing update, and rejected import preserve existing data', async ({ page }) => {
@@ -22,6 +32,45 @@ test.describe.serial('Product, pricing, planner, and attraction acceptance', () 
 
     expect((await browserJson(page, '/api/products', { method: 'DELETE', body: { code } })).status).toBe(200);
     expect(await assertRow('products', 'code', code)).toBeNull();
+  });
+
+  test('Product list and facets use Redis cache and successful mutations invalidate it', async ({ page }) => {
+    const state = await readE2eState();
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) test.skip(true, 'REDIS_URL is required for Product cache acceptance.');
+
+    const redis = createClient({ url: redisUrl });
+    await redis.connect();
+    try {
+      const existingCacheKeys = await productCacheKeys(redis);
+      if (existingCacheKeys.length > 0) await redis.del(existingCacheKeys);
+      await login(page, state.admin);
+
+      const pageResponse = await browserJson(page, `/api/products?page=1&pageSize=24&view=catalog&q=${state.prefix}`);
+      const facetsResponse = await browserJson(page, `/api/products/facets?q=${state.prefix}`);
+      expect(pageResponse.status).toBe(200);
+      expect(facetsResponse.status).toBe(200);
+
+      const cachedKeys = await productCacheKeys(redis);
+      expect(cachedKeys.some((key) => key.startsWith('cache:products:list:v1:'))).toBe(true);
+      expect(cachedKeys.some((key) => key.startsWith('cache:products:facets:v1:'))).toBe(true);
+      const cacheTtls = await Promise.all(cachedKeys.map((key) => redis.ttl(key)));
+      expect(cacheTtls.every((ttl) => ttl > 0)).toBe(true);
+
+      const code = `${state.prefix}-CACHE`;
+      const product = { code, name: 'Cached E2E Product', logic: '', dur: 'Full Day', cat: 'Experience', dest: 'Hanoi', lvl: 'Easy', desc: '', usp: '', price: '', region: 'north', photoIds: [], linkedPhotoIds: [] };
+      expect((await browserJson(page, '/api/products', { method: 'POST', body: { product } })).status).toBe(200);
+      expect(await productCacheKeys(redis)).toEqual([]);
+
+      expect((await browserJson(page, `/api/products?page=1&pageSize=24&view=catalog&q=${state.prefix}`)).status).toBe(200);
+      expect((await browserJson(page, `/api/products/facets?q=${state.prefix}`)).status).toBe(200);
+      expect((await productCacheKeys(redis)).length).toBeGreaterThan(0);
+
+      expect((await browserJson(page, '/api/products/pricing', { method: 'PATCH', body: { pricing: { productCode: code, p1: 321, incl: {} } } })).status).toBe(200);
+      expect(await productCacheKeys(redis)).toEqual([]);
+    } finally {
+      if (redis.isOpen) await redis.quit();
+    }
   });
 
   test('Planner CRUD and validation failures affect only the intended task', async ({ page }) => {

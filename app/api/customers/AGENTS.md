@@ -9,5 +9,5 @@ CRM BFF for Clients: paginated list, detail, create/update/delete with permissio
 
 ## Boundaries
 - Domain logic: `lib/customers/customer-repository.ts` + Zod in `customer-list-input.ts`.
-- Handlers must call `checkPermissionForRequest`; middleware skips duplicate Auth redirect for this subtree.
+- Handlers must call `checkPermissionForRequest`. Proxy already skips `/api/*`; repository uses `getServerSupabaseClient()`.
 - Do not expose service-role or raw Supabase rows beyond mapped DTOs.

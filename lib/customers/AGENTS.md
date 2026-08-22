@@ -8,7 +8,7 @@ Customer form shape, onboarding, and brief conversion.
 - `customer-delete.ts` — booking guard, local CASCADE cleanup, rollback snapshot
 - `customer-validation.ts` — email / phone / travel-date helpers
 - `customer-list-input.ts` — Zod list/create/patch contracts for BFF
-- `customer-repository.ts` — `server-only` PostgREST list/CRUD (cookie session client)
+- `customer-repository.ts` — `server-only` PostgREST list/CRUD (`getServerSupabaseClient`)
 - `nationalities.ts`, `countries.ts` — typeahead lists + membership checks
 
 ## Boundaries

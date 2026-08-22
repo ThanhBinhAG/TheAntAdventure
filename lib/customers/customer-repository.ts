@@ -1,7 +1,5 @@
 import 'server-only';
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { STAGE_ORDER } from '@/lib/constants';
 import {
   buildInquiryComm,
@@ -32,8 +30,7 @@ import {
   rowToLead,
 } from '@/lib/db/mappers';
 import type { Row } from '@/lib/db/mappers/shared';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
-import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { getServerSupabaseClient } from '@/lib/supabase/server';
 import type { Agent, Comm, Customer, Lead } from '@/lib/types';
 
 export class CustomerRepositoryError extends Error {
@@ -58,29 +55,16 @@ type CustomerSupabaseClient = Awaited<
 >;
 
 async function createCustomerServerClient() {
-  const url = getSupabaseUrl();
-  const key = getSupabaseAnonKey();
-
-  if (!url || !key) {
+  try {
+    return await getServerSupabaseClient();
+  } catch (error) {
     throw new CustomerRepositoryError(
-      'Supabase URL hoặc anon key chưa được cấu hình.',
+      error instanceof Error
+        ? error.message
+        : 'CRM session không hợp lệ hoặc Supabase chưa được cấu hình.',
       'config',
     );
   }
-
-  const cookieStore = await cookies();
-
-  return createServerClient(url, key, {
-    ...getSupabaseGlobalFetchOptions(),
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll() {
-        /* route handlers own auth; no cookie mutation here */
-      },
-    },
-  });
 }
 
 function escapeIlike(value: string): string {

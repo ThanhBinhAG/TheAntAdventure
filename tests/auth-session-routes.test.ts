@@ -12,6 +12,8 @@ require.cache[serverOnlyPath] = {
 } as NodeModule;
 
 let loginError: Error | null = null;
+let crmSessionCreateError: Error | null = null;
+let crmSessionRevokeError: Error | null = null;
 let revokedCookie: string | undefined;
 let sessionCookie: string | null = null;
 let crmSession: Record<string, unknown> | null = null;
@@ -48,12 +50,16 @@ mock.module(require.resolve('@supabase/supabase-js'), {
 mock.module(require.resolve('../lib/auth/crm-session'), {
   namedExports: {
     CRM_SESSION_COOKIE: 'crm_session',
-    createCrmSession: async () => ({ cookieValue: 'signed-crm-session' }),
+    createCrmSession: async () => {
+      if (crmSessionCreateError) throw crmSessionCreateError;
+      return { cookieValue: 'signed-crm-session' };
+    },
     setCrmSessionCookie: (response: CookieResponse, value: string) => {
       response.cookies.set('crm_session', value, { httpOnly: true, path: '/' });
     },
     revokeCrmSession: async (value: string | undefined) => {
       revokedCookie = value;
+      if (crmSessionRevokeError) throw crmSessionRevokeError;
     },
     clearCrmSessionCookie: (response: CookieResponse) => {
       response.cookies.set('crm_session', '', { maxAge: 0, path: '/' });
@@ -77,14 +83,20 @@ mock.module(require.resolve('../lib/auth/break-glass'), {
       usernameMatches: false,
       passwordMatches: false,
     }),
-    clearBreakGlassCookie: () => {},
+    clearBreakGlassCookie: (response: CookieResponse) => {
+      response.cookies.set('bg_session', '', { maxAge: 0, path: '/' });
+    },
   },
 });
 mock.module(require.resolve('../lib/auth/break-glass-supabase'), {
   namedExports: { getBreakGlassSupabaseSession: async () => null },
 });
 mock.module(require.resolve('../lib/auth/cookie-hygiene'), {
-  namedExports: { clearSupabaseAuthCookies: () => {} },
+  namedExports: {
+    clearSupabaseAuthCookies: (response: CookieResponse) => {
+      response.cookies.set('sb-test-auth-token', '', { maxAge: 0, path: '/' });
+    },
+  },
 });
 mock.module(require.resolve('../lib/auth/rate-limit'), {
   namedExports: {
@@ -118,6 +130,8 @@ test('CRM auth session routes', async (t) => {
 
   await t.beforeEach(() => {
     loginError = null;
+    crmSessionCreateError = null;
+    crmSessionRevokeError = null;
     revokedCookie = undefined;
     sessionCookie = null;
     crmSession = null;
@@ -159,6 +173,22 @@ test('CRM auth session routes', async (t) => {
     assert.match(body.error, /không đúng/);
   });
 
+  await t.test('returns 503 when the durable session store cannot create a session', async () => {
+    crmSessionCreateError = new Error('durable session store unavailable');
+    const response = await loginRoute.POST(new Request('http://localhost/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identity: 'user@example.com', password: 'correct-password' }),
+    }));
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      ok: false,
+      error: 'Không thể tạo CRM session. Vui lòng thử lại.',
+    });
+    assert.doesNotMatch(response.headers.get('set-cookie') ?? '', /crm_session=/);
+  });
+
   await t.test('revokes the CRM session on logout', async () => {
     const response = await logoutRoute.POST(new Request('http://localhost/api/auth/logout', {
       method: 'POST',
@@ -168,5 +198,24 @@ test('CRM auth session routes', async (t) => {
     assert.equal(response.status, 200);
     assert.equal(revokedCookie, 'signed-crm-session');
     assert.match(response.headers.get('set-cookie') ?? '', /crm_session=;/);
+  });
+
+  await t.test('clears every auth cookie and returns 503 when durable revoke fails', async () => {
+    crmSessionRevokeError = new Error('durable session store unavailable');
+    const response = await logoutRoute.POST(new Request('http://localhost/api/auth/logout', {
+      method: 'POST',
+      headers: { Cookie: 'crm_session=signed-crm-session; bg_session=break-glass; sb-test-auth-token=legacy' },
+    }));
+
+    assert.equal(response.status, 503);
+    assert.equal(revokedCookie, 'signed-crm-session');
+    assert.deepEqual(await response.json(), {
+      ok: false,
+      error: 'Không thể thu hồi CRM session. Vui lòng thử lại.',
+    });
+    const setCookie = response.headers.get('set-cookie') ?? '';
+    assert.match(setCookie, /crm_session=;/);
+    assert.match(setCookie, /bg_session=;/);
+    assert.match(setCookie, /sb-test-auth-token=;/);
   });
 });

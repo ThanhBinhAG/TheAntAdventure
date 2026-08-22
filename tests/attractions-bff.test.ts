@@ -14,7 +14,8 @@ require.cache[serverOnlyPath] = {
 
 // State mocks to verify database calls
 let supabaseCalls: { method: string; table: string; data?: any; eqCode?: string }[] = [];
-let attractionAggregateRpcError: { message: string } | null = null;
+let attractionAggregateRpcError: { message: string; code?: string } | null = null;
+let attractionDeleteResult: { data: { id: string }[] | null; error: { message: string } | null };
 
 // Mock dependencies
 mock.module(require.resolve('../lib/auth/session'), {
@@ -49,7 +50,11 @@ mock.module(require.resolve('../lib/supabase/server'), {
       return {
         rpc: (name: string, data: any) => {
           supabaseCalls.push({ method: 'rpc', table: name, data });
-          return Promise.resolve({ error: name === 'save_attraction_aggregate' ? attractionAggregateRpcError : null });
+          return Promise.resolve({
+            error: name === 'save_attraction_aggregate' || name === 'update_attraction_aggregate'
+              ? attractionAggregateRpcError
+              : null,
+          });
         },
         from: (table: string) => ({
           select: () => {
@@ -113,7 +118,9 @@ mock.module(require.resolve('../lib/supabase/server'), {
             return {
               eq: (field: string, val: string) => {
                 supabaseCalls.push({ method: 'delete', table, eqCode: val });
-                return Promise.resolve({ error: null });
+                return {
+                  select: () => Promise.resolve(attractionDeleteResult),
+                };
               },
             };
           },
@@ -131,6 +138,7 @@ test('Attractions BFF APIs - Tests', async (t) => {
   await t.beforeEach(() => {
     supabaseCalls = [];
     attractionAggregateRpcError = null;
+    attractionDeleteResult = { data: [{ id: 'ATT-001' }], error: null };
   });
 
   await t.test('GET /api/attractions/all - lists all attractions with assembled photos', async () => {
@@ -240,7 +248,7 @@ test('Attractions BFF APIs - Tests', async (t) => {
 
     assert.equal(supabaseCalls.length, 1);
     assert.equal(supabaseCalls[0].method, 'rpc');
-    assert.equal(supabaseCalls[0].table, 'save_attraction_aggregate');
+    assert.equal(supabaseCalls[0].table, 'update_attraction_aggregate');
     assert.equal(supabaseCalls[0].data.p_photo_links[0].attraction_id, 'ATT-001');
   });
 
@@ -257,7 +265,7 @@ test('Attractions BFF APIs - Tests', async (t) => {
     assert.equal(response.status, 500);
     assert.equal(supabaseCalls.length, 1);
     assert.equal(supabaseCalls[0].method, 'rpc');
-    assert.equal(supabaseCalls[0].table, 'save_attraction_aggregate');
+    assert.equal(supabaseCalls[0].table, 'update_attraction_aggregate');
   });
 
   await t.test('DELETE /api/attractions - deletes an existing attraction', async () => {
@@ -277,5 +285,25 @@ test('Attractions BFF APIs - Tests', async (t) => {
     assert.equal(supabaseCalls[0].method, 'delete');
     assert.equal(supabaseCalls[0].table, 'attractions');
     assert.equal(supabaseCalls[0].eqCode, 'ATT-001');
+  });
+
+  await t.test('PATCH and DELETE return 404 when the attraction does not exist', async () => {
+    attractionAggregateRpcError = { code: 'P0002', message: 'Attraction not found' };
+    const patchResponse = await attractionsRoute.PATCH(new Request('http://localhost/api/attractions', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        attraction: { id: 'ATT-MISSING', region: 'north', type: 'museum', name: 'Missing', dest: 'Hanoi' },
+      }),
+    }));
+    assert.equal(patchResponse.status, 404);
+
+    attractionDeleteResult = { data: [], error: null };
+    const deleteResponse = await attractionsRoute.DELETE(new Request('http://localhost/api/attractions', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: 'ATT-MISSING' }),
+    }));
+    assert.equal(deleteResponse.status, 404);
   });
 });

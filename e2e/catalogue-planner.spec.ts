@@ -1,8 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { createClient } from 'redis';
-import { assertRow, browserJson, login, readE2eState } from './support';
+import { assertRow, browserJson, getAdminClient, login, readE2eState } from './support';
 
-async function productCacheKeys(redis: ReturnType<typeof createClient>): Promise<string[]> {
+type RedisScanClient = {
+  scanIterator(options: { MATCH: string; COUNT: number }): AsyncIterable<string | string[]>;
+};
+
+async function productCacheKeys(redis: RedisScanClient): Promise<string[]> {
   const keys: string[] = [];
   for await (const batch of redis.scanIterator({ MATCH: 'cache:products:*:v1:*', COUNT: 100 })) {
     const scannedKeys = Array.isArray(batch) ? batch : [batch];
@@ -12,6 +16,17 @@ async function productCacheKeys(redis: ReturnType<typeof createClient>): Promise
 }
 
 test.describe.serial('Product, pricing, planner, and attraction acceptance', () => {
+  test('Planner and Attractions enforce unauthenticated and forbidden access', async ({ page }) => {
+    await page.goto('/login');
+    expect((await browserJson(page, '/api/planner/all')).status).toBe(401);
+    expect((await browserJson(page, '/api/attractions/all')).status).toBe(401);
+
+    const state = await readE2eState();
+    await login(page, state.unassigned);
+    expect((await browserJson(page, '/api/planner/all')).status).toBe(403);
+    expect((await browserJson(page, '/api/attractions/all')).status).toBe(403);
+  });
+
   test('Product CRUD, pricing update, and rejected import preserve existing data', async ({ page }) => {
     const state = await readE2eState();
     const code = `${state.prefix}-PRODUCT`;
@@ -86,21 +101,66 @@ test.describe.serial('Product, pricing, planner, and attraction acceptance', () 
     expect(await assertRow('tasks', 'id', `${id}-BAD`)).toBeNull();
     expect((await browserJson(page, '/api/planner', { method: 'DELETE', body: { id } })).status).toBe(200);
     expect(await assertRow('tasks', 'id', id)).toBeNull();
+    expect((await browserJson(page, '/api/planner', { method: 'PATCH', body: { id, patch: { status: 'done' } } })).status).toBe(404);
+    expect((await browserJson(page, '/api/planner', { method: 'DELETE', body: { id } })).status).toBe(404);
   });
 
   test('Attraction region filter and rejected mutation keep database state consistent', async ({ page }) => {
     const state = await readE2eState();
     const northId = `${state.prefix}-ATTRACTION-N`;
     const centralId = `${state.prefix}-ATTRACTION-C`;
+    const existingPhotoId = `${state.prefix}-ATTRACTION-PHOTO`;
+    const missingPhotoId = `${state.prefix}-ATTRACTION-PHOTO-MISSING`;
+    const admin = getAdminClient();
     await login(page, state.admin);
     const attraction = (id: string, region: 'north' | 'central') => ({ id, region, type: 'museum', name: `${region} E2E attraction`, dest: 'E2E destination', hours: '', closed: '', admission: '', duration: 1, best_time: '', crowd: '', book_req: false, seasonal: '', notes: '', alert: '', phone: '', photoIds: [], linkedPhotoIds: [] });
-    expect((await browserJson(page, '/api/attractions', { method: 'POST', body: { attraction: attraction(northId, 'north') } })).status).toBe(200);
-    expect((await browserJson(page, '/api/attractions', { method: 'POST', body: { attraction: attraction(centralId, 'central') } })).status).toBe(200);
-    const northRows = await browserJson(page, '/api/attractions/all?region=north');
-    expect(northRows.status).toBe(200);
-    expect(JSON.stringify(northRows.body)).toContain(northId);
-    expect(JSON.stringify(northRows.body)).not.toContain(centralId);
-    expect((await browserJson(page, '/api/attractions', { method: 'POST', body: { attraction: { ...attraction(`${northId}-BAD`, 'north'), name: '' } } })).status).toBe(422);
-    expect(await assertRow('attractions', 'id', `${northId}-BAD`)).toBeNull();
+    try {
+      expect((await browserJson(page, '/api/attractions', { method: 'POST', body: { attraction: attraction(northId, 'north') } })).status).toBe(200);
+      expect((await browserJson(page, '/api/attractions', { method: 'POST', body: { attraction: attraction(centralId, 'central') } })).status).toBe(200);
+      const northRows = await browserJson(page, '/api/attractions/all?region=north');
+      expect(northRows.status).toBe(200);
+      expect(JSON.stringify(northRows.body)).toContain(northId);
+      expect(JSON.stringify(northRows.body)).not.toContain(centralId);
+      expect((await browserJson(page, '/api/attractions', { method: 'POST', body: { attraction: { ...attraction(`${northId}-BAD`, 'north'), name: '' } } })).status).toBe(422);
+      expect(await assertRow('attractions', 'id', `${northId}-BAD`)).toBeNull();
+
+      const { error: photoError } = await admin
+        .from('photos')
+        .insert({ id: existingPhotoId, caption: 'E2E attraction photo', region: 'north' });
+      if (photoError) throw photoError;
+      const originalAttraction = {
+        ...attraction(northId, 'north'),
+        name: 'Attraction before failed photo update',
+        photoIds: [existingPhotoId],
+        linkedPhotoIds: [existingPhotoId],
+      };
+      expect((await browserJson(page, '/api/attractions', { method: 'PATCH', body: { attraction: originalAttraction } })).status).toBe(200);
+
+      const failedAttraction = {
+        ...originalAttraction,
+        name: 'Attraction name must roll back',
+        photoIds: [missingPhotoId],
+        linkedPhotoIds: [missingPhotoId],
+      };
+      expect((await browserJson(page, '/api/attractions', { method: 'PATCH', body: { attraction: failedAttraction } })).status).toBe(500);
+      expect((await assertRow('attractions', 'id', northId))?.name).toBe(originalAttraction.name);
+      const { data: photoLinks, error: photoLinksError } = await admin
+        .from('attraction_photos')
+        .select('photo_id')
+        .eq('attraction_id', northId);
+      if (photoLinksError) throw photoLinksError;
+      expect(photoLinks?.map((link) => link.photo_id)).toEqual([existingPhotoId]);
+
+      expect((await browserJson(page, '/api/attractions', {
+        method: 'PATCH',
+        body: { attraction: { ...attraction(`${northId}-MISSING`, 'north'), name: 'Missing attraction' } },
+      })).status).toBe(404);
+      expect((await browserJson(page, '/api/attractions', {
+        method: 'DELETE',
+        body: { id: `${northId}-MISSING` },
+      })).status).toBe(404);
+    } finally {
+      await admin.from('photos').delete().eq('id', existingPhotoId);
+    }
   });
 });

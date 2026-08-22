@@ -56,12 +56,18 @@ export async function updateAttractionServer(
   supabase: SupabaseClient,
   id: string,
   attraction: Attraction
-): Promise<void> {
+): Promise<boolean> {
   if (id !== attraction.id) {
     throw new Error('Attraction ID cannot change during update');
   }
   const row = attractionToRow(attraction as unknown as Record<string, unknown>);
-  await saveAttractionAggregateServer(supabase, row, attractionPhotoRows(attraction));
+  const { error } = await supabase.rpc('update_attraction_aggregate', {
+    p_attraction: row,
+    p_photo_links: attractionPhotoRows(attraction),
+  });
+  if (error?.code === 'P0002') return false;
+  if (error) throw error;
+  return true;
 }
 
 async function saveAttractionAggregateServer(
@@ -82,10 +88,12 @@ async function saveAttractionAggregateServer(
 export async function deleteAttractionServer(
   supabase: SupabaseClient,
   id: string
-): Promise<void> {
-  const { error } = await supabase
+): Promise<boolean> {
+  const { data, error } = await supabase
     .from('attractions')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  return (data?.length ?? 0) > 0;
 }

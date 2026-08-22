@@ -128,7 +128,7 @@ test('Product PostgreSQL transactions roll back failed imports and aggregate wri
     assert.ok(redis, 'Redis must be available for Product cache integration.');
     await invalidateProductFacetsCache();
 
-    const pageQuery = { page: 1, pageSize: 24, view: 'catalog' as const, q: existingCode };
+    const pageQuery = { page: 1, pageSize: 24 as const, view: 'catalog' as const, q: existingCode };
     const facetQuery = { q: existingCode };
     assert.equal((await listProductsPage(pageQuery)).items[0]?.code, existingCode);
     assert.ok((await listProductFacets(facetQuery)).categories.includes('Integration test'));

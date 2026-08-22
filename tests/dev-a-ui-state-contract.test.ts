@@ -26,5 +26,7 @@ test('Dev A screens expose loading failures and update local state only after su
   const persistEnd = tourDesign.indexOf('const persistTourDesignAck', persistStart);
   const persistDraft = tourDesign.slice(persistStart, persistEnd);
   assert.match(tourDesign, /setSaveState\(saved \? 'saved' : 'error'\)/);
-  assert.ok(persistDraft.indexOf('upsertTourDraft(draft)') > persistDraft.indexOf("await fetch('/api/tour-design/save'"));
+  assert.match(tourDesign, /TourDraftSaveQueue/);
+  assert.match(persistDraft, /onLatestSuccess/);
+  assert.ok(persistDraft.indexOf('upsertTourDraft({ ...draft, saveRevision })') > persistDraft.indexOf("await fetch('/api/tour-design/save'"));
 });

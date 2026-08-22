@@ -39,6 +39,7 @@ import {
   type ProposalHotelRatesPersist,
   tourDraftIdForLead,
 } from '@/lib/tour-design/tour-draft-utils';
+import { TourDraftSaveQueue } from '@/lib/tour-design/tour-save-queue';
 import { outlineDocFromRows, printOutline } from '@/lib/outline/outline-html';
 import { getBffArray } from '@/lib/bff/client';
 import type { ProposalTemplateOverrides } from '@/lib/proposals/proposal-content-overrides';
@@ -96,7 +97,8 @@ export default function TourDesignPage() {
   const [readError, setReadError] = useState<string | null>(null);
 
   const urlInitRef = useRef<string | null>(null);
-  const lastDraftFingerprintRef = useRef<string | null>(null);
+  const lastDraftFingerprintsRef = useRef(new Map<string, string>());
+  const saveQueueRef = useRef(new TourDraftSaveQueue());
 
   useEffect(() => {
     let active = true;
@@ -107,6 +109,9 @@ export default function TourDesignPage() {
       getBffArray<GalleryPhoto>('/api/photos/all', 'Không thể tải thư viện ảnh.'),
     ]).then(([catalogue, drafts, outlineDays, galleryPhotos]) => {
       if (!active) return;
+      drafts.forEach((draft) => {
+        saveQueueRef.current.setSaveRevision(draft.id, draft.saveRevision ?? 0);
+      });
       setProducts(catalogue);
       setTourDrafts(drafts);
       setTourOutlineDays(outlineDays);
@@ -182,6 +187,7 @@ export default function TourDesignPage() {
         outlineSentAt: patch?.outlineSentAt ?? outlineSentAt,
         outlineApprovedAt: patch?.outlineApprovedAt ?? outlineApprovedAt,
         outlineRevision: patch?.outlineRevision ?? outlineRevision,
+        saveRevision: saveQueueRef.current.getSaveRevision(tourDraftIdForLead(lid)),
         selectedCodes: patch?.selectedCodes ?? selectedCodes,
         selectedPackageId: patch?.selectedPackageId ?? selectedPackageId,
         experienceOverrides: patch?.experienceOverrides ?? experienceOverrides,
@@ -195,24 +201,58 @@ export default function TourDesignPage() {
         clientType: patch?.clientType ?? clientType,
         currentStep: patch?.step ?? step,
       });
-      const fingerprint = JSON.stringify({ draft, rows });
-      if (lastDraftFingerprintRef.current === fingerprint) return true;
+      const { saveRevision: _saveRevision, ...draftForFingerprint } = draft;
+      const fingerprint = JSON.stringify({ draft: draftForFingerprint, rows });
+      if (lastDraftFingerprintsRef.current.get(draft.id) === fingerprint) return true;
       try {
-        const response = await fetch('/api/tour-design/save', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ draft, outlineDays: rows }),
+        await saveQueueRef.current.enqueue({
+          draftId: draft.id,
+          initialSaveRevision: draft.saveRevision ?? 0,
+          save: async (expectedSaveRevision) => {
+            const response = await fetch('/api/tour-design/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ draft, outlineDays: rows, expectedSaveRevision }),
+            });
+            const result = await response.json().catch(() => null) as {
+              ok?: boolean;
+              error?: string;
+              data?: { saveRevision?: number };
+              currentSaveRevision?: number;
+            } | null;
+            if (!response.ok || !result?.ok) {
+              const error = new Error(result?.error ?? 'Không thể lưu thiết kế tour.') as Error & {
+                currentSaveRevision?: number;
+              };
+              if (typeof result?.currentSaveRevision === 'number') {
+                error.currentSaveRevision = result.currentSaveRevision;
+                // Let an already queued newer save use the server's current version.
+                saveQueueRef.current.setSaveRevision(draft.id, result.currentSaveRevision);
+              }
+              throw error;
+            }
+            const saveRevision = result.data?.saveRevision;
+            if (typeof saveRevision !== 'number' || !Number.isInteger(saveRevision) || saveRevision < 1) {
+              throw new Error('Máy chủ không trả về phiên bản lưu hợp lệ.');
+            }
+            return { saveRevision };
+          },
+          onLatestSuccess: ({ saveRevision }) => {
+            lastDraftFingerprintsRef.current.set(draft.id, fingerprint);
+            upsertTourDraft({ ...draft, saveRevision });
+            replaceOutlineDaysForDraft(draft.id, rows);
+          },
         });
-        const result = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
-        if (!response.ok || !result?.ok) {
-          throw new Error(result?.error ?? 'Không thể lưu thiết kế tour.');
-        }
-
-        lastDraftFingerprintRef.current = fingerprint;
-        upsertTourDraft(draft);
-        replaceOutlineDaysForDraft(draft.id, rows);
         return true;
       } catch (error) {
+        if (
+          error &&
+          typeof error === 'object' &&
+          'currentSaveRevision' in error &&
+          typeof error.currentSaveRevision === 'number'
+        ) {
+          saveQueueRef.current.setSaveRevision(draft.id, error.currentSaveRevision);
+        }
         console.error('Failed to save tour design:', error);
         return false;
       }
@@ -269,6 +309,7 @@ export default function TourDesignPage() {
       const c = customers.find((x) => x.id === cid);
 
       if (draft) {
+        saveQueueRef.current.setSaveRevision(draft.id, draft.saveRevision ?? 0);
         const savedBrief = briefFromDraft(draft);
         if (savedBrief) {
           setBrief({ ...DEFAULT_TOUR_BRIEF, ...savedBrief });
@@ -295,6 +336,7 @@ export default function TourDesignPage() {
         const days = tourOutlineDays.filter((d) => d.draftId === draft.id);
         setOutlineRows(days.length ? days : []);
       } else if (c) {
+        saveQueueRef.current.setSaveRevision(tourDraftIdForLead(lid), 0);
         setBrief(customerToBrief(c));
         setClientType(c.clientType || 'b2c');
         setOutlineRows([]);
@@ -571,7 +613,8 @@ export default function TourDesignPage() {
     setSaveState('idle');
     setStep(0);
     urlInitRef.current = null;
-    lastDraftFingerprintRef.current = null;
+    lastDraftFingerprintsRef.current.clear();
+    saveQueueRef.current.clear();
   }
 
   function updateOutlineRow(id: string, patch: Partial<TourOutlineDay>) {

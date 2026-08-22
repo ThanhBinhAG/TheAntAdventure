@@ -10,6 +10,25 @@ import {
 } from '@/lib/db/mappers/tour';
 import type { TourDraft, TourOutlineDay } from '@/lib/types';
 
+export class TourDesignSaveConflictError extends Error {
+  constructor(readonly currentSaveRevision?: number) {
+    super('Thiết kế tour đã được thay đổi bởi một lượt lưu mới hơn.');
+    this.name = 'TourDesignSaveConflictError';
+  }
+}
+
+function currentSaveRevisionFromRpcError(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const details = 'details' in error ? error.details : undefined;
+  if (typeof details !== 'string') return undefined;
+  const match = /^current_save_revision=(\d+)$/.exec(details);
+  return match ? Number(match[1]) : undefined;
+}
+
+function isSaveConflict(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'P0001');
+}
+
 /**
  * Lấy toàn bộ danh sách tour drafts từ server.
  */
@@ -41,11 +60,24 @@ export async function getAllTourOutlineDaysServer(): Promise<TourOutlineDay[]> {
 export async function saveTourDesignServer(
   supabase: SupabaseClient,
   draft: TourDraft,
-  outlineDays: TourOutlineDay[]
-): Promise<void> {
-  const { error } = await supabase.rpc('save_tour_design_transaction', {
+  outlineDays: TourOutlineDay[],
+  expectedSaveRevision: number
+): Promise<number> {
+  const { data, error } = await supabase.rpc('save_tour_design_versioned_transaction', {
     p_draft: tourDraftToRow(draft),
     p_outline_days: outlineDays.map((day) => tourOutlineDayToRow(day)),
+    p_expected_save_revision: expectedSaveRevision,
   });
-  if (error) throw error;
+  if (error) {
+    if (isSaveConflict(error)) {
+      throw new TourDesignSaveConflictError(currentSaveRevisionFromRpcError(error));
+    }
+    throw error;
+  }
+
+  const saveRevision = Number(data);
+  if (!Number.isInteger(saveRevision) || saveRevision < 1) {
+    throw new Error('Tour Design save transaction did not return a valid revision.');
+  }
+  return saveRevision;
 }

@@ -14,7 +14,8 @@ require.cache[serverOnlyPath] = {
 
 // State mocks to verify database calls
 let supabaseCalls: { method: string; table: string; data?: any; eqCode?: string }[] = [];
-let tourSaveRpcError: { message: string } | null = null;
+let tourSaveRpcError: { message: string; code?: string; details?: string } | null = null;
+let tourSaveRpcResult: number | null = 1;
 
 // Mock dependencies
 mock.module(require.resolve('../lib/auth/session'), {
@@ -49,7 +50,7 @@ mock.module(require.resolve('../lib/supabase/server'), {
       return {
         rpc: (name: string, data: any) => {
           supabaseCalls.push({ method: 'rpc', table: name, data });
-          return Promise.resolve({ data: null, error: tourSaveRpcError });
+          return Promise.resolve({ data: tourSaveRpcResult, error: tourSaveRpcError });
         },
         from: (table: string) => ({
           select: () => {
@@ -120,6 +121,7 @@ test('Tour Design BFF APIs - Tests', async (t) => {
   await t.beforeEach(() => {
     supabaseCalls = [];
     tourSaveRpcError = null;
+    tourSaveRpcResult = 1;
   });
 
   await t.test('GET /api/tour-design/drafts/all - lists all drafts with mapping', async () => {
@@ -186,7 +188,7 @@ test('Tour Design BFF APIs - Tests', async (t) => {
     const req = new Request('http://localhost/api/tour-design/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ draft: newDraft, outlineDays: newOutlines }),
+      body: JSON.stringify({ draft: newDraft, outlineDays: newOutlines, expectedSaveRevision: 0 }),
     });
 
     const response = await saveRoute.POST(req);
@@ -194,14 +196,16 @@ test('Tour Design BFF APIs - Tests', async (t) => {
 
     const json = await response.json();
     assert.equal(json.ok, true);
+    assert.equal(json.data.saveRevision, 1);
 
     assert.equal(supabaseCalls.length, 1);
     assert.equal(supabaseCalls[0].method, 'rpc');
-    assert.equal(supabaseCalls[0].table, 'save_tour_design_transaction');
+    assert.equal(supabaseCalls[0].table, 'save_tour_design_versioned_transaction');
     assert.equal(supabaseCalls[0].data.p_draft.id, 'TD-002');
     assert.equal(supabaseCalls[0].data.p_draft.lead_id, 'L-002');
     assert.equal(supabaseCalls[0].data.p_outline_days[0].id, 'TOD-002');
     assert.equal(supabaseCalls[0].data.p_outline_days[0].outline_date, '2026-08-21');
+    assert.equal(supabaseCalls[0].data.p_expected_save_revision, 0);
   });
 
   await t.test('POST /api/tour-design/save fails atomically when the transaction rejects', async () => {
@@ -212,6 +216,7 @@ test('Tour Design BFF APIs - Tests', async (t) => {
       body: JSON.stringify({
         draft: { id: 'TD-003', leadId: 'L-003', custId: 'C-003' },
         outlineDays: [],
+        expectedSaveRevision: 0,
       }),
     });
 
@@ -219,5 +224,28 @@ test('Tour Design BFF APIs - Tests', async (t) => {
     assert.equal(response.status, 500);
     assert.equal(supabaseCalls.length, 1);
     assert.equal(supabaseCalls[0].method, 'rpc');
+  });
+
+  await t.test('POST /api/tour-design/save returns 409 when an older revision arrives late', async () => {
+    tourSaveRpcError = {
+      message: 'Tour draft was modified by a newer save',
+      code: 'P0001',
+      details: 'current_save_revision=2',
+    };
+    const req = new Request('http://localhost/api/tour-design/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        draft: { id: 'TD-004', leadId: 'L-004', custId: 'C-004' },
+        outlineDays: [],
+        expectedSaveRevision: 1,
+      }),
+    });
+
+    const response = await saveRoute.POST(req);
+    assert.equal(response.status, 409);
+    const json = await response.json();
+    assert.equal(json.ok, false);
+    assert.equal(json.currentSaveRevision, 2);
   });
 });

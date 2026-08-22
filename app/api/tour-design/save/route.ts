@@ -1,7 +1,11 @@
 import { z } from 'zod';
+import { NextResponse } from 'next/server';
 import { bffRoute } from '@/lib/bff/route';
 import type { TourDraft, TourOutlineDay } from '@/lib/types';
-import { saveTourDesignServer } from '@/lib/tour-design/tour-design-repository';
+import {
+  saveTourDesignServer,
+  TourDesignSaveConflictError,
+} from '@/lib/tour-design/tour-design-repository';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,14 +44,30 @@ export const POST = bffRoute(
     bodySchema: z.object({
       draft: tourDraftSchema,
       outlineDays: z.array(tourOutlineDaySchema),
+      expectedSaveRevision: z.number().int().nonnegative(),
     }),
   },
   async ({ supabase, body }) => {
-    await saveTourDesignServer(
-      supabase,
-      body.draft as unknown as TourDraft,
-      body.outlineDays as unknown as TourOutlineDay[]
-    );
-    return { success: true };
+    try {
+      const saveRevision = await saveTourDesignServer(
+        supabase,
+        body.draft as unknown as TourDraft,
+        body.outlineDays as unknown as TourOutlineDay[],
+        body.expectedSaveRevision
+      );
+      return { success: true, saveRevision };
+    } catch (error) {
+      if (error instanceof TourDesignSaveConflictError) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: error.message,
+            currentSaveRevision: error.currentSaveRevision,
+          },
+          { status: 409 }
+        );
+      }
+      throw error;
+    }
   }
 );

@@ -228,8 +228,8 @@ export async function listCustomersPage(
 
   let stageIds: string[] | null = null;
   if (input.stage) {
-    stageIds = await resolveStageCustomerIds(supabase, input.stage);
-    if (stageIds.length === 0) {
+    const resolvedStageIds = await resolveStageCustomerIds(supabase, input.stage);
+    if (resolvedStageIds.length === 0) {
       return {
         items: [],
         page: input.page,
@@ -240,6 +240,7 @@ export async function listCustomersPage(
         hasNextPage: false,
       };
     }
+    stageIds = resolvedStageIds;
   }
 
   let query = supabase.from('customers').select('*', { count: 'exact' });

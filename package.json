@@ -31,7 +31,9 @@
     "docker:up": "sh scripts/docker-with-env.sh up",
     "docker:deploy": "sh scripts/docker-with-env.sh deploy",
     "docker:down": "sh scripts/docker-with-env.sh down",
-    "docker:status": "sh scripts/docker-with-env.sh status"
+    "docker:status": "sh scripts/docker-with-env.sh status",
+    "redis:up": "COMPOSE_PROJECT_NAME=the-ant-adventures-crm docker compose up -d redis",
+    "redis:down": "COMPOSE_PROJECT_NAME=the-ant-adventures-crm docker compose stop redis"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

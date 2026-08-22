@@ -201,7 +201,8 @@ export default function TourDesignPage() {
         clientType: patch?.clientType ?? clientType,
         currentStep: patch?.step ?? step,
       });
-      const { saveRevision: _saveRevision, ...draftForFingerprint } = draft;
+      const draftForFingerprint = { ...draft };
+      delete draftForFingerprint.saveRevision;
       const fingerprint = JSON.stringify({ draft: draftForFingerprint, rows });
       if (lastDraftFingerprintsRef.current.get(draft.id) === fingerprint) return true;
       try {

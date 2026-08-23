@@ -109,6 +109,12 @@ export default function Products() {
   }, []);
 
   const handleSave = async (product: Product, asDraft: boolean) => {
+    if (!canWrite) {
+      const message = 'You need write permission for Products to save a product.';
+      setSaveError(message);
+      throw new Error(message);
+    }
+
     const codeInputError = validateProductCodeInput({
       region: product.region,
       dest: product.dest,
@@ -402,6 +408,7 @@ export default function Products() {
         product={editProduct}
         isNew={isNew}
         sourceTab={returnTab}
+        canWrite={canWrite}
         externalError={saveError}
         onDismissError={() => setSaveError(null)}
         onClose={closeForm}

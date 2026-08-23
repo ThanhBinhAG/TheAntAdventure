@@ -152,7 +152,7 @@ export async function pushStoreRowsToSupabase(
   }
 
   try {
-    for (const table of STORE_ROW_TABLES) {
+    for (const table of filterBffManagedTables(STORE_ROW_TABLES)) {
       const rows = patch[table];
       if (!rows?.length) continue;
       if (!isTableHydrated(table)) continue;

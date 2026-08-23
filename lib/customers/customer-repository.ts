@@ -397,6 +397,15 @@ async function findDuplicateEmail(
   );
 }
 
+/** Server-side uniqueness check for the Clients form (on-the-fly + create/update). */
+export async function findDuplicateCustomerEmail(
+  email: string,
+  excludeId?: string,
+): Promise<Customer | null> {
+  const supabase = await createCustomerServerClient();
+  return findDuplicateEmail(supabase, email, excludeId);
+}
+
 export type CreateCustomerResult = {
   customer: Customer;
   lead?: Lead;

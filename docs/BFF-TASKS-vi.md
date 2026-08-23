@@ -98,8 +98,10 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 
 ### B2 — B2B Agents
 
-- [ ] Agent API/repository, UI/hook và permission test.
-- [ ] Gỡ direct browser-Supabase path.
+- [x] Agent API/repository, UI/hook và permission test.
+- [x] Gỡ direct browser-Supabase path.
+
+> **Done 2026-08-23 (DEV B):** `/api/agents` + Zod/repo, `useAgentPage` / register / delete, contract tests. Notes via form PATCH. Hydrate/shared sync `agents` retained for dashboard/customers (rule #6). Inventory: `Personal/docs/bff-agents-inventory.md`. Network checklist: `Personal/docs/bff-agents-network-checklist.md`.
 
 ### B3 — Sales Pipeline
 

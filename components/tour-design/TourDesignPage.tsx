@@ -804,14 +804,17 @@ export default function TourDesignPage() {
         onSave={async (payload) => {
           try {
             const result = await saveFromForm(payload);
-            if (!result.ok) return false;
+            if (!result.ok) return result;
             setClientFormOpen(false);
             autoFillFromCustomer(result.customer.id);
             if (result.message) toast.success(result.message);
-            return true;
+            return result;
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Không thể tạo khách hàng.');
-            return false;
+            return {
+              ok: false as const,
+              error: 'save_failed' as const,
+              message: err instanceof Error ? err.message : 'Không thể tạo khách hàng.',
+            };
           }
         }}
       />

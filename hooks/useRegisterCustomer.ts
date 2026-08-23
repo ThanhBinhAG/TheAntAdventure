@@ -4,11 +4,16 @@ import { useCallback } from 'react';
 import { useStore } from '@/hooks/useStore';
 import type { CustomerFormSavePayload } from '@/components/customers/CustomerFormModal';
 import type { CustomerFormData } from '@/lib/customers/customer-form';
+import {
+  formatDuplicateEmailMessage,
+} from '@/lib/customers/customer-onboarding';
+import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
 import type { Comm, Customer, Lead } from '@/lib/types';
 
 export type CustomerSaveOutcome =
   | { ok: true; customer: Customer; leadId?: string; message?: string }
-  | { ok: false; error: 'duplicate_email'; existing: Customer };
+  | { ok: false; error: 'duplicate_email'; existing: Customer; message: string }
+  | { ok: false; error: 'save_failed'; message: string };
 
 type CustomerMutationResponse = {
   ok?: boolean;
@@ -18,6 +23,26 @@ type CustomerMutationResponse = {
   comm?: Comm | null;
   existing?: Customer | null;
 };
+
+function duplicateOutcome(
+  existing: Customer,
+  fallbackEmail: string,
+): Extract<CustomerSaveOutcome, { ok: false }> {
+  const row =
+    existing?.id && existing.name
+      ? existing
+      : ({
+          id: existing?.id || '—',
+          name: existing?.name || fallbackEmail,
+          email: existing?.email || fallbackEmail,
+        } as Customer);
+  return {
+    ok: false,
+    error: 'duplicate_email',
+    existing: row,
+    message: formatDuplicateEmailMessage(row),
+  };
+}
 
 async function readJson(res: Response): Promise<CustomerMutationResponse> {
   try {
@@ -54,19 +79,21 @@ export function useRegisterCustomer() {
         );
         const body = await readJson(res);
 
-        if (res.status === 409 || body.error === 'duplicate_email') {
-          return {
-            ok: false,
-            error: 'duplicate_email',
-            existing: body.existing ?? existing,
-          };
+        if (res.status === 409) {
+          return duplicateOutcome(
+            body.existing ?? existing,
+            payload.form.email,
+          );
         }
 
         if (!res.ok || !body.ok || !body.customer) {
           throw new Error(body.error || 'Không thể cập nhật khách hàng.');
         }
 
-        updateCustomer(body.customer.id, body.customer);
+        // BFF already persisted — mirror into Zustand without browser PostgREST upsert.
+        await withoutAutoSyncAsync(async () => {
+          updateCustomer(body.customer!.id, body.customer!);
+        });
         return { ok: true, customer: body.customer };
       }
 
@@ -84,20 +111,23 @@ export function useRegisterCustomer() {
       const body = await readJson(res);
 
       if (res.status === 409) {
-        return {
-          ok: false,
-          error: 'duplicate_email',
-          existing: body.existing ?? ({ email: payload.form.email } as Customer),
-        };
+        return duplicateOutcome(
+          body.existing ?? ({ email: payload.form.email } as Customer),
+          payload.form.email,
+        );
       }
 
       if (!res.ok || !body.ok || !body.customer) {
         throw new Error(body.error || 'Không thể tạo khách hàng.');
       }
 
-      addCustomer(body.customer);
-      if (body.lead) addLead(body.lead);
-      if (body.comm) addComm(body.comm);
+      // Server already wrote customer (+ optional lead/comm). Skip AutoSyncListener
+      // so the browser does not re-upsert to Supabase (401 / PostgREST 42501).
+      await withoutAutoSyncAsync(async () => {
+        addCustomer(body.customer!);
+        if (body.lead) addLead(body.lead);
+        if (body.comm) addComm(body.comm);
+      });
 
       const parts = [`Customer ${body.customer.id} created.`];
       if (body.lead) parts.push(`Lead ${body.lead.id} (Inquiry) added.`);

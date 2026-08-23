@@ -14,7 +14,7 @@ test('Dev A mutations stay BFF-managed and never enter browser auto-sync', () =>
   const store = source('lib/store.ts');
   const tourDesign = source('components/tour-design/TourDesignPage.tsx');
 
-  for (const table of ['products', 'product_pricing', 'tasks', 'attractions', 'tour_drafts', 'tour_outline_days']) {
+  for (const table of ['customers', 'agents', 'products', 'product_pricing', 'tasks', 'attractions', 'tour_drafts', 'tour_outline_days']) {
     assert.match(bffManaged, new RegExp(`'${table}'`));
   }
   assert.match(autoSync, /filterBffManagedTables/);

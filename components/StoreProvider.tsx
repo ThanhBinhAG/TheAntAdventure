@@ -82,8 +82,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setChecking(false);
   }, [remoteEnabled]);
 
-  // Lightweight boot ping so Topbar/panel show "Kết nối OK (Nms)" without waiting for Test connection.
-  // Full table counts stay on the Test connection button (healthCheck).
+  // Lightweight boot ping via CRM `/api/health` (not browser PostgREST) so Topbar shows
+  // "Kết nối OK (Nms)" without waiting for Test connection (full table counts / healthCheck).
   // A session-cached status resolves with zero requests; a cold cache pings on idle so the
   // status dot never competes with the route's own data fetches.
   useEffect(() => {

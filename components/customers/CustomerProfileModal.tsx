@@ -154,6 +154,7 @@ export default function CustomerProfileModal({
         toast.error(typeof body.error === 'string' ? body.error : 'Không thể lưu notes.');
         return;
       }
+      // Notes already saved via BFF; customers is BFF-managed (no browser upsert).
       updateCustomer(customer.id, { notes: notesDraft });
       toast.success('Notes saved.');
     } catch {

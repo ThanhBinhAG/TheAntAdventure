@@ -6,7 +6,7 @@ Supabase hydrate, push, auto-sync, mappers, and timeouts.
 ## Contents
 - `hydrate.ts` — public facade for route boot / ensure / full hydrate (re-exports `hydrate/`)
 - `hydrate/` — internal split: connection, route-persist, shared guards, page-boot, full-hydrate
-  (`bootSettled` session memo, denylist-safe delayed revalidate, ping inflight cache)
+  (`bootSettled` session memo, denylist-safe delayed revalidate, Topbar ping via `/api/health`)
 - `route-cache.ts` — sessionStorage route snapshot (5 min TTL, 60s revalidate min) for faster F5
 - `shell-cache.ts` — **deprecated** compatibility shim over `route-cache.ts`; do not add new callers — use `route-cache` directly.
 - `sync-config.ts` — `PAGE_BOOT_TABLES`, `SIDEBAR_BADGE_TABLES`, `PROFILE_LAZY_TABLES`, push waves, store key map
@@ -14,7 +14,7 @@ Supabase hydrate, push, auto-sync, mappers, and timeouts.
 - `sync-lifecycle.ts` — phase + `hydratedTables` / messages flags; hard `markHydrationPending` (wipe) vs soft `markHydrationSoftPending` (nav); auto-sync only pushes hydrated
 - `sync-push.ts` — full-table push + `pushStoreRowsToSupabase` (row upsert for create/edit); excludes BFF-managed Dev A tables
 - `auto-sync.ts` — debounce (2.5s) + `{ immediate: true }` + `persistCustomerRowsNow`; ignores store writes while `withoutAutoSyncAsync` is active and excludes BFF-managed tables
-- `bff-managed-tables.ts` — blocks Product, Pricing, Planner, Attractions, and Tour Design tables from browser snapshot pushes
+- `bff-managed-tables.ts` — blocks Customers, Agents, Product, Pricing, Planner, Attractions, and Tour Design tables from browser snapshot pushes
 - `mappers.ts` (barrel → [`mappers/`](mappers/AGENTS.md)), `supabase.ts` (thin re-export of `db` → [`supabase/`](supabase/AGENTS.md)), …
 
 ## Boundaries

@@ -118,6 +118,14 @@ export const customerPatchBodySchema = z.object({
 
 export type CustomerPatchBody = z.infer<typeof customerPatchBodySchema>;
 
+/** GET /api/customers/email-check — on-the-fly uniqueness while typing. */
+export const customerEmailCheckQuerySchema = z.object({
+  email: z.string().trim().email().max(200),
+  excludeId: z.string().trim().min(1).max(64).optional(),
+});
+
+export type CustomerEmailCheckQuery = z.infer<typeof customerEmailCheckQuerySchema>;
+
 export function optionalCustomerQueryParam(
   url: URL,
   name: string,

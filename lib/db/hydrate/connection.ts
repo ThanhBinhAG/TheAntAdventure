@@ -5,9 +5,41 @@ import { withTimeout } from '../timeout';
 const PING_TIMEOUT_MS = 8_000;
 /** Reuse any ping (ok or failed) briefly so Strict Mode remount / double-mount does not hit the network twice. */
 const PING_CACHE_MS = 1_000;
-/** Successful pings survive F5 so the Topbar dot renders without a `customers` round-trip on every reload. */
+/** Successful pings survive F5 so the Topbar dot renders without a health round-trip on every reload. */
 const PING_SESSION_KEY = 'ant-crm-conn-v1';
 const PING_SESSION_TTL_MS = 5 * 60 * 1000;
+
+type CrmHealthBody = {
+  status?: string;
+  db?: { ok?: boolean; latencyMs?: number; error?: string };
+};
+
+/** Same-origin CRM readiness — avoids browser PostgREST `customers` HEAD to Supabase. */
+async function pingViaCrmHealth(): Promise<ConnectionStatus> {
+  const start = Date.now();
+  try {
+    const res = await fetch('/api/health', {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    const body = (await res.json()) as CrmHealthBody;
+    const dbOk = body.db?.ok === true;
+    return {
+      ok: dbOk,
+      latencyMs: body.db?.latencyMs ?? Date.now() - start,
+      tables: {},
+      error: dbOk ? undefined : body.db?.error ?? `Health HTTP ${res.status}`,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      latencyMs: Date.now() - start,
+      tables: {},
+      error: e instanceof Error ? e.message : 'Connection failed',
+    };
+  }
+}
 
 export type ConnectionStatus = {
   ok: boolean;
@@ -89,9 +121,9 @@ export async function quickSupabasePing(): Promise<ConnectionStatus> {
   if (pingInflight) return pingInflight;
 
   pingInflight = withTimeout(
-    supabaseDb.quickPing(),
+    pingViaCrmHealth(),
     PING_TIMEOUT_MS,
-    { ok: false, latencyMs: PING_TIMEOUT_MS, tables: {}, error: 'Connection timeout — kiểm tra URL Supabase' }
+    { ok: false, latencyMs: PING_TIMEOUT_MS, tables: {}, error: 'Connection timeout — kiểm tra /api/health' }
   )
     .then((result) => {
       const entry: PingEntry = { at: Date.now(), result };

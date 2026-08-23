@@ -2,6 +2,8 @@ import type { SyncArrayTable } from './sync-config';
 
 /** Tables whose browser mutations must go through their feature BFF routes. */
 export const BFF_MANAGED_TABLES = new Set<SyncArrayTable>([
+  'customers',
+  'agents',
   'products',
   'product_pricing',
   'tasks',

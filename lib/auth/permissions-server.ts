@@ -9,11 +9,8 @@
 
 import 'server-only';
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { getAuthContext } from '@/lib/auth/session';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
-import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { getServerSupabaseClient } from '@/lib/supabase/server';
 import {
   getCachedPermissionCodes,
   setCachedPermissionCodes,
@@ -22,10 +19,6 @@ import {
   hasPermission,
   type PermissionCode,
 } from '@/lib/auth/permissions';
-import {
-  BG_SESSION_COOKIE,
-  isBreakGlassSessionValid,
-} from '@/lib/auth/break-glass';
 
 
 /** Kiểu một dòng do RPC current_permission_codes() trả về. */
@@ -40,26 +33,7 @@ type PermissionRow = { code: string };
  * - tài khoản chưa bị xóa mềm
  */
 async function readPermissionCodesFromSupabase(): Promise<PermissionCode[]> {
-  const url = getSupabaseUrl();
-  const key = getSupabaseAnonKey();
-
-  if (!url || !key) {
-    throw new Error('Supabase URL hoặc anon key chưa được cấu hình');
-  }
-
-  const cookieStore = await cookies();
-
-  const supabase = createServerClient(url, key, {
-    ...getSupabaseGlobalFetchOptions(),
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll() {
-        // Chỉ đọc permission, không cần ghi lại cookie.
-      },
-    },
-  });
+  const supabase = await getServerSupabaseClient();
 
   const { data, error } = await supabase.rpc('current_permission_codes');
 
@@ -104,14 +78,9 @@ async function readPermissionCodesWithCache(
 export async function getInitialPermissionCodesForCRMLayout(): Promise<
   PermissionCode[]
 > {
-  const breakGlassToken = (await cookies())
-    .get(BG_SESSION_COOKIE)
-    ?.value;
-
-  // Break-glass hợp lệ luôn có wildcard permission.
-  if (await isBreakGlassSessionValid(breakGlassToken)) {
-    return ['*'];
-  }
+  const auth = await getAuthContext();
+  if (!auth.authenticated) return [];
+  if (auth.isBreakGlass && auth.isSuperAdmin) return ['*'];
 
   return readPermissionCodesFromSupabase();
 }

@@ -14,6 +14,15 @@ export function getSupabaseAnonKey() {
   return (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
 }
 
+export function getServerSupabaseUrl() {
+  return (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim();
+}
+
+export function getServerSupabaseAnonKey() {
+  return (process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+}
+
+
 export function isUseSupabaseEnabled() {
   const v = (process.env.NEXT_PUBLIC_USE_SUPABASE ?? '').trim().toLowerCase();
   return v === 'true' || v === '1' || v === 'yes';
@@ -29,6 +38,11 @@ export function isRemoteDataEnabled() {
 
 export function getAuthCaptchaSiteKey() {
   return (process.env.NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY ?? '').trim();
+}
+
+/** Server-only — HMAC key for the opaque CRM session cookie. */
+export function getCrmSessionSecret() {
+  return (process.env.CRM_SESSION_SECRET ?? '').trim();
 }
 
 /** Auto push app → Supabase after edits (default: on when Supabase enabled) */

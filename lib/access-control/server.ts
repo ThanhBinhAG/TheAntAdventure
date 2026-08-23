@@ -12,10 +12,8 @@
  */
 import 'server-only';
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
-import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { getAuthContext } from '@/lib/auth/session';
+import { getServerSupabaseClient } from '@/lib/supabase/server';
 import { invalidatePermissionCache } from '@/lib/redis/permissions';
 import {
     getCachedAccessControlStaffRoles,
@@ -234,28 +232,9 @@ export class AccessControlRpcError extends Error {
     }
 }
 
-/** Tạo Supabase server client mang cookie của user đang gửi request. */
+/** Tạo Supabase server client mang access token từ CRM session hiện tại. */
 async function createAccessControlServerClient() {
-    const url = getSupabaseUrl();
-    const key = getSupabaseAnonKey();
-
-    if (!url || !key) {
-        throw new Error('Supabase URL hoặc anon key chưa được cấu hình.');
-    }
-
-    const cookieStore = await cookies();
-
-    return createServerClient(url, key, {
-        ...getSupabaseGlobalFetchOptions(),
-        cookies: {
-            getAll() {
-                return cookieStore.getAll();
-            },
-            setAll() {
-                // API này không cần ghi hoặc refresh cookie.
-            },
-        },
-    });
+    return getServerSupabaseClient();
 }
 
 /** Ném lỗi có mã PostgreSQL để Route Handler xử lý đúng HTTP status. */
@@ -278,6 +257,8 @@ function throwRpcError(error: {
  * Tab Người dùng dùng API phân trang riêng để phù hợp khi có nhiều nhân viên.
  */
 export async function getAccessControlData() {
+    const auth = await getAuthContext();
+    const isBreakGlassSuperAdmin = auth.isBreakGlass && auth.isSuperAdmin;
     const supabase = await createAccessControlServerClient();
 
     const [
@@ -287,7 +268,9 @@ export async function getAccessControlData() {
     ] = await Promise.all([
         supabase.rpc('list_access_control_roles'),
         supabase.rpc('list_access_control_permissions'),
-        supabase.rpc('is_current_super_admin'),
+        isBreakGlassSuperAdmin
+            ? Promise.resolve({ data: true, error: null })
+            : supabase.rpc('is_current_super_admin'),
     ]);
 
     throwRpcError(rolesResult.error);
@@ -299,7 +282,8 @@ export async function getAccessControlData() {
         permissions: (
             permissionsResult.data ?? []
         ) as AccessControlPermission[],
-        canCreatePermission: Boolean(superAdminResult.data),
+        canCreatePermission:
+            isBreakGlassSuperAdmin || Boolean(superAdminResult.data),
     };
 }
 
@@ -662,10 +646,13 @@ export async function getAccessControlAuditLogs(input: {
 /**
  * Kiểm tra chính xác role của session hiện tại là super_admin.
  *
- * Không thay bằng users.manage vì Admin thường cũng có thể có quyền đó,
- * còn lịch sử IP/thiết bị chỉ dành cho Super Admin.
+ * Break-glass là tài khoản khôi phục cao nhất: luôn Super Admin, không đợi RPC.
+ * Không thay bằng users.manage vì Admin thường cũng có thể có quyền đó.
  */
 export async function isCurrentAccessControlSuperAdmin(): Promise<boolean> {
+    const auth = await getAuthContext();
+    if (auth.isBreakGlass && auth.isSuperAdmin) return true;
+
     const supabase = await createAccessControlServerClient();
 
     const result = await supabase.rpc('is_current_super_admin');

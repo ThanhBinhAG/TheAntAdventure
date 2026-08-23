@@ -8,7 +8,6 @@ import {
   customerDeleteBlockedMessage,
   restoreCustomerDeleteSnapshot,
 } from '@/lib/customers/customer-delete';
-import { deleteCustomerFromRemote } from '@/lib/db/remote-delete';
 import { persistRouteCacheFromStore } from '@/lib/db/hydrate';
 
 export type CustomerDeleteResult =
@@ -48,25 +47,57 @@ export function useDeleteCustomer() {
       deleteCustomerLocal(id);
 
       try {
-        await deleteCustomerFromRemote(id);
+        const res = await fetch(`/api/customers/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          credentials: 'same-origin',
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+        };
+
+        if (!res.ok || body.ok === false) {
+          useStore.setState((current) =>
+            restoreCustomerDeleteSnapshot(snapshot, {
+              customers: current.customers,
+              leads: current.leads,
+              comms: current.comms,
+              tourDrafts: current.tourDrafts,
+              tourOutlineDays: current.tourOutlineDays,
+              feedback: current.feedback,
+            }),
+          );
+          return {
+            ok: false,
+            error: res.status === 409 ? 'blocked' : 'remote_failed',
+            message:
+              typeof body.error === 'string'
+                ? body.error
+                : 'Không thể xóa khách hàng trên server.',
+          };
+        }
+
         persistRouteCacheFromStore('customers');
         return { ok: true };
-      } catch (e) {
-        useStore.setState((s) =>
+      } catch {
+        useStore.setState((current) =>
           restoreCustomerDeleteSnapshot(snapshot, {
-            customers: s.customers,
-            leads: s.leads,
-            comms: s.comms,
-            tourDrafts: s.tourDrafts,
-            tourOutlineDays: s.tourOutlineDays,
-            feedback: s.feedback,
-          })
+            customers: current.customers,
+            leads: current.leads,
+            comms: current.comms,
+            tourDrafts: current.tourDrafts,
+            tourOutlineDays: current.tourOutlineDays,
+            feedback: current.feedback,
+          }),
         );
-        const message = e instanceof Error ? e.message : 'Không thể xóa trên Supabase.';
-        return { ok: false, error: 'remote_failed', message };
+        return {
+          ok: false,
+          error: 'remote_failed',
+          message: 'Không thể xóa khách hàng trên server.',
+        };
       }
     },
-    [deleteCustomerLocal]
+    [deleteCustomerLocal],
   );
 
   return { deleteCustomer };

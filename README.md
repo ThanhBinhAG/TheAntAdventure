@@ -10,10 +10,23 @@ Next.js 16 CRM for The Ant Adventures (React 19, Node 22+). **Supabase (PostgreS
 nvm use          # Node 22 — install via nvm if needed
 npm install
 cp .env.example .env.local   # Windows: copy .env.example .env.local
+npm run redis:up             # Redis on 127.0.0.1:6379 (cache only; do not docker:up while using npm run dev)
 npm run dev
 ```
 
 Open [http://localhost:3006](http://localhost:3006) → redirects to `/dashboard`.
+
+### Redis (local dev)
+
+Access Control staff-role lists, Product facets, and similar server reads cache in Redis when `REDIS_URL` is set ([`.env.example`](.env.example): `redis://127.0.0.1:6379`). Redis down does **not** fail those APIs; they fall back to Postgres.
+
+```bash
+npm run redis:up
+docker compose exec redis redis-cli ping   # PONG
+npm run dev                                # restart if Next was already running
+```
+
+Check [http://localhost:3006/api/health](http://localhost:3006/api/health) → `redis.configured: true`, `redis.ok: true`. Stop with `npm run redis:down` (does not start or stop the CRM container). Do not run `npm run docker:up` at the same time as `npm run dev` — both bind port **3006**.
 
 ## Docker (production package)
 
@@ -51,6 +64,7 @@ Edit **`.env.local`** (gitignored). Template: [`.env.example`](.env.example)
 | `NEXT_PUBLIC_SUPABASE_AUTO_SYNC` | No | `true` = auto-push edits to Supabase |
 | `NEXT_PUBLIC_SUPABASE_READ_ONLY` | No | `true` = hydrate only (safe on shared DB) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional | Server/scripts only — never expose in client |
+| `REDIS_URL` | Optional | Server cache (`redis://127.0.0.1:6379` for `npm run dev`; `npm run redis:up`) |
 
 After changing `.env.local`, restart: `npm run dev`.
 

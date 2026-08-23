@@ -36,6 +36,8 @@ import {
 } from '@/lib/pricing/pricing-utils';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { getBffArray } from '@/lib/bff/client';
+import type { Product, ProductPricing } from '@/lib/types';
 
 type PricingTab = 'pricelist' | 'costbuilder' | 'markup';
 
@@ -54,6 +56,8 @@ export default function Pricing() {
   const products = useStore((s) => s.products);
   const productPricing = useStore((s) => s.productPricing);
   const upsertProductPricing = useStore((s) => s.upsertProductPricing);
+  const setProducts = useStore((s) => s.setProducts);
+  const setProductPricing = useStore((s) => s.setProductPricing);
 
   const [tab, setTab] = useState<PricingTab>('pricelist');
   const [search, setSearch] = useState(() => highlightCode);
@@ -79,6 +83,7 @@ export default function Pricing() {
   const [mkPctVal, setMkPctVal] = useState(25);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   if (highlightCode !== previousHighlightCode) {
     setPreviousHighlightCode(highlightCode);
@@ -90,6 +95,26 @@ export default function Pricing() {
       highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [highlightCode, productPricing.length, search]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      getBffArray<Product>('/api/products/all', 'Không thể tải catalogue product.'),
+      getBffArray<ProductPricing>('/api/products/pricing/all', 'Không thể tải pricing product.'),
+    ])
+      .then(([catalogue, pricing]) => {
+        if (!active) return;
+        setProducts(catalogue);
+        setProductPricing(pricing);
+        setLoadError(null);
+      })
+      .catch((error: unknown) => {
+        if (active) setLoadError(error instanceof Error ? error.message : 'Không thể tải bảng giá.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [setProductPricing, setProducts]);
 
   const selectableProducts = useMemo(
     () => products.filter(isSelectableProduct),
@@ -127,9 +152,28 @@ export default function Pricing() {
   const mkSell = mkCost * (1 + mkPctVal / 100);
   const mkProfit = mkSell - mkCost;
 
-  const handleSavePricing = (row: ReturnType<typeof emptyProductPricing>) => {
-    upsertProductPricing(row);
-    setEditRow(null);
+  const handleSavePricing = async (row: ReturnType<typeof emptyProductPricing>) => {
+    try {
+      const res = await fetch('/api/products/pricing', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pricing: row }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Không thể lưu bảng giá.');
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? 'Không thể lưu bảng giá.');
+      }
+
+      upsertProductPricing(row);
+      setEditRow(null);
+      toast.success('Đã lưu bảng giá thành công.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Lưu bảng giá thất bại.');
+    }
   };
 
   const exportOptions = useMemo(
@@ -197,6 +241,11 @@ export default function Pricing() {
 
   return (
     <div>
+      {loadError && (
+        <div role="alert" style={{ marginBottom: 12, padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, fontSize: 12, color: '#991B1B' }}>
+          {loadError}
+        </div>
+      )}
       <div className="tabs">
         {(
           [

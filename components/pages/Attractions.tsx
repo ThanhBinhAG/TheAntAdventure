@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PaginationBar from '@/components/PaginationBar';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
@@ -12,6 +12,8 @@ import type { AttractionFormData } from '@/components/attractions/AttractionEdit
 import AttractionRegionColumn from '@/components/attractions/AttractionRegionColumn';
 import AttractionTable from '@/components/attractions/AttractionTable';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { toast } from '@/lib/toast';
+import { getBffArray } from '@/lib/bff/client';
 
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 
@@ -32,6 +34,7 @@ export default function Attractions() {
   const addAttraction = useStore((s) => s.addAttraction);
   const updateAttraction = useStore((s) => s.updateAttraction);
   const deleteAttraction = useStore((s) => s.deleteAttraction);
+  const setAttractions = useStore((s) => s.setAttractions);
 
   const [region, setRegion] = useState('');
   const [typeF, setTypeF] = useState('');
@@ -42,6 +45,25 @@ export default function Attractions() {
   const [addRegionPref, setAddRegionPref] = useState<Attraction['region'] | null>(null);
   const [lightbox, setLightbox] = useState<{ attractionId: string; index: number } | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const query = region ? `?region=${encodeURIComponent(region)}` : '';
+    void getBffArray<Attraction>(`/api/attractions/all${query}`, 'Không thể tải địa điểm tham quan.')
+      .then((rows) => {
+        if (active) {
+          setAttractions(rows);
+          setLoadError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) setLoadError(error instanceof Error ? error.message : 'Không thể tải địa điểm tham quan.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [region, setAttractions]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -100,13 +122,32 @@ export default function Attractions() {
     setFormMode('edit');
   }
 
-  function handleDelete(id: string) {
-    deleteAttraction(id);
-    if (expandedId === id) setExpandedId(null);
-    closeForm();
+  async function handleDelete(id: string) {
+    try {
+      const res = await fetch('/api/attractions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Không thể xóa địa điểm.');
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? 'Không thể xóa địa điểm.');
+      }
+
+      deleteAttraction(id);
+      if (expandedId === id) setExpandedId(null);
+      closeForm();
+      toast.success('Đã xóa địa điểm.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Xóa địa điểm thất bại.');
+    }
   }
 
-  function handleSave(form: AttractionFormData) {
+  async function handleSave(form: AttractionFormData) {
     const payload: Attraction = {
       id: form.id,
       region: form.region,
@@ -128,19 +169,41 @@ export default function Attractions() {
       linkedPhotoIds: [...form.linkedPhotoIds],
     };
 
-    if (formMode === 'edit') {
-      updateAttraction(payload.id, payload);
-    } else {
-      addAttraction(payload);
-      setRegion('');
-      setSearch('');
-      setExpandedId(payload.id);
+    try {
+      const isEdit = formMode === 'edit';
+      const res = await fetch('/api/attractions', {
+        method: isEdit ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attraction: payload }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Không thể lưu địa điểm.');
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? 'Không thể lưu địa điểm.');
+      }
+
+      if (isEdit) {
+        updateAttraction(payload.id, payload);
+        toast.success('Đã cập nhật địa điểm.');
+      } else {
+        addAttraction(payload);
+        setRegion('');
+        setSearch('');
+        setExpandedId(payload.id);
+        toast.success('Đã tạo địa điểm mới.');
+      }
+      closeForm();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Lưu địa điểm thất bại.');
     }
-    closeForm();
   }
 
   return (
     <div className="att-page">
+      {loadError && <div className="crm-page-hydrate-error" role="alert">{loadError}</div>}
       <div className="att-toolbar">
         <select value={region} onChange={(e) => setRegion(e.target.value)}>
           <option value="">All Regions</option>

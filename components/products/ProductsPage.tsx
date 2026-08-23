@@ -7,12 +7,11 @@ import PortfolioImportModal from '@/components/products/PortfolioImportModal';
 import ProductDetailDrawer from '@/components/products/ProductDetailDrawer';
 import ProductEditPanel from '@/components/products/ProductEditPanel';
 import ProductLibrary from '@/components/products/ProductLibrary';
-import { ensureTablesLoaded, pushTablesToSupabase } from '@/lib/db/hydrate';
-import { isRemoteDataEnabled, isSupabaseReadOnly } from '@/lib/env';
+import { getBffArray } from '@/lib/bff/client';
 import { validateProductCodeInput } from '@/lib/products/product-code';
 import type { PricingStatusFilter } from '@/lib/products/product-pricing-helpers';
 import { useStore } from '@/hooks/useStore';
-import type { Product } from '@/lib/types';
+import type { Product, ProductPricing } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
 
@@ -25,6 +24,9 @@ export default function Products() {
   const addProduct = useStore((s) => s.addProduct);
   const updateProduct = useStore((s) => s.updateProduct);
   const deleteProduct = useStore((s) => s.deleteProduct);
+  const upsertProductPricing = useStore((s) => s.upsertProductPricing);
+  const setProducts = useStore((s) => s.setProducts);
+  const setProductPricing = useStore((s) => s.setProductPricing);
 
   const [viewTab, setViewTab] = useState<ViewTab>('library');
   const [pickMode, setPickMode] = useState(false);
@@ -77,7 +79,12 @@ export default function Products() {
   const loadCatalogueForInteraction = useCallback(async () => {
     setCatalogueLoading(true);
     try {
-      await ensureTablesLoaded(['products', 'product_pricing']);
+      const [catalogue, pricing] = await Promise.all([
+        getBffArray<Product>('/api/products/all', 'Không thể tải catalogue product.'),
+        getBffArray<ProductPricing>('/api/products/pricing/all', 'Không thể tải pricing product.'),
+      ]);
+      setProducts(catalogue);
+      setProductPricing(pricing);
       return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không thể tải catalogue product.');
@@ -85,7 +92,7 @@ export default function Products() {
     } finally {
       setCatalogueLoading(false);
     }
-  }, []);
+  }, [setProductPricing, setProducts]);
 
   const setShellMode = (mode: ShellMode) => {
     if (formOpen) closeForm();
@@ -145,23 +152,39 @@ export default function Products() {
         ? 'archived'
         : 'active';
     const payload: Product = { ...product, status };
-    if (isNew) {
-      if (!payload.code.trim()) {
-        const msg = 'Product code is missing. Check destination and code type in the form.';
-        setSaveError(msg);
-        throw new Error(msg);
-      }
-      if (products.some((p) => p.code === payload.code)) {
-        const msg = `Product code "${payload.code}" already exists. Change destination or code type to generate a different code.`;
-        setSaveError(msg);
-        throw new Error(msg);
-      }
-    }
 
     setProductSaveBusy(true);
     try {
+      const url = '/api/products';
+      const method = isNew ? 'POST' : 'PATCH';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product: payload }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        const msg = json.error ?? 'Lỗi không thể lưu sản phẩm.';
+        setSaveError(msg);
+        throw new Error(msg);
+      }
+
+      const json = await res.json();
+      if (!json.ok) {
+        const msg = json.error ?? 'Lỗi không thể lưu sản phẩm.';
+        setSaveError(msg);
+        throw new Error(msg);
+      }
+
       if (isNew) {
         addProduct(payload);
+        upsertProductPricing({
+          productCode: payload.code,
+          stdCost: 0,
+          p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0, p7: 0, p8: 0, p9: 0, p10: 0,
+          c1: 0, c2: 0, c3: 0, c4: 0, c5: 0, c6: 0, c7: 0, c8: 0, c9: 0, c10: 0,
+          incl: { g: false, tr: false, tk: false, w: false, m: false },
+        });
       } else {
         updateProduct(payload.code, payload);
       }
@@ -171,28 +194,37 @@ export default function Products() {
       setEditProduct(payload);
       setDetailProductCode(payload.code);
       setDraftPreview(payload);
-
-      if (isRemoteDataEnabled() && !isSupabaseReadOnly()) {
-        const result = await pushTablesToSupabase(['products'], false);
-        if (!result.ok) {
-          const msg = result.error ?? 'Không lưu được product lên Supabase';
-          setSaveError(msg);
-          throw new Error(msg);
-        }
-      }
     } finally {
       setProductSaveBusy(false);
     }
   };
 
-  const handleDelete = (code: string) => {
-    deleteProduct(code);
-    closeForm();
-    if (pickMode) {
-      setPickMode(false);
+  const handleDelete = async (code: string) => {
+    try {
+      const res = await fetch('/api/products', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Không thể xóa sản phẩm.');
+      }
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error ?? 'Không thể xóa sản phẩm.');
+      }
+
+      deleteProduct(code);
+      closeForm();
+      if (pickMode) {
+        setPickMode(false);
+      }
+      setDetailProductCode(null);
+      setViewTab(returnTab);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Xóa sản phẩm thất bại.');
     }
-    setDetailProductCode(null);
-    setViewTab(returnTab);
   };
 
   const openDetail = (code: string) => {

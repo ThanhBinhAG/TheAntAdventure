@@ -19,6 +19,21 @@
 
 create extension if not exists "pgcrypto";
 
+-- Private server-owned CRM sessions. Browser roles receive no grants to this table.
+create table if not exists crm_sessions (
+  sid text primary key,
+  payload_ciphertext text not null,
+  expires_at timestamptz not null,
+  revoked_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_crm_sessions_active_expiry
+  on crm_sessions (expires_at) where revoked_at is null;
+alter table crm_sessions enable row level security;
+comment on table crm_sessions is
+  'Private server-owned CRM sessions. Payload is AES-GCM ciphertext; only the server service role may access it.';
+
 -- ============================================================
 --  MODULE 1 · AGENTS & CUSTOMERS (B2B / B2C)
 -- ============================================================
@@ -226,6 +241,100 @@ create table if not exists tour_outline_days (
   sort_order      smallint    default 0,
   constraint uq_tour_outline_day unique (draft_id, day_number)
 );
+
+create or replace function public.save_tour_design_transaction(
+  p_draft jsonb,
+  p_outline_days jsonb
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $function$
+declare
+  v_draft_id text := p_draft ->> 'id';
+begin
+  if jsonb_typeof(p_draft) <> 'object' or coalesce(v_draft_id, '') = '' then
+    raise exception 'Tour draft payload is invalid' using errcode = '22023';
+  end if;
+  if jsonb_typeof(p_outline_days) <> 'array' then
+    raise exception 'Tour outline payload must be an array' using errcode = '22023';
+  end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(p_outline_days) as day
+    where coalesce(day ->> 'draft_id', '') <> v_draft_id
+  ) then
+    raise exception 'Every outline day must belong to the draft' using errcode = '22023';
+  end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(p_outline_days) as day
+    group by day ->> 'day_number'
+    having count(*) > 1
+  ) then
+    raise exception 'Outline day numbers must be unique' using errcode = '22023';
+  end if;
+
+  insert into public.tour_drafts (
+    id, lead_id, cust_id, brief_json, outline_status, outline_notes,
+    outline_sent_at, outline_approved_at, outline_revision, selected_codes,
+    selected_package_id, markup_pct, client_type, current_step
+  ) values (
+    v_draft_id,
+    nullif(p_draft ->> 'lead_id', ''),
+    nullif(p_draft ->> 'cust_id', ''),
+    nullif(p_draft -> 'brief_json', 'null'::jsonb),
+    coalesce(nullif(p_draft ->> 'outline_status', ''), 'draft'),
+    nullif(p_draft ->> 'outline_notes', ''),
+    nullif(p_draft ->> 'outline_sent_at', '')::timestamptz,
+    nullif(p_draft ->> 'outline_approved_at', '')::timestamptz,
+    coalesce(nullif(p_draft ->> 'outline_revision', '')::smallint, 0),
+    case
+      when p_draft -> 'selected_codes' is null or p_draft -> 'selected_codes' = 'null'::jsonb then null
+      else array(select jsonb_array_elements_text(p_draft -> 'selected_codes'))
+    end,
+    nullif(p_draft ->> 'selected_package_id', ''),
+    coalesce(nullif(p_draft ->> 'markup_pct', '')::numeric, 30),
+    coalesce(nullif(p_draft ->> 'client_type', ''), 'b2c'),
+    coalesce(nullif(p_draft ->> 'current_step', '')::smallint, 0)
+  )
+  on conflict (id) do update set
+    lead_id = excluded.lead_id,
+    cust_id = excluded.cust_id,
+    brief_json = excluded.brief_json,
+    outline_status = excluded.outline_status,
+    outline_notes = excluded.outline_notes,
+    outline_sent_at = excluded.outline_sent_at,
+    outline_approved_at = excluded.outline_approved_at,
+    outline_revision = excluded.outline_revision,
+    selected_codes = excluded.selected_codes,
+    selected_package_id = excluded.selected_package_id,
+    markup_pct = excluded.markup_pct,
+    client_type = excluded.client_type,
+    current_step = excluded.current_step,
+    updated_at = now();
+
+  delete from public.tour_outline_days where draft_id = v_draft_id;
+
+  insert into public.tour_outline_days (
+    id, draft_id, day_number, outline_date, location, activities, hotels, sort_order
+  )
+  select
+    (day ->> 'id')::uuid,
+    v_draft_id,
+    (day ->> 'day_number')::smallint,
+    nullif(day ->> 'outline_date', '')::date,
+    nullif(day ->> 'location', ''),
+    nullif(day ->> 'activities', ''),
+    nullif(day ->> 'hotels', ''),
+    coalesce(nullif(day ->> 'sort_order', '')::smallint, (day ->> 'day_number')::smallint)
+  from jsonb_array_elements(p_outline_days) as day;
+end;
+$function$;
+
+revoke all on function public.save_tour_design_transaction(jsonb, jsonb) from public;
+grant execute on function public.save_tour_design_transaction(jsonb, jsonb) to authenticated;
 
 -- ============================================================
 --  MODULE 5 · BOOKINGS & ITINERARY
@@ -644,6 +753,45 @@ create table if not exists product_photos (
   primary key (product_code, photo_id)
 );
 
+-- Product import replaces the catalogue and required pricing stubs atomically.
+create or replace function public.replace_product_catalogue_transaction(
+  p_products jsonb,
+  p_pricing_stubs jsonb
+)
+returns void language plpgsql security invoker set search_path = public as $function$
+begin
+  if jsonb_typeof(p_products) <> 'array' or jsonb_typeof(p_pricing_stubs) <> 'array' then
+    raise exception 'Product import payloads must be arrays' using errcode = '22023';
+  end if;
+  if exists (select 1 from jsonb_to_recordset(p_products) as product(code text, name text, logic text, duration text, category text, destination text, level text, description text, usp text, notes_to_sales text, price_from text, region text) where coalesce(nullif(trim(product.code), ''), '') = '' or coalesce(nullif(trim(product.name), ''), '') = '') then
+    raise exception 'Every imported product requires a code and name' using errcode = '22023';
+  end if;
+  if exists (select 1 from jsonb_to_recordset(p_products) as product(code text) group by product.code having count(*) > 1) then
+    raise exception 'Imported product codes must be unique' using errcode = '22023';
+  end if;
+  if exists (select 1 from jsonb_to_recordset(p_pricing_stubs) as pricing(product_code text) where coalesce(nullif(trim(pricing.product_code), ''), '') = '') then
+    raise exception 'Every pricing stub requires a product code' using errcode = '22023';
+  end if;
+  if exists (select 1 from jsonb_to_recordset(p_pricing_stubs) as pricing(product_code text) group by pricing.product_code having count(*) > 1) then
+    raise exception 'Imported pricing product codes must be unique' using errcode = '22023';
+  end if;
+  if (select count(*) from jsonb_to_recordset(p_products) as product(code text)) <> (select count(*) from jsonb_to_recordset(p_pricing_stubs) as pricing(product_code text)) or exists (select 1 from jsonb_to_recordset(p_pricing_stubs) as pricing(product_code text) where not exists (select 1 from jsonb_to_recordset(p_products) as product(code text) where product.code = pricing.product_code)) then
+    raise exception 'Each imported product must have exactly one pricing stub' using errcode = '22023';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('replace_product_catalogue_transaction'));
+  delete from public.products;
+  insert into public.products (code, name, logic, duration, category, destination, level, description, usp, notes_to_sales, price_from, region)
+  select product.code, product.name, product.logic, product.duration, product.category, product.destination, product.level, product.description, product.usp, product.notes_to_sales, product.price_from, product.region
+  from jsonb_to_recordset(p_products) as product(code text, name text, logic text, duration text, category text, destination text, level text, description text, usp text, notes_to_sales text, price_from text, region text);
+  insert into public.product_pricing (product_code, std_cost, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, incl_guide, incl_transport, incl_tickets, incl_water, incl_meals)
+  select pricing.product_code, pricing.std_cost, pricing.p1, pricing.p2, pricing.p3, pricing.p4, pricing.p5, pricing.p6, pricing.p7, pricing.p8, pricing.p9, pricing.p10, pricing.c1, pricing.c2, pricing.c3, pricing.c4, pricing.c5, pricing.c6, pricing.c7, pricing.c8, pricing.c9, pricing.c10, pricing.incl_guide, pricing.incl_transport, pricing.incl_tickets, pricing.incl_water, pricing.incl_meals
+  from jsonb_to_recordset(p_pricing_stubs) as pricing(product_code text, std_cost numeric, p1 numeric, p2 numeric, p3 numeric, p4 numeric, p5 numeric, p6 numeric, p7 numeric, p8 numeric, p9 numeric, p10 numeric, c1 numeric, c2 numeric, c3 numeric, c4 numeric, c5 numeric, c6 numeric, c7 numeric, c8 numeric, c9 numeric, c10 numeric, incl_guide boolean, incl_transport boolean, incl_tickets boolean, incl_water boolean, incl_meals boolean);
+end;
+$function$;
+revoke all on function public.replace_product_catalogue_transaction(jsonb, jsonb) from public;
+grant execute on function public.replace_product_catalogue_transaction(jsonb, jsonb) to authenticated;
+
 -- Product catalogue server-pagination RPCs. Keep in sync with CLI migrations.
 create or replace function public.list_products_page(p_page_number integer, p_page_size integer, p_search_text text default null, p_filter_region text default null, p_filter_duration text default null, p_filter_category text default null, p_filter_destination text default null, p_filter_pricing_status text default null)
 returns jsonb language plpgsql stable security invoker set search_path = public as $$
@@ -730,6 +878,161 @@ create table if not exists attraction_photos (
   is_featured     boolean not null default false,
   primary key (attraction_id, photo_id)
 );
+
+-- Aggregate Product and Attraction mutations. Keep in sync with CLI migration.
++create or replace function public.save_product_aggregate(
+  p_product jsonb,
+  p_pricing_stub jsonb,
+  p_photo_links jsonb
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $function$
+declare
+  v_code text := p_product ->> 'code';
+begin
+  if jsonb_typeof(p_product) <> 'object'
+     or coalesce(nullif(trim(v_code), ''), '') = ''
+     or coalesce(nullif(trim(p_product ->> 'name'), ''), '') = '' then
+    raise exception 'Product payload requires a code and name' using errcode = '22023';
+  end if;
+  if jsonb_typeof(p_pricing_stub) <> 'object'
+     or p_pricing_stub ->> 'product_code' <> v_code then
+    raise exception 'Product pricing stub must belong to the product' using errcode = '22023';
+  end if;
+  if jsonb_typeof(p_photo_links) <> 'array' then
+    raise exception 'Product photo links must be an array' using errcode = '22023';
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(p_photo_links) as photo
+    where coalesce(nullif(trim(photo ->> 'photo_id'), ''), '') = ''
+       or photo ->> 'product_code' <> v_code
+  ) or exists (
+    select 1 from jsonb_array_elements(p_photo_links) as photo
+    group by photo ->> 'photo_id' having count(*) > 1
+  ) then
+    raise exception 'Product photo links must be unique and belong to the product' using errcode = '22023';
+  end if;
+
+  insert into public.products (
+    code, name, logic, duration, category, destination, level, description,
+    usp, notes_to_sales, price_from, region
+  ) values (
+    v_code, p_product ->> 'name', nullif(p_product ->> 'logic', ''),
+    nullif(p_product ->> 'duration', ''), nullif(p_product ->> 'category', ''),
+    nullif(p_product ->> 'destination', ''), nullif(p_product ->> 'level', ''),
+    nullif(p_product ->> 'description', ''), nullif(p_product ->> 'usp', ''),
+    nullif(p_product ->> 'notes_to_sales', ''), nullif(p_product ->> 'price_from', ''),
+    nullif(p_product ->> 'region', '')
+  ) on conflict (code) do update set
+    name = excluded.name, logic = excluded.logic, duration = excluded.duration,
+    category = excluded.category, destination = excluded.destination,
+    level = excluded.level, description = excluded.description, usp = excluded.usp,
+    notes_to_sales = excluded.notes_to_sales, price_from = excluded.price_from,
+    region = excluded.region, updated_at = now();
+
+  insert into public.product_pricing (
+    product_code, std_cost, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10,
+    c1, c2, c3, c4, c5, c6, c7, c8, c9, c10,
+    incl_guide, incl_transport, incl_tickets, incl_water, incl_meals
+  ) values (
+    v_code,
+    coalesce((p_pricing_stub ->> 'std_cost')::numeric, 0),
+    coalesce((p_pricing_stub ->> 'p1')::numeric, 0), coalesce((p_pricing_stub ->> 'p2')::numeric, 0),
+    coalesce((p_pricing_stub ->> 'p3')::numeric, 0), coalesce((p_pricing_stub ->> 'p4')::numeric, 0),
+    coalesce((p_pricing_stub ->> 'p5')::numeric, 0), coalesce((p_pricing_stub ->> 'p6')::numeric, 0),
+    coalesce((p_pricing_stub ->> 'p7')::numeric, 0), coalesce((p_pricing_stub ->> 'p8')::numeric, 0),
+    coalesce((p_pricing_stub ->> 'p9')::numeric, 0), coalesce((p_pricing_stub ->> 'p10')::numeric, 0),
+    coalesce((p_pricing_stub ->> 'c1')::numeric, 0), coalesce((p_pricing_stub ->> 'c2')::numeric, 0),
+    coalesce((p_pricing_stub ->> 'c3')::numeric, 0), coalesce((p_pricing_stub ->> 'c4')::numeric, 0),
+    coalesce((p_pricing_stub ->> 'c5')::numeric, 0), coalesce((p_pricing_stub ->> 'c6')::numeric, 0),
+    coalesce((p_pricing_stub ->> 'c7')::numeric, 0), coalesce((p_pricing_stub ->> 'c8')::numeric, 0),
+    coalesce((p_pricing_stub ->> 'c9')::numeric, 0), coalesce((p_pricing_stub ->> 'c10')::numeric, 0),
+    coalesce((p_pricing_stub ->> 'incl_guide')::boolean, false),
+    coalesce((p_pricing_stub ->> 'incl_transport')::boolean, false),
+    coalesce((p_pricing_stub ->> 'incl_tickets')::boolean, false),
+    coalesce((p_pricing_stub ->> 'incl_water')::boolean, false),
+    coalesce((p_pricing_stub ->> 'incl_meals')::boolean, false)
+  ) on conflict (product_code) do nothing;
+
+  delete from public.product_photos where product_code = v_code;
+  insert into public.product_photos (product_code, photo_id, sort_order, is_featured)
+  select
+    v_code, photo ->> 'photo_id', coalesce((photo ->> 'sort_order')::smallint, 0),
+    coalesce((photo ->> 'is_featured')::boolean, false)
+  from jsonb_array_elements(p_photo_links) as photo;
+end;
+$function$;
+
+create or replace function public.save_attraction_aggregate(
+  p_attraction jsonb,
+  p_photo_links jsonb
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $function$
+declare
+  v_id text := p_attraction ->> 'id';
+begin
+  if jsonb_typeof(p_attraction) <> 'object'
+     or coalesce(nullif(trim(v_id), ''), '') = ''
+     or coalesce(nullif(trim(p_attraction ->> 'name'), ''), '') = ''
+     or coalesce(nullif(trim(p_attraction ->> 'region'), ''), '') not in ('north', 'central', 'south')
+     or coalesce(nullif(trim(p_attraction ->> 'type'), ''), '') = ''
+     or coalesce(nullif(trim(p_attraction ->> 'dest'), ''), '') = '' then
+    raise exception 'Attraction payload is invalid' using errcode = '22023';
+  end if;
+  if jsonb_typeof(p_photo_links) <> 'array' then
+    raise exception 'Attraction photo links must be an array' using errcode = '22023';
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(p_photo_links) as photo
+    where coalesce(nullif(trim(photo ->> 'photo_id'), ''), '') = ''
+       or photo ->> 'attraction_id' <> v_id
+  ) or exists (
+    select 1 from jsonb_array_elements(p_photo_links) as photo
+    group by photo ->> 'photo_id' having count(*) > 1
+  ) then
+    raise exception 'Attraction photo links must be unique and belong to the attraction' using errcode = '22023';
+  end if;
+
+  insert into public.attractions (
+    id, region, type, name, dest, hours, closed, admission, duration,
+    best_time, crowd, book_req, seasonal, notes, alert, phone
+  ) values (
+    v_id, p_attraction ->> 'region', p_attraction ->> 'type', p_attraction ->> 'name',
+    p_attraction ->> 'dest', nullif(p_attraction ->> 'hours', ''),
+    nullif(p_attraction ->> 'closed', ''), nullif(p_attraction ->> 'admission', ''),
+    coalesce((p_attraction ->> 'duration')::smallint, 0),
+    nullif(p_attraction ->> 'best_time', ''), nullif(p_attraction ->> 'crowd', ''),
+    coalesce((p_attraction ->> 'book_req')::boolean, false),
+    nullif(p_attraction ->> 'seasonal', ''), nullif(p_attraction ->> 'notes', ''),
+    nullif(p_attraction ->> 'alert', ''), coalesce(p_attraction ->> 'phone', '')
+  ) on conflict (id) do update set
+    region = excluded.region, type = excluded.type, name = excluded.name,
+    dest = excluded.dest, hours = excluded.hours, closed = excluded.closed,
+    admission = excluded.admission, duration = excluded.duration,
+    best_time = excluded.best_time, crowd = excluded.crowd,
+    book_req = excluded.book_req, seasonal = excluded.seasonal, notes = excluded.notes,
+    alert = excluded.alert, phone = excluded.phone, updated_at = now();
+
+  delete from public.attraction_photos where attraction_id = v_id;
+  insert into public.attraction_photos (attraction_id, photo_id, sort_order, is_featured)
+  select
+    v_id, photo ->> 'photo_id', coalesce((photo ->> 'sort_order')::smallint, 0),
+    coalesce((photo ->> 'is_featured')::boolean, false)
+  from jsonb_array_elements(p_photo_links) as photo;
+end;
+$function$;
+
+revoke all on function public.save_product_aggregate(jsonb, jsonb, jsonb) from public;
+grant execute on function public.save_product_aggregate(jsonb, jsonb, jsonb) to authenticated;
+revoke all on function public.save_attraction_aggregate(jsonb, jsonb) from public;
+grant execute on function public.save_attraction_aggregate(jsonb, jsonb) to authenticated;
 
 insert into attractions (
   id, region, type, name, dest, hours, closed, admission, duration,

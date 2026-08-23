@@ -11,7 +11,7 @@ import {
   isTableHydrated,
   updateBaselineCounts,
 } from './sync-lifecycle';
-import type { SyncTableOptions } from './sync-policy';
+import type { SyncTableOptions, SyncTableResult } from './sync-policy';
 import {
   countBackupRows,
   SYNC_PUSH_WAVES,
@@ -21,6 +21,7 @@ import {
 import { db as supabaseDb } from './supabase';
 import { upsertSimpleRows } from './supabase/generic-sync';
 import { HANDLERS, type Row } from './supabase/shared';
+import { filterBffManagedTables } from './bff-managed-tables';
 
 export type StoreRowPatch = {
   customers?: Customer[];
@@ -54,7 +55,17 @@ async function syncTableFromBackup(
   table: SyncArrayTable,
   backup: BackupData,
   options: SyncTableOptions
-) {
+): Promise<SyncTableResult> {
+  if (
+    table === 'products' ||
+    table === 'product_pricing' ||
+    table === 'tasks' ||
+    table === 'attractions' ||
+    table === 'tour_drafts' ||
+    table === 'tour_outline_days'
+  ) {
+    return { skippedOrphanDelete: false };
+  }
   const key = TABLE_TO_STORE_KEY[table];
   const rows = backup[key];
   const list = Array.isArray(rows) ? (rows as unknown as Record<string, unknown>[]) : [];
@@ -84,8 +95,9 @@ export async function pushTablesToSupabase(
   try {
     const backup = useStore.getState().exportBackup();
     // Never push unhydrated tables (empty local arrays would wipe remote).
-    const target =
-      tables !== undefined ? filterHydratedTables(tables) : getHydratedTables();
+    const target = filterBffManagedTables(
+      tables !== undefined ? filterHydratedTables(tables) : getHydratedTables()
+    );
     if (!target.length && !(includeMessages && isMessagesHydrated())) {
       return { ok: false, error: 'No hydrated tables to push' };
     }

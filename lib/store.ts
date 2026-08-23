@@ -1,5 +1,4 @@
 import { create, type StateCreator } from 'zustand';
-import { deleteProductFromRemote, deleteProductPricingFromRemote } from './db/remote-delete';
 import { applyLocalCustomerDelete } from './customers/customer-delete';
 import { appLog } from './system/app-logger';
 import { rolloverTasks } from './planner/planner-task-utils';
@@ -128,7 +127,9 @@ interface CRMState {
   removeCruise: (id: string) => void;
   addCalEvent: (event: Record<string, unknown>) => void;
   removeCalEvent: (id: string) => void;
+  setPhotos: (photos: Record<string, unknown>[]) => void;
   addTask: (task: Record<string, unknown>) => void;
+  setTasks: (tasks: Task[]) => void;
   updateTask: (id: string, data: Record<string, unknown>) => void;
   rolloverIncompleteTasks: () => void;
 
@@ -273,7 +274,6 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           products: s.products.filter((p) => p.code !== code),
           productPricing: s.productPricing.filter((p) => p.productCode !== code),
         }));
-        void deleteProductFromRemote(code);
       },
       setProductPricing: (productPricing) => set({ productPricing }),
       upsertProductPricing: (row, syncProductPrice = true) =>
@@ -293,7 +293,6 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         set((s) => ({
           productPricing: s.productPricing.filter((p) => p.productCode !== productCode),
         }));
-        void deleteProductPricingFromRemote(productCode);
       },
       addContract: (contract) => set((s) => ({ contracts: [contract, ...s.contracts] })),
       updateContract: (id, data) =>
@@ -351,7 +350,9 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         set((s) => ({
           calEvents: s.calEvents.filter((x) => (x as { id?: string }).id !== id),
         })),
+      setPhotos: (photos) => set({ photos }),
       addTask: (task) => set((s) => ({ tasks: [...s.tasks, task] })),
+      setTasks: (tasks) => set({ tasks }),
       updateTask: (id, data) =>
         set((s) => ({
           tasks: s.tasks.map((t) => {

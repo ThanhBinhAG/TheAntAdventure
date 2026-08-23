@@ -1,12 +1,7 @@
 import 'server-only';
-import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import {
-  BG_SESSION_COOKIE,
-  isBreakGlassSessionValid,
-} from '@/lib/auth/break-glass';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
-import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { CRM_SESSION_COOKIE, getCrmSession } from '@/lib/auth/crm-session';
+import { ensureBreakGlassShadowPrivilegesOnce } from '@/lib/auth/break-glass-supabase';
 
 export type AuthContext = {
   authenticated: boolean;
@@ -16,58 +11,28 @@ export type AuthContext = {
   email: string | null;
 };
 
-const BREAK_GLASS_ACTOR: AuthContext = {
-  authenticated: true,
-  isSuperAdmin: true,
-  isBreakGlass: true,
-  userId: null,
-  email: null,
-};
-
-export async function authContextFromBreakGlassCookie(
-  token: string | undefined,
-): Promise<AuthContext | null> {
-  if (!(await isBreakGlassSessionValid(token))) return null;
-  return BREAK_GLASS_ACTOR;
-}
-
 /** Cookie-store based context (Route Handlers / Server Components). */
 export async function getAuthContext(): Promise<AuthContext> {
   const cookieStore = await cookies();
-  const bg = cookieStore.get(BG_SESSION_COOKIE)?.value;
-  const fromBg = await authContextFromBreakGlassCookie(bg);
-  if (fromBg) return fromBg;
-
-  const url = getSupabaseUrl();
-  const key = getSupabaseAnonKey();
-  if (!url || !key) {
+  const session = await getCrmSession(cookieStore.get(CRM_SESSION_COOKIE)?.value);
+  if (!session) {
     return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
   }
 
-  const supabase = createServerClient(url, key, {
-    ...getSupabaseGlobalFetchOptions(),
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll() {
-        /* read-only */
-      },
-    },
-  });
-
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
-  if (!user) {
-    return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
+  if (session.isBreakGlass) {
+    try {
+      await ensureBreakGlassShadowPrivilegesOnce();
+    } catch {
+      // Recovery session still authenticates; Access Control RPCs need the grant.
+    }
   }
 
   return {
     authenticated: true,
-    isSuperAdmin: false,
-    isBreakGlass: false,
-    userId: user.id,
-    email: user.email ?? null,
+    isSuperAdmin: session.isBreakGlass,
+    isBreakGlass: session.isBreakGlass,
+    userId: session.userId,
+    email: session.email,
   };
 }
 

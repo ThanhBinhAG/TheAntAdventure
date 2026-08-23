@@ -8,11 +8,14 @@
   "scripts": {
     "dev": "NODE_OPTIONS=--max-old-space-size=3072 next dev -p 3006",
     "build": "next build --webpack",
+    "build:with-leakage": "npm run build && npm run leakage:check",
+    "leakage:check": "bash scripts/scan-leakage.sh",
     "analyze": "ANALYZE=true next build --webpack",
     "start": "next start -p 3006",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test $(find Personal/tests -name '*.test.ts' 2>/dev/null | sort)",
+    "test": "node --experimental-test-module-mocks --import tsx --test $(find tests -name '*.test.ts' 2>/dev/null | sort)",
+    "test:e2e": "playwright test",
     "db:link": "supabase link",
     "db:login": "supabase login",
     "db:migration:new": "supabase migration new",
@@ -28,7 +31,9 @@
     "docker:up": "sh scripts/docker-with-env.sh up",
     "docker:deploy": "sh scripts/docker-with-env.sh deploy",
     "docker:down": "sh scripts/docker-with-env.sh down",
-    "docker:status": "sh scripts/docker-with-env.sh status"
+    "docker:status": "sh scripts/docker-with-env.sh status",
+    "redis:up": "COMPOSE_PROJECT_NAME=the-ant-adventures-crm docker compose up -d redis",
+    "redis:down": "COMPOSE_PROJECT_NAME=the-ant-adventures-crm docker compose stop redis"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
@@ -59,6 +64,7 @@
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^16.3.1",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.19.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

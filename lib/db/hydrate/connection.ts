@@ -4,7 +4,7 @@ import { withTimeout } from '../timeout';
 
 const PING_TIMEOUT_MS = 8_000;
 /** Reuse any ping (ok or failed) briefly so Strict Mode remount / double-mount does not hit the network twice. */
-const PING_CACHE_MS = 15_000;
+const PING_CACHE_MS = 1_000;
 /** Successful pings survive F5 so the Topbar dot renders without a `customers` round-trip on every reload. */
 const PING_SESSION_KEY = 'ant-crm-conn-v1';
 const PING_SESSION_TTL_MS = 5 * 60 * 1000;

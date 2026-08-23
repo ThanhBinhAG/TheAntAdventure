@@ -45,54 +45,56 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 | Task | Owner chính | Hoàn thành khi |
 |---|---|---|
 | Ghi nhận baseline Network | A | Có capture login, dashboard và 9 feature hiện tại |
-| Inventory direct Supabase imports | B | Mỗi caller có feature owner và API thay thế |
+| Inventory direct Supabase imports | B | Mỗi caller có feature owner và API thay thế — **Clients callers: done** (`Personal/docs/bff-customers-inventory.md`); còn Agents/Sales/Gallery/Weather |
 | Server-only Supabase client + BFF helper | A | `lib/supabase/server.ts`, auth/permission/error primitives sẵn sàng |
 | CRM-owned HttpOnly session | A | Browser không giữ Supabase token |
-| Shared DTO/test fixtures | B | Feature owner có contract và test fixture dùng chung |
+| Shared DTO/test fixtures | B | Feature owner có contract và test fixture dùng chung — **Customers Zod + fixtures: done** (`customer-list-input.ts`, `Personal/tests/customer-*.test.ts`) |
 | Redis helper/cache policy | A | Cache-aside, TTL và invalidation; Redis-down không fail API |
-| CI leakage check | B | Build fail nếu browser bundle có hostname/key/path Supabase |
+| CI leakage check | B | Build fail nếu browser bundle có hostname/key/path Supabase — **script added** (`npm run check:supabase-leakage`); hard-fail CI sau khi hết browser Supabase path |
 
 ## Developer A — feature end-to-end
 
 ### A0 — Auth & Session
 
-- [ ] Hoàn thiện login/logout, CRM HttpOnly session, session validation, refresh và revoke.
-- [ ] Chuyển middleware redirect và permission enforcement hoàn toàn về CRM BFF.
-- [ ] Browser không giữ Supabase access/refresh token; không gọi Supabase Auth trực tiếp.
-- [ ] Test unauthenticated, login fail/success, logout, session expiry, revoke và forbidden permission.
+- [x] Hoàn thiện login/logout, CRM HttpOnly session, session validation, refresh và revoke.
+- [x] Chuyển middleware redirect và permission enforcement hoàn toàn về CRM BFF.
+- [x] Browser không giữ Supabase access/refresh token; không gọi Supabase Auth trực tiếp.
+- [x] Test unauthenticated, login fail/success, logout, session expiry, revoke và forbidden permission.
 
 ### A1 — Tour Product
 
-- [ ] API/repository Products và Pricing; filter, sort, pagination ở server.
-- [ ] Redis cache Product list/facets; invalidate sau product/pricing mutation.
-- [ ] Chuyển UI/hook sang CRM API, optimistic update và error state.
-- [ ] Test quyền, cache invalidation, UI parity; gỡ direct browser-Supabase path.
+- [x] API/repository Products và Pricing; filter, sort, pagination ở server.
+- [x] Redis cache Product list/facets; invalidate sau product/pricing mutation.
+- [x] Chuyển UI/hook sang CRM API, optimistic update và error state.
+- [x] Test quyền, cache invalidation, UI parity; gỡ direct browser-Supabase path.
 
 ### A2 — Daily Planner
 
-- [ ] API/repository dữ liệu planner và mutation liên quan.
-- [ ] Chuyển UI/hook sang CRM API; kiểm tra quyền và rollback khi mutation lỗi.
-- [ ] Test parity; gỡ direct browser-Supabase path.
+- [x] API/repository dữ liệu planner và mutation liên quan.
+- [x] Chuyển UI/hook sang CRM API; kiểm tra quyền và rollback khi mutation lỗi.
+- [x] Test parity; gỡ direct browser-Supabase path.
 
 ### A3 — Attraction Schedule
 
-- [ ] API/repository địa điểm tham quan và lịch theo tỉnh.
-- [ ] Chuyển UI/hook, filter theo tỉnh và mutation sang CRM API.
-- [ ] Test quyền, dữ liệu theo tỉnh, UI parity; gỡ direct browser-Supabase path.
+- [x] API/repository địa điểm tham quan và lịch theo tỉnh.
+- [x] Chuyển UI/hook, filter theo tỉnh và mutation sang CRM API.
+- [x] Test quyền, dữ liệu theo tỉnh, UI parity; gỡ direct browser-Supabase path.
 
 ### A4 — Tour Design
 
-- [ ] API/repository aggregate cho Tour Draft, Outline và child records.
-- [ ] Đảm bảo ghi nhiều bảng transaction hoặc rollback an toàn.
-- [ ] Chuyển UI/hook, test permission/mutation rollback; gỡ direct browser-Supabase path.
+- [x] API/repository aggregate cho Tour Draft, Outline và child records.
+- [x] Đảm bảo ghi nhiều bảng transaction hoặc rollback an toàn.
+- [x] Chuyển UI/hook, test permission/mutation rollback; gỡ direct browser-Supabase path.
 
 ## Developer B — feature end-to-end
 
 ### B1 — Clients
 
-- [ ] Customer API/repository cho list/detail/create/update/delete.
-- [ ] Search/pagination ở server; chuyển UI/hook và optimistic update.
-- [ ] Test quyền, filter, UI parity; gỡ direct browser-Supabase path.
+- [x] Customer API/repository cho list/detail/create/update/delete.
+- [x] Search/pagination ở server; chuyển UI/hook và optimistic update.
+- [x] Test quyền, filter, UI parity; gỡ direct browser-Supabase path.
+
+> **Done 2026-08-21 (DEV B):** `/api/customers` + repo Zod, `useCustomerPage` / register / delete, contract tests, Network filter B2B → CRM API. Notes qua `PATCH`. Hydrate/shared sync `customers` vẫn còn cho route khác (quy tắc #6 — chưa xóa sync chung). Comms / new inquiry profile để B3. Inventory callers: `Personal/docs/bff-customers-inventory.md`. CI script: `npm run check:supabase-leakage` (chưa hard-fail build tới cutover).
 
 ### B2 — B2B Agents
 

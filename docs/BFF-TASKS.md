@@ -54,20 +54,20 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
 
 ### Developer A task list
 
-- [ ] A0. Complete Auth & Session end-to-end: login/logout, HttpOnly CRM session, session validation/refresh/revocation, middleware redirects, permission enforcement, tests, and removal of browser Supabase token handling.
-- [ ] A0.1. Establish BFF API conventions, error format, auth/permission middleware, and server-only Supabase client.
-- [ ] A1. Implement the shared Redis cache wrapper and cache invalidation contract.
-- [ ] A2. Complete Tour Product end-to-end: product/pricing API/repository/cache, UI/hooks, tests, and direct-path removal.
-- [ ] A3. Complete Daily Planner end-to-end: planner API/repository, authorization, UI/hooks, tests, and direct-path removal.
-- [ ] A4. Complete Attraction Schedule end-to-end: province-attraction/schedule API/repository, UI/hooks, tests, and direct-path removal.
-- [ ] A5. Complete Tour Design end-to-end: draft/outline API/repository, child-record write safety, UI/hooks, tests, and direct-path removal.
+- [x] A0. Complete Auth & Session end-to-end: login/logout, HttpOnly CRM session, session validation/refresh/revocation, middleware redirects, permission enforcement, tests, and removal of browser Supabase token handling.
+- [x] A0.1. Establish BFF API conventions, error format, auth/permission middleware, and server-only Supabase client.
+- [x] A1. Implement the shared Redis cache wrapper and cache invalidation contract.
+- [x] A2. Complete Tour Product end-to-end: product/pricing API/repository/cache, UI/hooks, tests, and direct-path removal.
+- [x] A3. Complete Daily Planner end-to-end: planner API/repository, authorization, UI/hooks, tests, and direct-path removal.
+- [x] A4. Complete Attraction Schedule end-to-end: province-attraction/schedule API/repository, UI/hooks, tests, and direct-path removal.
+- [x] A5. Complete Tour Design end-to-end: draft/outline API/repository, child-record write safety, UI/hooks, tests, and direct-path removal.
 - [ ] A6. Coordinate final removal of public Supabase runtime/build configuration with Owner-Ops after all nine scoped features pass acceptance.
 
 ### Developer B task list
 
-- [ ] B0. Produce and maintain the direct browser-Supabase inventory, mapping every caller to an API replacement.
-- [ ] B1. Define shared domain DTOs and test fixtures jointly with Developer A.
-- [ ] B2. Complete Clients end-to-end: customer API/repository, server search/pagination, UI/hooks, tests, and direct-path removal.
+- [ ] B0. Produce and maintain the direct browser-Supabase inventory, mapping every caller to an API replacement. *(Clients callers mapped 2026-08-21; other features still open.)*
+- [x] B1. Define shared domain DTOs and test fixtures jointly with Developer A. *(Customers contract + fixtures shipped; expand as Agents/Sales land.)*
+- [x] B2. Complete Clients end-to-end: customer API/repository, server search/pagination, UI/hooks, tests, and direct-path removal.
 - [ ] B3. Complete B2B Agents end-to-end: agent API/repository, UI/hooks, tests, and direct-path removal.
 - [ ] B4. Complete Sales Pipeline end-to-end: lead/pipeline API/repository, UI/hooks, tests, and direct-path removal.
 - [ ] B5. Complete Photo Gallery end-to-end: gallery metadata plus existing upload/delete CRM APIs, UI/hooks, tests, and direct-path removal.

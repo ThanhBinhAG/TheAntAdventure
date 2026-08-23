@@ -601,21 +601,26 @@ export default function SalesPage() {
         mode="add"
         customers={customers}
         onClose={() => setFormOpen(false)}
-        onSave={(payload) => {
-          const result = saveFromForm({ ...payload, flagTourDesign: true });
-          if (!result.ok) return false;
-          setFormOpen(false);
-          if (result.leadId) {
-            setCreatedClient({
-              leadId: result.leadId,
-              custId: result.customer.id,
-              name: result.customer.name,
-              message: result.message || `Customer ${result.customer.id} created.`,
-            });
-          } else if (result.message) {
-            toast.info(result.message);
+        onSave={async (payload) => {
+          try {
+            const result = await saveFromForm({ ...payload, flagTourDesign: true });
+            if (!result.ok) return false;
+            setFormOpen(false);
+            if (result.leadId) {
+              setCreatedClient({
+                leadId: result.leadId,
+                custId: result.customer.id,
+                name: result.customer.name,
+                message: result.message || `Customer ${result.customer.id} created.`,
+              });
+            } else if (result.message) {
+              toast.info(result.message);
+            }
+            return true;
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Không thể tạo khách hàng.');
+            return false;
           }
-          return true;
         }}
       />
 

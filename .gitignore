@@ -44,6 +44,11 @@ Thumbs.db
 *.tsbuildinfo
 next-env.d.ts
 
+# Playwright browser E2E artifacts and generated test state
+playwright-report/
+test-results/
+.e2e-state.json
+
 # Vercel / deploy
 .vercel
 
@@ -55,7 +60,3 @@ backups/
 Personal/
 Material_test/
 Material/
-
-# Unit tests live under Personal/tests/ (gitignored). Keep tests/AGENTS.md only.
-tests/*.test.ts
-tests/**/*.test.ts

@@ -1,0 +1,146 @@
+import 'server-only';
+
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { getAuthContext, type AuthContext } from '@/lib/auth/session';
+import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
+import { getServerSupabaseClient } from '@/lib/supabase/server';
+import type { PermissionCode } from '@/lib/auth/permissions';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+export type BffRequestContext<TQuery = unknown, TBody = unknown> = {
+  request: NextRequest;
+  auth: AuthContext;
+  supabase: SupabaseClient;
+  query: TQuery;
+  body: TBody;
+};
+
+export type BffRouteOptions<TQuery extends z.ZodTypeAny, TBody extends z.ZodTypeAny> = {
+  requiredPermission?: PermissionCode;
+  querySchema?: TQuery;
+  bodySchema?: TBody;
+};
+
+/**
+ * Wrapper chuẩn hóa cho các API Route Handlers ở BFF.
+ * Tự động xác thực, phân quyền, validate input bằng Zod, và inject server-only Supabase client.
+ */
+export function bffRoute<
+  TQuery extends z.ZodTypeAny = z.ZodTypeAny,
+  TBody extends z.ZodTypeAny = z.ZodTypeAny,
+>(
+  options: BffRouteOptions<TQuery, TBody>,
+  handler: (ctx: BffRequestContext<z.infer<TQuery>, z.infer<TBody>>) => Promise<NextResponse | Response | unknown>
+) {
+  return async (request: Request) => {
+    const nextRequest = new NextRequest(request);
+
+    try {
+      // 1. Xác thực & Phân quyền
+      if (options.requiredPermission) {
+        const permission = await checkPermissionForRequest(options.requiredPermission);
+        if (!permission.allowed) {
+          const errorMsg =
+            permission.status === 401
+              ? 'Chưa đăng nhập hoặc session đã hết hạn.'
+              : `Bạn không có quyền thực hiện hành động này (Yêu cầu: ${options.requiredPermission}).`;
+          return NextResponse.json({ ok: false, error: errorMsg }, { status: permission.status });
+        }
+      } else {
+        // Nếu không yêu cầu permission cụ thể, vẫn bắt buộc phải đăng nhập
+        const auth = await getAuthContext();
+        if (!auth.authenticated) {
+          return NextResponse.json({ ok: false, error: 'Chưa đăng nhập hoặc session đã hết hạn.' }, { status: 401 });
+        }
+      }
+
+      // 2. Lấy Auth Context thực tế để truyền vào handler
+      const auth = await getAuthContext();
+
+      // 3. Tạo user-scoped Supabase client
+      const supabase = await getServerSupabaseClient();
+
+      // 4. Validate query parameters (nếu có schema)
+      let queryData: z.infer<TQuery> | undefined = undefined;
+      if (options.querySchema) {
+        const url = new URL(request.url);
+        const queryObj: Record<string, string | string[]> = {};
+        
+        url.searchParams.forEach((value, key) => {
+          if (key in queryObj) {
+            const existing = queryObj[key];
+            if (Array.isArray(existing)) {
+              existing.push(value);
+            } else {
+              queryObj[key] = [existing, value];
+            }
+          } else {
+            queryObj[key] = value;
+          }
+        });
+
+        const parsedQuery = options.querySchema.safeParse(queryObj);
+        if (!parsedQuery.success) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: 'Tham số truy vấn không hợp lệ.',
+              details: parsedQuery.error.format(),
+            },
+            { status: 400 }
+          );
+        }
+        queryData = parsedQuery.data;
+      }
+
+      // 5. Validate JSON body (nếu có schema)
+      let bodyData: z.infer<TBody> | undefined = undefined;
+      if (options.bodySchema) {
+        let bodyObj: unknown;
+        try {
+          bodyObj = await nextRequest.json();
+        } catch {
+          return NextResponse.json(
+            { ok: false, error: 'Yêu cầu phải có body dạng JSON.' },
+            { status: 400 }
+          );
+        }
+
+        const parsedBody = options.bodySchema.safeParse(bodyObj);
+        if (!parsedBody.success) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: 'Dữ liệu yêu cầu không hợp lệ.',
+              details: parsedBody.error.format(),
+            },
+            { status: 422 }
+          );
+        }
+        bodyData = parsedBody.data;
+      }
+
+      const result = await handler({
+        request: nextRequest,
+        auth,
+        supabase,
+        query: queryData as z.infer<TQuery>,
+        body: bodyData as z.infer<TBody>,
+      });
+
+      // Nếu handler trả về Response/NextResponse trực tiếp thì chuyển tiếp thẳng
+      if (result instanceof NextResponse || result instanceof Response) {
+        return result;
+      }
+
+      // Ngược lại, bọc kết quả thành công trong cấu trúc chuẩn
+      return NextResponse.json({ ok: true, data: result });
+
+    } catch (error) {
+      console.error('BFF Route Handler Error:', error);
+      const message = error instanceof Error ? error.message : 'Đã có lỗi xảy ra trên server.';
+      return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    }
+  };
+}

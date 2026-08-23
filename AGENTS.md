@@ -53,6 +53,13 @@ Whenever you make **notable code or project changes** (features, fixes, refactor
 
 Do not consider a task complete until the changelog reflects the work.
 
+## CI/CD environment contract
+
+- [`.env.example`](.env.example) is the single source of truth for CRM environment-variable names.
+- Mark every value required for a production deploy with a standalone `# CI_REQUIRED` line immediately before its assignment (commented assignments are supported).
+- Do not add a separate hard-coded required-variable list to CI scripts. The production validator reads `CI_REQUIRED` markers from `.env.example`.
+- A new shared deployment env is seeded with all names from `.env.example`; CI may generate secrets or inject managed values, but must never copy placeholder example values into production.
+
 ## Git push and commits
 
 - Before pushing to GitLab, run `npm run lint` and fix failures first. See [`.cursor/rules/git-push-and-commits.mdc`](.cursor/rules/git-push-and-commits.mdc).

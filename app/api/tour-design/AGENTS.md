@@ -5,6 +5,8 @@ BFF Route Handlers cho tính năng thiết kế Tour (Tour Design & Outlines).
 
 ## Contents
 - `save/route.ts` — POST lưu atomically draft và thay thế các ngày hành trình qua PostgreSQL RPC transaction.
+- `drafts/route.ts` — GET một draft theo `id` hoặc drafts theo các `leadIds` đang cần trên màn hình.
+- `outlines/route.ts` — GET outline days của một `draftId` đang được mở.
 - `drafts/all/route.ts` — GET toàn bộ danh sách tour drafts cho client hydration.
 - `outlines/all/route.ts` — GET toàn bộ danh sách tour outline days cho client hydration.
 

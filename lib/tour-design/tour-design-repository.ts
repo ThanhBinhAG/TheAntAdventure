@@ -56,6 +56,48 @@ export async function getAllTourOutlineDaysServer(): Promise<TourOutlineDay[]> {
   return (data || []).map((row) => rowToTourOutlineDay(row));
 }
 
+/** Read one draft when a user opens its Tour Design session. */
+export async function getTourDraftByIdServer(
+  supabase: SupabaseClient,
+  draftId: string
+): Promise<TourDraft | null> {
+  const { data, error } = await supabase
+    .from('tour_drafts')
+    .select('*')
+    .eq('id', draftId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? rowToTourDraft(data) : null;
+}
+
+/** Read only drafts connected to the currently available leads. */
+export async function getTourDraftsForLeadsServer(
+  supabase: SupabaseClient,
+  leadIds: string[]
+): Promise<TourDraft[]> {
+  if (leadIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('tour_drafts')
+    .select('*')
+    .in('lead_id', leadIds);
+  if (error) throw error;
+  return (data ?? []).map(rowToTourDraft);
+}
+
+/** Load outlines only for the draft currently being viewed. */
+export async function getTourOutlineDaysForDraftServer(
+  supabase: SupabaseClient,
+  draftId: string
+): Promise<TourOutlineDay[]> {
+  const { data, error } = await supabase
+    .from('tour_outline_days')
+    .select('*')
+    .eq('draft_id', draftId)
+    .order('day_number');
+  if (error) throw error;
+  return (data ?? []).map(rowToTourOutlineDay);
+}
+
 /** Save the draft and replacement outline as one PostgreSQL transaction. */
 export async function saveTourDesignServer(
   supabase: SupabaseClient,

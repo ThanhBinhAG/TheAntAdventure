@@ -11,12 +11,18 @@ test.describe.serial('Tour Design transaction acceptance', () => {
       { id: newId(), draftId, dayNumber: 1, date: '2026-09-01', location: 'Hanoi', activities: 'Arrival', hotels: '', sortOrder: 1 },
       { id: newId(), draftId, dayNumber: 2, date: '2026-09-02', location: 'Ha Long', activities: 'Cruise', hotels: '', sortOrder: 2 },
     ];
-    const firstSave = await browserJson(page, '/api/tour-design/save', {
-      method: 'POST',
-      body: { draft, outlineDays, expectedSaveRevision: 0 },
-    });
-    expect(firstSave.status).toBe(200);
-    expect((firstSave.body as { data: { saveRevision: number } }).data.saveRevision).toBe(1);
+
+    const concurrentFirstSaves = await Promise.all([
+      browserJson(page, '/api/tour-design/save', {
+        method: 'POST',
+        body: { draft, outlineDays, expectedSaveRevision: 0 },
+      }),
+      browserJson(page, '/api/tour-design/save', {
+        method: 'POST',
+        body: { draft, outlineDays, expectedSaveRevision: 0 },
+      }),
+    ]);
+    expect(concurrentFirstSaves.map((result) => result.status).sort()).toEqual([200, 409]);
     expect((await assertRow('tour_drafts', 'id', draftId))?.outline_notes).toBe('committed outline');
 
     const newestDraft = { ...draft, outlineNotes: 'newest outline', outlineRevision: 2 };
@@ -49,7 +55,7 @@ test.describe.serial('Tour Design transaction acceptance', () => {
       body: { draft: failedDraft, outlineDays: duplicateDays, expectedSaveRevision: 2 },
     })).status).toBe(500);
     expect((await assertRow('tour_drafts', 'id', draftId))?.outline_notes).toBe('newest outline');
-    const rows = await browserJson(page, '/api/tour-design/outlines/all');
+    const rows = await browserJson(page, `/api/tour-design/outlines?draftId=${encodeURIComponent(draftId)}`);
     expect(rows.status).toBe(200);
     expect(JSON.stringify(rows.body)).toContain('Newest arrival');
     expect(JSON.stringify(rows.body)).not.toContain('must-not-commit');

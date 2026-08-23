@@ -1,6 +1,10 @@
+import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { bffRoute } from '@/lib/bff/route';
-import { updateProductPricingServer } from '@/lib/products/product-repository';
+import {
+  getProductPricingByCodeServer,
+  updateProductPricingServer,
+} from '@/lib/products/product-repository';
 import { invalidateProductFacetsCache } from '@/lib/redis/product-facets';
 
 export const dynamic = 'force-dynamic';
@@ -36,6 +40,20 @@ const pricingSchema = z.object({
     m: z.boolean().default(false),
   }),
 });
+
+export const GET = bffRoute(
+  {
+    requiredPermission: 'products.read',
+    querySchema: z.object({ productCode: z.string().min(1) }),
+  },
+  async ({ supabase, query }) => {
+    const pricing = await getProductPricingByCodeServer(supabase, query.productCode);
+    if (!pricing) {
+      return NextResponse.json({ ok: false, error: 'Không tìm thấy bảng giá Product.' }, { status: 404 });
+    }
+    return pricing;
+  }
+);
 
 // PATCH: Cập nhật chi tiết bảng giá cho một sản phẩm
 export const PATCH = bffRoute(

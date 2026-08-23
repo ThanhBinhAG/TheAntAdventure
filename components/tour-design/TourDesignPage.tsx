@@ -41,10 +41,10 @@ import {
 } from '@/lib/tour-design/tour-draft-utils';
 import { TourDraftSaveQueue } from '@/lib/tour-design/tour-save-queue';
 import { outlineDocFromRows, printOutline } from '@/lib/outline/outline-html';
-import { getBffArray } from '@/lib/bff/client';
+import { getBffArray, getBffData } from '@/lib/bff/client';
 import type { ProposalTemplateOverrides } from '@/lib/proposals/proposal-content-overrides';
 import { DEFAULT_PROPOSAL_LAYOUT_ID, type ProposalLayoutId } from '@/lib/proposals/proposal-layouts';
-import type { ExperienceOverride, OutlineStatus, Product, TourDraft, TourOutlineDay } from '@/lib/types';
+import type { ExperienceOverride, OutlineStatus, Product, ProductPricing, TourDraft, TourOutlineDay } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import { TourDesignQueueCards } from '@/components/tour-design/TourDesignQueueCards';
@@ -58,7 +58,6 @@ export default function TourDesignPage() {
   const customers = useStore((s) => s.customers);
   const leads = useStore((s) => s.leads);
   const tourDrafts = useStore((s) => s.tourDrafts);
-  const tourOutlineDays = useStore((s) => s.tourOutlineDays);
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
   const hotels = useStore((s) => s.hotels);
   const addLead = useStore((s) => s.addLead);
@@ -67,8 +66,8 @@ export default function TourDesignPage() {
   const upsertTourDraft = useStore((s) => s.upsertTourDraft);
   const replaceOutlineDaysForDraft = useStore((s) => s.replaceOutlineDaysForDraft);
   const setProducts = useStore((s) => s.setProducts);
+  const setProductPricing = useStore((s) => s.setProductPricing);
   const setTourDrafts = useStore((s) => s.setTourDrafts);
-  const setTourOutlineDays = useStore((s) => s.setTourOutlineDays);
   const setPhotos = useStore((s) => s.setPhotos);
   const { saveFromForm } = useRegisterCustomer();
 
@@ -102,19 +101,8 @@ export default function TourDesignPage() {
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      getBffArray<Product>('/api/products/all', 'Không thể tải catalogue product.'),
-      getBffArray<TourDraft>('/api/tour-design/drafts/all', 'Không thể tải bản nháp tour.'),
-      getBffArray<TourOutlineDay>('/api/tour-design/outlines/all', 'Không thể tải hành trình tour.'),
-      getBffArray<GalleryPhoto>('/api/photos/all', 'Không thể tải thư viện ảnh.'),
-    ]).then(([catalogue, drafts, outlineDays, galleryPhotos]) => {
+    void getBffArray<GalleryPhoto>('/api/photos/all', 'Không thể tải thư viện ảnh.').then((galleryPhotos) => {
       if (!active) return;
-      drafts.forEach((draft) => {
-        saveQueueRef.current.setSaveRevision(draft.id, draft.saveRevision ?? 0);
-      });
-      setProducts(catalogue);
-      setTourDrafts(drafts);
-      setTourOutlineDays(outlineDays);
       setPhotos(galleryPhotos);
       setReadError(null);
     }).catch((error: unknown) => {
@@ -123,7 +111,63 @@ export default function TourDesignPage() {
     return () => {
       active = false;
     };
-  }, [setPhotos, setProducts, setTourDrafts, setTourOutlineDays]);
+  }, [setPhotos]);
+
+  useEffect(() => {
+    const leadIds = [...new Set(leads.map((lead) => lead.id).filter(Boolean))];
+    if (leadIds.length === 0) {
+      setTourDrafts([]);
+      return;
+    }
+
+    let active = true;
+    void getBffArray<TourDraft>(
+      `/api/tour-design/drafts?leadIds=${encodeURIComponent(leadIds.join(','))}`,
+      'Không thể tải bản nháp tour.'
+    ).then((drafts) => {
+      if (!active) return;
+      drafts.forEach((draft) => {
+        saveQueueRef.current.setSaveRevision(draft.id, draft.saveRevision ?? 0);
+      });
+      setTourDrafts(drafts);
+    }).catch((error: unknown) => {
+      if (active) setReadError(error instanceof Error ? error.message : 'Không thể tải bản nháp tour.');
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [leads, setTourDrafts]);
+
+  useEffect(() => {
+    const missingCodes = selectedCodes.filter((code) => !products.some((product) => product.code === code));
+    if (missingCodes.length === 0) return;
+
+    let active = true;
+    void Promise.all(missingCodes.map(async (code) => {
+      const [product, pricing] = await Promise.all([
+        getBffData<Product>(`/api/products?code=${encodeURIComponent(code)}`, 'Không thể tải Product đã chọn.'),
+        getBffData<ProductPricing>(`/api/products/pricing?productCode=${encodeURIComponent(code)}`, 'Không thể tải bảng giá Product đã chọn.'),
+      ]);
+      return { product, pricing };
+    })).then((loaded) => {
+      if (!active) return;
+      const currentProducts = useStore.getState().products;
+      const byCode = new Map(currentProducts.map((product) => [product.code, product]));
+      loaded.forEach(({ product }) => byCode.set(product.code, product));
+      setProducts([...byCode.values()]);
+      const currentPricing = useStore.getState().productPricing;
+      const pricingByCode = new Map(currentPricing.map((pricing) => [pricing.productCode, pricing]));
+      loaded.forEach(({ pricing }) => pricingByCode.set(pricing.productCode, pricing));
+      setProductPricing([...pricingByCode.values()]);
+    }).catch((error: unknown) => {
+      if (active) setReadError(error instanceof Error ? error.message : 'Không thể tải Product đã chọn.');
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [products, selectedCodes, setProductPricing, setProducts]);
 
   const experiencesBlocked = isExperiencesBlocked(leadId, outlineRows.length, outlineStatus);
   const pendingLeads = useMemo(() => getPendingTourDesignLeads(leads), [leads]);
@@ -302,12 +346,32 @@ export default function TourDesignPage() {
   );
 
   const openLeadSession = useCallback(
-    (lid: string, cid: string, urlStep?: number) => {
+    async (lid: string, cid: string, urlStep?: number) => {
       setLeadId(lid);
       setCustId(cid);
 
-      const draft = tourDrafts.find((d) => d.leadId === lid);
+      let draft = tourDrafts.find((item) => item.leadId === lid) ?? null;
+      let days: TourOutlineDay[] = [];
       const c = customers.find((x) => x.id === cid);
+
+      try {
+        const loadedDraft = await getBffData<TourDraft | null>(
+          `/api/tour-design/drafts?id=${encodeURIComponent(tourDraftIdForLead(lid))}`,
+          'Không thể tải bản nháp tour.'
+        );
+        if (loadedDraft) {
+          draft = loadedDraft;
+          days = await getBffArray<TourOutlineDay>(
+            `/api/tour-design/outlines?draftId=${encodeURIComponent(loadedDraft.id)}`,
+            'Không thể tải hành trình tour.'
+          );
+          upsertTourDraft(loadedDraft);
+          replaceOutlineDaysForDraft(loadedDraft.id, days);
+        }
+      } catch (error) {
+        setReadError(error instanceof Error ? error.message : 'Không thể tải bản nháp tour.');
+        return;
+      }
 
       if (draft) {
         saveQueueRef.current.setSaveRevision(draft.id, draft.saveRevision ?? 0);
@@ -334,7 +398,6 @@ export default function TourDesignPage() {
         setClientType(draft.clientType ?? c?.clientType ?? 'b2c');
         const nextStep = urlStep ?? draft.currentStep ?? 0;
         setStep(nextStep);
-        const days = tourOutlineDays.filter((d) => d.draftId === draft.id);
         setOutlineRows(days.length ? days : []);
       } else if (c) {
         saveQueueRef.current.setSaveRevision(tourDraftIdForLead(lid), 0);
@@ -352,9 +415,11 @@ export default function TourDesignPage() {
         setProposalSpecialNotes('');
         setProposalHotelRates(null);
         setProposalLayoutId(DEFAULT_PROPOSAL_LAYOUT_ID);
+        setSelectedCodes([]);
+        setSelectedPackageId(null);
       }
     },
-    [customers, tourDrafts, tourOutlineDays]
+    [customers, replaceOutlineDaysForDraft, tourDrafts, upsertTourDraft]
   );
 
   const ensureLeadSession = useCallback((): string => {
@@ -380,7 +445,7 @@ export default function TourDesignPage() {
     if (urlInitRef.current === key) return;
     urlInitRef.current = key;
     const restoredStep = Number.isFinite(urlStep) ? urlStep : undefined;
-    openLeadSession(urlLeadId, urlCustId, restoredStep);
+    void openLeadSession(urlLeadId, urlCustId, restoredStep);
     if ((restoredStep ?? 0) >= 1) {
       void persistTourDesignAck(urlLeadId);
     }

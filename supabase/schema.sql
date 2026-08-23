@@ -375,6 +375,9 @@ begin
     raise exception 'Outline day numbers must be unique' using errcode = '22023';
   end if;
 
+  -- A row lock cannot protect two concurrent first inserts, so lock by draft id first.
+  perform pg_advisory_xact_lock(hashtext('tour-design:' || v_draft_id));
+
   select save_revision into v_current_save_revision
   from public.tour_drafts where id = v_draft_id for update;
 
@@ -1149,6 +1152,35 @@ $function$;
 
 revoke all on function public.save_product_aggregate(jsonb, jsonb, jsonb) from public;
 grant execute on function public.save_product_aggregate(jsonb, jsonb, jsonb) to authenticated;
+
+create or replace function public.update_product_aggregate(
+  p_product jsonb,
+  p_pricing_stub jsonb,
+  p_photo_links jsonb
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $function$
+declare
+  v_code text := p_product ->> 'code';
+begin
+  if not exists (
+    select 1
+    from public.products
+    where code = v_code
+    for update
+  ) then
+    raise exception 'Product does not exist' using errcode = 'P0002';
+  end if;
+
+  perform public.save_product_aggregate(p_product, p_pricing_stub, p_photo_links);
+end;
+$function$;
+
+revoke all on function public.update_product_aggregate(jsonb, jsonb, jsonb) from public;
+grant execute on function public.update_product_aggregate(jsonb, jsonb, jsonb) to authenticated;
 revoke all on function public.save_attraction_aggregate(jsonb, jsonb) from public;
 grant execute on function public.save_attraction_aggregate(jsonb, jsonb) to authenticated;
 

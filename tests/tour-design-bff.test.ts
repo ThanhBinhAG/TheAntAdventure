@@ -248,4 +248,19 @@ test('Tour Design BFF APIs - Tests', async (t) => {
     assert.equal(json.ok, false);
     assert.equal(json.currentSaveRevision, 2);
   });
+
+  await t.test('POST /api/tour-design/save rejects an outline status unsupported by the database', async () => {
+    const response = await saveRoute.POST(new Request('http://localhost/api/tour-design/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        draft: { id: 'TD-INVALID', leadId: 'L-004', custId: 'C-004', outlineStatus: 'revision' },
+        outlineDays: [],
+        expectedSaveRevision: 0,
+      }),
+    }));
+
+    assert.equal(response.status, 422);
+    assert.equal(supabaseCalls.length, 0);
+  });
 });

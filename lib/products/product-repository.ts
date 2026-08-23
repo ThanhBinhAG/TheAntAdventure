@@ -11,6 +11,13 @@ import {
 } from '@/lib/db/mappers';
 import type { Product, ProductPricing } from '@/lib/types';
 
+export class ProductNotFoundError extends Error {
+  constructor(code: string) {
+    super(`Không tìm thấy Product: ${code}.`);
+    this.name = 'ProductNotFoundError';
+  }
+}
+
 /**
  * Lấy toàn bộ sản phẩm (kèm ảnh) từ server.
  */
@@ -45,6 +52,42 @@ export async function getAllProductPricingServer(): Promise<ProductPricing[]> {
   if (error) throw error;
 
   return (data || []).map(rowToProductPricing);
+}
+
+/** Read one Product aggregate for detail/editing without hydrating the catalogue. */
+export async function getProductByCodeServer(
+  supabase: SupabaseClient,
+  code: string
+): Promise<Product | null> {
+  const { data: baseRow, error: productError } = await supabase
+    .from('products')
+    .select('*')
+    .eq('code', code)
+    .maybeSingle();
+  if (productError) throw productError;
+  if (!baseRow) return null;
+
+  const { data: links, error: photoError } = await supabase
+    .from('product_photos')
+    .select('*')
+    .eq('product_code', code);
+  if (photoError) throw photoError;
+
+  return assembleProducts([baseRow], links ?? [])[0] as unknown as Product;
+}
+
+/** Read one pricing row for a Product on demand. */
+export async function getProductPricingByCodeServer(
+  supabase: SupabaseClient,
+  productCode: string
+): Promise<ProductPricing | null> {
+  const { data, error } = await supabase
+    .from('product_pricing')
+    .select('*')
+    .eq('product_code', productCode)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? rowToProductPricing(data) : null;
 }
 
 /** Replace the full catalogue and its required pricing stubs in one database transaction. */
@@ -105,7 +148,15 @@ export async function updateProductServer(
   if (code !== product.code) {
     throw new Error('Product code cannot change during update');
   }
-  await saveProductAggregateServer(supabase, product);
+  const { error } = await supabase.rpc('update_product_aggregate', {
+    p_product: productToRow(product),
+    p_pricing_stub: productPricingToRow(defaultProductPricing(product.code)),
+    p_photo_links: productPhotoRows(product),
+  });
+  if (error) {
+    if (error.code === 'P0002') throw new ProductNotFoundError(code);
+    throw error;
+  }
 
   return product;
 }
@@ -117,11 +168,13 @@ export async function deleteProductServer(
   supabase: SupabaseClient,
   code: string
 ): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('products')
     .delete()
-    .eq('code', code);
+    .eq('code', code)
+    .select('code');
   if (error) throw error;
+  if (!data?.length) throw new ProductNotFoundError(code);
 }
 
 /**

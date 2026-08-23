@@ -16,7 +16,8 @@ require.cache[serverOnlyPath] = {
 let supabaseCalls: { method: string; table: string; data?: any; eqCode?: string }[] = [];
 let cacheInvalidated = false;
 let productImportRpcError: { message: string } | null = null;
-let productAggregateRpcError: { message: string } | null = null;
+let productAggregateRpcError: { message: string; code?: string } | null = null;
+let productDeleteFound = true;
 
 // Mock dependencies
 mock.module(require.resolve('../lib/auth/session'), {
@@ -56,7 +57,7 @@ mock.module(require.resolve('../lib/supabase/server'), {
           return Promise.resolve({
             error: name === 'replace_product_catalogue_transaction'
               ? productImportRpcError
-              : name === 'save_product_aggregate'
+              : name === 'save_product_aggregate' || name === 'update_product_aggregate'
                 ? productAggregateRpcError
                 : null,
           });
@@ -66,6 +67,25 @@ mock.module(require.resolve('../lib/supabase/server'), {
             supabaseCalls.push({ method: 'select', table });
             return {
               order: () => Promise.resolve({ data: [], error: null }),
+              eq: (field: string, value: string) => ({
+                maybeSingle: () => Promise.resolve({
+                  data: table === 'products'
+                    ? {
+                      code: value, name: 'Test Product', logic: '', duration: '', category: '',
+                      destination: '', level: '', description: '', usp: '', notes_to_sales: '',
+                      price_from: '', region: 'north',
+                    }
+                    : table === 'product_pricing'
+                      ? {
+                        product_code: value, std_cost: 0,
+                        p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0, p7: 0, p8: 0, p9: 0, p10: 0,
+                        c1: 0, c2: 0, c3: 0, c4: 0, c5: 0, c6: 0, c7: 0, c8: 0, c9: 0, c10: 0,
+                        incl_guide: false, incl_transport: false, incl_tickets: false, incl_water: false, incl_meals: false,
+                      }
+                      : null,
+                  error: null,
+                }),
+              }),
             };
           },
           insert: (data: any) => {
@@ -88,7 +108,12 @@ mock.module(require.resolve('../lib/supabase/server'), {
               },
               eq: (field: string, val: string) => {
                 supabaseCalls.push({ method: 'delete', table, eqCode: val });
-                return Promise.resolve({ error: null });
+                return {
+                  select: () => Promise.resolve({
+                    data: productDeleteFound ? [{ code: val }] : [],
+                    error: null,
+                  }),
+                };
               },
             };
           },
@@ -139,6 +164,7 @@ test('Tour Product BFF APIs - Tests', async (t) => {
     cacheInvalidated = false;
     productImportRpcError = null;
     productAggregateRpcError = null;
+    productDeleteFound = true;
   });
 
   await t.test('GET /api/products - paginated page', async () => {
@@ -214,7 +240,7 @@ test('Tour Product BFF APIs - Tests', async (t) => {
 
     assert.equal(supabaseCalls.length, 1);
     assert.equal(supabaseCalls[0].method, 'rpc');
-    assert.equal(supabaseCalls[0].table, 'save_product_aggregate');
+    assert.equal(supabaseCalls[0].table, 'update_product_aggregate');
     assert.equal(supabaseCalls[0].data.p_photo_links.length, 2);
     assert.equal(cacheInvalidated, true);
   });
@@ -231,8 +257,20 @@ test('Tour Product BFF APIs - Tests', async (t) => {
     const response = await productsRoute.PATCH(req);
     assert.equal(response.status, 500);
     assert.equal(supabaseCalls.length, 1);
-    assert.equal(supabaseCalls[0].table, 'save_product_aggregate');
+    assert.equal(supabaseCalls[0].table, 'update_product_aggregate');
     assert.equal(cacheInvalidated, false);
+  });
+
+  await t.test('PATCH /api/products - returns 404 instead of creating a missing product', async () => {
+    productAggregateRpcError = { message: 'Product does not exist', code: 'P0002' };
+    const response = await productsRoute.PATCH(new Request('http://localhost/api/products', {
+      method: 'PATCH',
+      body: JSON.stringify({ product: { code: 'MISSING', name: 'Missing Product', region: 'north' } }),
+    }));
+
+    assert.equal(response.status, 404);
+    assert.equal(cacheInvalidated, false);
+    assert.equal(supabaseCalls[0].table, 'update_product_aggregate');
   });
 
   await t.test('DELETE /api/products - deletes a product', async () => {
@@ -251,6 +289,17 @@ test('Tour Product BFF APIs - Tests', async (t) => {
     assert.equal(deletes[0].table, 'products');
     assert.equal(deletes[0].eqCode, 'AA-NV-TEST-01');
     assert.equal(cacheInvalidated, true);
+  });
+
+  await t.test('DELETE /api/products - returns 404 when no product is deleted', async () => {
+    productDeleteFound = false;
+    const response = await productsRoute.DELETE(new Request('http://localhost/api/products', {
+      method: 'DELETE',
+      body: JSON.stringify({ code: 'MISSING' }),
+    }));
+
+    assert.equal(response.status, 404);
+    assert.equal(cacheInvalidated, false);
   });
 
   await t.test('GET /api/products/all - full hydration products', async () => {

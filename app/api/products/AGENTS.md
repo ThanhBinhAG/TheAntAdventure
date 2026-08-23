@@ -4,11 +4,11 @@
 Route Handler cho danh sách Tour Products phân trang ở server.
 
 ## Contents
-- `route.ts` — GET trang product phân trang, POST/PATCH/DELETE chỉnh sửa hoặc xóa product.
+- `route.ts` — GET page hoặc Product theo `code`; POST/PATCH/DELETE chỉnh sửa hoặc xóa product.
 - `all/route.ts` — GET toàn bộ danh sách products cho hydration.
 - `facets/route.ts` — GET bộ lọc catalog (categories / destinations / pricing pulse).
 - `pricing/all/route.ts` — GET toàn bộ product pricing cho hydration.
-- `pricing/route.ts` — PATCH cập nhật chi tiết bảng giá.
+- `pricing/route.ts` — GET bảng giá theo Product và PATCH cập nhật chi tiết bảng giá.
 - `import/route.ts` — POST import Excel thay thế toàn bộ catalogue.
 
 ## Boundaries

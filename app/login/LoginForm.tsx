@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { FormEvent, useCallback, useState } from 'react';
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
 import { getAuthCaptchaSiteKey } from '@/lib/env';
@@ -46,7 +46,6 @@ type LoginFormProps = {
 };
 
 export function LoginForm({ showDebugLink = false }: LoginFormProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const captchaSiteKey = getAuthCaptchaSiteKey();
   const captchaRequired = Boolean(captchaSiteKey);
@@ -111,9 +110,8 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
       });
       const next = searchParams.get('next');
       const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
-      // Chuyển người dùng đến trang CRM sau khi API login đã ghi session vào cookie.
-      // Không gọi router.refresh() vì có thể tạo thêm một lượt tải dữ liệu không cần thiết.
-      router.push(safeNext);
+      // A full navigation avoids a prefetched unauthenticated CRM response after the cookie changes.
+      window.location.assign(safeNext);
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Login failed.';
       logAuthEvent('signIn exception', { error: raw }, 'error');

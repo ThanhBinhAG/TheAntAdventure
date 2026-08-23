@@ -13,6 +13,8 @@ import {
   createProductServer,
   updateProductServer,
   deleteProductServer,
+  getProductByCodeServer,
+  ProductNotFoundError,
 } from '@/lib/products/product-repository';
 import { invalidateProductFacetsCache } from '@/lib/redis/product-facets';
 
@@ -42,8 +44,16 @@ export const GET = bffRoute(
   {
     requiredPermission: 'products.read',
   },
-  async ({ request }) => {
+  async ({ request, supabase }) => {
     const url = new URL(request.url);
+    const code = url.searchParams.get('code');
+    if (code) {
+      const product = await getProductByCodeServer(supabase, code);
+      if (!product) {
+        return NextResponse.json({ ok: false, error: 'Không tìm thấy Product.' }, { status: 404 });
+      }
+      return product;
+    }
     const parsed = productListQuerySchema.safeParse({
       page: optionalProductQueryParam(url, 'page'),
       pageSize: optionalProductQueryParam(url, 'pageSize'),
@@ -127,7 +137,15 @@ export const PATCH = bffRoute(
     }),
   },
   async ({ supabase, body }) => {
-    const updated = await updateProductServer(supabase, body.product.code, body.product);
+    let updated;
+    try {
+      updated = await updateProductServer(supabase, body.product.code, body.product);
+    } catch (error) {
+      if (error instanceof ProductNotFoundError) {
+        return NextResponse.json({ ok: false, error: error.message }, { status: 404 });
+      }
+      throw error;
+    }
     await invalidateProductFacetsCache();
     return updated;
   }
@@ -142,7 +160,14 @@ export const DELETE = bffRoute(
     }),
   },
   async ({ supabase, body }) => {
-    await deleteProductServer(supabase, body.code);
+    try {
+      await deleteProductServer(supabase, body.code);
+    } catch (error) {
+      if (error instanceof ProductNotFoundError) {
+        return NextResponse.json({ ok: false, error: error.message }, { status: 404 });
+      }
+      throw error;
+    }
     await invalidateProductFacetsCache();
     return { success: true };
   }

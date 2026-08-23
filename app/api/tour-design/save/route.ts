@@ -14,7 +14,7 @@ const tourDraftSchema = z.object({
   leadId: z.string().min(1),
   custId: z.string().min(1),
   briefJson: z.record(z.string(), z.any()).optional().nullable().transform((v) => v || undefined),
-  outlineStatus: z.enum(['draft', 'sent', 'approved', 'revision']).default('draft'),
+  outlineStatus: z.enum(['draft', 'sent', 'approved']).default('draft'),
   outlineNotes: z.string().optional().nullable().transform((v) => v || undefined),
   outlineSentAt: z.string().optional().nullable().transform((v) => v || undefined),
   outlineApprovedAt: z.string().optional().nullable().transform((v) => v || undefined),

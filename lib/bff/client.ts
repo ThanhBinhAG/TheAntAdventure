@@ -4,6 +4,16 @@ type BffArrayResponse<T> = {
   error?: string;
 };
 
+/** Browser-safe reader for one BFF resource. */
+export async function getBffData<T>(url: string, fallbackError: string): Promise<T> {
+  const response = await fetch(url, { credentials: 'same-origin' });
+  const body = await response.json().catch(() => null) as BffArrayResponse<T> | null;
+  if (!response.ok || !body?.ok || !('data' in body)) {
+    throw new Error(body?.error ?? fallbackError);
+  }
+  return body.data as T;
+}
+
 /** Browser-safe reader for BFF collection endpoints. */
 export async function getBffArray<T>(url: string, fallbackError: string): Promise<T[]> {
   const response = await fetch(url, { credentials: 'same-origin' });

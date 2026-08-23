@@ -72,7 +72,11 @@ mock.module(require.resolve('next/headers'), {
 
 mock.module(require.resolve('../lib/auth/break-glass'), {
   namedExports: {
-    verifyBreakGlassCredentials: () => false,
+    checkBreakGlassCredentials: () => ({
+      configured: false,
+      usernameMatches: false,
+      passwordMatches: false,
+    }),
     clearBreakGlassCookie: () => {},
   },
 });

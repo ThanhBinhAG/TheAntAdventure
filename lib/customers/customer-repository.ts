@@ -26,12 +26,15 @@ import {
   customerToRow,
   leadToRow,
   rowToAgent,
+  rowToComm,
   rowToCustomer,
   rowToLead,
 } from '@/lib/db/mappers';
 import type { Row } from '@/lib/db/mappers/shared';
+import { moneyAbs } from '@/lib/db/mappers/shared';
+import { rowToFeedback } from '@/lib/db/mappers/ops-content';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
-import type { Agent, Comm, Customer, Lead } from '@/lib/types';
+import type { Agent, Booking, Comm, Customer, Lead } from '@/lib/types';
 
 export class CustomerRepositoryError extends Error {
   constructor(
@@ -567,4 +570,103 @@ export async function deleteCustomer(id: string): Promise<void> {
 
   const { error } = await supabase.from('customers').delete().eq('id', id);
   if (error) throw new CustomerRepositoryError(error.message);
+}
+
+export type CustomerProfileFeedback = {
+  id?: string;
+  custId: string;
+  bkid?: string;
+  date?: string;
+  nps?: number;
+  comments?: string;
+  best?: string;
+  improve?: string;
+};
+
+export type CustomerProfileContext = {
+  leads: Lead[];
+  comms: Comm[];
+  bookings: Booking[];
+  feedback: CustomerProfileFeedback[];
+};
+
+function mapBookingSummaryRow(r: Row): Booking {
+  return {
+    id: String(r.id),
+    custId: String(r.cust_id ?? ''),
+    leadId: r.lead_id != null && String(r.lead_id) ? String(r.lead_id) : undefined,
+    tour: String(r.tour ?? ''),
+    pax: Number(r.pax ?? 1),
+    start: r.start_date ? String(r.start_date) : '',
+    end: r.end_date ? String(r.end_date) : '',
+    total: moneyAbs(r.total),
+    deposit: moneyAbs(r.deposit),
+    status: String(r.status ?? ''),
+    guide: String(r.guide_name ?? ''),
+    hotel: String(r.hotel ?? ''),
+    changes: [],
+    guideAlertPending: Boolean(r.guide_alert_pending),
+  };
+}
+
+/** Related rows for the Clients profile modal (server-only; no browser PostgREST). */
+export async function getCustomerProfileContext(
+  customerId: string,
+): Promise<CustomerProfileContext> {
+  const supabase = await createCustomerServerClient();
+
+  const { data: customerRow, error: customerError } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('id', customerId)
+    .maybeSingle();
+
+  if (customerError) throw new CustomerRepositoryError(customerError.message);
+  if (!customerRow) {
+    throw new CustomerRepositoryError('Không tìm thấy khách hàng.', 'not_found');
+  }
+
+  const [leadsRes, commsRes, bookingsRes] = await Promise.all([
+    supabase.from('leads').select('*').eq('cust_id', customerId),
+    supabase.from('comms').select('*').eq('cust_id', customerId),
+    supabase.from('bookings').select('*').eq('cust_id', customerId),
+  ]);
+
+  if (leadsRes.error) throw new CustomerRepositoryError(leadsRes.error.message);
+  if (commsRes.error) throw new CustomerRepositoryError(commsRes.error.message);
+  if (bookingsRes.error) throw new CustomerRepositoryError(bookingsRes.error.message);
+
+  const bookings = ((bookingsRes.data ?? []) as Row[]).map(mapBookingSummaryRow);
+  const bookingIds = bookings.map((b) => b.id);
+
+  let feedback: CustomerProfileFeedback[] = [];
+  if (bookingIds.length) {
+    const { data: feedbackRows, error: feedbackError } = await supabase
+      .from('feedback')
+      .select('*')
+      .in('booking_id', bookingIds);
+
+    if (feedbackError) throw new CustomerRepositoryError(feedbackError.message);
+
+    feedback = ((feedbackRows ?? []) as Row[]).map((row) => {
+      const mapped = rowToFeedback(row) as Row;
+      return {
+        id: mapped.id ? String(mapped.id) : undefined,
+        custId: customerId,
+        bkid: mapped.bkid ? String(mapped.bkid) : undefined,
+        date: mapped.date ? String(mapped.date) : undefined,
+        nps: mapped.nps != null ? Number(mapped.nps) : undefined,
+        comments: mapped.comments ? String(mapped.comments) : undefined,
+        best: mapped.best ? String(mapped.best) : undefined,
+        improve: mapped.improve ? String(mapped.improve) : undefined,
+      };
+    });
+  }
+
+  return {
+    leads: ((leadsRes.data ?? []) as Row[]).map(rowToLead),
+    comms: ((commsRes.data ?? []) as Row[]).map(rowToComm),
+    bookings,
+    feedback,
+  };
 }

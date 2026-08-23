@@ -30,6 +30,7 @@ export {
   routeBootSatisfied,
   setActivePageBoot,
   cancelPageBoot,
+  shouldSkipSettledBoot,
 } from './hydrate/page-boot';
 
 export {

@@ -98,6 +98,7 @@ docker:
       # sessions and the emergency credentials are never unexpectedly rotated.
       ensure_generated_env "$BASE_ENV_FILE" "NEXT_PUBLIC_USE_SUPABASE" "true"
       ensure_generated_env "$BASE_ENV_FILE" "CRM_SESSION_SECRET" "$(random_secret)"
+      ensure_generated_env "$BASE_ENV_FILE" "WEATHER_CRON_SECRET" "$(random_secret)"
       ensure_generated_env "$BASE_ENV_FILE" "BREAK_GLASS_USERNAME" "breakglass-$(openssl rand -hex 8)"
       ensure_generated_env "$BASE_ENV_FILE" "BREAK_GLASS_PASSWORD" "$(random_secret)"
       ensure_generated_env "$BASE_ENV_FILE" "BREAK_GLASS_SESSION_SECRET" "$(random_secret)"

@@ -25,8 +25,10 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   assert.doesNotMatch(tourDesignBoot, /'tour_outline_days'/);
 
   assert.doesNotMatch(products, /ensureTablesLoaded/);
-  assert.match(products, /getBffArray<Product>\('\/api\/products\/all'/);
-  assert.match(products, /getBffArray<ProductPricing>\('\/api\/products\/pricing\/all'/);
+  assert.match(products, /getBffData<Product>\(/);
+  assert.match(products, /api\/products\?code=/);
+  assert.doesNotMatch(products, /\/api\/products\/all/);
+  assert.doesNotMatch(products, /\/api\/products\/pricing\/all/);
 
   assert.match(planner, /getBffArray<Task>\('\/api\/planner\/all'/);
   assert.match(planner, /setTasks/);
@@ -39,12 +41,17 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   assert.match(gallery, /setAttractions/);
 
   assert.doesNotMatch(pricing, /ensureTablesLoaded/);
-  assert.match(pricing, /getBffArray<Product>\('\/api\/products\/all'/);
-  assert.match(pricing, /getBffArray<ProductPricing>\('\/api\/products\/pricing\/all'/);
+  assert.match(pricing, /useProductPage/);
+  assert.match(pricing, /\/api\/products\/pricing\?productCode=/);
+  assert.doesNotMatch(pricing, /\/api\/products\/all/);
+  assert.doesNotMatch(pricing, /\/api\/products\/pricing\/all/);
 
   assert.doesNotMatch(tourDesign, /ensureTablesLoaded/);
-  assert.match(tourDesign, /getBffArray<Product>\('\/api\/products\/all'/);
-  assert.match(tourDesign, /getBffArray<TourDraft>\('\/api\/tour-design\/drafts\/all'/);
-  assert.match(tourDesign, /getBffArray<TourOutlineDay>\('\/api\/tour-design\/outlines\/all'/);
+  assert.match(tourDesign, /\/api\/tour-design\/drafts\?leadIds=/);
+  assert.match(tourDesign, /\/api\/tour-design\/drafts\?id=/);
+  assert.match(tourDesign, /\/api\/tour-design\/outlines\?draftId=/);
+  assert.doesNotMatch(tourDesign, /\/api\/products\/all/);
+  assert.doesNotMatch(tourDesign, /\/api\/tour-design\/drafts\/all/);
+  assert.doesNotMatch(tourDesign, /\/api\/tour-design\/outlines\/all/);
   assert.match(tourDesign, /getBffArray<GalleryPhoto>\('\/api\/photos\/all'/);
 });

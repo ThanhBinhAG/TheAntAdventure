@@ -1,6 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import PaginationBar from '@/components/PaginationBar';
+import { usePageSize } from '@/hooks/usePageSize';
+import { useProductPage } from '@/hooks/useProductPage';
+import type { ProductPageSize } from '@/lib/products/product-list-input';
 import { REG_COLORS_HEX, REG_LABELS } from '@/lib/core/page-helpers';
 import { assembleProposalDoc } from '@/lib/proposals/proposal-assembler';
 import { buildProposalHTML } from '@/lib/proposals/proposal-html';
@@ -93,14 +97,31 @@ export default function TourExperiencesStep({
   const [libDur, setLibDur] = useState('');
   const [libCat, setLibCat] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [libraryPage, setLibraryPage] = useState(1);
+  const { pageSize, setPageSize } = usePageSize();
+  const { data: productPage, error: productPageError, isLoading: productPageLoading, retry: retryProductPage } = useProductPage({
+    page: libraryPage,
+    pageSize: pageSize as ProductPageSize,
+    view: 'catalog',
+    q: libSearch || undefined,
+    region: libRegion || undefined,
+    duration: libDur || undefined,
+    category: libCat || undefined,
+  });
+
+  const availableProducts = useMemo(() => {
+    const byCode = new Map(products.map((product) => [product.code, product]));
+    (productPage?.items ?? []).forEach((product) => byCode.set(product.code, product));
+    return [...byCode.values()];
+  }, [productPage?.items, products]);
 
   const selectedProducts = useMemo(
-    () => selectedCodes.map((c) => products.find((p) => p.code === c)).filter(Boolean) as Product[],
-    [products, selectedCodes]
+    () => selectedCodes.map((c) => availableProducts.find((p) => p.code === c)).filter(Boolean) as Product[],
+    [availableProducts, selectedCodes]
   );
 
   const libFiltered = useMemo(() => {
-    return products.filter((p) => {
+    return (productPage?.items ?? []).filter((p) => {
       if (!isSelectableProduct(p)) return false;
       if (libRegion && p.region !== libRegion) return false;
       if (libDur) {
@@ -117,7 +138,7 @@ export default function TourExperiencesStep({
       if (q && !p.name.toLowerCase().includes(q) && !p.code.toLowerCase().includes(q) && !p.desc.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [products, libSearch, libRegion, libDur, libCat]);
+  }, [productPage?.items, libSearch, libRegion, libDur, libCat]);
 
   const activePreview = TOUR_PACKAGES.find((p) => p.id === (previewPkgId || selectedPackageId)) || null;
   const proposalPreviewDoc = useMemo(
@@ -231,11 +252,22 @@ export default function TourExperiencesStep({
                   ))}
                 </select>
                 <div style={{ fontSize: 11, color: 'var(--m)', width: '100%' }}>
-                  {libFiltered.length} experience{libFiltered.length !== 1 ? 's' : ''} found
+                  {productPage?.totalCount ?? 0} experience{(productPage?.totalCount ?? 0) !== 1 ? 's' : ''} found
                 </div>
               </div>
               <div className="td-lib-list">
-                {libFiltered.length === 0 ? (
+                {productPageError ? (
+                  <EmptyState
+                    className="crm-empty-state--flush"
+                    size="compact"
+                    variant="products"
+                    title="Cannot load experiences"
+                    description="Please retry loading the product catalogue."
+                    action={<button type="button" className="btn btn-s btn-sm" onClick={retryProductPage}>Try again</button>}
+                  />
+                ) : productPageLoading && !productPage ? (
+                  <p style={{ padding: 16, color: 'var(--m)' }}>Loading experiences…</p>
+                ) : libFiltered.length === 0 ? (
                   <EmptyState
                     className="crm-empty-state--flush"
                     size="compact"
@@ -244,11 +276,24 @@ export default function TourExperiencesStep({
                     description="Try adjusting region, duration, or category filters."
                   />
                 ) : (
-                  libFiltered.slice(0, 80).map((p) => (
+                  libFiltered.map((p) => (
                     <ExpRow key={p.code} product={p} selected={selectedCodes.includes(p.code)} pax={brief.pax} onToggle={() => onToggleProduct(p.code)} disabled={!canWrite} />
                   ))
                 )}
               </div>
+              <PaginationBar
+                page={productPage?.page ?? libraryPage}
+                setPage={setLibraryPage}
+                totalPages={productPage?.totalPages ?? 1}
+                total={productPage?.totalCount ?? 0}
+                pageSize={pageSize}
+                rangeStart={productPage?.totalCount ? ((productPage.page - 1) * pageSize) + 1 : 0}
+                rangeEnd={productPage ? Math.min(productPage.page * pageSize, productPage.totalCount) : 0}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setLibraryPage(1);
+                }}
+              />
             </>
           )}
         </div>

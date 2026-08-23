@@ -99,6 +99,8 @@ export interface TourDraft {
   outlineSentAt?: string;
   outlineApprovedAt?: string;
   outlineRevision?: number;
+  /** Monotonic persistence version used to reject stale Tour Design saves. */
+  saveRevision?: number;
   selectedCodes?: string[];
   selectedPackageId?: string | null;
   /** Draft-scoped edits keyed by product code; persisted under brief_json.__experienceOverrides. */
@@ -464,4 +466,3 @@ export type PageSlug =
   | 'devnotes'
   | 'teamchat'
   | 'access-control';
-

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NextResponse } from 'next/server';
 import { bffRoute } from '@/lib/bff/route';
 import type { Task } from '@/lib/types';
 import {
@@ -44,7 +45,10 @@ export const PATCH = bffRoute(
     }),
   },
   async ({ supabase, body }) => {
-    await updateTaskServer(supabase, body.id, body.patch as Partial<Task>);
+    const updated = await updateTaskServer(supabase, body.id, body.patch as Partial<Task>);
+    if (!updated) {
+      return NextResponse.json({ ok: false, error: 'Không tìm thấy task.' }, { status: 404 });
+    }
     return { success: true };
   }
 );
@@ -58,7 +62,10 @@ export const DELETE = bffRoute(
     }),
   },
   async ({ supabase, body }) => {
-    await deleteTaskServer(supabase, body.id);
+    const deleted = await deleteTaskServer(supabase, body.id);
+    if (!deleted) {
+      return NextResponse.json({ ok: false, error: 'Không tìm thấy task.' }, { status: 404 });
+    }
     return { success: true };
   }
 );

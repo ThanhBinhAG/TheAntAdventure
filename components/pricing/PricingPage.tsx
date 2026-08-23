@@ -36,8 +36,12 @@ import {
 } from '@/lib/pricing/pricing-utils';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
-import { getBffArray } from '@/lib/bff/client';
-import type { Product, ProductPricing } from '@/lib/types';
+import { getBffData } from '@/lib/bff/client';
+import type { ProductPricing } from '@/lib/types';
+import PaginationBar from '@/components/PaginationBar';
+import { usePageSize } from '@/hooks/usePageSize';
+import { useProductPage } from '@/hooks/useProductPage';
+import type { ProductPageSize } from '@/lib/products/product-list-input';
 
 type PricingTab = 'pricelist' | 'costbuilder' | 'markup';
 
@@ -53,11 +57,7 @@ export default function Pricing() {
   const searchParams = useSearchParams();
   const highlightCode = searchParams.get('product') ?? '';
 
-  const products = useStore((s) => s.products);
-  const productPricing = useStore((s) => s.productPricing);
   const upsertProductPricing = useStore((s) => s.upsertProductPricing);
-  const setProducts = useStore((s) => s.setProducts);
-  const setProductPricing = useStore((s) => s.setProductPricing);
 
   const [tab, setTab] = useState<PricingTab>('pricelist');
   const [search, setSearch] = useState(() => highlightCode);
@@ -84,6 +84,18 @@ export default function Pricing() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [exportError, setExportError] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pagePricing, setPagePricing] = useState<ProductPricing[]>([]);
+  const { pageSize, setPageSize } = usePageSize();
+  const { data: productPage } = useProductPage({
+    page,
+    pageSize: pageSize as ProductPageSize,
+    view: 'catalog',
+    q: search || undefined,
+    region: region || undefined,
+    duration: duration && duration !== 'multi' ? duration : undefined,
+    category: category || undefined,
+  });
 
   if (highlightCode !== previousHighlightCode) {
     setPreviousHighlightCode(highlightCode);
@@ -94,18 +106,22 @@ export default function Pricing() {
     if (highlightCode && highlightRef.current) {
       highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [highlightCode, productPricing.length, search]);
+  }, [highlightCode, pagePricing.length, search]);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      getBffArray<Product>('/api/products/all', 'Không thể tải catalogue product.'),
-      getBffArray<ProductPricing>('/api/products/pricing/all', 'Không thể tải pricing product.'),
-    ])
-      .then(([catalogue, pricing]) => {
+    const products = productPage?.items ?? [];
+    void Promise.all(
+      products.map((product) =>
+        getBffData<ProductPricing>(
+          `/api/products/pricing?productCode=${encodeURIComponent(product.code)}`,
+          `Không thể tải bảng giá của ${product.code}.`
+        ).catch(() => null)
+      )
+    )
+      .then((pricing) => {
         if (!active) return;
-        setProducts(catalogue);
-        setProductPricing(pricing);
+        setPagePricing(pricing.filter((row): row is ProductPricing => row !== null));
         setLoadError(null);
       })
       .catch((error: unknown) => {
@@ -114,21 +130,21 @@ export default function Pricing() {
     return () => {
       active = false;
     };
-  }, [setProductPricing, setProducts]);
+  }, [productPage?.items]);
 
   const selectableProducts = useMemo(
-    () => products.filter(isSelectableProduct),
-    [products]
+    () => (productPage?.items ?? []).filter(isSelectableProduct),
+    [productPage?.items]
   );
 
   const allRows = useMemo(
-    () => buildPricingTableRows(selectableProducts, productPricing),
-    [selectableProducts, productPricing]
+    () => buildPricingTableRows(selectableProducts, pagePricing),
+    [selectableProducts, pagePricing]
   );
 
   const orphanCount = useMemo(
-    () => countOrphanPricing(selectableProducts, productPricing),
-    [selectableProducts, productPricing]
+    () => countOrphanPricing(selectableProducts, pagePricing),
+    [selectableProducts, pagePricing]
   );
   const missingCount = allRows.filter((r) => r.missingProduct).length;
 
@@ -168,6 +184,12 @@ export default function Pricing() {
         throw new Error(json.error ?? 'Không thể lưu bảng giá.');
       }
 
+      setPagePricing((current) => {
+        const exists = current.some((pricing) => pricing.productCode === row.productCode);
+        return exists
+          ? current.map((pricing) => pricing.productCode === row.productCode ? row : pricing)
+          : [...current, row];
+      });
       upsertProductPricing(row);
       setEditRow(null);
       toast.success('Đã lưu bảng giá thành công.');
@@ -352,7 +374,7 @@ export default function Pricing() {
                   </span>
                 </div>
                 <span style={{ fontSize: 12, color: 'var(--m)', fontWeight: 500 }}>
-                  Showing {filtered.length} of {allRows.length} tours
+                  Showing {filtered.length} of {productPage?.totalCount ?? 0} tours
                 </span>
                 <button className="btn btn-s btn-sm" type="button" onClick={() => { setSearch(''); setRegion(''); setCategory(''); setDuration(''); }}>
                   Clear Filters
@@ -392,6 +414,19 @@ export default function Pricing() {
                 </div>
               )}
             </div>
+            <PaginationBar
+              page={productPage?.page ?? page}
+              setPage={setPage}
+              totalPages={productPage?.totalPages ?? 1}
+              total={productPage?.totalCount ?? 0}
+              pageSize={pageSize}
+              rangeStart={productPage?.totalCount ? ((productPage.page - 1) * pageSize) + 1 : 0}
+              rangeEnd={productPage ? Math.min(productPage.page * pageSize, productPage.totalCount) : 0}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
           </div>
 
           <div className="card">

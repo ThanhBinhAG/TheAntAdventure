@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NextResponse } from 'next/server';
 import { bffRoute } from '@/lib/bff/route';
 import type { Attraction } from '@/lib/types';
 import {
@@ -53,7 +54,10 @@ export const PATCH = bffRoute(
     }),
   },
   async ({ supabase, body }) => {
-    await updateAttractionServer(supabase, body.attraction.id, body.attraction as unknown as Attraction);
+    const updated = await updateAttractionServer(supabase, body.attraction.id, body.attraction as unknown as Attraction);
+    if (!updated) {
+      return NextResponse.json({ ok: false, error: 'Không tìm thấy địa điểm tham quan.' }, { status: 404 });
+    }
     return { success: true };
   }
 );
@@ -67,7 +71,10 @@ export const DELETE = bffRoute(
     }),
   },
   async ({ supabase, body }) => {
-    await deleteAttractionServer(supabase, body.id);
+    const deleted = await deleteAttractionServer(supabase, body.id);
+    if (!deleted) {
+      return NextResponse.json({ ok: false, error: 'Không tìm thấy địa điểm tham quan.' }, { status: 404 });
+    }
     return { success: true };
   }
 );

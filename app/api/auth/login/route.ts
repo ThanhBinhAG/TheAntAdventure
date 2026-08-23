@@ -74,7 +74,7 @@ export async function POST(request: Request) {
   const ip = getClientIp(request);
   const rate = await checkLoginRateLimit(ip);
   if (!rate.ok) {
-    return fail(429, 'Quá nhiều lần đăng nhập thất bại. Thử lại sau.', {
+    return fail(429, 'Quá nhiều lần đăng nhập thất bại. Thử lại sau 1 phút.', {
       'Retry-After': String(rate.retryAfterSec),
     });
   }

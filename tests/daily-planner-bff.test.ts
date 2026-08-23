@@ -14,6 +14,8 @@ require.cache[serverOnlyPath] = {
 
 // State mocks to verify database calls
 let supabaseCalls: { method: string; table: string; data?: any; eqCode?: string }[] = [];
+let plannerUpdateResult: { data: { id: string }[] | null; error: { message: string } | null };
+let plannerDeleteResult: { data: { id: string }[] | null; error: { message: string } | null };
 
 // Mock dependencies
 mock.module(require.resolve('../lib/auth/session'), {
@@ -75,7 +77,9 @@ mock.module(require.resolve('../lib/supabase/server'), {
             return {
               eq: (field: string, val: string) => {
                 supabaseCalls.push({ method: 'update', table, data, eqCode: val });
-                return Promise.resolve({ error: null });
+                return {
+                  select: () => Promise.resolve(plannerUpdateResult),
+                };
               },
             };
           },
@@ -83,7 +87,9 @@ mock.module(require.resolve('../lib/supabase/server'), {
             return {
               eq: (field: string, val: string) => {
                 supabaseCalls.push({ method: 'delete', table, eqCode: val });
-                return Promise.resolve({ error: null });
+                return {
+                  select: () => Promise.resolve(plannerDeleteResult),
+                };
               },
             };
           },
@@ -100,6 +106,8 @@ test('Daily Planner BFF APIs - Tests', async (t) => {
 
   await t.beforeEach(() => {
     supabaseCalls = [];
+    plannerUpdateResult = { data: [{ id: 'TK-001' }], error: null };
+    plannerDeleteResult = { data: [{ id: 'TK-001' }], error: null };
   });
 
   await t.test('GET /api/planner/all - lists all tasks with mapping', async () => {
@@ -202,5 +210,33 @@ test('Daily Planner BFF APIs - Tests', async (t) => {
     assert.equal(supabaseCalls[0].method, 'delete');
     assert.equal(supabaseCalls[0].table, 'tasks');
     assert.equal(supabaseCalls[0].eqCode, 'TK-001');
+  });
+
+  await t.test('PATCH and DELETE return 404 when the task does not exist', async () => {
+    plannerUpdateResult = { data: [], error: null };
+    const patchResponse = await plannerRoute.PATCH(new Request('http://localhost/api/planner', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: 'TK-MISSING', patch: { status: 'done' } }),
+    }));
+    assert.equal(patchResponse.status, 404);
+
+    plannerDeleteResult = { data: [], error: null };
+    const deleteResponse = await plannerRoute.DELETE(new Request('http://localhost/api/planner', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: 'TK-MISSING' }),
+    }));
+    assert.equal(deleteResponse.status, 404);
+  });
+
+  await t.test('returns 500 when the Planner database write fails', async () => {
+    plannerUpdateResult = { data: null, error: { message: 'Planner database unavailable' } };
+    const response = await plannerRoute.PATCH(new Request('http://localhost/api/planner', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: 'TK-001', patch: { status: 'done' } }),
+    }));
+    assert.equal(response.status, 500);
   });
 });

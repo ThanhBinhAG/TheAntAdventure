@@ -113,7 +113,7 @@ export default function ProductCard({
         {metaTags.length > 0 && (
           <div className="tp-card-meta">
             {metaTags.map((tag, i) => (
-              <span key={tag}>
+              <span key={`${tag}-${i}`}>
                 {i > 0 && <span className="tp-card-meta-sep">·</span>}
                 {tag}
               </span>

@@ -1,17 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import ModulesView from '@/components/products/ModulesView';
 import PortfolioImportModal from '@/components/products/PortfolioImportModal';
 import ProductDetailDrawer from '@/components/products/ProductDetailDrawer';
 import ProductEditPanel from '@/components/products/ProductEditPanel';
 import ProductLibrary from '@/components/products/ProductLibrary';
-import { getBffArray } from '@/lib/bff/client';
+import { getBffData } from '@/lib/bff/client';
 import { validateProductCodeInput } from '@/lib/products/product-code';
 import type { PricingStatusFilter } from '@/lib/products/product-pricing-helpers';
 import { useStore } from '@/hooks/useStore';
-import type { Product, ProductPricing } from '@/lib/types';
+import type { Product } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
 
@@ -20,13 +20,10 @@ type ShellMode = 'catalog' | 'modules' | 'manage';
 
 export default function Products() {
   const { canWrite } = usePagePermission('products');
-  const products = useStore((s) => s.products);
   const addProduct = useStore((s) => s.addProduct);
   const updateProduct = useStore((s) => s.updateProduct);
   const deleteProduct = useStore((s) => s.deleteProduct);
   const upsertProductPricing = useStore((s) => s.upsertProductPricing);
-  const setProducts = useStore((s) => s.setProducts);
-  const setProductPricing = useStore((s) => s.setProductPricing);
 
   const [viewTab, setViewTab] = useState<ViewTab>('library');
   const [pickMode, setPickMode] = useState(false);
@@ -43,6 +40,7 @@ export default function Products() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const [detailProductCode, setDetailProductCode] = useState<string | null>(null);
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -50,12 +48,6 @@ export default function Products() {
   const [importOpen, setImportOpen] = useState(false);
   const [draftPreview, setDraftPreview] = useState<Product | null>(null);
   const [productSaveBusy, setProductSaveBusy] = useState(false);
-  const [catalogueLoading, setCatalogueLoading] = useState(false);
-
-  const detailProduct = useMemo(
-    () => (detailProductCode ? products.find((p) => p.code === detailProductCode) ?? null : null),
-    [products, detailProductCode]
-  );
 
   const shellMode: ShellMode = pickMode ? 'manage' : viewTab === 'modules' ? 'modules' : 'catalog';
   const searchValue = shellMode === 'modules' || (pickMode && returnTab === 'modules') ? modSearch : libSearch;
@@ -74,35 +66,16 @@ export default function Products() {
     setPickMode(false);
     closeForm();
     setDetailProductCode(null);
+    setDetailProduct(null);
   };
-
-  const loadCatalogueForInteraction = useCallback(async () => {
-    setCatalogueLoading(true);
-    try {
-      const [catalogue, pricing] = await Promise.all([
-        getBffArray<Product>('/api/products/all', 'Không thể tải catalogue product.'),
-        getBffArray<ProductPricing>('/api/products/pricing/all', 'Không thể tải pricing product.'),
-      ]);
-      setProducts(catalogue);
-      setProductPricing(pricing);
-      return true;
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể tải catalogue product.');
-      return false;
-    } finally {
-      setCatalogueLoading(false);
-    }
-  }, [setProductPricing, setProducts]);
 
   const setShellMode = (mode: ShellMode) => {
     if (formOpen) closeForm();
     if (mode === 'manage') {
-      void (async () => {
-        if (!(await loadCatalogueForInteraction())) return;
-        setReturnTab(viewTab);
-        setPickMode(true);
-        setDetailProductCode(null);
-      })();
+      setReturnTab(viewTab);
+      setPickMode(true);
+      setDetailProductCode(null);
+      setDetailProduct(null);
       return;
     }
     setPickMode(false);
@@ -113,6 +86,7 @@ export default function Products() {
   const openFormForProduct = (p: Product) => {
     if (!pickMode) setReturnTab(viewTab);
     setDetailProductCode(p.code);
+    setDetailProduct(p);
     setEditProduct(p);
     setIsNew(false);
     setSaveError(null);
@@ -193,6 +167,7 @@ export default function Products() {
       setIsNew(false);
       setEditProduct(payload);
       setDetailProductCode(payload.code);
+      setDetailProduct(payload);
       setDraftPreview(payload);
     } finally {
       setProductSaveBusy(false);
@@ -221,6 +196,7 @@ export default function Products() {
         setPickMode(false);
       }
       setDetailProductCode(null);
+      setDetailProduct(null);
       setViewTab(returnTab);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Xóa sản phẩm thất bại.');
@@ -230,8 +206,16 @@ export default function Products() {
   const openDetail = (code: string) => {
     if (pickMode || formOpen) return;
     void (async () => {
-      if (!(await loadCatalogueForInteraction())) return;
-      setDetailProductCode(code);
+      try {
+        const product = await getBffData<Product>(
+          `/api/products?code=${encodeURIComponent(code)}`,
+          'Không thể tải Product.'
+        );
+        setDetailProduct(product);
+        setDetailProductCode(code);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Không thể tải Product.');
+      }
     })();
   };
 
@@ -242,6 +226,7 @@ export default function Products() {
       return;
     }
     setDetailProductCode(null);
+    setDetailProduct(null);
   };
 
   const showLibrary = viewTab === 'library' || (pickMode && returnTab === 'library');
@@ -278,7 +263,6 @@ export default function Products() {
             aria-selected={shellMode === 'manage'}
             className={`tp-seg-btn${shellMode === 'manage' ? ' on' : ''}`}
             onClick={() => setShellMode('manage')}
-            disabled={catalogueLoading}
           >
             Manage
           </button>

@@ -1,10 +1,12 @@
 # components/agents/ — Agent overview
 
 ## Role
-Agent (sales partner) form modal UI.
+B2B Agents page and form modal UI.
 
 ## Contents
-- Agent form modal component(s)
+- `AgentsPage.tsx` — list/search via `useAgentPage`; create/edit/delete via register/delete hooks (BFF)
+- `AgentFormModal.tsx` — add/edit form; server allocates `AGT-NNN` on create
 
 ## Boundaries
 - Commission math lives in `lib/sales`; page shell in `components/pages`.
+- Browser must not write `agents` via store auto-sync after BFF mutate.

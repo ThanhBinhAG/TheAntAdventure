@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
 import {
   isActivePipelineLead,
@@ -10,7 +10,12 @@ import {
 import { TIER_BG, TIER_COLORS } from '@/lib/core/page-helpers';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
-import { usePageSize } from '@/hooks/usePageSize';
+import { usePageSize, type PageSizeOption } from '@/hooks/usePageSize';
+import { useAgentPage } from '@/hooks/useAgentPage';
+import { useRegisterAgent } from '@/hooks/useRegisterAgent';
+import { useDeleteAgent } from '@/hooks/useDeleteAgent';
+import { useEnsureAgentsCatalogLoaded } from '@/hooks/useEnsureAgentsCatalogLoaded';
+import { PROTECTED_AGENT_ID } from '@/lib/agents/agent-ids';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
 import type { Agent } from '@/lib/types';
@@ -22,65 +27,115 @@ import { usePagePermission } from '@/hooks/usePagePermission';
 
 export default function Agents() {
   const { canWrite } = usePagePermission('agents');
-  const agents = useStore((s) => s.agents);
+  const storeAgents = useStore((s) => s.agents);
   const leads = useStore((s) => s.leads);
-  const addAgent = useStore((s) => s.addAgent);
-  const updateAgent = useStore((s) => s.updateAgent);
-  const deleteAgent = useStore((s) => s.deleteAgent);
+  const { saveFromAgent } = useRegisterAgent();
+  const { deleteAgent } = useDeleteAgent();
+  const { applyCatalogItems, ensureCatalog, reloadCatalog } =
+    useEnsureAgentsCatalogLoaded();
 
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<'add' | 'edit' | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return agents.filter(
-      (a) =>
-        !q ||
-        a.name.toLowerCase().includes(q) ||
-        a.country.toLowerCase().includes(q) ||
-        (a.tier || '').toLowerCase().includes(q) ||
-        (a.notes || '').toLowerCase().includes(q)
-    );
-  }, [agents, search]);
+  const { pageSize, setPageSize } = usePageSize();
+  const pageSizeOption = pageSize as PageSizeOption;
 
-  const totalAgents = agents.filter((a) => a.id !== 'AGT-001').length;
-  const activeAgents = agents.filter((a) => a.id !== 'AGT-001' && a.status === 'Active').length;
+  function goToFirstPage() {
+    setPage(1);
+  }
+
+  const {
+    items: agentsPage,
+    totalCount,
+    totalPages,
+    error: listError,
+    isLoading,
+    retry,
+    refresh,
+  } = useAgentPage({
+    page,
+    pageSize: pageSizeOption,
+    q: search.trim() || undefined,
+  });
+
+  // Prefer one list GET: when the page already holds the full unfiltered set, seed the
+  // commission catalog from it. Only hit pageSize=96 when the list is a partial page.
+  useEffect(() => {
+    if (isLoading || listError) return;
+    const unfilteredFullSet =
+      !search.trim() && agentsPage.length === totalCount;
+    if (unfilteredFullSet) {
+      void applyCatalogItems(agentsPage);
+      return;
+    }
+    void ensureCatalog();
+  }, [
+    isLoading,
+    listError,
+    search,
+    agentsPage,
+    totalCount,
+    applyCatalogItems,
+    ensureCatalog,
+  ]);
+
+  const totalAgents = storeAgents.filter((a) => a.id !== PROTECTED_AGENT_ID).length;
+  const activeAgents = storeAgents.filter(
+    (a) => a.id !== PROTECTED_AGENT_ID && a.status === 'Active',
+  ).length;
   const summaryRows = useMemo(
-    () => summarizeAgentCommissions(agents, leads),
-    [agents, leads]
+    () => summarizeAgentCommissions(storeAgents, leads),
+    [storeAgents, leads]
   );
 
-  const { pageSize, setPageSize } = usePageSize();
-  const agentsPagination = usePagination(filtered, pageSize, [search, view, pageSize]);
   const summaryPagination = usePagination(summaryRows.rows, pageSize, [search, view, pageSize]);
-  const { paginatedItems: agentsPage } = agentsPagination;
   const { paginatedItems: summaryPage } = summaryPagination;
 
   const totalEarnedComm = summaryRows.grandComm;
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSizeOption + 1;
+  const rangeEnd = Math.min(page * pageSizeOption, totalCount);
 
-  const profile = profileId ? agents.find((a) => a.id === profileId) : null;
-  const editAgent = editId ? agents.find((a) => a.id === editId) : null;
+  const profile =
+    (profileId && agentsPage.find((a) => a.id === profileId)) ||
+    (profileId ? storeAgents.find((a) => a.id === profileId) : null) ||
+    null;
+  const editAgent =
+    (editId && agentsPage.find((a) => a.id === editId)) ||
+    (editId ? storeAgents.find((a) => a.id === editId) : null) ||
+    null;
 
   async function handleDelete(id: string) {
-    if (id === 'AGT-001') return;
+    if (id === PROTECTED_AGENT_ID) return;
     const ok = await confirmDialog('Delete this agent?', { title: 'Delete agent' });
     if (!ok) return;
-    deleteAgent(id);
+    const result = await deleteAgent(id);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
     setProfileId(null);
     toast.success('Agent deleted.');
+    refresh();
+    void reloadCatalog();
   }
 
-  function handleSave(agent: Agent) {
-    if (formMode === 'edit') {
-      updateAgent(agent.id, agent);
-      setEditId(null);
-    } else {
-      addAgent(agent);
+  async function handleSave(agent: Agent) {
+    const mode = formMode === 'edit' ? 'edit' : 'add';
+    const result = await saveFromAgent(agent, mode);
+    if (!result.ok) {
+      toast.error(result.message);
+      throw new Error(result.message);
     }
+    if (result.message) toast.success(result.message);
+    else toast.success(mode === 'edit' ? 'Agent updated.' : 'Agent created.');
+    setEditId(null);
     setFormMode(null);
+    refresh();
+    void reloadCatalog();
   }
 
   function openEdit(id: string) {
@@ -88,6 +143,22 @@ export default function Agents() {
     setEditId(id);
     setFormMode('edit');
   }
+
+  function changePageSize(size: number) {
+    setPageSize(size);
+    goToFirstPage();
+  }
+
+  const agentsListPagination = {
+    page,
+    setPage,
+    totalPages: Math.max(totalPages, 1),
+    total: totalCount,
+    pageSize: pageSizeOption,
+    rangeStart,
+    rangeEnd,
+    onPageSizeChange: changePageSize,
+  };
 
   function renderAgentCard(a: Agent) {
     const agLeads = leads.filter((l) => l.agentId === a.id && isActivePipelineLead(l.stage));
@@ -268,7 +339,7 @@ export default function Agents() {
           <div style={{ color: 'var(--m)', fontSize: 13 }}>No leads linked to this agent yet.</div>
         )}
         <div style={{ marginTop: 20, paddingTop: 14, borderTop: '1px solid var(--b)', display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
-          {a.id !== 'AGT-001' && (
+          {a.id !== PROTECTED_AGENT_ID && (
             <>
               <button
                 type="button"
@@ -318,7 +389,10 @@ export default function Agents() {
           type="text"
           placeholder="🔍 Search agents…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            goToFirstPage();
+          }}
           style={{ padding: '6px 11px', border: '1.5px solid var(--b)', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, width: 170 }}
         />
         <button
@@ -352,7 +426,19 @@ export default function Agents() {
         </div>
       </div>
 
-      {!agentsPage.length ? (
+      {listError && !isLoading && !agentsPage.length ? (
+        <EmptyState
+          className="crm-empty-state--flush"
+          variant="agents"
+          title="Could not load agents"
+          description={listError}
+          action={
+            <button type="button" className="btn btn-p btn-sm" onClick={retry}>
+              Retry
+            </button>
+          }
+        />
+      ) : !agentsPage.length && !isLoading ? (
         <EmptyState
           className="crm-empty-state--flush"
           variant="agents"
@@ -365,7 +451,14 @@ export default function Agents() {
           action={
             <>
               {search.trim() && (
-                <button type="button" className="btn btn-s btn-sm" onClick={() => setSearch('')}>
+                <button
+                  type="button"
+                  className="btn btn-s btn-sm"
+                  onClick={() => {
+                    setSearch('');
+                    goToFirstPage();
+                  }}
+                >
                   Clear search
                 </button>
               )}
@@ -383,7 +476,7 @@ export default function Agents() {
       ) : view === 'grid' ? (
         <>
           <div className="agents-grid">{agentsPage.map(renderAgentCard)}</div>
-          <PaginationBar {...agentsPagination} onPageSizeChange={setPageSize} />
+          <PaginationBar {...agentsListPagination} />
         </>
       ) : (
         <div className="card" style={{ marginBottom: 20, padding: 0, overflow: 'hidden' }}>
@@ -443,7 +536,7 @@ export default function Agents() {
                           <button className="btn btn-s btn-sm" type="button" onClick={() => setProfileId(a.id)}>
                             View
                           </button>
-                          {a.id !== 'AGT-001' && (
+                          {a.id !== PROTECTED_AGENT_ID && (
                             <>
                               <button
                                 className="btn btn-s btn-sm"
@@ -471,7 +564,7 @@ export default function Agents() {
               </tbody>
             </table>
           </div>
-          <PaginationBar {...agentsPagination} onPageSizeChange={setPageSize} />
+          <PaginationBar {...agentsListPagination} />
         </div>
       )}
 
@@ -546,7 +639,7 @@ export default function Agents() {
         open={formMode !== null}
         mode={formMode === 'edit' ? 'edit' : 'add'}
         agent={editAgent}
-        agents={agents}
+        agents={storeAgents}
         onClose={() => {
           setFormMode(null);
           setEditId(null);

@@ -1811,9 +1811,14 @@ kbd{font-family:inherit}
 .sb-chat-badge{background:var(--red)}
 
 /* ── Customer modals ── */
-.nc-modal{width:740px;max-width:95vw;padding:0;overflow:hidden}
-.nc-modal-body{padding:22px;overflow-y:auto;max-height:80vh}
+.nc-modal{width:740px;max-width:95vw;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:90vh}
+.nc-modal-body{padding:22px;overflow-y:auto;flex:1 1 auto;min-height:0;max-height:none}
 .nc-modal-hd{border-radius:14px 14px 0 0}
+.nc-modal-ft{flex-shrink:0;padding:12px 22px 16px;border-top:1px solid var(--b);background:var(--s,#fff);border-radius:0 0 14px 14px;display:flex;flex-direction:column;gap:10px}
+.nc-modal-ft-actions{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.nc-form-error{padding:10px 12px;border-radius:8px;border:1px solid #f0b4b4;background:#fdf2f2;color:#C0392B;font-size:12px;line-height:1.45;font-weight:600}
+.nc-field-invalid{border-color:#C0392B!important;box-shadow:0 0 0 2px rgba(192,57,43,.22)!important;background:#fff8f7}
+.nc-field-invalid-label{color:#C0392B!important}
 .nc-section-type{background:#F0F7F3;border:1px solid #C8E6D4;border-radius:9px;padding:13px 16px;margin-bottom:16px}
 .nc-section-children{background:var(--amb-l);border:1px solid #FDE68A;border-radius:9px;padding:14px 16px;margin-bottom:16px}
 .nc-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--g);margin-bottom:10px}

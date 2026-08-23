@@ -125,18 +125,24 @@ export default function Customers() {
 
   async function handleSave(
     payload: Parameters<typeof saveFromForm>[0],
-  ): Promise<boolean> {
+  ): Promise<Awaited<ReturnType<typeof saveFromForm>> | false> {
     try {
       const result = await saveFromForm(payload);
-      if (!result.ok) return false;
+      if (!result.ok) {
+        // CustomerFormModal surfaces duplicate_email / save_failed on the form.
+        return result;
+      }
       if (result.message) toast.success(result.message);
       setFormMode(null);
       setEditId(null);
       refresh();
-      return true;
+      return result;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Không thể lưu khách hàng.');
-      return false;
+      return {
+        ok: false as const,
+        error: 'save_failed' as const,
+        message: err instanceof Error ? err.message : 'Không thể lưu khách hàng.',
+      };
     }
   }
 

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 export type EmptyStateVariant =
   | 'generic'
+  | 'access'
   | 'clients'
   | 'leads'
   | 'photos'
@@ -25,12 +26,32 @@ type EmptyStateProps = {
   /** Tighter padding for table cells / nested panels */
   size?: 'default' | 'compact';
   className?: string;
+  /** Override default `status` (e.g. `alert` for permission errors). */
+  role?: 'status' | 'alert';
 };
 
 function EmptyIcon({ variant }: { variant: EmptyStateVariant }) {
   const common = { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true as const };
 
   switch (variant) {
+    case 'access':
+      return (
+        <svg {...common}>
+          <path
+            d="M7.5 10.5V8.25a4.5 4.5 0 0 1 9 0V10.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+          <path
+            d="M6.5 10.5h11A1.5 1.5 0 0 1 19 12v7.5A1.5 1.5 0 0 1 17.5 21h-11A1.5 1.5 0 0 1 5 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+          <circle cx="12" cy="15.25" r="1.35" fill="currentColor" />
+        </svg>
+      );
     case 'clients':
       return (
         <svg {...common}>
@@ -155,13 +176,14 @@ export default function EmptyState({
   variant = 'generic',
   size = 'default',
   className = '',
+  role = 'status',
 }: EmptyStateProps) {
   const classes = ['crm-empty-state', size === 'compact' ? 'crm-empty-state--compact' : '', className]
     .filter(Boolean)
     .join(' ');
 
   return (
-    <div className={classes} role="status">
+    <div className={classes} role={role}>
       <div className="crm-empty-state-icon">
         <EmptyIcon variant={variant} />
       </div>

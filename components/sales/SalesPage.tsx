@@ -604,7 +604,7 @@ export default function SalesPage() {
         onSave={async (payload) => {
           try {
             const result = await saveFromForm({ ...payload, flagTourDesign: true });
-            if (!result.ok) return false;
+            if (!result.ok) return result;
             setFormOpen(false);
             if (result.leadId) {
               setCreatedClient({
@@ -616,10 +616,13 @@ export default function SalesPage() {
             } else if (result.message) {
               toast.info(result.message);
             }
-            return true;
+            return result;
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Không thể tạo khách hàng.');
-            return false;
+            return {
+              ok: false as const,
+              error: 'save_failed' as const,
+              message: err instanceof Error ? err.message : 'Không thể tạo khách hàng.',
+            };
           }
         }}
       />

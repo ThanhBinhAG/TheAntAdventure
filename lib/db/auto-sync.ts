@@ -234,8 +234,10 @@ export function isAutoSyncDebouncePending() {
  * Cancels a pending full-table debounce for those tables.
  */
 export async function persistCustomerRowsNow(patch: StoreRowPatch) {
-  const tables = (['customers', 'leads', 'comms'] as const).filter(
-    (t) => Array.isArray(patch[t]) && (patch[t]?.length ?? 0) > 0
+  const tables = filterBffManagedTables(
+    (['customers', 'leads', 'comms'] as const).filter(
+      (t) => Array.isArray(patch[t]) && (patch[t]?.length ?? 0) > 0
+    )
   );
   clearPendingAutoSync(tables);
 

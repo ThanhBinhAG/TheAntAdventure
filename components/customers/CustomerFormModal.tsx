@@ -21,10 +21,12 @@ import {
   normalizeNationality,
 } from '@/lib/customers/nationalities';
 import type { Customer } from '@/lib/types';
-import { toast } from '@/lib/toast';
+import type { CustomerSaveOutcome } from '@/hooks/useRegisterCustomer';
 
 const CHILD_TAGS = ['Infant 0–2', 'Toddler 3–5', 'Child 6–9', 'Pre-teen 10–12', 'Teen 13–17'];
 const EMAIL_CHECK_DEBOUNCE_MS = 400;
+
+type FormErrorField = 'name' | 'email' | 'phone' | 'whatsapp' | 'country' | 'nat';
 
 export type CustomerFormSavePayload = {
   form: CustomerFormData;
@@ -34,6 +36,8 @@ export type CustomerFormSavePayload = {
   flagTourDesign?: boolean;
 };
 
+export type CustomerFormSaveResult = boolean | CustomerSaveOutcome;
+
 type EmailCheckStatus = 'idle' | 'checking' | 'available' | 'duplicate';
 
 interface CustomerFormModalProps {
@@ -42,11 +46,28 @@ interface CustomerFormModalProps {
   customer?: Customer | null;
   customers: Customer[];
   onClose: () => void;
-  onSave: (payload: CustomerFormSavePayload) => boolean | Promise<boolean>;
+  onSave: (
+    payload: CustomerFormSavePayload,
+  ) => CustomerFormSaveResult | Promise<CustomerFormSaveResult>;
 }
 
 function initialForm(mode: CustomerFormModalProps['mode'], customer: CustomerFormModalProps['customer']) {
   return customer && mode === 'edit' ? customerToForm(customer) : { ...EMPTY_CUSTOMER_FORM };
+}
+
+function fieldDomId(field: FormErrorField) {
+  return `nc-field-${field}`;
+}
+
+function revealField(field: FormErrorField) {
+  requestAnimationFrame(() => {
+    const el = document.getElementById(fieldDomId(field));
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (el instanceof HTMLElement) {
+      el.focus({ preventScroll: true });
+    }
+  });
 }
 
 export default function CustomerFormModal({ open, mode, customer, customers, onClose, onSave }: CustomerFormModalProps) {
@@ -56,6 +77,8 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
   const [logInquiry, setLogInquiry] = useState(true);
   const [emailCheck, setEmailCheck] = useState<EmailCheckStatus>('idle');
   const [duplicateCustomer, setDuplicateCustomer] = useState<Customer | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [errorField, setErrorField] = useState<FormErrorField | null>(null);
   const [previousEmail, setPreviousEmail] = useState(form.email);
 
   if (formKey !== previousFormKey) {
@@ -64,6 +87,8 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     setLogInquiry(true);
     setEmailCheck('idle');
     setDuplicateCustomer(null);
+    setFormError(null);
+    setErrorField(null);
   }
 
   if (form.email !== previousEmail) {
@@ -72,39 +97,83 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     setDuplicateCustomer(null);
   }
 
-  useEffect(() => {
-    const email = form.email.trim();
-    if (!open || !email) return;
+  const excludeId = mode === 'edit' && customer ? customer.id : undefined;
+  const emailTrimmed = form.email.trim();
+  const localDuplicate =
+    open && emailTrimmed && isValidEmail(emailTrimmed)
+      ? findDuplicateCustomerByEmail(customers, emailTrimmed, excludeId)
+      : null;
 
-    const excludeId = mode === 'edit' && customer ? customer.id : undefined;
-    let resultTimer: ReturnType<typeof setTimeout> | undefined;
+  // Server email-check only — local duplicates are derived above (no sync setState in effect).
+  useEffect(() => {
+    if (!open || !emailTrimmed || !isValidEmail(emailTrimmed) || localDuplicate) {
+      return;
+    }
+
+    const controller = new AbortController();
     const timer = setTimeout(() => {
       setEmailCheck('checking');
-      resultTimer = setTimeout(() => {
-        const dup = findDuplicateCustomerByEmail(customers, email, excludeId);
-        if (dup) {
-          setEmailCheck('duplicate');
-          setDuplicateCustomer(dup);
-        } else {
+      const params = new URLSearchParams({ email: emailTrimmed });
+      if (excludeId) params.set('excludeId', excludeId);
+
+      void fetch(`/api/customers/email-check?${params.toString()}`, {
+        credentials: 'same-origin',
+        signal: controller.signal,
+      })
+        .then(async (res) => {
+          const body = (await res.json().catch(() => ({}))) as {
+            ok?: boolean;
+            available?: boolean;
+            existing?: Customer | null;
+          };
+          if (!res.ok || !body.ok) {
+            setEmailCheck('idle');
+            setDuplicateCustomer(null);
+            return;
+          }
+          if (body.available === false && body.existing?.id) {
+            setEmailCheck('duplicate');
+            setDuplicateCustomer(body.existing);
+            return;
+          }
           setEmailCheck('available');
           setDuplicateCustomer(null);
-        }
-      }, 0);
+        })
+        .catch((err: unknown) => {
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          setEmailCheck('idle');
+          setDuplicateCustomer(null);
+        });
     }, EMAIL_CHECK_DEBOUNCE_MS);
 
     return () => {
       clearTimeout(timer);
-      if (resultTimer) clearTimeout(resultTimer);
+      controller.abort();
     };
-  }, [form.email, customers, mode, customer, open]);
+  }, [emailTrimmed, excludeId, localDuplicate, open]);
 
   if (!open) return null;
 
   const showChildren = Number(form.numChildren) > 0;
-  const emailBlocked = emailCheck === 'duplicate';
-  const saveDisabled = emailBlocked || emailCheck === 'checking';
+  const emailStatus: EmailCheckStatus = localDuplicate ? 'duplicate' : emailCheck;
+  const duplicateForUi = localDuplicate ?? duplicateCustomer;
+  const emailBlocked = emailStatus === 'duplicate';
+  const saveDisabled = emailBlocked || emailStatus === 'checking';
+  const emailInvalid = emailBlocked || errorField === 'email';
+
+  function clearErrors() {
+    setFormError(null);
+    setErrorField(null);
+  }
+
+  function fail(field: FormErrorField | null, message: string) {
+    setFormError(message);
+    setErrorField(field);
+    if (field) revealField(field);
+  }
 
   function set<K extends keyof CustomerFormData>(key: K, value: CustomerFormData[K]) {
+    clearErrors();
     setForm((f) => ({ ...f, [key]: value }));
   }
 
@@ -112,33 +181,39 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     set('childAges', form.childAges ? `${form.childAges}, ${tag}` : tag);
   }
 
+  function fieldInvalid(field: FormErrorField) {
+    return errorField === field || (field === 'email' && emailBlocked);
+  }
+
   async function handleSave() {
+    clearErrors();
+
     if (!form.name.trim()) {
-      toast.warning('Please enter client name.');
+      fail('name', 'Please enter client name.');
       return;
     }
     if (!form.email.trim()) {
-      toast.warning('Please enter email.');
+      fail('email', 'Please enter email.');
       return;
     }
     if (!isValidEmail(form.email)) {
-      toast.warning('Please enter a valid email address.');
+      fail('email', 'Please enter a valid email address.');
       return;
     }
     if (form.phone.trim() && !isValidPhone(form.phone)) {
-      toast.warning('Phone must contain numbers only (optional +, spaces, dashes).');
+      fail('phone', 'Phone must contain numbers only (optional +, spaces, dashes).');
       return;
     }
     if (form.whatsapp.trim() && !isValidPhone(form.whatsapp)) {
-      toast.warning('WhatsApp must contain numbers only (optional +, spaces, dashes).');
+      fail('whatsapp', 'WhatsApp must contain numbers only (optional +, spaces, dashes).');
       return;
     }
     if (!isKnownCountry(form.country)) {
-      toast.warning('Please choose a Country from the suggestion list.');
+      fail('country', 'Please choose a Country from the suggestion list.');
       return;
     }
     if (form.nat.trim() && !isKnownNationality(form.nat)) {
-      toast.warning('Please choose a Nationality from the suggestion list.');
+      fail('nat', 'Please choose a Nationality from the suggestion list.');
       return;
     }
 
@@ -147,6 +222,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     if (dup) {
       setEmailCheck('duplicate');
       setDuplicateCustomer(dup);
+      fail('email', formatDuplicateEmailMessage(dup));
       return;
     }
 
@@ -162,7 +238,42 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
       logInquiry: mode === 'add' ? logInquiry : false,
       existingCustomer: mode === 'edit' && customer ? customer : undefined,
     });
-    if (saved) onClose();
+
+    if (saved === true) {
+      onClose();
+      return;
+    }
+
+    if (saved && typeof saved === 'object' && saved.ok === true) {
+      onClose();
+      return;
+    }
+
+    if (
+      saved &&
+      typeof saved === 'object' &&
+      saved.ok === false &&
+      saved.error === 'duplicate_email'
+    ) {
+      setEmailCheck('duplicate');
+      setDuplicateCustomer(saved.existing);
+      fail('email', saved.message || formatDuplicateEmailMessage(saved.existing));
+      return;
+    }
+
+    if (
+      saved &&
+      typeof saved === 'object' &&
+      saved.ok === false &&
+      saved.error === 'save_failed'
+    ) {
+      fail(null, saved.message);
+      return;
+    }
+
+    if (saved === false) {
+      fail(null, 'Không thể lưu khách hàng.');
+    }
   }
 
   return (
@@ -228,19 +339,29 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
           <div className="nc-section-title">Contact</div>
           <div className="nc-grid-3" style={{ marginBottom: 16 }}>
             <div className="fg" style={{ gridColumn: '1 / 3' }}>
-              <label className="lbl">
+              <label className={`lbl${fieldInvalid('name') ? ' nc-field-invalid-label' : ''}`}>
                 Full Name <span className="req">*</span>
               </label>
-              <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. James & Sarah Miller" />
+              <input
+                id={fieldDomId('name')}
+                className={fieldInvalid('name') ? 'nc-field-invalid' : undefined}
+                value={form.name}
+                onChange={(e) => set('name', e.target.value)}
+                placeholder="e.g. James & Sarah Miller"
+                aria-invalid={fieldInvalid('name')}
+              />
             </div>
             <div className="fg">
-              <label className="lbl">Country</label>
+              <label className={`lbl${fieldInvalid('country') ? ' nc-field-invalid-label' : ''}`}>Country</label>
               <input
+                id={fieldDomId('country')}
+                className={fieldInvalid('country') ? 'nc-field-invalid' : undefined}
                 list="nc-country-list"
                 value={form.country}
                 onChange={(e) => set('country', e.target.value)}
                 placeholder="Type to search…"
                 autoComplete="off"
+                aria-invalid={fieldInvalid('country')}
               />
               <datalist id="nc-country-list">
                 {COUNTRIES.map((c) => (
@@ -249,57 +370,67 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
               </datalist>
             </div>
             <div className="fg">
-              <label className="lbl">
+              <label className={`lbl${emailInvalid ? ' nc-field-invalid-label' : ''}`}>
                 Email <span className="req">*</span>
               </label>
               <input
+                id={fieldDomId('email')}
+                className={emailInvalid ? 'nc-field-invalid' : undefined}
                 type="email"
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
                 placeholder="email@example.com"
-                aria-invalid={emailBlocked}
-                style={emailBlocked ? { borderColor: '#C0392B', boxShadow: '0 0 0 1px #C0392B' } : undefined}
+                aria-invalid={emailInvalid}
               />
-              {emailCheck === 'checking' && form.email.trim() && (
+              {emailStatus === 'checking' && form.email.trim() && (
                 <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>Checking email…</div>
               )}
-              {emailBlocked && duplicateCustomer && (
-                <div style={{ fontSize: 11, color: '#C0392B', marginTop: 4, lineHeight: 1.45 }}>
-                  {formatDuplicateEmailMessage(duplicateCustomer)}
+              {emailBlocked && duplicateForUi && (
+                <div style={{ fontSize: 11, color: '#C0392B', marginTop: 4, lineHeight: 1.45, fontWeight: 600 }}>
+                  {formatDuplicateEmailMessage(duplicateForUi)}
                 </div>
               )}
-              {emailCheck === 'available' && form.email.trim() && (
+              {emailStatus === 'available' && form.email.trim() && !emailInvalid && (
                 <div style={{ fontSize: 11, color: 'var(--g)', marginTop: 4 }}>Email available</div>
               )}
             </div>
             <div className="fg">
-              <label className="lbl">Phone</label>
+              <label className={`lbl${fieldInvalid('phone') ? ' nc-field-invalid-label' : ''}`}>Phone</label>
               <input
+                id={fieldDomId('phone')}
+                className={fieldInvalid('phone') ? 'nc-field-invalid' : undefined}
                 type="tel"
                 inputMode="tel"
                 value={form.phone}
                 onChange={(e) => set('phone', sanitizePhoneInput(e.target.value))}
                 placeholder="+1 415 555 ..."
+                aria-invalid={fieldInvalid('phone')}
               />
             </div>
             <div className="fg">
-              <label className="lbl">WhatsApp</label>
+              <label className={`lbl${fieldInvalid('whatsapp') ? ' nc-field-invalid-label' : ''}`}>WhatsApp</label>
               <input
+                id={fieldDomId('whatsapp')}
+                className={fieldInvalid('whatsapp') ? 'nc-field-invalid' : undefined}
                 type="tel"
                 inputMode="tel"
                 value={form.whatsapp}
                 onChange={(e) => set('whatsapp', sanitizePhoneInput(e.target.value))}
                 placeholder="If different from phone"
+                aria-invalid={fieldInvalid('whatsapp')}
               />
             </div>
             <div className="fg">
-              <label className="lbl">Nationality</label>
+              <label className={`lbl${fieldInvalid('nat') ? ' nc-field-invalid-label' : ''}`}>Nationality</label>
               <input
+                id={fieldDomId('nat')}
+                className={fieldInvalid('nat') ? 'nc-field-invalid' : undefined}
                 list="nc-nationality-list"
                 value={form.nat}
                 onChange={(e) => set('nat', e.target.value)}
                 placeholder="Type to search…"
                 autoComplete="off"
+                aria-invalid={fieldInvalid('nat')}
               />
               <datalist id="nc-nationality-list">
                 {NATIONALITIES.map((n) => (
@@ -469,20 +600,27 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
           </div>
 
           <div className="nc-section-title">Notes</div>
-          <div className="fg" style={{ marginBottom: 18 }}>
+          <div className="fg" style={{ marginBottom: 8 }}>
             <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} style={{ minHeight: 80 }} placeholder="Dietary restrictions, mobility, anniversaries..." />
           </div>
 
           {mode === 'add' && (
-            <label className="fg" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, cursor: 'pointer' }}>
+            <label className="fg" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, cursor: 'pointer' }}>
               <input type="checkbox" checked={logInquiry} onChange={(e) => setLogInquiry(e.target.checked)} />
               <span style={{ fontSize: 12.5 }}>
                 Log initial inquiry in Communications
               </span>
             </label>
           )}
+        </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
+        <div className="nc-modal-ft">
+          {formError ? (
+            <div className="nc-form-error" role="alert">
+              {formError}
+            </div>
+          ) : null}
+          <div className="nc-modal-ft-actions">
             <button className="btn btn-s" type="button" onClick={onClose}>
               Cancel
             </button>

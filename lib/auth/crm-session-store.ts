@@ -3,6 +3,7 @@ import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import { getServerSupabaseUrl, getSupabaseServiceRoleKey } from '@/lib/env';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { debugLog } from '@/lib/system/debug-logger';
 
 export type DurableCrmSession = {
   sid: string;
@@ -29,7 +30,13 @@ export async function createDurableCrmSession(session: DurableCrmSession): Promi
     payload_ciphertext: session.payloadCiphertext,
     expires_at: session.expiresAt,
   });
-  if (error) throw new Error('Không thể tạo CRM session durable.');
+  if (error) {
+    debugLog('auth', 'durable CRM session insert failed', {
+      level: 'error',
+      meta: { message: error.message, code: error.code },
+    });
+    throw new Error('Không thể tạo CRM session durable.');
+  }
 }
 
 export async function findDurableCrmSession(sid: string): Promise<DurableCrmSession | null> {

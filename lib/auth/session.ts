@@ -1,6 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import { CRM_SESSION_COOKIE, getCrmSession } from '@/lib/auth/crm-session';
+import { ensureBreakGlassShadowPrivilegesOnce } from '@/lib/auth/break-glass-supabase';
 
 export type AuthContext = {
   authenticated: boolean;
@@ -16,6 +17,14 @@ export async function getAuthContext(): Promise<AuthContext> {
   const session = await getCrmSession(cookieStore.get(CRM_SESSION_COOKIE)?.value);
   if (!session) {
     return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
+  }
+
+  if (session.isBreakGlass) {
+    try {
+      await ensureBreakGlassShadowPrivilegesOnce();
+    } catch {
+      // Recovery session still authenticates; Access Control RPCs need the grant.
+    }
   }
 
   return {

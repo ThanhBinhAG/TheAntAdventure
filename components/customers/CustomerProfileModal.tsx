@@ -137,9 +137,28 @@ export default function CustomerProfileModal({
     setCommForm({ ...commForm, subj: '', body: '' });
   }
 
-  function saveNotes() {
-    updateCustomer(customer.id, { notes: notesDraft });
-    toast.success('Notes saved.');
+  async function saveNotes() {
+    try {
+      const res = await fetch(`/api/customers/${encodeURIComponent(customer.id)}`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: notesDraft }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        customer?: { notes?: string };
+      };
+      if (!res.ok || !body.ok) {
+        toast.error(typeof body.error === 'string' ? body.error : 'Không thể lưu notes.');
+        return;
+      }
+      updateCustomer(customer.id, { notes: notesDraft });
+      toast.success('Notes saved.');
+    } catch {
+      toast.error('Không thể lưu notes.');
+    }
   }
 
   function aiDraftEmail() {

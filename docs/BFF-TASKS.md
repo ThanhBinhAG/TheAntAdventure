@@ -65,9 +65,9 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
 
 ### Developer B task list
 
-- [ ] B0. Produce and maintain the direct browser-Supabase inventory, mapping every caller to an API replacement.
-- [ ] B1. Define shared domain DTOs and test fixtures jointly with Developer A.
-- [ ] B2. Complete Clients end-to-end: customer API/repository, server search/pagination, UI/hooks, tests, and direct-path removal.
+- [ ] B0. Produce and maintain the direct browser-Supabase inventory, mapping every caller to an API replacement. *(Clients callers mapped 2026-08-21; other features still open.)*
+- [x] B1. Define shared domain DTOs and test fixtures jointly with Developer A. *(Customers contract + fixtures shipped; expand as Agents/Sales land.)*
+- [x] B2. Complete Clients end-to-end: customer API/repository, server search/pagination, UI/hooks, tests, and direct-path removal.
 - [ ] B3. Complete B2B Agents end-to-end: agent API/repository, UI/hooks, tests, and direct-path removal.
 - [ ] B4. Complete Sales Pipeline end-to-end: lead/pipeline API/repository, UI/hooks, tests, and direct-path removal.
 - [ ] B5. Complete Photo Gallery end-to-end: gallery metadata plus existing upload/delete CRM APIs, UI/hooks, tests, and direct-path removal.

@@ -3,6 +3,13 @@
 ## Role
 CLI migrations (`db:push`). Incremental SQL dated; do not paste bootstrap copies here.
 
+## Auth / CRM session (Dev A — bắt buộc cho login)
+
+- File: [`20260821113000_add_durable_crm_sessions.sql`](20260821113000_add_durable_crm_sessions.sql)
+- Tạo bảng `public.crm_sessions` (cookie `crm_session` mã hóa). **Không tạo file trùng** — đây đã là migration canonical.
+- Mỗi **database** apply **một lần**. Repo clone mới + `db:push` trên DB trống sẽ tự chạy; không paste lại trên máy đã có version này.
+- Shared `sb.mitelai.com` nếu PostgREST báo `PGRST205` / thiếu `crm_sessions`: paste đúng nội dung file này trên SQL Editor, rồi `notify pgrst, 'reload schema'`. **Không** `db:push` full nếu còn migration RLS chưa an toàn trên DB đó.
+
 ## Contents (current chain)
 - `20260730042242_02_migrations.sql` — schema CRM (thay baseline cũ)
 - `20260730071047_add_data.sql` — seed data

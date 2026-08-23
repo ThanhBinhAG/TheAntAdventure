@@ -182,13 +182,15 @@ case "$cmd" in
     exec docker compose --env-file "$ENV_FILE" up --build -d "$@"
     ;;
   deploy)
-    # After CI (or local) build: clean down, free port, up from image (no rebuild)
+    # After CI (or local) build: clean down, free port, start the CRM app from
+    # the existing image. Do not start the local-only Redis service here: VM
+    # deploys use shared_redis and port 6379 is already owned by that service.
     echo "Deploying with ENV_FILE=$ENV_FILE (COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME)"
     APP_PORT_HOST=$(resolve_app_port)
     echo "Host APP_PORT=${APP_PORT_HOST}"
     docker compose --env-file "$ENV_FILE" down --remove-orphans || true
     free_host_port "$APP_PORT_HOST"
-    exec docker compose --env-file "$ENV_FILE" up -d --no-build --remove-orphans "$@"
+    exec docker compose --env-file "$ENV_FILE" up -d --no-build --remove-orphans app "$@"
     ;;
   down)
     exec docker compose --env-file "$ENV_FILE" down "$@"

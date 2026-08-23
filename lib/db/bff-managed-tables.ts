@@ -12,6 +12,9 @@ export const BFF_MANAGED_TABLES = new Set<SyncArrayTable>([
   'tour_outline_days',
 ]);
 
-export function filterBffManagedTables(tables: readonly SyncArrayTable[]): SyncArrayTable[] {
+/** Preserves the input table union so callers like `StoreRowPatch` indexing stay typed. */
+export function filterBffManagedTables<T extends SyncArrayTable>(
+  tables: readonly T[],
+): T[] {
   return tables.filter((table) => !BFF_MANAGED_TABLES.has(table));
 }

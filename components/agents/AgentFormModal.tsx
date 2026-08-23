@@ -38,7 +38,7 @@ interface AgentFormModalProps {
   agent?: Agent | null;
   agents: Agent[];
   onClose: () => void;
-  onSave: (agent: Agent) => void;
+  onSave: (agent: Agent) => void | Promise<void>;
 }
 
 function nextAgentId(agents: Agent[]): string {
@@ -82,7 +82,7 @@ export default function AgentFormModal({ open, mode, agent, agents, onClose, onS
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form.name.trim()) {
       toast.warning('Agent name is required.');
       return;
@@ -100,8 +100,12 @@ export default function AgentFormModal({ open, mode, agent, agents, onClose, onS
       notes: form.notes.trim(),
       status: form.status as Agent['status'],
     };
-    onSave(saved);
-    onClose();
+    try {
+      await onSave(saved);
+      onClose();
+    } catch {
+      // Parent already toasted; keep modal open for retry.
+    }
   }
 
   return (

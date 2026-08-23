@@ -7,8 +7,11 @@
 #   npm run docker:up       # build + run
 #   npm run docker:deploy   # recreate from existing image (CI)
 #   npm run docker:status
+#   npm run redis:up        # local Redis only (127.0.0.1:6379) for npm run dev
 #
 # COMPOSE_PROJECT_NAME defaults to the-ant-adventures-crm (set in script / CI).
+# VM deploy uses shared_redis on network shared-services (REDIS_URL from env / CI).
+# Local npm run dev uses Compose service `redis` via REDIS_URL=redis://127.0.0.1:6379.
 
 services:
   app:
@@ -57,6 +60,31 @@ services:
       retries: 3
       start_period: 40s
     restart: unless-stopped
+
+  # Local / WSL cache for `npm run redis:up` + `npm run dev` (Ngôn feat/redis).
+  # Not required by `app` on VM06 — that uses shared_redis via REDIS_URL.
+  redis:
+    image: redis:7.4-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis-data:
 
 networks:
   # Supabase ant-crm stack network; resolves supabase-ant-crm-gateway.

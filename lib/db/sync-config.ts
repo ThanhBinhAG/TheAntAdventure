@@ -55,7 +55,9 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   dashboard: ['customers', 'leads', 'bookings', 'agents', 'feedback'],
   planner: ['cal_events'],
   customers: ['customers', 'leads', 'feedback'],
-  agents: ['agents', 'customers', 'leads'],
+  /** Agents list/CRUD via BFF; boot only `leads` for commission (Sales BFF later). */
+  /** Agents list/catalog via `/api/agents`; pipeline/commission leads wait for Sales BFF. */
+  agents: [],
   sales: ['leads', 'customers', 'comms', 'tour_drafts', 'bookings'],
   /** Customer, lead, hotel, and comm data are still owned by their existing loaders. */
   tourdesign: [

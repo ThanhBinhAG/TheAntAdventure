@@ -11,7 +11,7 @@ This document records the deployed CRM architecture before the BFF refactor. It 
 | Browser | Renders Next.js UI, holds Zustand state, hydrates and syncs business data | Calls CRM and Supabase directly |
 | CRM app | Next.js 16 application, authentication middleware, API routes, PDF/image work | Listens on port 3006 |
 | Supabase | Auth, PostgREST, Storage, and PostgreSQL business data | URL is configured as `NEXT_PUBLIC_SUPABASE_URL` |
-| Redis | Best-effort cache for selected server-side reads | Internal service at `redis://redis:6379` |
+| Redis | Best-effort cache for selected server-side reads | Local Compose `redis` on `127.0.0.1:6379`; VM06 uses `shared_redis` |
 | Reverse proxy | Deployment concern documented for nginx; terminates TLS before CRM | Not included as a CRM Compose service |
 
 ## Current request paths
@@ -53,7 +53,7 @@ The current implemented cache is Product facets:
 - Invalidation: scans and deletes that namespace after relevant writes
 - Fallback: a Redis error must not fail the Product API request
 
-`docker-compose.yml` runs Redis but binds it to `127.0.0.1:6379`; CRM accesses it by the Docker service name `redis`.
+`docker-compose.yml` includes a local `redis` service bound to `127.0.0.1:6379` for `npm run redis:up` / `npm run dev`. On VM06 the CRM container uses `REDIS_URL` pointing at `shared_redis` on the `shared-services` network (no Compose `depends_on` redis).
 
 ## Security implications
 

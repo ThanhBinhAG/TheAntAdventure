@@ -9,7 +9,8 @@ Next.js Route Handlers for server-side auth, media, exports, weather, and diagno
 - `branding/` — company logo (`logo/route.ts`)
 - `photos/` — gallery pipeline: `all`, `upload/{init,chunk,complete}`, `delete`
 - `products/` — paginated catalogue, hydration routes, facets, pricing, and XLSX imports
-- `customers/` — Clients BFF: list/search/pagination + CRUD
+- `customers/` — Clients BFF: list/search/pagination + CRUD + email-check
+- `agents/` — B2B Agents BFF: list/search/pagination + CRUD
 - `planner/` — daily planner (tasks) CRUD and hydration endpoints
 - `attractions/` — province attractions CRUD and hydration endpoints
 - `tour-design/` — tour drafts and outlines safe saving and hydration endpoints

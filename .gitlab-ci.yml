@@ -182,7 +182,7 @@ docker:
 
       # Fail before build/migration/deploy when the runtime cannot create a
       # durable CRM session or recovery login. Values are never printed.
-      sh scripts/validate-production-env.sh "$DEPLOY_ENV_FILE" --require-break-glass
+      sh scripts/validate-production-env.sh "$DEPLOY_ENV_FILE" .env.example
 
       export ENV_FILE="$DEPLOY_ENV_FILE"
       echo "Building with generated deployment environment"

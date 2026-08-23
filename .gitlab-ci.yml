@@ -169,15 +169,14 @@ docker:
         exit 1
       fi
 
-      # Persist the allocated DB number in the shared app env (without the Redis password).
-      if grep -q '^REDIS_DB=' "$BASE_ENV_FILE"; then
-        sed -i "s/^REDIS_DB=.*/REDIS_DB=$REDIS_DB/" "$BASE_ENV_FILE"
-      else
-        printf '\nREDIS_DB=%s\n' "$REDIS_DB" >> "$BASE_ENV_FILE"
-      fi
+      # Persist the allocated DB number in both the shared source env and this
+      # deploy's already-generated env. The latter was copied before Redis was
+      # allocated, so it must be explicitly updated before validation.
+      upsert_env "$BASE_ENV_FILE" "REDIS_DB" "$REDIS_DB"
+      upsert_env "$DEPLOY_ENV_FILE" "REDIS_DB" "$REDIS_DB"
 
       REDIS_PASSWORD="$(docker exec shared_redis sh -c 'cat /run/secrets/redis_password')"
-      printf 'REDIS_URL=redis://:%s@shared_redis:6379/%s\n' "$REDIS_PASSWORD" "$REDIS_DB" >> "$DEPLOY_ENV_FILE"
+      upsert_env "$DEPLOY_ENV_FILE" "REDIS_URL" "redis://:${REDIS_PASSWORD}@shared_redis:6379/${REDIS_DB}"
       unset REDIS_PASSWORD
 
       # Fail before build/migration/deploy when the runtime cannot create a

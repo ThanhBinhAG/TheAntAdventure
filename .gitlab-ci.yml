@@ -40,21 +40,74 @@ docker:
       set -eu
       docker info
 
+      # A fresh deploy VM may not have a shared app env yet. Create it with
+      # restrictive permissions; the required hand-managed secrets are checked
+      # below before an image is built or a migration can run.
+      SHARED_ENV_DIR="$MNT_FDATA/sharing"
+      SHARED_ENV_FILE="$SHARED_ENV_DIR/.env.local"
+      mkdir -p "$SHARED_ENV_DIR"
+      if [ ! -f "$SHARED_ENV_FILE" ]; then
+        umask 077
+        # Seed every documented variable name, but deliberately discard example
+        # values such as YOUR_PASSWORD and change-me. CI subsequently generates
+        # secrets or injects values from the authoritative secret manager.
+        awk '
+          /^[[:space:]]*#?[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=/ {
+            line = $0
+            sub(/^[[:space:]]*/, "", line)
+            sub(/^#[[:space:]]*/, "", line)
+            key = line
+            sub(/=.*/, "", key)
+            if (!seen[key]++) print key "="
+          }
+        ' .env.example > "$SHARED_ENV_FILE"
+      fi
+      chmod 600 "$SHARED_ENV_FILE"
+
+      # Keep the shared env canonical across deploys. The secret manager stays
+      # authoritative for Supabase credentials, so stale shared values cannot
+      # survive a main-branch deployment.
+      upsert_env() {
+        target="$1"
+        key="$2"
+        value="$3"
+        temp="$(mktemp "${target}.tmp.XXXXXX")"
+        awk -v key="$key" 'index($0, key "=") != 1 { print }' "$target" > "$temp"
+        printf '%s=%s\n' "$key" "$value" >> "$temp"
+        chmod 600 "$temp"
+        mv "$temp" "$target"
+      }
+
+      ensure_generated_env() {
+        target="$1"
+        key="$2"
+        generated_value="$3"
+        existing_value="$(sed -n "s/^${key}=//p" "$target" | tail -n 1 | tr -d '\r')"
+        if [ -z "$existing_value" ]; then
+          upsert_env "$target" "$key" "$generated_value"
+          echo "Generated missing $key in shared CRM environment."
+        fi
+      }
+
+      random_secret() {
+        openssl rand -base64 48 | tr -d '\n'
+      }
+
       BASE_ENV_FILE="$(sh scripts/docker-with-env.sh print)"
+      # These values must survive redeploys. Generate only when absent so CRM
+      # sessions and the emergency credentials are never unexpectedly rotated.
+      ensure_generated_env "$BASE_ENV_FILE" "NEXT_PUBLIC_USE_SUPABASE" "true"
+      ensure_generated_env "$BASE_ENV_FILE" "CRM_SESSION_SECRET" "$(random_secret)"
+      ensure_generated_env "$BASE_ENV_FILE" "BREAK_GLASS_USERNAME" "breakglass-$(openssl rand -hex 8)"
+      ensure_generated_env "$BASE_ENV_FILE" "BREAK_GLASS_PASSWORD" "$(random_secret)"
+      ensure_generated_env "$BASE_ENV_FILE" "BREAK_GLASS_SESSION_SECRET" "$(random_secret)"
+
       DEPLOY_ENV_FILE="$(mktemp)"
       SUPABASE_ENV_FILE="$(mktemp)"
       trap 'rm -f "$DEPLOY_ENV_FILE" "$SUPABASE_ENV_FILE"' EXIT
-      cp "$BASE_ENV_FILE" "$DEPLOY_ENV_FILE"
 
       # Fetch app-specific keys at deploy time; never print the returned secrets.
-      # Remove canonical values inherited from the shared env so a stale key can
-      # never win over the secret-manager values generated below.
-      sed -i \
-        -e '/^NEXT_PUBLIC_SUPABASE_ANON_KEY=/d' \
-        -e '/^SUPABASE_SERVICE_ROLE_KEY=/d' \
-        "$DEPLOY_ENV_FILE"
       share-supabase app-env ant-crm --show-secrets > "$SUPABASE_ENV_FILE"
-      cat "$SUPABASE_ENV_FILE" >> "$DEPLOY_ENV_FILE"
       ANON_KEY="$(sed -n 's/^ANON_KEY=//p' "$SUPABASE_ENV_FILE" | tail -n 1)"
       SERVICE_ROLE_KEY="$(sed -n 's/^SERVICE_ROLE_KEY=//p' "$SUPABASE_ENV_FILE" | tail -n 1)"
       if [ -z "$ANON_KEY" ] || [ -z "$SERVICE_ROLE_KEY" ]; then
@@ -70,13 +123,15 @@ docker:
           *\?*) DB_URL="${DB_URL}&sslmode=disable" ;;
           *) DB_URL="${DB_URL}?sslmode=disable" ;;
         esac
-        sed -i '/^SUPABASE_DB_URL=/d' "$DEPLOY_ENV_FILE"
-        printf 'SUPABASE_DB_URL=%s\n' "$DB_URL" >> "$DEPLOY_ENV_FILE"
       fi
-      printf '\nNEXT_PUBLIC_SUPABASE_ANON_KEY=%s\nSUPABASE_SERVICE_ROLE_KEY=%s\n' \
-        "$ANON_KEY" "$SERVICE_ROLE_KEY" >> "$DEPLOY_ENV_FILE"
+      upsert_env "$BASE_ENV_FILE" "NEXT_PUBLIC_SUPABASE_URL" "http://supabase-ant-crm-gateway:8000"
+      upsert_env "$BASE_ENV_FILE" "NEXT_PUBLIC_SUPABASE_ANON_KEY" "$ANON_KEY"
+      upsert_env "$BASE_ENV_FILE" "SUPABASE_SERVICE_ROLE_KEY" "$SERVICE_ROLE_KEY"
+      if [ -n "$DB_URL" ]; then
+        upsert_env "$BASE_ENV_FILE" "SUPABASE_DB_URL" "$DB_URL"
+      fi
       unset ANON_KEY SERVICE_ROLE_KEY DB_URL
-      printf '\nNEXT_PUBLIC_SUPABASE_URL=http://supabase-ant-crm-gateway:8000\n' >> "$DEPLOY_ENV_FILE"
+      cp "$BASE_ENV_FILE" "$DEPLOY_ENV_FILE"
 
       # Use VM06's persistent shared Redis, rather than creating a per-CRM Redis.
       # The marker is permanent: it records the logical DB allocated to this app.
@@ -124,6 +179,10 @@ docker:
       REDIS_PASSWORD="$(docker exec shared_redis sh -c 'cat /run/secrets/redis_password')"
       printf 'REDIS_URL=redis://:%s@shared_redis:6379/%s\n' "$REDIS_PASSWORD" "$REDIS_DB" >> "$DEPLOY_ENV_FILE"
       unset REDIS_PASSWORD
+
+      # Fail before build/migration/deploy when the runtime cannot create a
+      # durable CRM session or recovery login. Values are never printed.
+      sh scripts/validate-production-env.sh "$DEPLOY_ENV_FILE" --require-break-glass
 
       export ENV_FILE="$DEPLOY_ENV_FILE"
       echo "Building with generated deployment environment"

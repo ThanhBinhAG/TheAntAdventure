@@ -54,8 +54,8 @@ export const SIDEBAR_BADGE_TABLES: readonly SyncArrayTable[] = [
 export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[]>> = {
   dashboard: ['customers', 'leads', 'bookings', 'agents', 'feedback'],
   planner: ['cal_events'],
-  customers: ['customers', 'leads', 'feedback'],
-  /** Agents list/CRUD via BFF; boot only `leads` for commission (Sales BFF later). */
+  /** Clients list/CRUD via `/api/customers`; profile modal loads related rows via `/api/customers/:id/profile`. */
+  customers: [],
   /** Agents list/catalog via `/api/agents`; pipeline/commission leads wait for Sales BFF. */
   agents: [],
   sales: ['leads', 'customers', 'comms', 'tour_drafts', 'bookings'],

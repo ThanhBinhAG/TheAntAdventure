@@ -1,13 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { ensureTablesLoaded } from '@/lib/db/hydrate';
-import { PROFILE_LAZY_TABLES } from '@/lib/db/sync-config';
+import { useMemo, useState } from 'react';
 import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
 import { createInquiryLeadForCustomer } from '@/lib/customers/customer-onboarding';
 import { getClientLeads, getClientPipeline, getCustomerBookings } from '@/lib/core/crm-utils';
 import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
+import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useStore } from '@/hooks/useStore';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import type { Comm, Customer, Lead } from '@/lib/types';
@@ -75,17 +74,17 @@ export default function CustomerProfileModal({
   onDelete,
 }: CustomerProfileModalProps) {
   const { canWrite } = usePagePermission('customers');
-  const comms = useStore((s) => s.comms);
-  const leads = useStore((s) => s.leads);
-  const bookings = useStore((s) => s.bookings);
-  const feedback = useStore((s) => s.feedback) as { custId?: string; nps?: number; id?: string; bkid?: string; date?: string; comments?: string; best?: string; improve?: string }[];
+  const {
+    leads,
+    comms,
+    bookings,
+    feedback,
+    isLoading: profileLoading,
+    error: profileError,
+  } = useCustomerProfile(customer.id);
   const addComm = useStore((s) => s.addComm);
   const addLead = useStore((s) => s.addLead);
   const updateCustomer = useStore((s) => s.updateCustomer);
-
-  useEffect(() => {
-    void ensureTablesLoaded(PROFILE_LAZY_TABLES);
-  }, []);
 
   const [tab, setTab] = useState<Tab>(initialTab);
   const [showLostLeads, setShowLostLeads] = useState(false);
@@ -215,6 +214,14 @@ The Ant Adventures`;
         </div>
 
         <div className="prof-modal-body">
+          {profileError && (
+            <div className="crm-page-hydrate-error" role="alert" style={{ padding: '0.5rem 0.75rem', marginBottom: 8, color: '#b91c1c', fontSize: 12 }}>
+              {profileError}
+            </div>
+          )}
+          {profileLoading && (
+            <div style={{ padding: '8px 0', fontSize: 12, color: 'var(--m)' }}>Loading profile…</div>
+          )}
           <div className="prof-tabs">
             {TABS.map((t) => (
               <div key={t} className={`prof-tab${tab === t ? ' on' : ''}`} onClick={() => setTab(t)} role="button" tabIndex={0}>

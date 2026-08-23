@@ -56,11 +56,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setHydration(state);
         if (state.phase === 'ready') {
           setRemote(true);
-          useStore.getState().rolloverIncompleteTasks();
         }
       }),
     []
   );
+
+  useEffect(() => {
+    if (hydration.phase !== 'ready') return;
+    useStore.getState().rolloverIncompleteTasks();
+  }, [hydration.phase]);
 
   useEffect(() => {
     clearLocalPersistedData();

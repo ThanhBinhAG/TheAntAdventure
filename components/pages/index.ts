@@ -3,6 +3,7 @@ import type { ComponentType } from 'react';
 import type { PageSlug } from '@/lib/types';
 import PageRouteLoading from '@/components/PageRouteLoading';
 import Dashboard from './Dashboard';
+import Customers from './Customers';
 
 const loadPage = (importer: () => Promise<{ default: ComponentType }>) =>
   dynamic(importer, { loading: PageRouteLoading });
@@ -10,7 +11,7 @@ const loadPage = (importer: () => Promise<{ default: ComponentType }>) =>
 export const PAGE_COMPONENTS: Record<PageSlug, ComponentType> = {
   dashboard: Dashboard,
   planner: loadPage(() => import('./Planner')),
-  customers: loadPage(() => import('./Customers')),
+  customers: Customers,
   agents: loadPage(() => import('./Agents')),
   sales: loadPage(() => import('./Sales')),
   tourdesign: loadPage(() => import('./TourDesign')),

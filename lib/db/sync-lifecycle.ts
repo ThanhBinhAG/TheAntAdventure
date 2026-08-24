@@ -28,9 +28,31 @@ function emit() {
   listeners.forEach((fn) => fn(hydrationState));
 }
 
-function setState(patch: Partial<HydrationState>) {
-  hydrationState = { ...hydrationState, ...patch };
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function emitIfChanged(next: HydrationState) {
+  const prev = hydrationState;
+  if (
+    prev.phase === next.phase &&
+    prev.error === next.error &&
+    prev.messagesHydrated === next.messagesHydrated &&
+    arraysEqual(prev.hydratedTables, next.hydratedTables) &&
+    JSON.stringify(prev.baselineCounts) === JSON.stringify(next.baselineCounts)
+  ) {
+    return;
+  }
+  hydrationState = next;
   emit();
+}
+
+function setState(patch: Partial<HydrationState>) {
+  emitIfChanged({ ...hydrationState, ...patch });
 }
 
 function snapshotHydrated() {
@@ -80,11 +102,20 @@ export function markHydrationSoftPending() {
 }
 
 export function markHydrationReady(baselineCounts: Partial<Record<SyncArrayTable, number>>) {
+  const hydrated = snapshotHydrated();
+  if (
+    hydrationState.phase === 'ready' &&
+    hydrationState.error === null &&
+    hydrationState.messagesHydrated === hydrated.messagesHydrated &&
+    arraysEqual(hydrationState.hydratedTables, hydrated.hydratedTables)
+  ) {
+    return;
+  }
   setState({
     phase: 'ready',
     error: null,
     baselineCounts: { ...baselineCounts },
-    ...snapshotHydrated(),
+    ...hydrated,
   });
 }
 
@@ -100,7 +131,14 @@ export function updateBaselineCounts(counts: Partial<Record<SyncArrayTable, numb
 }
 
 export function markTablesHydrated(tables: readonly SyncArrayTable[]) {
-  for (const table of tables) hydratedTables.add(table);
+  let added = false;
+  for (const table of tables) {
+    if (!hydratedTables.has(table)) {
+      hydratedTables.add(table);
+      added = true;
+    }
+  }
+  if (!added) return;
   setState(snapshotHydrated());
 }
 

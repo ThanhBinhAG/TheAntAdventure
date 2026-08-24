@@ -8,12 +8,23 @@ import {
   ensurePageDataLoaded,
   routeBootSatisfied,
   setActivePageBoot,
+  shouldSkipSettledBoot,
 } from '@/lib/db/hydrate';
+import { bootTablesForPage } from '@/lib/db/sync-config';
 import type { PageSlug } from '@/lib/types';
+
+function routeBootIsInstant(slug: PageSlug): boolean {
+  return bootTablesForPage(slug).length === 0;
+}
+
+function initialReady(slug: PageSlug): boolean {
+  return routeBootIsInstant(slug) || shouldSkipSettledBoot(slug);
+}
 
 /**
  * Ensures route boot tables are loaded before rendering the page.
- * StoreProvider only marks hydration pending — fetch starts here per route.
+ * Routes with empty PAGE_BOOT_TABLES render children immediately (no loading flash).
+ * Parent should pass `key={slug}` so page changes reset gate state without sync effects.
  */
 export default function PageDataGate({
   page,
@@ -22,17 +33,14 @@ export default function PageDataGate({
   page: PageSlug;
   children: React.ReactNode;
 }) {
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => initialReady(page));
   const [error, setError] = useState<string | null>(null);
-  const [prevPage, setPrevPage] = useState(page);
-
-  if (page !== prevPage) {
-    setPrevPage(page);
-    setReady(false);
-    setError(null);
-  }
 
   useEffect(() => {
+    if (shouldSkipSettledBoot(page)) {
+      return;
+    }
+
     let cancelled = false;
     const generation = setActivePageBoot(page);
     cancelDelayedRevalidate();
@@ -41,23 +49,20 @@ export default function PageDataGate({
       try {
         const ok = await ensurePageDataLoaded(page, generation);
         if (cancelled) return;
-        if (!ok) {
-          // Strict Mode cancellations can invalidate generation promises even when
-          // the route boot tables are already hydrated by another in-flight boot.
-          if (routeBootSatisfied(page)) {
-            setReady(true);
-            return;
-          }
-
-          setError('Không tải được dữ liệu từ Supabase');
-          setReady(true);
-          return;
+        if (!ok && !routeBootSatisfied(page)) {
+          setError('Không thể tải dữ liệu từ Supabase');
         }
-        setReady(true);
       } catch (e) {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : 'Hydrate failed');
-        setReady(true);
+      } finally {
+        // Always unblock after boot finishes. Do not gate on initialReady(page):
+        // boot may settle mid-flight (bootSettled + hydrated tables), which makes
+        // initialReady true while this mount still has ready=false — that race
+        // left Dashboard/Planner/etc. stuck on PageRouteLoading forever.
+        if (!cancelled) {
+          setReady(true);
+        }
       }
     })();
 

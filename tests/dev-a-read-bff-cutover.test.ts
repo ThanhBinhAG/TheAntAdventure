@@ -18,15 +18,19 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   const tourDesignBoot = config.match(/tourdesign:\s*\[([\s\S]*?)\],\n\s*\/\/ Catalogue/)?.[1] ?? '';
 
   assert.match(config, /planner:\s*\['cal_events'\]/);
-  assert.match(config, /attractions:\s*\['photos', 'photo_folders'\]/);
+  assert.match(config, /attractions:\s*\[\]/);
   assert.match(config, /pricing:\s*\[\]/);
   assert.doesNotMatch(tourDesignBoot, /'products'/);
   assert.doesNotMatch(tourDesignBoot, /'tour_drafts'/);
   assert.doesNotMatch(tourDesignBoot, /'tour_outline_days'/);
+  assert.doesNotMatch(tourDesignBoot, /'customers'/);
+  assert.doesNotMatch(tourDesignBoot, /'leads'/);
 
   assert.doesNotMatch(products, /ensureTablesLoaded/);
-  assert.match(products, /getBffArray<Product>\('\/api\/products\/all'/);
-  assert.match(products, /getBffArray<ProductPricing>\('\/api\/products\/pricing\/all'/);
+  assert.match(products, /getBffData<Product>\(/);
+  assert.match(products, /api\/products\?code=/);
+  assert.doesNotMatch(products, /\/api\/products\/all/);
+  assert.doesNotMatch(products, /\/api\/products\/pricing\/all/);
 
   assert.match(planner, /getBffArray<Task>\('\/api\/planner\/all'/);
   assert.match(planner, /setTasks/);
@@ -34,17 +38,24 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   assert.match(attractions, /getBffArray<Attraction>\(`\/api\/attractions\/all/);
   assert.match(attractions, /setAttractions/);
 
+  assert.match(gallery, /useGalleryPage/);
   assert.doesNotMatch(gallery, /ensureTablesLoaded\(\['attractions'\]\)/);
   assert.match(gallery, /getBffArray<Attraction>\('\/api\/attractions\/all'/);
   assert.match(gallery, /setAttractions/);
 
   assert.doesNotMatch(pricing, /ensureTablesLoaded/);
-  assert.match(pricing, /getBffArray<Product>\('\/api\/products\/all'/);
-  assert.match(pricing, /getBffArray<ProductPricing>\('\/api\/products\/pricing\/all'/);
+  assert.match(pricing, /useProductPage/);
+  assert.match(pricing, /\/api\/products\/pricing\?productCode=/);
+  assert.doesNotMatch(pricing, /\/api\/products\/all/);
+  assert.doesNotMatch(pricing, /\/api\/products\/pricing\/all/);
 
   assert.doesNotMatch(tourDesign, /ensureTablesLoaded/);
-  assert.match(tourDesign, /getBffArray<Product>\('\/api\/products\/all'/);
-  assert.match(tourDesign, /getBffArray<TourDraft>\('\/api\/tour-design\/drafts\/all'/);
-  assert.match(tourDesign, /getBffArray<TourOutlineDay>\('\/api\/tour-design\/outlines\/all'/);
+  assert.match(tourDesign, /\/api\/tour-design\/drafts\?leadIds=/);
+  assert.match(tourDesign, /\/api\/tour-design\/drafts\?id=/);
+  assert.match(tourDesign, /\/api\/tour-design\/outlines\?draftId=/);
+  assert.doesNotMatch(tourDesign, /\/api\/products\/all/);
+  assert.doesNotMatch(tourDesign, /\/api\/tour-design\/drafts\/all/);
+  assert.doesNotMatch(tourDesign, /\/api\/tour-design\/outlines\/all/);
   assert.match(tourDesign, /getBffArray<GalleryPhoto>\('\/api\/photos\/all'/);
+  assert.match(tourDesign, /useTourDesignCrmContext/);
 });

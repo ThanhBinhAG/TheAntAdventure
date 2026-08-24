@@ -54,30 +54,26 @@ export const SIDEBAR_BADGE_TABLES: readonly SyncArrayTable[] = [
 export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[]>> = {
   dashboard: ['customers', 'leads', 'bookings', 'agents', 'feedback'],
   planner: ['cal_events'],
-  customers: ['customers', 'leads', 'feedback'],
-  /** Agents list/CRUD via BFF; boot only `leads` for commission (Sales BFF later). */
+  /** Clients list/CRUD via `/api/customers`; profile modal loads related rows via `/api/customers/:id/profile`. */
+  customers: [],
   /** Agents list/catalog via `/api/agents`; pipeline/commission leads wait for Sales BFF. */
   agents: [],
-  sales: ['leads', 'customers', 'comms', 'tour_drafts', 'bookings'],
-  /** Customer, lead, hotel, and comm data are still owned by their existing loaders. */
-  tourdesign: [
-    'customers',
-    'leads',
-    'hotels',
-    'comms',
-  ],
+  sales: [],
+  /** Customers/leads via `/api/tour-design/crm-context`; hotels/comms still boot here. */
+  tourdesign: ['hotels', 'comms'],
   // Catalogue pages use the paginated server API. The full data set is loaded
   // only when a user opens a detail drawer or enters Manage mode.
   products: [],
-  /** attractions deferred — Gallery lazy-loads for ?attraction= filter / delete unlink */
-  gallery: ['photos', 'photo_folders'],
+  /** Gallery list/folders via `/api/photos/*` and `/api/photo-folders`. */
+  gallery: [],
   /** Pricing loads its catalogue through Product/Pricing BFF routes. */
   pricing: [],
   bookings: ['bookings', 'customers'],
   contracts: ['contracts', 'bookings'],
   suppliers: ['hotels', 'transport', 'restaurants', 'cruises', 'suppliers'],
   guides: ['guides'],
-  attractions: ['photos', 'photo_folders'],
+  /** Pickers load gallery catalog via BFF when opened. */
+  attractions: [],
   /** Covers come from destinations API; no gallery hydrate on this route. */
   weather: [],
   posttour: ['feedback'],

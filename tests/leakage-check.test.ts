@@ -31,11 +31,12 @@ test('leakage check accepts a clean browser bundle and rejects Supabase paths or
   }
 });
 
-test('production build invokes the leakage check after Next build', async () => {
+test('leakage check remains available through the explicit verified build command', async () => {
   const packageJson = await import('node:fs/promises').then(({ readFile }) =>
     readFile(join(process.cwd(), 'package.json'), 'utf8')
   );
   const scripts = JSON.parse(packageJson).scripts as Record<string, string>;
   assert.equal(scripts['leakage:check'], 'bash scripts/scan-leakage.sh');
-  assert.match(scripts.build, /next build --webpack && npm run leakage:check/);
+  assert.equal(scripts.build, 'next build --webpack');
+  assert.equal(scripts['build:with-leakage'], 'npm run build && npm run leakage:check');
 });

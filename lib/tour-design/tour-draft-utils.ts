@@ -289,6 +289,7 @@ export function buildTourDraft(input: {
   outlineSentAt?: string;
   outlineApprovedAt?: string;
   outlineRevision?: number;
+  saveRevision?: number;
   selectedCodes: string[];
   selectedPackageId: string | null;
   markupPct: number;
@@ -310,6 +311,7 @@ export function buildTourDraft(input: {
     outlineSentAt: input.outlineSentAt,
     outlineApprovedAt: input.outlineApprovedAt,
     outlineRevision: input.outlineRevision ?? 0,
+    saveRevision: input.saveRevision ?? 0,
     selectedCodes: input.selectedCodes,
     selectedPackageId: input.selectedPackageId,
     experienceOverrides,

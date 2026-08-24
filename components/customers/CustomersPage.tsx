@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
 import { SALES_PEOPLE } from '@/lib/customers/customer-form';
 import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
-import { useStore } from '@/hooks/useStore';
 import { usePageSize, type PageSizeOption } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
@@ -44,7 +43,6 @@ const STAGE_FILTERS: {
 
 export default function Customers() {
   const { canWrite } = usePagePermission('customers');
-  const storeCustomers = useStore((s) => s.customers);
   const { saveFromForm } = useRegisterCustomer();
   const { deleteCustomer } = useDeleteCustomer();
 
@@ -105,13 +103,9 @@ export default function Customers() {
   }
 
   const profileCustomer =
-    (profileId && items.find((c) => c.id === profileId)) ||
-    (profileId ? storeCustomers.find((c) => c.id === profileId) : null) ||
-    null;
+    (profileId && items.find((c) => c.id === profileId)) || null;
   const editCustomer =
-    (editId && items.find((c) => c.id === editId)) ||
-    (editId ? storeCustomers.find((c) => c.id === editId) : null) ||
-    null;
+    (editId && items.find((c) => c.id === editId)) || null;
 
   function openProfile(id: string, tab: 'overview' | 'pipeline' = 'overview') {
     setProfileInitialTab(tab);
@@ -473,7 +467,7 @@ export default function Customers() {
         open={formMode !== null}
         mode={formMode === 'edit' ? 'edit' : 'add'}
         customer={editCustomer}
-        customers={storeCustomers}
+        customers={[]}
         onClose={() => {
           setFormMode(null);
           setEditId(null);

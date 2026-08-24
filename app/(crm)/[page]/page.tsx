@@ -24,7 +24,7 @@ export default async function CRMPage(props: PageProps) {
   return (
     <Suspense fallback={<PageRouteLoading />}>
       <PermissionGate page={slug}>
-        <PageDataGate page={slug}>
+        <PageDataGate page={slug} key={slug}>
           <PageComponent />
         </PageDataGate>
       </PermissionGate>

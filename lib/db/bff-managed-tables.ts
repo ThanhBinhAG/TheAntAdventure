@@ -4,12 +4,17 @@ import type { SyncArrayTable } from './sync-config';
 export const BFF_MANAGED_TABLES = new Set<SyncArrayTable>([
   'customers',
   'agents',
+  'leads',
+  'comms',
+  'bookings',
   'products',
   'product_pricing',
   'tasks',
   'attractions',
   'tour_drafts',
   'tour_outline_days',
+  'photos',
+  'photo_folders',
 ]);
 
 /** Preserves the input table union so callers like `StoreRowPatch` indexing stay typed. */

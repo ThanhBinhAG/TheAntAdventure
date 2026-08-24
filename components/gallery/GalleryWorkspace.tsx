@@ -12,11 +12,12 @@ import {
 } from '@dnd-kit/core';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/hooks/useStore';
-import {
-  persistRouteCacheFromStore,
-  pushTablesToSupabase,
-} from '@/lib/db/hydrate';
+import { persistRouteCacheFromStore } from '@/lib/db/hydrate';
 import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { useGalleryPage } from '@/hooks/useGalleryPage';
+import { useUpdatePhoto } from '@/hooks/useUpdatePhoto';
+import { useDeletePhoto } from '@/hooks/useDeletePhoto';
+import { usePhotoFolderMutations } from '@/hooks/usePhotoFolderMutations';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import { PHOTO_LIBRARY_REGIONS } from '@/lib/gallery/gallery-tags';
 import {
@@ -25,16 +26,14 @@ import {
   photoThumbUrl,
 } from '@/lib/gallery/gallery-helpers';
 import { photoMatchesSearchQuery, matchesFoldedQuery } from '@/lib/gallery/fold-search';
-import { deletePhotoViaApi, uploadPhotoViaApi } from '@/lib/gallery/photo-api';
+import { uploadPhotoViaApi } from '@/lib/gallery/photo-api';
 import {
   canDeleteFolder,
   childFolders,
   countPhotosInFolder,
-  createFolder,
   ensureUnsortedFolder,
   folderBreadcrumb,
   folderById,
-  renameFolder,
   UNSORTED_FOLDER_ID,
   type PhotoFolder,
 } from '@/lib/gallery/photo-folders';
@@ -98,6 +97,10 @@ function allocatePhotoIds(existing: GalleryPhoto[], count: number): string[] {
 
 export default function GalleryWorkspace() {
   const { canWrite } = usePagePermission('gallery');
+  const { loading: libraryLoading, error: libraryError } = useGalleryPage();
+  const { patchPhoto } = useUpdatePhoto();
+  const { deletePhoto } = useDeletePhoto();
+  const { createFolder, renameFolder, deleteFolder } = usePhotoFolderMutations();
   const searchParams = useSearchParams();
   const photoFilter = searchParams.get('photo') || '';
   const attractionFilter = searchParams.get('attraction') || '';
@@ -122,6 +125,7 @@ export default function GalleryWorkspace() {
   const [lightbox, setLightbox] = useState<GalleryPhoto | null>(null);
   const [dismissedPhotoFilter, setDismissedPhotoFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const displayError = error ?? libraryError;
   const [moveOpen, setMoveOpen] = useState(false);
   const [dragPhotoId, setDragPhotoId] = useState<string | null>(null);
   const [folderNameModal, setFolderNameModal] = useState<
@@ -130,6 +134,7 @@ export default function GalleryWorkspace() {
   const [infoFolder, setInfoFolder] = useState<PhotoFolder | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
 
   useEffect(() => {
     if (rawFolders.length === 0 && folders.some((f) => f.id === UNSORTED_FOLDER_ID)) {
@@ -235,37 +240,19 @@ export default function GalleryWorkspace() {
     setError(null);
   }
 
-  async function persistFolders(next: PhotoFolder[], previous: PhotoFolder[]) {
-    useStore.setState({ photoFolders: next });
-    syncGalleryRouteCache();
-    void withoutAutoSyncAsync(async () => {
-      const result = await pushTablesToSupabase(['photo_folders'], false);
-      if (!result.ok) {
-        useStore.setState({ photoFolders: previous });
-        syncGalleryRouteCache();
-        toast.error(result.error ?? 'Failed to save folders');
-      }
-    });
-  }
-
-  async function handleNewFolder() {
-    setFolderNameModal({ mode: 'create' });
-  }
-
   async function submitFolderName(name: string) {
     if (!folderNameModal) return;
     setError(null);
-    const previous = folders;
     try {
       if (folderNameModal.mode === 'create') {
-        const { folders: next } = createFolder(folders, name, currentFolderId);
-        await persistFolders(next, previous);
+        await createFolder({ name, parentId: currentFolderId });
         toast.success('Folder created.');
       } else {
-        await persistFolders(renameFolder(folders, folderNameModal.folder.id, name), previous);
+        await renameFolder(folderNameModal.folder.id, { name });
         toast.success('Folder renamed.');
       }
       setFolderNameModal(null);
+      syncGalleryRouteCache();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save folder');
       toast.error(e instanceof Error ? e.message : 'Could not save folder');
@@ -276,6 +263,10 @@ export default function GalleryWorkspace() {
     setFolderNameModal({ mode: 'rename', folder });
   }
 
+  async function handleNewFolder() {
+    setFolderNameModal({ mode: 'create' });
+  }
+
   async function handleDeleteFolder(folder: PhotoFolder) {
     const check = canDeleteFolder(folders, folder.id, photos);
     if (!check.ok) {
@@ -284,10 +275,10 @@ export default function GalleryWorkspace() {
     }
     const ok = await confirmDialog(`Delete folder “${folder.name}”?`, { title: 'Delete folder' });
     if (!ok) return;
-    const previous = folders;
     try {
-      await persistFolders(folders.filter((f) => f.id !== folder.id), previous);
+      await deleteFolder(folder.id);
       if (currentFolderId === folder.id) goRoot();
+      syncGalleryRouteCache();
       toast.success('Folder deleted.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not delete folder');
@@ -413,14 +404,12 @@ export default function GalleryWorkspace() {
           });
         } else {
           setSaveStatus('Saving metadata…');
-          await withoutAutoSyncAsync(async () => {
-            const next = (useStore.getState().photos as GalleryPhoto[]).map((p) =>
-              p.id === id ? record : p
-            );
-            useStore.setState({ photos: next });
-            const result = await pushTablesToSupabase(['photos'], false);
-            if (!result.ok) throw new Error(result.error ?? 'Failed to save metadata');
+          const result = await patchPhoto(id, {
+            caption: data.caption,
+            region: data.region,
+            tags: data.tags,
           });
+          if (!result.ok) throw new Error(result.message);
         }
         syncGalleryRouteCache();
       }
@@ -442,12 +431,7 @@ export default function GalleryWorkspace() {
     setError(null);
     try {
       setSaveStatus('Deleting…');
-      await deletePhotoViaApi(id, photo.storagePath);
-      await withoutAutoSyncAsync(async () => {
-        useStore.setState({
-          photos: (useStore.getState().photos as GalleryPhoto[]).filter((p) => p.id !== id),
-        });
-      });
+      await deletePhoto(photo);
       setModalOpen(false);
       setDismissedPhotoFilter(photoFilter);
       setLightbox(null);
@@ -480,14 +464,9 @@ export default function GalleryWorkspace() {
         .filter((p): p is GalleryPhoto => Boolean(p));
 
       await mapWithConcurrency(toDelete, GALLERY_DELETE_CONCURRENCY, async (photo) => {
-        await deletePhotoViaApi(photo.id, photo.storagePath);
+        await deletePhoto(photo);
       });
 
-      await withoutAutoSyncAsync(async () => {
-        useStore.setState({
-          photos: (useStore.getState().photos as GalleryPhoto[]).filter((p) => !remove.has(p.id)),
-        });
-      });
       setSelected(new Set());
       toast.success('Photos deleted.');
       syncGalleryRouteCache();
@@ -504,16 +483,10 @@ export default function GalleryWorkspace() {
     setSaving(true);
     setError(null);
     try {
-      const idSet = new Set(photoIds);
-      await withoutAutoSyncAsync(async () => {
-        useStore.setState({
-          photos: (useStore.getState().photos as GalleryPhoto[]).map((p) =>
-            idSet.has(p.id) ? { ...p, folderId } : p
-          ),
-        });
-        const result = await pushTablesToSupabase(['photos'], false);
-        if (!result.ok) throw new Error(result.error ?? 'Failed to move photos');
-      });
+      for (const photoId of photoIds) {
+        const result = await patchPhoto(photoId, { folderId });
+        if (!result.ok) throw new Error(result.message);
+      }
       setSelected(new Set());
       setMoveOpen(false);
       toast.success(`Moved ${photoIds.length} photo(s).`);
@@ -603,6 +576,11 @@ export default function GalleryWorkspace() {
 
   return (
     <div className="phlib">
+      {libraryLoading && (
+        <div className="crm-page-hydrate-error" role="status" style={{ padding: '0.75rem 1rem' }}>
+          Đang tải thư viện ảnh…
+        </div>
+      )}
       <div className="phlib-hero">
         <div className="phlib-hero-text">
           <h1 className="phlib-title">{title}</h1>
@@ -706,7 +684,7 @@ export default function GalleryWorkspace() {
         </span>
       </div>
 
-      {error && <div className="phlib-error">{error}</div>}
+      {displayError && <div className="phlib-error">{displayError}</div>}
       {!atRoot && attractionFilter && (
         <div className="phlib-filter-note">
           Filtered to attraction <code>{attractionFilter}</code>

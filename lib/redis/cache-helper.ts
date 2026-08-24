@@ -92,11 +92,12 @@ export async function cacheInvalidatePattern(pattern: string): Promise<void> {
     if (!client) return;
 
     const keys: string[] = [];
-    for await (const key of client.scanIterator({
+    for await (const batch of client.scanIterator({
       MATCH: pattern,
       COUNT: 100,
     })) {
-      keys.push(String(key));
+      const scannedKeys = Array.isArray(batch) ? batch : [batch];
+      keys.push(...scannedKeys.map((key) => String(key)));
     }
 
     if (keys.length > 0) {

@@ -25,6 +25,7 @@ test('Dev A mutations stay BFF-managed and never enter browser auto-sync', () =>
   const persistEnd = tourDesign.indexOf('const persistTourDesignAck', persistStart);
   const persistDraft = tourDesign.slice(persistStart, persistEnd);
   assert.match(persistDraft, /await fetch\('\/api\/tour-design\/save'/);
-  assert.ok(persistDraft.indexOf('upsertTourDraft(draft)') > persistDraft.indexOf('await fetch'));
+  assert.match(persistDraft, /onLatestSuccess/);
+  assert.ok(persistDraft.indexOf('upsertTourDraft({ ...draft, saveRevision })') > persistDraft.indexOf('await fetch'));
   assert.ok(persistDraft.indexOf('replaceOutlineDaysForDraft') > persistDraft.indexOf('await fetch'));
 });

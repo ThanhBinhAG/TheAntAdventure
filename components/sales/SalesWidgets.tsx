@@ -6,9 +6,8 @@ import { STAGE_PROB_V22, fmt, KANBAN_STAGES } from '@/lib/constants';
 import { isFollowUpOverdue } from '@/lib/sales/sales-lead-utils';
 import type { ListSortField, ListSortState } from '@/lib/sales/sales-lead-utils';
 import { outlineStatusLabel } from '@/lib/tour-design/tour-design-lead';
-import { getTourDraftForLead } from '@/lib/tour-design/tour-design-leads';
 import { useLanguage } from '@/hooks/useLanguage';
-import type { Lead, TourDraft } from '@/lib/types';
+import type { Lead } from '@/lib/types';
 
 export const STAGE_SELECT_OPTIONS = [...KANBAN_STAGES, 'Lost'] as const;
 
@@ -103,16 +102,14 @@ export function PipeCard({
   stage,
   name,
   today,
-  tourDrafts,
   onStageChange,
   onUpdate,
   onApproveOutline,
 }: {
-  lead: Lead;
+  lead: Lead & { outlineStatus?: string | null; outlineRevision?: number };
   stage: string;
   name: string;
   today: string;
-  tourDrafts: TourDraft[];
   onStageChange: (id: string, stage: string) => void;
   onUpdate: (id: string, data: Partial<Lead>) => void;
   onApproveOutline: (lead: Lead) => void;
@@ -126,8 +123,8 @@ export function PipeCard({
   const prob = lead.probability ?? STAGE_PROB_V22[stage] ?? 10;
   const weighted = Math.round(((lead.value || 0) * prob) / 100);
   const overdue = isFollowUpOverdue(lead, today);
-  const draft = getTourDraftForLead(lead.id, tourDrafts);
-  const outlineWaiting = draft?.outlineStatus === 'sent';
+  const outlineStatus = lead.outlineStatus ?? null;
+  const outlineWaiting = outlineStatus === 'sent';
 
   const firstName = name.split(' ')[0] || name;
   const travelWhen = lead.month || tsf('preferredDates');
@@ -150,11 +147,11 @@ ${tsf('aiEmailSignature')}`;
       title={`${lead.tour} | ${lead.pax} ${tsf('paxSuffix')} | ${lead.month}`}
     >
       <div className="pname">{name}</div>
-      {draft && (
+      {outlineStatus && (
         <div style={{ fontSize: 10.5, marginTop: 4 }}>
-          <span className={`bdg ${draft.outlineStatus === 'approved' ? 'bdg-g' : draft.outlineStatus === 'sent' ? 'bdg-a' : 'bdg-w'}`}>
-            Outline: {outlineStatusLabel(draft.outlineStatus)}
-            {(draft.outlineRevision ?? 0) > 0 ? ` v${draft.outlineRevision}` : ''}
+          <span className={`bdg ${outlineStatus === 'approved' ? 'bdg-g' : outlineStatus === 'sent' ? 'bdg-a' : 'bdg-w'}`}>
+            Outline: {outlineStatusLabel(outlineStatus)}
+            {(lead.outlineRevision ?? 0) > 0 ? ` v${lead.outlineRevision}` : ''}
           </span>
         </div>
       )}

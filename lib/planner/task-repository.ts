@@ -57,14 +57,16 @@ export async function updateTaskServer(
   supabase: SupabaseClient,
   id: string,
   patch: Partial<Task>
-): Promise<void> {
+): Promise<boolean> {
   const row = taskPatchToRow(patch);
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('tasks')
     .update(row)
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw error;
+  return (data?.length ?? 0) > 0;
 }
 
 /**
@@ -73,11 +75,13 @@ export async function updateTaskServer(
 export async function deleteTaskServer(
   supabase: SupabaseClient,
   id: string
-): Promise<void> {
-  const { error } = await supabase
+): Promise<boolean> {
+  const { data, error } = await supabase
     .from('tasks')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw error;
+  return (data?.length ?? 0) > 0;
 }

@@ -38,6 +38,7 @@ export interface ProductEditPanelProps {
   product: Product | null;
   isNew: boolean;
   sourceTab: SourceTab;
+  canWrite: boolean;
   externalError?: string | null;
   onClose: () => void;
   /** Persist locally then push to Supabase; resolve only when remote sync finishes. */
@@ -103,6 +104,7 @@ export default function ProductEditPanel({
   product,
   isNew,
   sourceTab,
+  canWrite,
   externalError,
   onClose,
   onSave,
@@ -134,7 +136,7 @@ export default function ProductEditPanel({
   const dirty = savedFingerprint === null || formFingerprint(form) !== savedFingerprint;
   const busy = saveState === 'saving';
   const cleanSaved = saveState === 'saved' && !dirty;
-  const saveDisabled = busy || cleanSaved;
+  const saveDisabled = busy || !canWrite;
 
   const rebuildCode = useCallback(
     (state: ProductFormState): ProductFormState => {
@@ -233,6 +235,7 @@ export default function ProductEditPanel({
   };
 
   const handleSave = async (asDraft: boolean) => {
+    if (!canWrite) return;
     if (saveDisabled) return;
     if (!form.name.trim()) {
       setSaveError('Please enter a product name.');
@@ -328,7 +331,7 @@ export default function ProductEditPanel({
 
       <div className={`tp-edit-aside-scroll${busy ? ' is-busy' : ''}`}>
         {busy && <div className="tp-save-overlay" aria-hidden="true" />}
-        <fieldset className="tp-edit-aside-fields" disabled={busy}>
+        <fieldset className="tp-edit-aside-fields" disabled={busy || !canWrite}>
         <FormSection
           title="Card tags & classification"
           hint="Product code: AA-{region}-{dest}-{activity}-{duration}-{seq}."
@@ -549,7 +552,7 @@ export default function ProductEditPanel({
           <button
             type="button"
             className="btn btn-s prod-form-delete"
-            disabled={busy}
+            disabled={busy || !canWrite}
             onClick={() => {
               if (busy) return;
               void (async () => {
@@ -575,6 +578,7 @@ export default function ProductEditPanel({
             type="button"
             onClick={() => void handleSave(true)}
             disabled={saveDisabled}
+            title={!canWrite ? 'You need write permission for Products to save a product' : undefined}
             aria-busy={busy && saveKind === 'draft'}
           >
             {busy && saveKind === 'draft' && <span className="tp-save-spin" aria-hidden="true" />}
@@ -585,6 +589,7 @@ export default function ProductEditPanel({
             type="button"
             onClick={() => void handleSave(false)}
             disabled={saveDisabled}
+            title={!canWrite ? 'You need write permission for Products to save a product' : undefined}
             aria-busy={busy && saveKind === 'activate'}
           >
             {busy && saveKind === 'activate' && <span className="tp-save-spin" aria-hidden="true" />}

@@ -2,39 +2,31 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { STAGE_COLORS, STAGE_PROB_V22, fmt, KANBAN_STAGES } from '@/lib/constants';
-import { getCustomerName } from '@/lib/core/crm-utils';
-import { ensureBookingForConfirmedLead } from '@/lib/sales/booking-from-lead';
-import { patchOutlineApproved } from '@/lib/tour-design/tour-design-lead';
-import { applyOutlineWorkflowPatch } from '@/lib/tour-design/tour-outline-workflow';
-import { getTourDraftForLead } from '@/lib/tour-design/tour-design-leads';
 import {
   PIPELINE_CARDS_LIMIT,
-  filterLeadsByTime,
   getLeadWeightedValue,
-  getUniqueTravelMonths,
   groupLeadsByTravelMonth,
   hasActiveFilters,
-  leadMatchesCustomerName,
-  leadMatchesSearch,
-  sortLeads,
   type ListSortField,
   type ListSortState,
   type SalesTimeFilterMode,
   type SalesTimeFilterState,
 } from '@/lib/sales/sales-lead-utils';
+import type { LeadListItem, LeadPageSize, LeadPatchBody } from '@/lib/sales/lead-list-input';
 import { localTodayIso } from '@/lib/core/date-utils';
-import { useStore } from '@/hooks/useStore';
-import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
+import { useSalesPage } from '@/hooks/useSalesPage';
+import { useUpdateLead } from '@/hooks/useUpdateLead';
+import { useConfirmLead } from '@/hooks/useConfirmLead';
+import { useApproveLeadOutline } from '@/hooks/useApproveLeadOutline';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
 import { useLanguage } from '@/hooks/useLanguage';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
 import type { SalesKey } from '@/lib/i18n/pages/sales';
-import type { Lead } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import { STAGE_SELECT_OPTIONS, SalesPolicyView, PipeCard, ListFollowUpCell, SortableTh } from '@/components/sales/SalesWidgets';
@@ -65,23 +57,18 @@ function timeFilterLabel(mode: SalesTimeFilterMode, tsf: (key: SalesKey) => stri
   return tsf(TIME_FILTER_LABELS[mode]);
 }
 
-
 export default function SalesPage() {
   const { tc, tStage, tsf, tLostReason } = useLanguage();
   const searchParams = useSearchParams();
   const urlCustId = searchParams.get('custId');
   const urlLeadId = searchParams.get('leadId');
   const urlTab = searchParams.get('tab');
-  const leads = useStore((s) => s.leads);
-  const customers = useStore((s) => s.customers);
-  const tourDrafts = useStore((s) => s.tourDrafts);
-  const updateLead = useStore((s) => s.updateLead);
-  const addBooking = useStore((s) => s.addBooking);
-  const bookings = useStore((s) => s.bookings);
-  const upsertTourDraft = useStore((s) => s.upsertTourDraft);
-  const addComm = useStore((s) => s.addComm);
   const { canWrite } = usePagePermission('sales');
   const { saveFromForm } = useRegisterCustomer();
+  const { patchLead } = useUpdateLead();
+  const { confirmLead } = useConfirmLead();
+  const { approveOutline } = useApproveLeadOutline();
+
   const [tab, setTab] = useState<SalesTab>(() =>
     urlLeadId ? 'list' : urlTab === 'list' || urlTab === 'pipeline' ? urlTab : 'pipeline'
   );
@@ -103,63 +90,93 @@ export default function SalesPage() {
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
   const [listSort, setListSort] = useState<ListSortState>({ field: 'followUp', direction: 'asc' });
   const [groupByMonth, setGroupByMonth] = useState(false);
+  const { pageSize, setPageSize } = usePageSize();
+  const [listPageState, setListPageState] = useState({ key: '', page: 1 });
+
+  const listPageKey = useMemo(
+    () =>
+      JSON.stringify({
+        search,
+        timeFilter,
+        stageFilter,
+        custIdFilter,
+        highlightLeadId,
+        listSort,
+        pageSize,
+        tab,
+      }),
+    [search, timeFilter, stageFilter, custIdFilter, highlightLeadId, listSort, pageSize, tab],
+  );
+  const listPage = listPageState.key === listPageKey ? listPageState.page : 1;
+  const setListPage = (page: number) => {
+    setListPageState({ key: listPageKey, page });
+  };
+
+  const dataEnabled = tab === 'pipeline' || tab === 'list';
+
+  const {
+    items: leads,
+    travelMonths,
+    totalCount,
+    totalPages: apiTotalPages,
+    isLoading,
+    error: loadError,
+    refresh,
+  } = useSalesPage({
+    page: tab === 'list' ? listPage : 1,
+    pageSize: pageSize as LeadPageSize,
+    scope: tab === 'list' ? 'list' : 'pipeline',
+    q: search,
+    custId: custIdFilter || undefined,
+    stage: stageFilter || undefined,
+    timeFilter,
+    sortField: listSort.field,
+    sortDirection: listSort.direction,
+    highlightLeadId: highlightLeadId || undefined,
+    enabled: dataEnabled,
+  });
 
   const highlightedLead = useMemo(
     () => leads.find((lead) => lead.id === highlightLeadId),
     [leads, highlightLeadId]
   );
   const effectiveCustIdFilter = custIdFilter || highlightedLead?.custId || '';
+
   const effectiveExpandedStages = useMemo(() => {
     const stages = new Set(expandedStages);
     if (highlightedLead) stages.add(highlightedLead.stage);
     return stages;
   }, [expandedStages, highlightedLead]);
 
-  const travelMonths = useMemo(() => getUniqueTravelMonths(leads), [leads]);
-
-  const filteredLeads = useMemo(() => {
-    let list = leads.filter((l) => l.stage !== 'Lost');
-    list = filterLeadsByTime(list, timeFilter, today);
-    if (stageFilter) list = list.filter((l) => l.stage === stageFilter);
-    if (effectiveCustIdFilter) list = list.filter((l) => l.custId === effectiveCustIdFilter);
-    if (search.trim()) {
-      const matchesSearch =
-        tab === 'pipeline'
-          ? (l: Lead) => leadMatchesCustomerName(l, search, customers)
-          : (l: Lead) => leadMatchesSearch(l, search, customers);
-      list = list.filter(matchesSearch);
-    }
-
-    if (highlightLeadId) {
-      const highlighted = leads.find((l) => l.id === highlightLeadId);
-      if (highlighted && !list.some((l) => l.id === highlightLeadId)) {
-        list = [highlighted, ...list];
-      }
-    }
-
-    return list;
-  }, [leads, timeFilter, stageFilter, effectiveCustIdFilter, search, customers, today, highlightLeadId, tab]);
-
+  const filteredLeads = leads;
   const activeLeads = filteredLeads.filter((l) => l.stage !== 'Lost' && l.stage !== 'Completed');
   const totalPipelineVal = activeLeads.reduce((s, l) => s + (l.value || 0), 0);
   const weightedForecast = activeLeads.reduce((s, l) => s + getLeadWeightedValue(l), 0);
   const confirmedVal = filteredLeads.filter((l) => l.stage === 'Confirmed').reduce((s, l) => s + (l.value || 0), 0);
 
-  const listLeads = useMemo(() => sortLeads(filteredLeads, listSort, customers), [filteredLeads, listSort, customers]);
+  const listLeads = tab === 'list' ? filteredLeads : [];
+  const pageLeads = listLeads;
 
-  const { pageSize, setPageSize } = usePageSize();
-  const listPagination = usePagination(listLeads, pageSize, [
-    search,
-    timeFilter,
-    stageFilter,
-    custIdFilter,
-    listSort,
-    groupByMonth,
-    pageSize,
-  ]);
-  const { paginatedItems: pageLeads } = listPagination;
+  const listRangeStart = totalCount === 0 ? 0 : (listPage - 1) * pageSize + 1;
+  const listRangeEnd = Math.min(listPage * pageSize, totalCount);
 
   const filtersActive = hasActiveFilters(search, timeFilter, stageFilter) || !!effectiveCustIdFilter;
+
+  const handleLeadPatch = useCallback(
+    async (leadId: string, patch: LeadPatchBody) => {
+      if (!canWrite) {
+        toast.error('You do not have permission to edit sales.');
+        return;
+      }
+      const result = await patchLead(leadId, patch);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      refresh();
+    },
+    [canWrite, patchLead, refresh],
+  );
 
   function clearFilters() {
     setSearch('');
@@ -186,7 +203,7 @@ export default function SalesPage() {
     });
   }
 
-  function moveStage(leadId: string, newStage: string) {
+  async function moveStage(leadId: string, newStage: string) {
     if (!canWrite) {
       toast.error('You do not have permission to edit sales.');
       return;
@@ -198,32 +215,34 @@ export default function SalesPage() {
         reason: (lead?.lostReason as string) || '',
         note: (lead?.lostNote as string) || '',
       });
-    } else {
-      updateLead(leadId, { stage: newStage, probability: STAGE_PROB_V22[newStage] ?? 10 });
-      if (newStage === 'Confirmed') {
-        const lead = leads.find((l) => l.id === leadId);
-        if (lead) {
-          const booking = ensureBookingForConfirmedLead(
-            { ...lead, stage: 'Confirmed', probability: STAGE_PROB_V22.Confirmed },
-            bookings
-          );
-          if (booking) addBooking(booking);
-        }
-      }
+      return;
     }
+    if (newStage === 'Confirmed') {
+      const result = await confirmLead(leadId);
+      if (!result.ok) toast.error(result.message);
+      else refresh();
+      return;
+    }
+    await handleLeadPatch(leadId, {
+      stage: newStage,
+      probability: STAGE_PROB_V22[newStage] ?? 10,
+    });
   }
 
-  function handleApproveOutline(lead: Lead) {
-    const draft = getTourDraftForLead(lead.id, tourDrafts);
-    if (!draft || draft.outlineStatus !== 'sent') return;
-    const name = getCustomerName(customers, lead.custId);
-    const patch = patchOutlineApproved(draft, lead.custId, name, lead.owner);
-    applyOutlineWorkflowPatch(lead.id, draft, patch, { upsertTourDraft, updateLead, addComm });
+  async function handleApproveOutline(lead: LeadListItem) {
+    if (!canWrite) {
+      toast.error('You do not have permission to edit sales.');
+      return;
+    }
+    if (lead.outlineStatus !== 'sent') return;
+    const result = await approveOutline(lead.id);
+    if (!result.ok) toast.error(result.message);
+    else refresh();
   }
 
-  function saveLostReason() {
+  async function saveLostReason() {
     if (!lostModal) return;
-    updateLead(lostModal.leadId, {
+    await handleLeadPatch(lostModal.leadId, {
       stage: 'Lost',
       probability: 0,
       lostReason: lostModal.reason,
@@ -233,7 +252,7 @@ export default function SalesPage() {
     setLostModal(null);
   }
 
-  function renderLeadRow(l: Lead) {
+  function renderLeadRow(l: LeadListItem) {
     const weighted = Math.round(getLeadWeightedValue(l));
     const lostReason = (l.lostReason as string) || '';
     return (
@@ -246,19 +265,28 @@ export default function SalesPage() {
           <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{l.id}</code>
         </td>
         <td>
-          <b>{getCustomerName(customers, l.custId)}</b>
+          <b>{l.customerName}</b>
         </td>
         <td style={{ fontSize: 12, maxWidth: 200 }}>{l.tour}</td>
         <td>{l.pax || '—'}</td>
         <td style={{ fontWeight: 600, color: 'var(--g)' }}>{l.value > 0 ? `$${fmt(l.value)}` : '—'}</td>
         <td style={{ fontWeight: 700, color: 'var(--pur)' }}>{weighted > 0 ? `$${fmt(weighted)}` : '—'}</td>
         <td style={{ fontSize: 12, color: 'var(--m)' }}>{l.month || '—'}</td>
-        <ListFollowUpCell lead={l} today={today} onUpdate={updateLead} />
+        <ListFollowUpCell
+          lead={l}
+          today={today}
+          onUpdate={(id, data) => {
+            void handleLeadPatch(id, {
+              followUpDate: data.followUpDate ?? null,
+              nextAction: data.nextAction ?? null,
+            });
+          }}
+        />
         <td>
           <select
             className="pipe-stage-select"
             value={l.stage}
-            onChange={(e) => moveStage(l.id, e.target.value)}
+            onChange={(e) => void moveStage(l.id, e.target.value)}
             aria-label={tc('stage')}
           >
             {STAGE_SELECT_OPTIONS.map((st) => (
@@ -348,7 +376,7 @@ export default function SalesPage() {
         </button>
       )}
       <span className="sales-result-count">
-        {filteredLeads.length} {tsf('leadCount')}
+        {totalCount} {tsf('leadCount')}
       </span>
     </div>
   );
@@ -381,9 +409,22 @@ export default function SalesPage() {
         </button>
       </div>
 
+      {loadError && (
+        <div className="crm-page-hydrate-error" role="alert" style={{ padding: '0.75rem 1rem', color: '#b91c1c', marginBottom: 12 }}>
+          {loadError}{' '}
+          <button type="button" className="btn btn-s btn-sm" onClick={refresh}>
+            Retry
+          </button>
+        </div>
+      )}
+
       {salesToolbar}
 
-      {tab === 'pipeline' && (
+      {isLoading && dataEnabled ? (
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--m)' }}>Loading…</div>
+      ) : null}
+
+      {!isLoading && tab === 'pipeline' && (
         <>
           <div className="pipeline-forecast-bar">
             <div style={{ textAlign: 'center', minWidth: 90 }}>
@@ -461,12 +502,16 @@ export default function SalesPage() {
                         key={l.id}
                         lead={l}
                         stage={stage}
-                        name={getCustomerName(customers, l.custId)}
+                        name={l.customerName}
                         today={today}
-                        tourDrafts={tourDrafts}
-                        onStageChange={moveStage}
-                        onUpdate={updateLead}
-                        onApproveOutline={handleApproveOutline}
+                        onStageChange={(id, st) => void moveStage(id, st)}
+                        onUpdate={(id, data) => {
+                          void handleLeadPatch(id, {
+                            followUpDate: data.followUpDate ?? null,
+                            nextAction: data.nextAction ?? null,
+                          });
+                        }}
+                        onApproveOutline={(lead) => void handleApproveOutline(lead as LeadListItem)}
                       />
                     ))}
                     {hiddenCount > 0 && (
@@ -487,7 +532,7 @@ export default function SalesPage() {
         </>
       )}
 
-      {tab === 'list' && (
+      {!isLoading && tab === 'list' && (
         <div className="card">
           <div className="sales-list-toolbar">
             <label>
@@ -545,13 +590,22 @@ export default function SalesPage() {
                             {group.label === 'TBD' ? tsf('travelMonthUndetermined') : group.label} ({group.leads.length})
                           </td>
                         </tr>,
-                        ...group.leads.map((l) => renderLeadRow(l)),
+                        ...group.leads.map((l) => renderLeadRow(l as LeadListItem)),
                       ])
-                    : pageLeads.map((l) => renderLeadRow(l))}
+                    : pageLeads.map((l) => renderLeadRow(l as LeadListItem))}
                 </tbody>
               </table>
             )}
-            <PaginationBar {...listPagination} onPageSizeChange={setPageSize} />
+            <PaginationBar
+              page={listPage}
+              setPage={setListPage}
+              totalPages={Math.max(1, apiTotalPages)}
+              total={totalCount}
+              pageSize={pageSize}
+              rangeStart={listRangeStart}
+              rangeEnd={listRangeEnd}
+              onPageSizeChange={setPageSize}
+            />
           </div>
         </div>
       )}
@@ -587,7 +641,7 @@ export default function SalesPage() {
                 <button className="btn btn-s" type="button" onClick={() => setLostModal(null)}>
                   {tc('cancel')}
                 </button>
-                <button className="btn btn-p" type="button" onClick={saveLostReason} disabled={!lostModal.reason}>
+                <button className="btn btn-p" type="button" onClick={() => void saveLostReason()} disabled={!lostModal.reason}>
                   {tc('confirmLost')}
                 </button>
               </div>
@@ -599,13 +653,14 @@ export default function SalesPage() {
       <CustomerFormModal
         open={formOpen}
         mode="add"
-        customers={customers}
+        customers={[]}
         onClose={() => setFormOpen(false)}
         onSave={async (payload) => {
           try {
             const result = await saveFromForm({ ...payload, flagTourDesign: true });
             if (!result.ok) return result;
             setFormOpen(false);
+            refresh();
             if (result.leadId) {
               setCreatedClient({
                 leadId: result.leadId,

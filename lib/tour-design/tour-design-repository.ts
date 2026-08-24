@@ -1,6 +1,8 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { rowToCustomer, rowToLead } from '@/lib/db/mappers/crm';
+import type { Row } from '@/lib/db/mappers/shared';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
 import {
   rowToTourDraft,
@@ -9,6 +11,24 @@ import {
   tourOutlineDayToRow,
 } from '@/lib/db/mappers/tour';
 import type { TourDraft, TourOutlineDay } from '@/lib/types';
+import type { TourDesignCrmContext } from '@/lib/tour-design/tour-design-types';
+
+/** Customers + leads for Client Brief dropdown and Sales → Tour Design handoff queue. */
+export async function getTourDesignCrmContextServer(): Promise<TourDesignCrmContext> {
+  const supabase = await getServerSupabaseClient();
+  const [customersRes, leadsRes] = await Promise.all([
+    supabase.from('customers').select('*'),
+    supabase.from('leads').select('*'),
+  ]);
+
+  if (customersRes.error) throw customersRes.error;
+  if (leadsRes.error) throw leadsRes.error;
+
+  return {
+    customers: ((customersRes.data ?? []) as Row[]).map(rowToCustomer),
+    leads: ((leadsRes.data ?? []) as Row[]).map(rowToLead),
+  };
+}
 
 export class TourDesignSaveConflictError extends Error {
   constructor(readonly currentSaveRevision?: number) {

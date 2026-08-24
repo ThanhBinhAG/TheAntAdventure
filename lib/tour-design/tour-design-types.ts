@@ -1,3 +1,5 @@
+import type { Customer, Lead } from '@/lib/types';
+
 export interface TourBrief {
   clientName: string;
   clientEmail: string;
@@ -86,4 +88,10 @@ export type GalleryPhoto = {
   createdAt?: string;
   /** Photo folder id (defaults to Unsorted). */
   folderId?: string;
+};
+
+/** CRM rows Tour Design loads via `/api/tour-design/crm-context`. */
+export type TourDesignCrmContext = {
+  customers: Customer[];
+  leads: Lead[];
 };

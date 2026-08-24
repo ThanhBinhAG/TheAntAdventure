@@ -56,7 +56,11 @@ export default function PageDataGate({
         if (cancelled) return;
         setError(e instanceof Error ? e.message : 'Hydrate failed');
       } finally {
-        if (!cancelled && !initialReady(page)) {
+        // Always unblock after boot finishes. Do not gate on initialReady(page):
+        // boot may settle mid-flight (bootSettled + hydrated tables), which makes
+        // initialReady true while this mount still has ready=false — that race
+        // left Dashboard/Planner/etc. stuck on PageRouteLoading forever.
+        if (!cancelled) {
           setReady(true);
         }
       }

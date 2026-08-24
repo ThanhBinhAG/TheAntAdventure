@@ -45,7 +45,7 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 | Task | Owner chính | Hoàn thành khi |
 |---|---|---|
 | Ghi nhận baseline Network | A | Có capture login, dashboard và 9 feature hiện tại |
-| Inventory direct Supabase imports | B | Mỗi caller có feature owner và API thay thế — **Clients callers: done** (`Personal/docs/bff-customers-inventory.md`); còn Agents/Sales/Gallery/Weather |
+| Inventory direct Supabase imports | B | Mỗi caller có feature owner và API thay thế — **Clients callers: done** (`Personal/docs/bff-customers-inventory.md`); **Agents: done**; **Sales: done** (`Personal/docs/bff-sales-inventory.md`); còn Gallery/Weather |
 | Server-only Supabase client + BFF helper | A | `lib/supabase/server.ts`, auth/permission/error primitives sẵn sàng |
 | CRM-owned HttpOnly session | A | Browser không giữ Supabase token |
 | Shared DTO/test fixtures | B | Feature owner có contract và test fixture dùng chung — **Customers Zod + fixtures: done** (`customer-list-input.ts`, `Personal/tests/customer-*.test.ts`) |
@@ -105,9 +105,11 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 
 ### B3 — Sales Pipeline
 
-- [ ] Lead/pipeline API/repository, UI/hook và permission test.
-- [ ] Test luồng chuyển stage, lỗi validation và UI parity.
-- [ ] Gỡ direct browser-Supabase path.
+- [x] Lead/pipeline API/repository, UI/hook và permission test.
+- [x] Test luồng chuyển stage, lỗi validation và UI parity.
+- [x] Gỡ direct browser-Supabase path.
+
+> **Done 2026-08-24 (DEV B):** `/api/leads` + Zod/repo, `useSalesPage` / `useUpdateLead` / `useConfirmLead` / `useApproveLeadOutline`, contract tests. Register Lead stays `/api/customers`. `PAGE_BOOT_TABLES.sales: []`; `leads`/`comms`/`bookings` in BFF denylist. Inventory: `Personal/docs/bff-sales-inventory.md`. Network checklist: `Personal/docs/bff-sales-network-checklist.md`.
 
 ### B4 — Photo Gallery
 

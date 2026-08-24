@@ -19,9 +19,11 @@ import { localTodayIso } from '@/lib/core/date-utils';
 function TaskStatusSelect({
   value,
   onChange,
+  disabled = false,
 }: {
   value: string;
   onChange: (status: TaskStatusValue) => void;
+  disabled?: boolean;
 }) {
   return (
     <select
@@ -29,6 +31,8 @@ function TaskStatusSelect({
       value={value || 'todo'}
       onChange={(e) => onChange(e.target.value as TaskStatusValue)}
       aria-label="Task progress"
+      disabled={disabled}
+      title={disabled ? 'You need write permission for Planner to update a task' : undefined}
     >
       {TASK_STATUSES.map((s) => (
         <option key={s.value} value={s.value}>
@@ -74,9 +78,10 @@ function formatShortDate(dateStr: string): string {
 interface CompletedTasksPanelProps {
   tasks: Task[];
   onStatusChange: (id: string, status: TaskStatusValue) => void;
+  canWrite: boolean;
 }
 
-export default function CompletedTasksPanel({ tasks, onStatusChange }: CompletedTasksPanelProps) {
+export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }: CompletedTasksPanelProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [timeFilter, setTimeFilter] = useState<CompletedTimeFilter>('all');
@@ -254,6 +259,7 @@ export default function CompletedTasksPanel({ tasks, onStatusChange }: Completed
                         <TaskStatusSelect
                           value={t.status || 'done'}
                           onChange={(s) => onStatusChange(t.id!, s)}
+                          disabled={!canWrite}
                         />
                       )}
                     </div>

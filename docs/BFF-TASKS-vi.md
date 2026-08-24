@@ -61,30 +61,35 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 - [x] Browser không giữ Supabase access/refresh token; không gọi Supabase Auth trực tiếp.
 - [x] Test unauthenticated, login fail/success, logout, session expiry, revoke và forbidden permission.
 
-### A1 — Tour Product
+### A1 — Redis cache và invalidation
+
+- [x] Shared cache wrapper, cache-aside Product/facets, invalidation theo batch và fallback khi Redis lỗi.
+- [x] Test Redis-down không làm mutation Product thất bại.
+
+### A2 — Tour Product
 
 - [x] API/repository Products và Pricing; filter, sort, pagination ở server.
 - [x] Redis cache Product list/facets; invalidate sau product/pricing mutation.
 - [x] Chuyển UI/hook sang CRM API, optimistic update và error state.
 - [x] Test quyền, cache invalidation, UI parity; gỡ direct browser-Supabase path.
 
-### A2 — Daily Planner
+### A3 — Daily Planner
 
 - [x] API/repository dữ liệu planner và mutation liên quan.
 - [x] Chuyển UI/hook sang CRM API; kiểm tra quyền và rollback khi mutation lỗi.
 - [x] Test parity; gỡ direct browser-Supabase path.
 
-### A3 — Attraction Schedule
+### A4 — Attraction Schedule
 
 - [x] API/repository địa điểm tham quan và lịch theo tỉnh.
 - [x] Chuyển UI/hook, filter theo tỉnh và mutation sang CRM API.
 - [x] Test quyền, dữ liệu theo tỉnh, UI parity; gỡ direct browser-Supabase path.
 
-### A4 — Tour Design
+### A5 — Tour Design
 
-- [x] API/repository aggregate cho Tour Draft, Outline và child records.
-- [x] Đảm bảo ghi nhiều bảng transaction hoặc rollback an toàn.
-- [x] Chuyển UI/hook, test permission/mutation rollback; gỡ direct browser-Supabase path.
+- [x] API/repository aggregate cho Tour Draft, Outline và hotel reference data qua BFF.
+- [x] Transaction Outline workflow ghi Draft + Lead + Comm; có optimistic-version conflict 409 và rollback an toàn.
+- [x] Chuyển UI/hook, test 401/403/422/409, regression boot; gỡ direct browser-Supabase path của Tour Design.
 
 ## Developer B — feature end-to-end
 

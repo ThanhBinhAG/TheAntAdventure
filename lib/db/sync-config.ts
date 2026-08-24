@@ -60,8 +60,8 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   /** Agents list/catalog via `/api/agents`; pipeline/commission leads wait for Sales BFF. */
   agents: [],
   sales: [],
-  /** Customers/leads via `/api/tour-design/crm-context`; hotels/comms still boot here. */
-  tourdesign: ['hotels', 'comms'],
+  /** Every Tour Design read uses its permissioned BFF routes. */
+  tourdesign: [],
   // Catalogue pages use the paginated server API. The full data set is loaded
   // only when a user opens a detail drawer or enters Manage mode.
   products: [],

@@ -14,13 +14,7 @@ import type { OverridePatch } from '@/components/tour-design/SelectedExperiences
 import type { TourPackage } from '@/lib/seeds/tourPackages';
 import { customerToBrief } from '@/lib/customers/customer-to-brief';
 import { isExperiencesBlocked } from '@/lib/tour-design/tour-design-gate';
-import {
-  ensureTourDesignLead,
-  patchOutlineApproved,
-  patchOutlineResent,
-  patchOutlineRevise,
-  patchOutlineSent,
-} from '@/lib/tour-design/tour-design-lead';
+import { ensureTourDesignLead } from '@/lib/tour-design/tour-design-lead';
 import {
   getOutlineAwaitingApproval,
   getPendingTourDesignLeads,
@@ -42,17 +36,40 @@ import { outlineDocFromRows, printOutline } from '@/lib/outline/outline-html';
 import { getBffArray, getBffData } from '@/lib/bff/client';
 import type { ProposalTemplateOverrides } from '@/lib/proposals/proposal-content-overrides';
 import { DEFAULT_PROPOSAL_LAYOUT_ID, type ProposalLayoutId } from '@/lib/proposals/proposal-layouts';
-import type { ExperienceOverride, OutlineStatus, Product, ProductPricing, TourDraft, TourOutlineDay } from '@/lib/types';
+import type {
+  Comm,
+  ExperienceOverride,
+  Lead,
+  OutlineStatus,
+  Product,
+  ProductPricing,
+  TourDraft,
+  TourOutlineDay,
+} from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import { useTourDesignCrmContext } from '@/hooks/useTourDesignCrmContext';
+import { useTourDesignReferenceData } from '@/hooks/useTourDesignReferenceData';
 import { TourDesignQueueCards } from '@/components/tour-design/TourDesignQueueCards';
 
 const STEPS = ['Client Brief', 'Outline', 'Tour Experiences', 'Pricing', 'Export'] as const;
+type OutlineWorkflowAction = 'sent' | 'resent' | 'approved' | 'revised';
+
+type OutlineWorkflowResponse = {
+  ok?: boolean;
+  error?: string;
+  currentSaveRevision?: number;
+  data?: {
+    draft?: TourDraft;
+    lead?: Lead;
+    comm?: Comm | null;
+  };
+};
 
 export default function TourDesignPage() {
   const { canWrite } = usePagePermission('tourdesign');
   useTourDesignCrmContext();
+  const { error: referenceDataError } = useTourDesignReferenceData();
   const searchParams = useSearchParams();
   const products = useStore((s) => s.products);
   const customers = useStore((s) => s.customers);
@@ -98,6 +115,7 @@ export default function TourDesignPage() {
   const urlInitRef = useRef<string | null>(null);
   const lastDraftFingerprintsRef = useRef(new Map<string, string>());
   const saveQueueRef = useRef(new TourDraftSaveQueue());
+  const visibleReadError = referenceDataError ?? readError;
 
   useEffect(() => {
     let active = true;
@@ -636,30 +654,51 @@ export default function TourDesignPage() {
     );
   }
 
-  function applyOutlineWorkflow(
-    patch: ReturnType<typeof patchOutlineSent>,
-    state: {
-      outlineStatus?: OutlineStatus;
-      outlineSentAt?: string;
-      outlineApprovedAt?: string;
-      outlineRevision?: number;
+  async function runOutlineWorkflow(action: OutlineWorkflowAction) {
+    if (!canWrite) {
+      toast.warning('Bạn không có quyền chỉnh sửa Tour Design.');
+      return;
     }
-  ) {
     if (!leadId || !custId) return;
-    if (state.outlineStatus) setOutlineStatus(state.outlineStatus);
-    if (state.outlineSentAt !== undefined) setOutlineSentAt(state.outlineSentAt);
-    if (state.outlineApprovedAt !== undefined) setOutlineApprovedAt(state.outlineApprovedAt);
-    if (state.outlineRevision !== undefined) setOutlineRevision(state.outlineRevision);
-    updateLead(leadId, patch.lead);
-    if (patch.comm) addComm(patch.comm);
-    persistDraft({
-      outlineStatus: state.outlineStatus,
-      outlineSentAt: state.outlineSentAt,
-      outlineApprovedAt: state.outlineApprovedAt,
-      outlineRevision: state.outlineRevision,
-      step,
-      outlineRows,
-    });
+
+    const draft = currentDraftSnapshot();
+    setSaveState('saving');
+    try {
+      const response = await fetch('/api/tour-design/outline-workflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          draft,
+          outlineDays: outlineRows,
+          expectedSaveRevision: draft.saveRevision ?? saveQueueRef.current.getSaveRevision(draft.id),
+        }),
+      });
+      const body = await response.json().catch(() => null) as OutlineWorkflowResponse | null;
+      if (!response.ok || !body?.ok || !body.data?.draft || !body.data.lead) {
+        if (typeof body?.currentSaveRevision === 'number') {
+          saveQueueRef.current.setSaveRevision(draft.id, body.currentSaveRevision);
+        }
+        throw new Error(body?.error ?? 'Không thể cập nhật trạng thái Outline.');
+      }
+
+      const result = body.data as { draft: TourDraft; lead: Lead; comm?: Comm | null };
+      const savedDraft = result.draft;
+      saveQueueRef.current.setSaveRevision(savedDraft.id, savedDraft.saveRevision ?? 0);
+      upsertTourDraft(savedDraft);
+      replaceOutlineDaysForDraft(savedDraft.id, outlineRows);
+      updateLead(result.lead.id, result.lead);
+      if (result.comm) addComm(result.comm);
+
+      setOutlineStatus(savedDraft.outlineStatus);
+      setOutlineSentAt(savedDraft.outlineSentAt);
+      setOutlineApprovedAt(savedDraft.outlineApprovedAt);
+      setOutlineRevision(savedDraft.outlineRevision ?? 0);
+      setSaveState('saved');
+    } catch (error) {
+      setSaveState('error');
+      toast.error(error instanceof Error ? error.message : 'Không thể cập nhật trạng thái Outline.');
+    }
   }
 
   function aiSuggestStyle() {
@@ -717,44 +756,19 @@ export default function TourDesignPage() {
   }
 
   function markOutlineSent() {
-    if (!leadId || !custId) return;
-    const name = custName || brief.clientName || 'Client';
-    const patch = patchOutlineSent(currentDraftSnapshot(), custId, name, brief.salesperson);
-    applyOutlineWorkflow(patch, {
-      outlineStatus: 'sent',
-      outlineSentAt: patch.draft.outlineSentAt,
-      outlineRevision: patch.draft.outlineRevision,
-    });
+    void runOutlineWorkflow('sent');
   }
 
   function resendOutline() {
-    if (!leadId || !custId) return;
-    const name = custName || brief.clientName || 'Client';
-    const patch = patchOutlineResent(currentDraftSnapshot(), custId, name, brief.salesperson);
-    applyOutlineWorkflow(patch, {
-      outlineStatus: 'sent',
-      outlineSentAt: patch.draft.outlineSentAt,
-      outlineRevision: patch.draft.outlineRevision,
-    });
+    void runOutlineWorkflow('resent');
   }
 
   function approveOutline() {
-    if (!leadId || !custId) return;
-    const name = custName || brief.clientName || 'Client';
-    const patch = patchOutlineApproved(currentDraftSnapshot(), custId, name, brief.salesperson);
-    applyOutlineWorkflow(patch, {
-      outlineStatus: 'approved',
-      outlineApprovedAt: patch.draft.outlineApprovedAt,
-    });
+    void runOutlineWorkflow('approved');
   }
 
   function reviseOutline() {
-    if (!leadId || !custId) return;
-    const patch = patchOutlineRevise(currentDraftSnapshot());
-    setOutlineStatus('draft');
-    setOutlineApprovedAt(undefined);
-    updateLead(leadId, patch.lead);
-    persistDraft({ outlineStatus: 'draft', outlineApprovedAt: undefined, step, outlineRows });
+    void runOutlineWorkflow('revised');
   }
 
   function handleStepClick(i: number) {
@@ -764,7 +778,7 @@ export default function TourDesignPage() {
 
   return (
     <div>
-      {readError && <div className="crm-page-hydrate-error" role="alert">{readError}</div>}
+      {visibleReadError && <div className="crm-page-hydrate-error" role="alert">{visibleReadError}</div>}
       <TourDesignQueueCards
         pendingLeads={pendingLeads}
         awaitingOutline={awaitingOutline}

@@ -10,7 +10,9 @@ BFF Route Handlers cho tính năng thiết kế Tour (Tour Design & Outlines).
 - `drafts/all/route.ts` — GET toàn bộ danh sách tour drafts cho client hydration.
 - `outlines/all/route.ts` — GET toàn bộ danh sách tour outline days cho client hydration.
 - `crm-context/route.ts` — GET customers + leads cho Client Brief và Sales handoff queue (`tour_design.read`).
+- `reference-data/route.ts` — GET hotel catalog for Tour Design (`tour_design.read`).
 - `acknowledgements/route.ts` — POST xác nhận Sales handoff idempotently (`tour_design.write`).
+- `outline-workflow/route.ts` — POST transition Outline + Lead + Comm atomically (`tour_design.write`).
 
 ## Boundaries
 - Quyền đọc yêu cầu `tour_design.read`, quyền ghi yêu cầu `tour_design.write`.

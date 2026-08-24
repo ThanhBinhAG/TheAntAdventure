@@ -60,7 +60,7 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
 - [x] A2. Complete Tour Product end-to-end: product/pricing API/repository/cache, UI/hooks, tests, and direct-path removal.
 - [x] A3. Complete Daily Planner end-to-end: planner API/repository, authorization, UI/hooks, tests, and direct-path removal.
 - [x] A4. Complete Attraction Schedule end-to-end: province-attraction/schedule API/repository, UI/hooks, tests, and direct-path removal.
-- [x] A5. Complete Tour Design end-to-end: draft/outline API/repository, child-record write safety, UI/hooks, tests, and direct-path removal.
+- [x] A5. Complete Tour Design end-to-end: BFF reference data, draft/outline API/repository, atomic Outline → Lead/Comm workflow, UI/hooks, tests, and direct-path removal.
 - [ ] A6. Coordinate final removal of public Supabase runtime/build configuration with Owner-Ops after all nine scoped features pass acceptance.
 
 ### Developer B task list

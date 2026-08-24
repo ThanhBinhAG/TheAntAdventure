@@ -1,7 +1,8 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { rowToCustomer, rowToLead } from '@/lib/db/mappers/crm';
+import { rowToComm, rowToCustomer, rowToLead } from '@/lib/db/mappers/crm';
+import { assembleHotels } from '@/lib/db/mappers/ops-content';
 import type { Row } from '@/lib/db/mappers/shared';
 import {
   rowToTourDraft,
@@ -9,8 +10,11 @@ import {
   rowToTourOutlineDay,
   tourOutlineDayToRow,
 } from '@/lib/db/mappers/tour';
-import type { Lead, TourDraft, TourOutlineDay } from '@/lib/types';
-import type { TourDesignCrmContext } from '@/lib/tour-design/tour-design-types';
+import type { Comm, Hotel, Lead, TourDraft, TourOutlineDay } from '@/lib/types';
+import type {
+  TourDesignCrmContext,
+  TourDesignReferenceData,
+} from '@/lib/tour-design/tour-design-types';
 
 /** Customers + leads for Client Brief dropdown and Sales → Tour Design handoff queue. */
 export async function getTourDesignCrmContextServer(
@@ -28,6 +32,26 @@ export async function getTourDesignCrmContextServer(
     customers: ((customersRes.data ?? []) as Row[]).map(rowToCustomer),
     leads: ((leadsRes.data ?? []) as Row[]).map(rowToLead),
   };
+}
+
+/** Hotel catalog for Tour Design. Never load communications when opening this page. */
+export async function getTourDesignReferenceDataServer(
+  supabase: SupabaseClient,
+): Promise<TourDesignReferenceData> {
+  const { data, error } = await supabase.from('hotels').select('*, hotel_rooms(*)');
+  if (error) throw error;
+
+  const hotelRows: Row[] = [];
+  const roomRows: Row[] = [];
+  for (const raw of (data ?? []) as Row[]) {
+    const rooms = (raw.hotel_rooms as Row[] | undefined) ?? [];
+    const { hotel_rooms: _rooms, ...hotel } = raw;
+    void _rooms;
+    hotelRows.push(hotel);
+    roomRows.push(...rooms);
+  }
+
+  return { hotels: assembleHotels(hotelRows, roomRows) as unknown as Hotel[] };
 }
 
 export type TourDesignAcknowledgement = {
@@ -78,6 +102,21 @@ export class TourDesignSaveConflictError extends Error {
   }
 }
 
+export type TourDesignOutlineWorkflowAction = 'sent' | 'resent' | 'approved' | 'revised';
+
+export type TourDesignOutlineWorkflowInput = {
+  action: TourDesignOutlineWorkflowAction;
+  draft: TourDraft;
+  outlineDays: TourOutlineDay[];
+  expectedSaveRevision: number;
+};
+
+export type TourDesignOutlineWorkflowResult = {
+  draft: TourDraft;
+  lead: Lead;
+  comm: Comm | null;
+};
+
 function currentSaveRevisionFromRpcError(error: unknown): number | undefined {
   if (!error || typeof error !== 'object') return undefined;
   const details = 'details' in error ? error.details : undefined;
@@ -88,6 +127,42 @@ function currentSaveRevisionFromRpcError(error: unknown): number | undefined {
 
 function isSaveConflict(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'P0001');
+}
+
+/**
+ * Persist a state transition of the Outline plus its Lead and Communication
+ * effects in one server-side PostgreSQL transaction.
+ */
+export async function applyTourDesignOutlineWorkflowServer(
+  supabase: SupabaseClient,
+  input: TourDesignOutlineWorkflowInput,
+): Promise<TourDesignOutlineWorkflowResult> {
+  const { data, error } = await supabase.rpc('apply_tour_design_outline_workflow', {
+    p_action: input.action,
+    p_draft: tourDraftToRow(input.draft),
+    p_outline_days: input.outlineDays.map((day) => tourOutlineDayToRow(day)),
+    p_expected_save_revision: input.expectedSaveRevision,
+  });
+  if (error) {
+    if (isSaveConflict(error)) {
+      throw new TourDesignSaveConflictError(currentSaveRevisionFromRpcError(error));
+    }
+    throw error;
+  }
+
+  if (!data || typeof data !== 'object') {
+    throw new Error('Tour Design workflow transaction did not return data.');
+  }
+  const result = data as { draft?: Row; lead?: Row; comm?: Row | null };
+  if (!result.draft || !result.lead) {
+    throw new Error('Tour Design workflow transaction returned an incomplete result.');
+  }
+
+  return {
+    draft: rowToTourDraft(result.draft),
+    lead: rowToLead(result.lead),
+    comm: result.comm ? rowToComm(result.comm) : null,
+  };
 }
 
 /**

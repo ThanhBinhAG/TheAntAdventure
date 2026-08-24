@@ -125,6 +125,13 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 - [ ] Chuyển UI/hook, test refresh failure và UI parity.
 - [ ] Gỡ direct browser-Supabase path.
 
+### Dashboard BFF (ngoài 9 feature gốc — theo `BFF-REFACTOR-PLAN`)
+
+- [x] Aggregate `GET /api/dashboard` + `dashboard.read`; metrics server-side; Redis cache-aside.
+- [x] UI/hook; `PAGE_BOOT_TABLES.dashboard: []`; gỡ PostgREST hydrate trên `/dashboard`.
+
+> **Done 2026-08-24 (DEV B):** [`/api/dashboard`](app/api/dashboard/route.ts), [`useDashboardPage`](hooks/useDashboardPage.ts), [`dashboard-repository.ts`](lib/dashboard/dashboard-repository.ts); inventory/checklist `Personal/docs/bff-dashboard-*`; contract tests [`tests/dashboard-bff.test.ts`](tests/dashboard-bff.test.ts). Lead writes invalidate dashboard cache. Shared hydrate retained for other routes (rule #6).
+
 ## Thứ tự làm song song
 
 | Đợt | Developer A | Developer B | Checkpoint |

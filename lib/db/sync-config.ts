@@ -52,7 +52,8 @@ export const SIDEBAR_BADGE_TABLES: readonly SyncArrayTable[] = [
  * Omitted slugs load nothing until explicitly needed (e.g. pricing catalog APIs).
  */
 export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[]>> = {
-  dashboard: ['customers', 'leads', 'bookings', 'agents', 'feedback'],
+  /** Metrics via GET /api/dashboard — no PostgREST hydrate on this route. */
+  dashboard: [],
   planner: ['cal_events'],
   /** Clients list/CRUD via `/api/customers`; profile modal loads related rows via `/api/customers/:id/profile`. */
   customers: [],

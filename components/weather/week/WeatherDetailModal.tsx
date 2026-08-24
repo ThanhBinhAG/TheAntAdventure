@@ -10,6 +10,7 @@ import {
   regionLabel,
   weatherLabelVi,
 } from '@/components/weather/weatherLabels';
+import { usePagePermission } from '@/hooks/usePagePermission';
 import type { WeatherDestinationMeta } from '@/lib/weather/types';
 
 type Props = {
@@ -20,7 +21,8 @@ type Props = {
 };
 
 export default function WeatherDetailModal({ open, destinationId, meta, onClose }: Props) {
-  const { data, loading, error, refresh } = useDestinationWeather(destinationId, {
+  const { canWrite } = usePagePermission('weather');
+  const { data, loading, error, refresh, reload } = useDestinationWeather(destinationId, {
     enabled: open && Boolean(destinationId),
   });
   const resolved = useResolvedCover(meta);
@@ -85,7 +87,7 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
           {error ? (
             <div className="wg-main-card-error">
               <p>{error}</p>
-              <button type="button" className="btn btn-s btn-sm" onClick={() => void refresh()}>
+              <button type="button" className="btn btn-s btn-sm" onClick={() => void reload()}>
                 Try again
               </button>
             </div>
@@ -151,9 +153,11 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
           <button type="button" className="btn btn-s" onClick={onClose}>
             Close
           </button>
-          <button type="button" className="btn btn-p" onClick={() => void refresh()}>
-            Refresh
-          </button>
+          {canWrite ? (
+            <button type="button" className="btn btn-p" onClick={() => void refresh()}>
+              Refresh
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

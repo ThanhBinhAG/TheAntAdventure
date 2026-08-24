@@ -10,45 +10,57 @@ import {
 
 const inflight = new Map<string, Promise<DestinationWeatherDetail>>();
 
-async function fetchDestinationWeather(
-  id: string,
-  force: boolean
-): Promise<DestinationWeatherDetail> {
-  const cacheKey = `${id}:${force ? 'force' : 'soft'}`;
-  const existing = inflight.get(cacheKey);
+type FetchMode = 'soft' | 'refresh';
+
+async function fetchSoftDestinationWeather(id: string): Promise<DestinationWeatherDetail> {
+  const res = await fetch(`/api/weather/destination?id=${encodeURIComponent(id)}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || `Weather fetch failed (${res.status})`);
+
+  const detail = json as DestinationWeatherDetail;
+  writeClientWeatherCache(detail);
+  return detail;
+}
+
+async function fetchRefreshDestinationWeather(id: string): Promise<DestinationWeatherDetail> {
+  const res = await fetch('/api/weather/destination/refresh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, force: true }),
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || `Weather refresh failed (${res.status})`);
+
+  const detail = json.detail as DestinationWeatherDetail;
+  writeClientWeatherCache(detail);
+  return detail;
+}
+
+function cacheKey(id: string, mode: FetchMode) {
+  return `${id}:${mode}`;
+}
+
+async function fetchWithDedupe(id: string, mode: FetchMode): Promise<DestinationWeatherDetail> {
+  const key = cacheKey(id, mode);
+  const existing = inflight.get(key);
   if (existing) return existing;
 
   const promise = (async () => {
-    if (!force) {
-      const cached = readClientWeatherCache(id);
-      if (cached) return cached;
-    }
-
-    const qs = new URLSearchParams({ id });
-    if (force) qs.set('force', '1');
-    const res = await fetch(
-      `/api/weather/destination?${qs.toString()}`,
-      force ? { cache: 'no-store' } : undefined
-    );
-    const json = await res.json();
-    if (!res.ok) {
-      throw new Error(json?.error || `Weather fetch failed (${res.status})`);
-    }
-    const detail = json as DestinationWeatherDetail;
-    writeClientWeatherCache(detail);
-    return detail;
+    if (mode === 'soft') return await fetchSoftDestinationWeather(id);
+    return await fetchRefreshDestinationWeather(id);
   })().finally(() => {
-    inflight.delete(cacheKey);
+    inflight.delete(key);
   });
 
-  inflight.set(cacheKey, promise);
+  inflight.set(key, promise);
   return promise;
 }
 
 /** Best-effort prefetch (hover/focus) — deduped via inflight map. */
 export function prefetchDestinationWeather(id: string): void {
   if (readClientWeatherCache(id)) return;
-  void fetchDestinationWeather(id, false).catch(() => {
+  void fetchWithDedupe(id, 'soft').catch(() => {
     /* prefetch is best-effort */
   });
 }
@@ -87,11 +99,10 @@ export function useDestinationWeather(
   }, []);
 
   const load = useCallback(
-    async (force = false) => {
+    async (mode: FetchMode) => {
       if (!id) return null;
-      if (force) clearClientWeatherCache(id);
 
-      if (!force) {
+      if (mode === 'soft') {
         const cached = readClientWeatherCache(id);
         if (cached) {
           if (mounted.current) {
@@ -101,6 +112,9 @@ export function useDestinationWeather(
           }
           return cached;
         }
+      } else {
+        // Client cache can be stale; refresh clears it before forcing server update.
+        clearClientWeatherCache(id);
       }
 
       if (mounted.current) {
@@ -109,7 +123,7 @@ export function useDestinationWeather(
       }
 
       try {
-        const detail = await fetchDestinationWeather(id, force);
+        const detail = await fetchWithDedupe(id, mode);
         if (mounted.current) {
           setData(detail);
           setLoading(false);
@@ -135,7 +149,7 @@ export function useDestinationWeather(
     let cancelled = false;
     void (async () => {
       try {
-        const detail = await fetchDestinationWeather(activeId, false);
+        const detail = await fetchWithDedupe(activeId, 'soft');
         if (!cancelled && mounted.current) {
           setData(detail);
           setLoading(false);
@@ -155,8 +169,8 @@ export function useDestinationWeather(
     };
   }, [activeId]);
 
-  const refresh = useCallback(() => load(true), [load]);
-  const reload = useCallback(() => load(false), [load]);
+  const refresh = useCallback(() => load('refresh'), [load]);
+  const reload = useCallback(() => load('soft'), [load]);
 
   return {
     data,

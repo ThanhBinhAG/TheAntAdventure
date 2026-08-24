@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
-import { isRefreshAuthorized } from '@/lib/weather/auth';
+import { checkRefreshAuthorized, weatherDeniedJson } from '@/lib/weather/auth';
 import { isWeatherBackendConfigured } from '@/lib/weather/supabase-admin';
-import {
-  softDeleteDestination,
-  updateDestination,
-  type DestinationInput,
-} from '@/lib/weather/destinations';
-import type { WeatherRegion } from '@/lib/weather/coordinates';
+import { softDeleteDestination, updateDestination } from '@/lib/weather/destinations';
+import { destinationPatchBodySchema } from '@/lib/weather/destination-input';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -18,30 +14,29 @@ export async function PATCH(request: Request, ctx: Ctx) {
     );
   }
 
-  const allowed = await isRefreshAuthorized(request);
-  if (!allowed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const permission = await checkRefreshAuthorized(request);
+  if (!permission.allowed) {
+    return weatherDeniedJson(permission);
   }
 
   const { id } = await ctx.params;
-  let body: Partial<DestinationInput>;
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
-  if (body.region != null && !['north', 'central', 'south'].includes(body.region)) {
-    return NextResponse.json({ error: 'region must be north, central, or south.' }, { status: 400 });
+  const parsed = destinationPatchBodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'Invalid body.' },
+      { status: 400 }
+    );
   }
 
   try {
-    const patch: Partial<DestinationInput> = { ...body };
-    if (body.latitude != null) patch.latitude = Number(body.latitude);
-    if (body.longitude != null) patch.longitude = Number(body.longitude);
-    if (body.region != null) patch.region = body.region as WeatherRegion;
-
-    const destination = await updateDestination(id, patch);
+    const destination = await updateDestination(id, parsed.data);
     return NextResponse.json({ destination });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -62,9 +57,9 @@ export async function DELETE(request: Request, ctx: Ctx) {
     );
   }
 
-  const allowed = await isRefreshAuthorized(request);
-  if (!allowed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const permission = await checkRefreshAuthorized(request);
+  if (!permission.allowed) {
+    return weatherDeniedJson(permission);
   }
 
   const { id } = await ctx.params;

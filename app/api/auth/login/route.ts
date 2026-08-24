@@ -150,7 +150,8 @@ export async function POST(request: Request) {
   let supabase;
   try {
     supabase = createSupabaseRouteClient(request, response);
-  } catch {
+  } catch (error) {
+    console.error(error);
     await recordLoginFailure(ip);
     return fail(503, 'Supabase Auth chưa được cấu hình.');
   }

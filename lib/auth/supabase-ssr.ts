@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { createServerClient } from '@supabase/ssr';
-import { NextRequest, type NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import type { Session } from '@supabase/supabase-js';
 import { getServerSupabaseAnonKey, getServerSupabaseUrl } from '@/lib/env';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
@@ -33,14 +33,33 @@ function requireSupabaseAuthConfig() {
 }
 
 /**
+ * Reads the raw Cookie header without constructing another NextRequest. Route
+ * Handler requests may be framework-wrapped, and re-wrapping one makes the
+ * native Request private state inaccessible.
+ */
+function readRequestCookies(request: Request): Map<string, string> {
+  const cookies = new Map<string, string>();
+  const cookieHeader = request.headers.get('cookie');
+  if (!cookieHeader) return cookies;
+
+  for (const entry of cookieHeader.split(';')) {
+    const separator = entry.indexOf('=');
+    if (separator <= 0) continue;
+
+    const name = entry.slice(0, separator).trim();
+    if (!name) continue;
+    cookies.set(name, entry.slice(separator + 1).trim());
+  }
+  return cookies;
+}
+
+/**
  * Server-only Supabase SSR client for a Route Handler that may update auth
  * cookies. Tokens remain HttpOnly and are never returned in a JSON response.
  */
 export function createSupabaseRouteClient(request: Request, response: NextResponse) {
   const { url, key } = requireSupabaseAuthConfig();
-  const cookieState = new Map(
-    new NextRequest(request).cookies.getAll().map((cookie) => [cookie.name, cookie.value]),
-  );
+  const cookieState = readRequestCookies(request);
 
   return createServerClient(url, key, {
     ...getSupabaseGlobalFetchOptions(),

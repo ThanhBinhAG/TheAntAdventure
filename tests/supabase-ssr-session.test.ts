@@ -61,3 +61,25 @@ test('Supabase SSR route client writes only secure HttpOnly auth cookies and no-
     mutableEnv.NODE_ENV = originalNodeEnv;
   }
 });
+
+test('Supabase SSR route client reads cookies without re-wrapping a proxied Route Handler request', async () => {
+  const { createSupabaseRouteClient } = await import('../lib/auth/supabase-ssr');
+  const response = NextResponse.json({ ok: true });
+  const request = new Proxy(new Request('https://crm.example.test/api/auth/login', {
+    headers: { cookie: 'sb-project-auth-token=session-value; theme=dark' },
+  }), {
+    get(target, property, receiver) {
+      if (property === 'headers') return target.headers;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  assert.doesNotThrow(() => createSupabaseRouteClient(request, response));
+  const cookieMethods = (capturedOptions as {
+    cookies: { getAll: () => Array<{ name: string; value: string }> };
+  }).cookies;
+  assert.deepEqual(cookieMethods.getAll(), [
+    { name: 'sb-project-auth-token', value: 'session-value' },
+    { name: 'theme', value: 'dark' },
+  ]);
+});

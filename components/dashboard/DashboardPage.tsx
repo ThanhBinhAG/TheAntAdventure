@@ -10,50 +10,42 @@ import {
   Legend,
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { FX, FX_SYM, fmt } from '@/lib/constants';
-import { computeDashboardMetrics } from '@/lib/dashboard/dashboard-metrics';
 import { TIER_BG, TIER_COLORS } from '@/lib/core/page-helpers';
-import { useStore } from '@/hooks/useStore';
 import EmptyState from '@/components/EmptyState';
 import { ForecastBreakdown } from '@/components/dashboard/DashboardForecast';
-
+import { useDashboardPage } from '@/hooks/useDashboardPage';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 export default function DashboardPage() {
-  const leads = useStore((s) => s.leads);
-  const bookings = useStore((s) => s.bookings);
-  const customers = useStore((s) => s.customers);
-  const agents = useStore((s) => s.agents);
-  const feedback = useStore((s) => s.feedback) as { nps?: number; custId?: string }[];
-
   const [typeF, setTypeF] = useState<'' | 'b2b' | 'b2c'>('');
   const [marketF, setMarketF] = useState('');
   const [currency, setCurrency] = useState<'USD' | 'EUR' | 'VND'>('USD');
 
+  const { data, loading, error, reload } = useDashboardPage({
+    clientType: typeF,
+    market: marketF,
+  });
+
   const sym = FX_SYM[currency];
   const rate = FX[currency];
-
-  const metrics = useMemo(
-    () =>
-      computeDashboardMetrics(leads, bookings, customers, feedback, {
-        clientType: typeF,
-        market: marketF,
-      }),
-    [leads, bookings, customers, feedback, typeF, marketF]
-  );
+  const metrics = data?.metrics;
 
   const filterLabel = [typeF && (typeF === 'b2b' ? 'B2B Agents' : 'B2C Direct'), marketF]
     .filter(Boolean)
     .join(' · ');
 
-  const mktLabels = Object.keys(metrics.filtered);
-  const filteredMkt = metrics.filtered;
-  const mktVals = mktLabels.map((m) => Math.round(filteredMkt[m] * rate));
+  const mktLabels = metrics ? Object.keys(metrics.filtered) : [];
+  const mktVals = metrics
+    ? mktLabels.map((m) => Math.round(metrics.filtered[m] * rate))
+    : [];
 
-  const totalToursAllTime = metrics.toursByMonth.reduce((s, n) => s + n, 0);
+  const totalToursAllTime = metrics
+    ? metrics.toursByMonth.reduce((s, n) => s + n, 0)
+    : 0;
 
   return (
     <div>
@@ -82,6 +74,23 @@ export default function DashboardPage() {
         </span>
       </div>
 
+      {error ? (
+        <div className="card" style={{ marginBottom: 14, padding: 18 }}>
+          <p style={{ color: 'var(--m)', margin: 0 }}>{error}</p>
+          <button type="button" className="btn btn-s btn-sm" style={{ marginTop: 10 }} onClick={() => void reload()}>
+            Try again
+          </button>
+        </div>
+      ) : null}
+
+      {loading && !metrics ? (
+        <div className="card" style={{ marginBottom: 14, padding: 24, textAlign: 'center', color: 'var(--m)' }}>
+          Loading dashboard…
+        </div>
+      ) : null}
+
+      {metrics ? (
+        <>
       <div className="dash-kpi-grid">
         <div className="dash-kpi-card">
           <div className="dash-kpi-hd" style={{ background: 'var(--blue-l)' }}>
@@ -121,7 +130,7 @@ export default function DashboardPage() {
           </div>
           <div className="dash-kpi-body" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div className="dash-kpi-val" style={{ fontSize: 36, color: 'var(--g)' }}>
-              {metrics.confirmed.length}
+              {metrics.confirmedCount}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11.5, color: 'var(--m)' }}>{metrics.totalPax} pax secured</div>
@@ -145,8 +154,8 @@ export default function DashboardPage() {
               {fmt(Math.round(metrics.realized * rate))}
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--m)', marginTop: 3 }}>
-              {metrics.completedLeads.length} completed tours ·{' '}
-              {bookings.filter((b) => b.status === 'Fully Paid').length} fully paid
+              {metrics.completedCount} completed tours ·{' '}
+              {metrics.fullyPaidBookingCount} fully paid
             </div>
           </div>
         </div>
@@ -167,7 +176,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <ForecastBreakdown leads={metrics.filteredLeads} customers={customers} />
+      <ForecastBreakdown
+        deals={data?.forecastDeals ?? []}
+        allActiveValue={data?.forecastAllActiveValue ?? 0}
+        allActiveWeighted={data?.forecastAllActiveWeighted ?? 0}
+      />
 
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="card-body" style={{ padding: '14px 18px' }}>
@@ -494,55 +507,43 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div className="card-body" style={{ padding: 12 }}>
-              {(() => {
-                const rows = agents
-                  .filter((a) => a.id !== 'AGT-001')
-                  .map((a) => {
-                    const agLeads = metrics.filteredLeads.filter(
-                      (l) => l.agentId === a.id && l.stage !== 'Lost'
-                    );
-                    const pipeline = agLeads.reduce((s, l) => s + (l.value || 0), 0);
-                    const comm = Math.round(pipeline * (a.commissionPct / 100));
-                    const tc = TIER_COLORS[a.tier] || '#6B7F74';
-                    const tb = TIER_BG[a.tier] || '#f9f9f9';
-                    return { a, pipeline, comm, tc, tb, count: agLeads.length };
-                  })
-                  .filter((r) => r.pipeline > 0)
-                  .sort((x, y) => y.pipeline - x.pipeline);
-                const totalComm = rows.reduce((s, r) => s + r.comm, 0);
-                if (!rows.length) {
-                  return <div style={{ color: 'var(--m)', fontSize: 13 }}>No agent pipeline data.</div>;
-                }
-                return (
-                  <>
-                    {rows.map((r) => (
-                      <div key={r.a.id} className="dash-agent-row">
-                        <span className="dash-agent-tier" style={{ background: r.tb, color: r.tc, borderColor: r.tc }}>
-                          {r.a.tier}
+              {!(data?.agentPipeline.length) ? (
+                <div style={{ color: 'var(--m)', fontSize: 13 }}>No agent pipeline data.</div>
+              ) : (
+                <>
+                  {data.agentPipeline.map((r) => {
+                    const tc = TIER_COLORS[r.tier] || '#6B7F74';
+                    const tb = TIER_BG[r.tier] || '#f9f9f9';
+                    return (
+                      <div key={r.id} className="dash-agent-row">
+                        <span className="dash-agent-tier" style={{ background: tb, color: tc, borderColor: tc }}>
+                          {r.tier}
                         </span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {r.a.name}
+                            {r.name}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--m)' }}>
-                            {r.count} lead{r.count !== 1 ? 's' : ''} · {r.a.commissionPct}% comm
+                            {r.leadCount} lead{r.leadCount !== 1 ? 's' : ''} · {r.commissionPct}% comm
                           </div>
                         </div>
                         <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <div style={{ fontWeight: 700, fontSize: 13 }}>${fmt(r.pipeline)}</div>
-                          <div style={{ fontSize: 11, color: 'var(--gold)' }}>–${fmt(r.comm)}</div>
+                          <div style={{ fontSize: 11, color: 'var(--gold)' }}>–${fmt(r.commission)}</div>
                         </div>
                       </div>
-                    ))}
-                    {totalComm > 0 && (
-                      <div className="dash-agent-total">
-                        <span style={{ color: 'var(--m)' }}>Total Est. Commission</span>
-                        <span style={{ fontWeight: 700, color: 'var(--gold)' }}>${fmt(totalComm)}</span>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+                    );
+                  })}
+                  {(data.totalEstCommission ?? 0) > 0 && (
+                    <div className="dash-agent-total">
+                      <span style={{ color: 'var(--m)' }}>Total Est. Commission</span>
+                      <span style={{ fontWeight: 700, color: 'var(--gold)' }}>
+                        ${fmt(data.totalEstCommission)}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -568,6 +569,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+        </>
+      ) : null}
     </div>
   );
 }

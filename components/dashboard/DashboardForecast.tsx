@@ -1,30 +1,20 @@
 'use client';
 
-import { useMemo } from 'react';
 import Link from 'next/link';
-import { STAGE_PROB_V22, STAGE_COLORS, fmt } from '@/lib/constants';
-import { getCustomerName } from '@/lib/core/crm-utils';
-import type { Customer, Lead } from '@/lib/types';
+import { STAGE_COLORS, fmt } from '@/lib/constants';
+import type { DashboardForecastDeal } from '@/lib/dashboard/dashboard-types';
 
-export function ForecastBreakdown({ leads, customers }: { leads: Lead[]; customers: Customer[] }) {
-  const { deals, allActive } = useMemo(() => {
-    const active = leads
-      .filter((l) => l.stage !== 'Lost' && l.stage !== 'Completed' && (l.value || 0) > 0)
-      .map((l) => {
-        const prob = l.probability ?? STAGE_PROB_V22[l.stage] ?? 10;
-        return {
-          ...l,
-          tourValue: l.value || 0,
-          probability: prob,
-          weightedValue: ((l.value || 0) * prob) / 100,
-        };
-      });
-    return {
-      allActive: active,
-      deals: [...active].sort((a, b) => b.weightedValue - a.weightedValue).slice(0, 12),
-    };
-  }, [leads]);
+type Props = {
+  deals: DashboardForecastDeal[];
+  allActiveValue: number;
+  allActiveWeighted: number;
+};
 
+export function ForecastBreakdown({
+  deals,
+  allActiveValue,
+  allActiveWeighted,
+}: Props) {
   if (deals.length < 2) {
     return (
       <div className="card" style={{ marginBottom: 14 }}>
@@ -44,8 +34,6 @@ export function ForecastBreakdown({ leads, customers }: { leads: Lead[]; custome
 
   const totalValue = deals.reduce((s, d) => s + d.tourValue, 0);
   const totalWeighted = deals.reduce((s, d) => s + d.weightedValue, 0);
-  const allActiveValue = allActive.reduce((s, d) => s + d.tourValue, 0);
-  const allActiveWeighted = allActive.reduce((s, d) => s + d.weightedValue, 0);
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
@@ -72,7 +60,7 @@ export function ForecastBreakdown({ leads, customers }: { leads: Lead[]; custome
             <tbody>
               {deals.map((d) => (
                 <tr key={d.id}>
-                  <td style={{ fontWeight: 600 }}>{getCustomerName(customers, d.custId)}</td>
+                  <td style={{ fontWeight: 600 }}>{d.customerName}</td>
                   <td>{d.tour}</td>
                   <td style={{ textAlign: 'right' }}>${fmt(Math.round(d.tourValue))}</td>
                   <td>

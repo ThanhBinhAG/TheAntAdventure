@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { STAGE_PROB_V22 } from '@/lib/constants';
+import { invalidateDashboardCache } from '@/lib/dashboard/dashboard-repository';
 import {
   bookingToRow,
   commToRow,
@@ -303,6 +304,7 @@ export async function updateLeadRecord(
 
   if (error) throw new LeadRepositoryError(error.message);
 
+  await invalidateDashboardCache();
   return getLeadById(id);
 }
 
@@ -357,6 +359,7 @@ export async function confirmLead(id: string): Promise<ConfirmLeadResult> {
     .insert(bookingToRow(booking));
   if (insertErr) throw new LeadRepositoryError(insertErr.message);
 
+  await invalidateDashboardCache();
   return {
     lead: { ...lead, hasBooking: true },
     booking,
@@ -435,6 +438,7 @@ export async function approveLeadOutline(id: string): Promise<ApproveOutlineResu
   }
 
   const refreshed = await getLeadById(id);
+  await invalidateDashboardCache();
   return {
     lead: {
       ...refreshed,

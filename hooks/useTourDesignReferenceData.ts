@@ -23,7 +23,7 @@ function fetchTourDesignReferenceDataOnce() {
 }
 
 /** Loads Tour Design hotel reference data through BFF, never browser PostgREST. */
-export function useTourDesignReferenceData() {
+export function useTourDesignReferenceData(enabled: boolean) {
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -41,11 +41,12 @@ export function useTourDesignReferenceData() {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return;
     const timer = window.setTimeout(() => {
       void reload();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [reload]);
+  }, [enabled, reload]);
 
   return { error, reload };
 }

@@ -15,6 +15,7 @@ import type {
   TourDesignCrmContext,
   TourDesignReferenceData,
 } from '@/lib/tour-design/tour-design-types';
+import type { TourDesignContentDraft } from '@/lib/tour-design/tour-draft-utils';
 
 /** Customers + leads for Client Brief dropdown and Sales → Tour Design handoff queue. */
 export async function getTourDesignCrmContextServer(
@@ -256,6 +257,39 @@ export async function saveTourDesignServer(
   const saveRevision = Number(data);
   if (!Number.isInteger(saveRevision) || saveRevision < 1) {
     throw new Error('Tour Design save transaction did not return a valid revision.');
+  }
+  return saveRevision;
+}
+
+/** Save editable draft content while preserving the server-owned Outline lifecycle. */
+export async function saveTourDesignContentServer(
+  supabase: SupabaseClient,
+  draft: TourDesignContentDraft,
+  outlineDays: TourOutlineDay[],
+  expectedSaveRevision: number,
+): Promise<number> {
+  const contentRow = tourDraftToRow({ ...draft, outlineStatus: 'draft' } as TourDraft);
+  delete contentRow.outline_status;
+  delete contentRow.outline_sent_at;
+  delete contentRow.outline_approved_at;
+  delete contentRow.outline_revision;
+  delete contentRow.save_revision;
+
+  const { data, error } = await supabase.rpc('save_tour_design_content_versioned_transaction', {
+    p_draft: contentRow,
+    p_outline_days: outlineDays.map((day) => tourOutlineDayToRow(day)),
+    p_expected_save_revision: expectedSaveRevision,
+  });
+  if (error) {
+    if (isSaveConflict(error)) {
+      throw new TourDesignSaveConflictError(currentSaveRevisionFromRpcError(error));
+    }
+    throw error;
+  }
+
+  const saveRevision = Number(data);
+  if (!Number.isInteger(saveRevision) || saveRevision < 1) {
+    throw new Error('Tour Design content save transaction did not return a valid revision.');
   }
   return saveRevision;
 }

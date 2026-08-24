@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { bffRoute } from '@/lib/bff/route';
-import type { TourDraft, TourOutlineDay } from '@/lib/types';
+import type { TourOutlineDay } from '@/lib/types';
 import {
-  saveTourDesignServer,
+  saveTourDesignContentServer,
   TourDesignSaveConflictError,
 } from '@/lib/tour-design/tour-design-repository';
+import type { TourDesignContentDraft } from '@/lib/tour-design/tour-draft-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,18 +15,14 @@ const tourDraftSchema = z.object({
   leadId: z.string().min(1),
   custId: z.string().min(1),
   briefJson: z.record(z.string(), z.any()).optional().nullable().transform((v) => v || undefined),
-  outlineStatus: z.enum(['draft', 'sent', 'approved']).default('draft'),
   outlineNotes: z.string().optional().nullable().transform((v) => v || undefined),
-  outlineSentAt: z.string().optional().nullable().transform((v) => v || undefined),
-  outlineApprovedAt: z.string().optional().nullable().transform((v) => v || undefined),
-  outlineRevision: z.number().optional().nullable().transform((v) => v || undefined),
   selectedCodes: z.array(z.string()).optional().nullable().transform((v) => v || undefined),
   selectedPackageId: z.string().optional().nullable().transform((v) => v || undefined),
   experienceOverrides: z.record(z.string(), z.any()).optional().nullable().transform((v) => v || undefined),
   markupPct: z.number().optional().nullable().transform((v) => v || undefined),
   clientType: z.enum(['b2c', 'b2b']).optional().nullable().transform((v) => v || undefined),
   currentStep: z.number().optional().nullable().transform((v) => v || undefined),
-});
+}).strict();
 
 const tourOutlineDaySchema = z.object({
   id: z.string().min(1),
@@ -49,9 +46,9 @@ export const POST = bffRoute(
   },
   async ({ supabase, body }) => {
     try {
-      const saveRevision = await saveTourDesignServer(
+      const saveRevision = await saveTourDesignContentServer(
         supabase,
-        body.draft as unknown as TourDraft,
+        body.draft as TourDesignContentDraft,
         body.outlineDays as unknown as TourOutlineDay[],
         body.expectedSaveRevision
       );

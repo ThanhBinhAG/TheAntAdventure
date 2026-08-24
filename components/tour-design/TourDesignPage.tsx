@@ -18,7 +18,6 @@ import { ensureTourDesignLead } from '@/lib/tour-design/tour-design-lead';
 import {
   getOutlineAwaitingApproval,
   getPendingTourDesignLeads,
-  getTourDraftForLead,
   isPendingTourDesignLead,
 } from '@/lib/tour-design/tour-design-leads';
 import { DEFAULT_TOUR_BRIEF, type TourBrief, type GalleryPhoto } from '@/lib/tour-design/tour-design-types';
@@ -28,6 +27,7 @@ import {
   createOutlineDay,
   resolveExperienceOverrides,
   resolveProposalExportState,
+  toTourDesignContentDraft,
   type ProposalHotelRatesPersist,
   tourDraftIdForLead,
 } from '@/lib/tour-design/tour-draft-utils';
@@ -68,8 +68,9 @@ type OutlineWorkflowResponse = {
 
 export default function TourDesignPage() {
   const { canWrite } = usePagePermission('tourdesign');
+  const [step, setStep] = useState(0);
   useTourDesignCrmContext();
-  const { error: referenceDataError } = useTourDesignReferenceData();
+  const { error: referenceDataError } = useTourDesignReferenceData(step === 4);
   const searchParams = useSearchParams();
   const products = useStore((s) => s.products);
   const customers = useStore((s) => s.customers);
@@ -88,7 +89,6 @@ export default function TourDesignPage() {
   const setPhotos = useStore((s) => s.setPhotos);
   const { saveFromForm } = useRegisterCustomer();
 
-  const [step, setStep] = useState(0);
   const [clientFormOpen, setClientFormOpen] = useState(false);
   const [clientType, setClientType] = useState<'b2c' | 'b2b'>('b2c');
   const [custId, setCustId] = useState('');
@@ -275,7 +275,11 @@ export default function TourDesignPage() {
             const response = await fetch('/api/tour-design/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ draft, outlineDays: rows, expectedSaveRevision }),
+              body: JSON.stringify({
+                draft: toTourDesignContentDraft(draft),
+                outlineDays: rows,
+                expectedSaveRevision,
+              }),
             });
             const result = await response.json().catch(() => null) as {
               ok?: boolean;
@@ -627,31 +631,29 @@ export default function TourDesignPage() {
   }
 
   function currentDraftSnapshot() {
-    return (
-      getTourDraftForLead(leadId, tourDrafts) ??
-      buildTourDraft({
-        leadId,
-        custId,
-        brief,
-        outlineStatus,
-        outlineNotes,
-        outlineSentAt,
-        outlineApprovedAt,
-        outlineRevision,
-        selectedCodes,
-        selectedPackageId,
-        experienceOverrides,
-        proposalExport: {
-          templateOverrides: proposalTemplateOverrides,
-          specialNotes: proposalSpecialNotes,
-          hotelRates: proposalHotelRates ?? undefined,
-          layoutId: proposalLayoutId,
-        },
-        markupPct,
-        clientType,
-        currentStep: step,
-      })
-    );
+    return buildTourDraft({
+      leadId,
+      custId,
+      brief,
+      outlineStatus,
+      outlineNotes,
+      outlineSentAt,
+      outlineApprovedAt,
+      outlineRevision,
+      saveRevision: saveQueueRef.current.getSaveRevision(tourDraftIdForLead(leadId)),
+      selectedCodes,
+      selectedPackageId,
+      experienceOverrides,
+      proposalExport: {
+        templateOverrides: proposalTemplateOverrides,
+        specialNotes: proposalSpecialNotes,
+        hotelRates: proposalHotelRates ?? undefined,
+        layoutId: proposalLayoutId,
+      },
+      markupPct,
+      clientType,
+      currentStep: step,
+    });
   }
 
   async function runOutlineWorkflow(action: OutlineWorkflowAction) {

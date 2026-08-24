@@ -121,9 +121,9 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 
 ### B5 — Weather Guide
 
-- [ ] Weather read/refresh API/repository; refresh phải có quyền riêng.
-- [ ] Chuyển UI/hook, test refresh failure và UI parity.
-- [ ] Gỡ direct browser-Supabase path.
+- [x] Weather read/refresh API/repository; refresh phải có quyền riêng.
+- [x] Chuyển UI/hook, test refresh failure và UI parity.
+- [x] Gỡ direct browser-Supabase path.
 
 ### Dashboard BFF (ngoài 9 feature gốc — theo `BFF-REFACTOR-PLAN`)
 

@@ -25,6 +25,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Query param id is required.' }, { status: 400 });
   }
 
+  const force = searchParams.get('force') === '1' || searchParams.get('force') === 'true';
+  if (force) {
+    return NextResponse.json(
+      {
+        error: 'Deprecated. Use POST /api/weather/destination/refresh (weather.write).',
+        deprecated: true,
+      },
+      { status: 410 },
+    );
+  }
+
   try {
     const { detail, fromCache } = await getDestinationWeather(id, { force: false });
     return NextResponse.json(

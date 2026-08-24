@@ -2,7 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { checkBreakGlassCredentials } from '@/lib/auth/break-glass';
 import { getBreakGlassSupabaseSession } from '@/lib/auth/break-glass-supabase';
-import { createCrmSession, setCrmSessionCookie } from '@/lib/auth/crm-session';
+import {
+  createCrmSession,
+  setCrmAccessCookies,
+  setCrmSessionCookie,
+} from '@/lib/auth/crm-session';
 import { clearSupabaseAuthCookies } from '@/lib/auth/cookie-hygiene';
 import {
   checkLoginRateLimit,
@@ -109,8 +113,9 @@ export async function POST(request: Request) {
       const supabaseSession = await getBreakGlassSupabaseSession();
       if (!supabaseSession) return fail(500, 'Break-glass session is not available.');
       let cookieValue: string;
+      let crmSession;
       try {
-        ({ cookieValue } = await createCrmSession({
+        ({ cookieValue, session: crmSession } = await createCrmSession({
           userId: null,
           email: null,
           isBreakGlass: true,
@@ -127,6 +132,7 @@ export async function POST(request: Request) {
       }
       const response = NextResponse.json({ ok: true, mode: 'break_glass' });
       setCrmSessionCookie(response, cookieValue);
+      await setCrmAccessCookies(response, crmSession);
       clearSupabaseAuthCookies(response, request.headers.get('cookie'));
       await recordSuccessfulLoginSafely({
         userId: null,
@@ -191,8 +197,9 @@ export async function POST(request: Request) {
   }
 
   let cookieValue: string;
+  let crmSession;
   try {
-    ({ cookieValue } = await createCrmSession({
+    ({ cookieValue, session: crmSession } = await createCrmSession({
       userId: data.user.id,
       email: data.user.email ?? null,
       isBreakGlass: false,
@@ -206,6 +213,7 @@ export async function POST(request: Request) {
 
   const response = NextResponse.json({ ok: true, mode: 'crm' });
   setCrmSessionCookie(response, cookieValue);
+  await setCrmAccessCookies(response, crmSession);
   clearSupabaseAuthCookies(response, request.headers.get('cookie'));
 
   // Chạy ngầm ghi lịch sử để không chặn luồng trả về kết quả cho người dùng

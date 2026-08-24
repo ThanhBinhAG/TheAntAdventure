@@ -19,8 +19,11 @@ import {
   revokeDurableCrmSession,
   updateDurableCrmSession,
 } from '@/lib/auth/crm-session-store';
+import { issueCrmAccessToken } from '@/lib/auth/crm-access-token';
 
 export const CRM_SESSION_COOKIE = 'crm_session';
+export const CRM_ACCESS_COOKIE = 'crm_access';
+export const CRM_SUPABASE_ACCESS_COOKIE = 'crm_supabase_access';
 
 const SESSION_TTL_SEC = 7 * 24 * 60 * 60;
 const REVOKED_SESSION_PREFIX = 'crm:session:revoked:';
@@ -125,12 +128,17 @@ function expiresAtIso(expiresAt: number): string {
   return new Date(expiresAt * 1000).toISOString();
 }
 
-async function isRevokedInRedis(sid: string): Promise<boolean> {
+export type CrmSessionRevocationStatus = 'active' | 'revoked' | 'unavailable';
+
+export async function getCrmSessionRevocationStatus(
+  sid: string,
+): Promise<CrmSessionRevocationStatus> {
   try {
     const redis = await getRedisClient();
-    return Boolean(redis && await redis.get(revokedKeyFor(sid)));
+    if (!redis) return 'unavailable';
+    return await redis.get(revokedKeyFor(sid)) ? 'revoked' : 'active';
   } catch {
-    return false;
+    return 'unavailable';
   }
 }
 
@@ -173,7 +181,7 @@ export async function getCrmSession(cookieValue: string | undefined): Promise<Cr
   }
   if (!sid) return null;
 
-  if (await isRevokedInRedis(sid)) return null;
+  if (await getCrmSessionRevocationStatus(sid) === 'revoked') return null;
 
   try {
     const stored = await findDurableCrmSession(sid);
@@ -256,6 +264,26 @@ export function setCrmSessionCookie(response: NextResponse, cookieValue: string)
   response.cookies.set(CRM_SESSION_COOKIE, cookieValue, cookieOptions(SESSION_TTL_SEC));
 }
 
+/**
+ * Sets short-lived JWT credentials only when the dedicated migration secret is
+ * configured. The durable signed session remains the refresh/revoke fallback.
+ */
+export async function setCrmAccessCookies(response: NextResponse, session: CrmSession): Promise<void> {
+  const issued = await issueCrmAccessToken(session);
+  if (!issued) return;
+  response.cookies.set(CRM_ACCESS_COOKIE, issued.token, cookieOptions(issued.maxAge));
+  response.cookies.set(
+    CRM_SUPABASE_ACCESS_COOKIE,
+    session.supabaseAccessToken,
+    cookieOptions(issued.maxAge),
+  );
+}
+
 export function clearCrmSessionCookie(response: NextResponse): void {
   response.cookies.set(CRM_SESSION_COOKIE, '', cookieOptions(0));
+}
+
+export function clearCrmAccessCookies(response: NextResponse): void {
+  response.cookies.set(CRM_ACCESS_COOKIE, '', cookieOptions(0));
+  response.cookies.set(CRM_SUPABASE_ACCESS_COOKIE, '', cookieOptions(0));
 }

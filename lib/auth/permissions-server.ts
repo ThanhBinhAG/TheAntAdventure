@@ -9,8 +9,9 @@
 
 import 'server-only';
 
-import { getAuthContext } from '@/lib/auth/session';
+import { getAuthContext, type AuthContext } from '@/lib/auth/session';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   getCachedPermissionCodes,
   setCachedPermissionCodes,
@@ -24,6 +25,11 @@ import {
 /** Kiểu một dòng do RPC current_permission_codes() trả về. */
 type PermissionRow = { code: string };
 
+export type PermissionRequestContext = {
+  auth: AuthContext;
+  getSupabaseClient: () => Promise<SupabaseClient>;
+};
+
 /**
  * Gọi RPC để lấy permission từ cookie session hiện tại.
  *
@@ -32,8 +38,10 @@ type PermissionRow = { code: string };
  * - tài khoản còn hoạt động
  * - tài khoản chưa bị xóa mềm
  */
-async function readPermissionCodesFromSupabase(): Promise<PermissionCode[]> {
-  const supabase = await getServerSupabaseClient();
+async function readPermissionCodesFromSupabase(
+  getSupabaseClient: () => Promise<SupabaseClient> = getServerSupabaseClient,
+): Promise<PermissionCode[]> {
+  const supabase = await getSupabaseClient();
 
   const { data, error } = await supabase.rpc('current_permission_codes');
 
@@ -48,6 +56,7 @@ async function readPermissionCodesFromSupabase(): Promise<PermissionCode[]> {
 
 async function readPermissionCodesWithCache(
   userId: string,
+  getSupabaseClient?: () => Promise<SupabaseClient>,
 ): Promise<PermissionCode[]> {
   const cached = await getCachedPermissionCodes(userId);
 
@@ -55,7 +64,7 @@ async function readPermissionCodesWithCache(
     return cached.permissionCodes;
   }
 
-  const permissionCodes = await readPermissionCodesFromSupabase();
+  const permissionCodes = await readPermissionCodesFromSupabase(getSupabaseClient);
 
   await setCachedPermissionCodes(
     userId,
@@ -93,8 +102,14 @@ export async function getInitialPermissionCodesForCRMLayout(): Promise<
  */
 export async function getCurrentPermissionCodesForRequest(): Promise<
   PermissionCode[] | null
-> {
-  const auth = await getAuthContext();
+>;
+export async function getCurrentPermissionCodesForRequest(
+  context: PermissionRequestContext,
+): Promise<PermissionCode[] | null>;
+export async function getCurrentPermissionCodesForRequest(
+  context?: PermissionRequestContext,
+): Promise<PermissionCode[] | null> {
+  const auth = context?.auth ?? await getAuthContext();
 
   if (!auth.authenticated) return null;
 
@@ -103,7 +118,7 @@ export async function getCurrentPermissionCodesForRequest(): Promise<
 
   // API vẫn gọi auth.getUser() ở trên để phân biệt 401 và 403 chính xác.
   // Sau đó dùng chung hàm RPC để lấy danh sách quyền.
-  return readPermissionCodesWithCache(auth.userId!);
+  return readPermissionCodesWithCache(auth.userId!, context?.getSupabaseClient);
 }
 
 /**
@@ -129,8 +144,11 @@ export type RequestPermissionResult =
 
 export async function checkPermissionForRequest(
   requiredPermission: PermissionCode,
+  context?: PermissionRequestContext,
 ): Promise<RequestPermissionResult> {
-  const permissionCodes = await getCurrentPermissionCodesForRequest();
+  const permissionCodes = context
+    ? await getCurrentPermissionCodesForRequest(context)
+    : await getCurrentPermissionCodesForRequest();
 
   // Không có session hợp lệ.
   if (permissionCodes == null) {

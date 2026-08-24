@@ -50,9 +50,9 @@ mock.module(require.resolve('@supabase/supabase-js'), {
 mock.module(require.resolve('../lib/auth/crm-session'), {
   namedExports: {
     CRM_SESSION_COOKIE: 'crm_session',
-    createCrmSession: async () => {
+    createCrmSession: async (input: Record<string, unknown>) => {
       if (crmSessionCreateError) throw crmSessionCreateError;
-      return { cookieValue: 'signed-crm-session' };
+      return { session: { sid: 'session-1', ...input }, cookieValue: 'signed-crm-session' };
     },
     setCrmSessionCookie: (response: CookieResponse, value: string) => {
       response.cookies.set('crm_session', value, { httpOnly: true, path: '/' });
@@ -64,6 +64,15 @@ mock.module(require.resolve('../lib/auth/crm-session'), {
     clearCrmSessionCookie: (response: CookieResponse) => {
       response.cookies.set('crm_session', '', { maxAge: 0, path: '/' });
     },
+    setCrmAccessCookies: async (response: CookieResponse) => {
+      response.cookies.set('crm_access', 'signed-access-token', { httpOnly: true, path: '/' });
+      response.cookies.set('crm_supabase_access', 'supabase-access-token', { httpOnly: true, path: '/' });
+    },
+    clearCrmAccessCookies: (response: CookieResponse) => {
+      response.cookies.set('crm_access', '', { maxAge: 0, path: '/' });
+      response.cookies.set('crm_supabase_access', '', { maxAge: 0, path: '/' });
+    },
+    getCrmSessionRevocationStatus: async () => 'active',
     getCrmSession: async () => crmSession,
   },
 });
@@ -116,6 +125,7 @@ mock.module(require.resolve('../lib/env'), {
   namedExports: {
     getSupabaseUrl: () => 'https://supabase.example.test',
     getSupabaseAnonKey: () => 'anon-key',
+    getCrmAccessTokenSecret: () => '',
     isBreakGlassConfigured: () => false,
   },
 });

@@ -1,10 +1,11 @@
 # components/auth/ — Agent overview
 
 ## Role
-Auth-related widgets (e.g. Turnstile captcha).
+Auth-related widgets (Turnstile captcha and access-token refresh).
 
 ## Contents
-- Captcha / auth UI pieces
+- `TurnstileWidget.tsx` — login CAPTCHA.
+- `CrmAccessRefresher.tsx` — refreshes HttpOnly CRM access credentials while authenticated CRM is open.
 
 ## Boundaries
 - Session/rate-limit: `lib/auth`. Login page: `app/login`.

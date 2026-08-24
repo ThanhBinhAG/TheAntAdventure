@@ -45,6 +45,11 @@ export function getCrmSessionSecret() {
   return (process.env.CRM_SESSION_SECRET ?? '').trim();
 }
 
+/** Server-only HS256 key for the short-lived CRM access JWT during the migration rollout. */
+export function getCrmAccessTokenSecret() {
+  return (process.env.CRM_ACCESS_TOKEN_SECRET ?? '').trim();
+}
+
 /** Auto push app → Supabase after edits (default: on when Supabase enabled) */
 export function isAutoSyncEnabled() {
   const v = (process.env.NEXT_PUBLIC_SUPABASE_AUTO_SYNC ?? '').trim().toLowerCase();

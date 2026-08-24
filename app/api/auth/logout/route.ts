@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { clearBreakGlassCookie } from '@/lib/auth/break-glass';
-import { clearCrmSessionCookie, revokeCrmSession, CRM_SESSION_COOKIE } from '@/lib/auth/crm-session';
+import {
+  clearCrmAccessCookies,
+  clearCrmSessionCookie,
+  revokeCrmSession,
+  CRM_SESSION_COOKIE,
+} from '@/lib/auth/crm-session';
 import { clearSupabaseAuthCookies } from '@/lib/auth/cookie-hygiene';
 
 function logoutResponse(input: {
@@ -12,6 +17,7 @@ function logoutResponse(input: {
 
   // Expire every browser credential even when durable revocation is unavailable.
   clearCrmSessionCookie(response);
+  clearCrmAccessCookies(response);
   clearBreakGlassCookie(response);
   clearSupabaseAuthCookies(response, input.cookieHeader);
 

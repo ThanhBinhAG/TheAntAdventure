@@ -8,10 +8,14 @@ import {
 } from '@/lib/env';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 import {
+  CRM_ACCESS_COOKIE,
   CRM_SESSION_COOKIE,
+  CRM_SUPABASE_ACCESS_COOKIE,
   getCrmSession,
+  getCrmSessionRevocationStatus,
   refreshCrmSessionIfNeeded,
 } from '@/lib/auth/crm-session';
+import { verifyCrmAccessToken } from '@/lib/auth/crm-access-token';
 import { cookies } from 'next/headers';
 
 /**
@@ -28,6 +32,25 @@ export async function getServerSupabaseClient() {
   }
 
   const cookieStore = await cookies();
+  const supabaseAccessToken = cookieStore.get(CRM_SUPABASE_ACCESS_COOKIE)?.value;
+  const access = await verifyCrmAccessToken(
+    cookieStore.get(CRM_ACCESS_COOKIE)?.value,
+    supabaseAccessToken,
+  );
+  if (access) {
+    const revocation = await getCrmSessionRevocationStatus(access.sid);
+    if (revocation === 'active' && supabaseAccessToken) {
+      return createClient(url, key, {
+        ...getSupabaseGlobalFetchOptions(),
+        accessToken: async () => supabaseAccessToken,
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+    }
+    if (revocation === 'revoked') {
+      throw new Error('CRM session không hợp lệ hoặc đã hết hạn.');
+    }
+    // Redis outage: verify against durable storage below before using a token.
+  }
   const storedSession = await getCrmSession(cookieStore.get(CRM_SESSION_COOKIE)?.value);
   const session = storedSession && await refreshCrmSessionIfNeeded(storedSession);
   if (!session) throw new Error('CRM session không hợp lệ hoặc đã hết hạn.');

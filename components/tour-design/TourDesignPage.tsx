@@ -47,12 +47,14 @@ import { DEFAULT_PROPOSAL_LAYOUT_ID, type ProposalLayoutId } from '@/lib/proposa
 import type { ExperienceOverride, OutlineStatus, Product, ProductPricing, TourDraft, TourOutlineDay } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { useTourDesignCrmContext } from '@/hooks/useTourDesignCrmContext';
 import { TourDesignQueueCards } from '@/components/tour-design/TourDesignQueueCards';
 
 const STEPS = ['Client Brief', 'Outline', 'Tour Experiences', 'Pricing', 'Export'] as const;
 
 export default function TourDesignPage() {
   const { canWrite } = usePagePermission('tourdesign');
+  useTourDesignCrmContext();
   const searchParams = useSearchParams();
   const products = useStore((s) => s.products);
   const customers = useStore((s) => s.customers);

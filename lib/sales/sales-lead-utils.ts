@@ -254,3 +254,59 @@ export function hasActiveFilters(
     !!stageFilter
   );
 }
+
+/** BFF list item helpers — `customerName` joined server-side. */
+type LeadWithCustomerName = Lead & { customerName: string };
+
+export function leadMatchesSearchItem(lead: LeadWithCustomerName, query: string): boolean {
+  const q = query.toLowerCase().trim();
+  if (!q) return true;
+  const haystack = [
+    lead.id,
+    lead.tour,
+    lead.owner,
+    lead.month,
+    lead.notes,
+    lead.nextAction,
+    lead.customerName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
+export function leadMatchesCustomerNameItem(lead: LeadWithCustomerName, query: string): boolean {
+  const q = query.toLowerCase().trim();
+  if (!q) return true;
+  return lead.customerName.toLowerCase().includes(q);
+}
+
+export function sortLeadItems(leads: LeadWithCustomerName[], sort: ListSortState): LeadWithCustomerName[] {
+  const { field, direction } = sort;
+  return [...leads].sort((a, b) => {
+    switch (field) {
+      case 'weighted':
+        return direction === 'asc'
+          ? getLeadWeightedValue(a) - getLeadWeightedValue(b)
+          : getLeadWeightedValue(b) - getLeadWeightedValue(a);
+      case 'value':
+        return direction === 'asc' ? (a.value || 0) - (b.value || 0) : (b.value || 0) - (a.value || 0);
+      case 'travelDate':
+        return compareNullable(parseLeadTravelMonth(a.month || ''), parseLeadTravelMonth(b.month || ''), direction, (x, y) => x - y);
+      case 'followUp':
+        return compareNullable(a.followUpDate || null, b.followUpDate || null, direction, (x, y) => x.localeCompare(y));
+      case 'stage':
+        return direction === 'asc'
+          ? stageOrderIndex(b.stage) - stageOrderIndex(a.stage)
+          : stageOrderIndex(a.stage) - stageOrderIndex(b.stage);
+      case 'customer': {
+        const nameA = a.customerName.toLowerCase();
+        const nameB = b.customerName.toLowerCase();
+        return direction === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      }
+      default:
+        return 0;
+    }
+  });
+}

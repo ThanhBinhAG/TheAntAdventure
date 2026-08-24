@@ -58,14 +58,9 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   customers: [],
   /** Agents list/catalog via `/api/agents`; pipeline/commission leads wait for Sales BFF. */
   agents: [],
-  sales: ['leads', 'customers', 'comms', 'tour_drafts', 'bookings'],
-  /** Customer, lead, hotel, and comm data are still owned by their existing loaders. */
-  tourdesign: [
-    'customers',
-    'leads',
-    'hotels',
-    'comms',
-  ],
+  sales: [],
+  /** Customers/leads via `/api/tour-design/crm-context`; hotels/comms still boot here. */
+  tourdesign: ['hotels', 'comms'],
   // Catalogue pages use the paginated server API. The full data set is loaded
   // only when a user opens a detail drawer or enters Manage mode.
   products: [],

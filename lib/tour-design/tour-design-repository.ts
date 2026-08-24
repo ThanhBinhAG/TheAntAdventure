@@ -10,7 +10,7 @@ import {
   rowToTourOutlineDay,
   tourOutlineDayToRow,
 } from '@/lib/db/mappers/tour';
-import type { TourDraft, TourOutlineDay } from '@/lib/types';
+import type { Lead, TourDraft, TourOutlineDay } from '@/lib/types';
 import type { TourDesignCrmContext } from '@/lib/tour-design/tour-design-types';
 
 /** Customers + leads for Client Brief dropdown and Sales → Tour Design handoff queue. */
@@ -27,6 +27,47 @@ export async function getTourDesignCrmContextServer(): Promise<TourDesignCrmCont
   return {
     customers: ((customersRes.data ?? []) as Row[]).map(rowToCustomer),
     leads: ((leadsRes.data ?? []) as Row[]).map(rowToLead),
+  };
+}
+
+export type TourDesignAcknowledgement = {
+  acknowledged: boolean;
+  lead: Lead | null;
+};
+
+/**
+ * Mark a Sales handoff as received exactly once. The predicate makes repeated
+ * or concurrent requests a harmless no-op after the first Pending lead update.
+ */
+export async function acknowledgeTourDesignLeadServer(
+  supabase: SupabaseClient,
+  leadId: string,
+): Promise<TourDesignAcknowledgement> {
+  const { data, error } = await supabase
+    .from('leads')
+    .update({ tour_design_acked: true })
+    .eq('id', leadId)
+    .eq('needs_tour_design', true)
+    .eq('tour_design_acked', false)
+    .eq('stage', 'Pending')
+    .select('*')
+    .maybeSingle();
+  if (error) throw error;
+
+  if (data) {
+    return { acknowledged: true, lead: rowToLead(data as Row) };
+  }
+
+  const { data: current, error: currentError } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('id', leadId)
+    .maybeSingle();
+  if (currentError) throw currentError;
+
+  return {
+    acknowledged: false,
+    lead: current ? rowToLead(current as Row) : null,
   };
 }
 

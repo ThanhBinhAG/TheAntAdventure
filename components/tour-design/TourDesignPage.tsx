@@ -21,9 +21,7 @@ import {
   patchOutlineRevise,
   patchOutlineSent,
 } from '@/lib/tour-design/tour-design-lead';
-import { persistCustomerRowsNow, scheduleAutoSync } from '@/lib/db/auto-sync';
 import {
-  ackTourDesignLead,
   getOutlineAwaitingApproval,
   getPendingTourDesignLeads,
   getTourDraftForLead,
@@ -332,19 +330,32 @@ export default function TourDesignPage() {
 
   const persistTourDesignAck = useCallback(
     async (lid: string) => {
+      if (!canWrite) return;
       const lead = useStore.getState().leads.find((l) => l.id === lid);
-      if (!lead || !isPendingTourDesignLead(lead)) return;
-      updateLead(lid, { tourDesignAcked: true });
-      const result = await persistCustomerRowsNow({ leads: [ackTourDesignLead(lead)] });
-      if (result.ok) return;
-      if (result.error === 'Auto-sync not allowed') {
-        scheduleAutoSync({ tables: ['leads'] });
-        return;
+      if (!lead || !isPendingTourDesignLead(lead) || lead.stage !== 'Pending') return;
+
+      try {
+        const response = await fetch('/api/tour-design/acknowledgements', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ leadId: lid }),
+        });
+        const body = await response.json() as {
+          ok?: boolean;
+          error?: string;
+          data?: { lead?: typeof lead | null; acknowledged?: boolean };
+        };
+        if (!response.ok || !body.ok || typeof body.data?.acknowledged !== 'boolean') {
+          throw new Error(body.error || 'Could not save the Tour Design task.');
+        }
+        if (body.data.lead?.id === lid) {
+          updateLead(lid, body.data.lead);
+        }
+      } catch {
+        toast.warning('Could not save the Tour Design task. It will stay in the queue.');
       }
-      updateLead(lid, { tourDesignAcked: false });
-      toast.warning('Could not save the Tour Design task. It will stay in the queue.');
     },
-    [updateLead]
+    [canWrite, updateLead]
   );
 
   const openLeadSession = useCallback(

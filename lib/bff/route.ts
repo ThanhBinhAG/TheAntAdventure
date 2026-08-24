@@ -37,9 +37,27 @@ export function bffRoute<
     const nextRequest = new NextRequest(request);
 
     try {
-      // 1. Xác thực & Phân quyền
+      // 1. Xác thực một lần, sau đó lazily tạo một user-scoped client cho quyền/handler.
+      const auth = await getAuthContext();
+      if (!auth.authenticated) {
+        return NextResponse.json(
+          { ok: false, error: 'Chưa đăng nhập hoặc session đã hết hạn.' },
+          { status: 401 },
+        );
+      }
+      let supabase: SupabaseClient | undefined;
+      const getSupabaseClient = async () => {
+        if (!supabase) supabase = await getServerSupabaseClient(auth);
+        return supabase;
+      };
+
+      // 2. Phân quyền. Cache hit không cần tạo client trước; cache miss dùng đúng
+      // client mà handler sẽ nhận, tránh xác minh Supabase JWT lặp lại.
       if (options.requiredPermission) {
-        const permission = await checkPermissionForRequest(options.requiredPermission);
+        const permission = await checkPermissionForRequest(options.requiredPermission, {
+          auth,
+          getSupabaseClient,
+        });
         if (!permission.allowed) {
           const errorMsg =
             permission.status === 401
@@ -47,19 +65,10 @@ export function bffRoute<
               : `Bạn không có quyền thực hiện hành động này (Yêu cầu: ${options.requiredPermission}).`;
           return NextResponse.json({ ok: false, error: errorMsg }, { status: permission.status });
         }
-      } else {
-        // Nếu không yêu cầu permission cụ thể, vẫn bắt buộc phải đăng nhập
-        const auth = await getAuthContext();
-        if (!auth.authenticated) {
-          return NextResponse.json({ ok: false, error: 'Chưa đăng nhập hoặc session đã hết hạn.' }, { status: 401 });
-        }
       }
 
-      // 2. Lấy Auth Context thực tế để truyền vào handler
-      const auth = await getAuthContext();
-
-      // 3. Tạo user-scoped Supabase client
-      const supabase = await getServerSupabaseClient();
+      // 3. Tái sử dụng client đã tạo khi permission cache miss, hoặc tạo một lần cho handler.
+      const handlerSupabase = await getSupabaseClient();
 
       // 4. Validate query parameters (nếu có schema)
       let queryData: z.infer<TQuery> | undefined = undefined;
@@ -124,7 +133,7 @@ export function bffRoute<
       const result = await handler({
         request: nextRequest,
         auth,
-        supabase,
+        supabase: handlerSupabase,
         query: queryData as z.infer<TQuery>,
         body: bodyData as z.infer<TBody>,
       });

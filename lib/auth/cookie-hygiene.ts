@@ -35,7 +35,6 @@ export function estimateCookieHeaderBytes(cookieHeader: string | null | undefine
   bytes: number;
   cookieCount: number;
   authChunkCount: number;
-  hasBreakGlass: boolean;
 } {
   const header = cookieHeader ?? '';
   const bytes =
@@ -47,11 +46,9 @@ export function estimateCookieHeaderBytes(cookieHeader: string | null | undefine
     .map((p) => p.trim())
     .filter(Boolean);
   let authChunkCount = 0;
-  let hasBreakGlass = false;
   for (const part of parts) {
     const name = part.split('=')[0]?.trim() ?? '';
     if (isSupabaseAuthCookieName(name)) authChunkCount += 1;
-    if (name === 'bg_session') hasBreakGlass = true;
   }
-  return { bytes, cookieCount: parts.length, authChunkCount, hasBreakGlass };
+  return { bytes, cookieCount: parts.length, authChunkCount };
 }

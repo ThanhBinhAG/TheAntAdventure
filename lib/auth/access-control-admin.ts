@@ -93,7 +93,33 @@ export async function createAccessControlAuthUser(input: {
         );
     }
 
-    return data.user.id;
+  return data.user.id;
+}
+
+/** Ban/unban the Auth account so refresh/login are revoked with CRM account status. */
+export async function setAccessControlAuthUserActive(
+    userId: string,
+    isActive: boolean,
+): Promise<void> {
+    const admin = getAccessControlAdminClient();
+    if (!admin) {
+        throw new AccessControlAuthAdminError(
+            'Máy chủ chưa cấu hình SUPABASE_SERVICE_ROLE_KEY.',
+            503,
+        );
+    }
+
+    const { error } = await admin.auth.admin.updateUserById(userId, {
+        ban_duration: isActive ? 'none' : '876000h',
+    });
+    if (error) {
+        throw new AccessControlAuthAdminError(
+            isActive
+                ? 'Không thể kích hoạt tài khoản Supabase Auth.'
+                : 'Không thể khóa tài khoản Supabase Auth.',
+            503,
+        );
+    }
 }
 
 /**

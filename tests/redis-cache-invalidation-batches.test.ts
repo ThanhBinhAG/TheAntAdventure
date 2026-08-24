@@ -12,30 +12,73 @@ require.cache[serverOnlyPath] = {
 } as NodeModule;
 
 const deletedKeys: string[][] = [];
+let scanBatches: string[][] = [];
+let failDeleteAtCall: number | null = null;
 
 mock.module(require.resolve('../lib/redis/client'), {
   namedExports: {
     getRedisClient: async () => ({
       scanIterator: async function* () {
-        yield ['cache:products:list:v1:first', 'cache:products:facets:v1:first'];
-        yield ['cache:products:list:v1:second'];
+        yield* scanBatches;
       },
       del: async (keys: string[]) => {
         deletedKeys.push(keys);
+        if (failDeleteAtCall === deletedKeys.length) {
+          throw new Error('Redis DEL failed');
+        }
       },
     }),
   },
 });
 
-test('cache invalidation flattens node-redis SCAN batches before DEL', async () => {
+test('cache invalidation deletes each SCAN batch without accumulating every key', async () => {
   const { cacheInvalidatePattern } = await import('../lib/redis/cache-helper');
   deletedKeys.length = 0;
+  scanBatches = [
+    ['cache:products:list:v1:first', 'cache:products:facets:v1:first'],
+    ['cache:products:list:v1:second'],
+  ];
+  failDeleteAtCall = null;
 
   await cacheInvalidatePattern('cache:products:*:v1:*');
 
-  assert.deepEqual(deletedKeys, [[
-    'cache:products:list:v1:first',
-    'cache:products:facets:v1:first',
-    'cache:products:list:v1:second',
-  ]]);
+  assert.deepEqual(deletedKeys, [
+    ['cache:products:list:v1:first', 'cache:products:facets:v1:first'],
+    ['cache:products:list:v1:second'],
+  ]);
+});
+
+test('cache invalidation splits an unexpectedly large SCAN batch', async () => {
+  const { cacheInvalidatePattern } = await import('../lib/redis/cache-helper');
+  deletedKeys.length = 0;
+  scanBatches = [Array.from({ length: 201 }, (_, index) => `cache:products:v1:${index}`)];
+  failDeleteAtCall = null;
+
+  await cacheInvalidatePattern('cache:products:*:v1:*');
+
+  assert.deepEqual(deletedKeys.map((batch) => batch.length), [100, 100, 1]);
+});
+
+test('cache invalidation swallows a Redis failure after an earlier batch', async () => {
+  const { cacheInvalidatePattern } = await import('../lib/redis/cache-helper');
+  deletedKeys.length = 0;
+  scanBatches = [['cache:products:v1:first'], ['cache:products:v1:second']];
+  failDeleteAtCall = 2;
+
+  await assert.doesNotReject(cacheInvalidatePattern('cache:products:*:v1:*'));
+  assert.deepEqual(deletedKeys, [
+    ['cache:products:v1:first'],
+    ['cache:products:v1:second'],
+  ]);
+});
+
+test('cache invalidation does not issue DEL when SCAN returns no keys', async () => {
+  const { cacheInvalidatePattern } = await import('../lib/redis/cache-helper');
+  deletedKeys.length = 0;
+  scanBatches = [[], []];
+  failDeleteAtCall = null;
+
+  await cacheInvalidatePattern('cache:products:*:v1:*');
+
+  assert.deepEqual(deletedKeys, []);
 });

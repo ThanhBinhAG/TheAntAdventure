@@ -111,11 +111,12 @@ async function attachPageCoverThumbs(
 
 export async function listProductsPage(
     input: ProductListQuery,
+    suppliedClient?: SupabaseClient,
 ): Promise<ProductPageResponse<Product>> {
     const cached = await getCachedProductPage(input);
     if (cached) return cached;
 
-    const supabase = await getServerSupabaseClient();
+    const supabase = suppliedClient ?? await getServerSupabaseClient();
     const result = input.view === 'modules'
         ? await supabase.rpc('list_product_modules_page', {
             p_page_number: input.page,
@@ -156,11 +157,12 @@ export async function listProductsPage(
 
 export async function listProductFacets(
     input: ProductListFilters,
+    suppliedClient?: SupabaseClient,
 ): Promise<ProductListFacets> {
     const cached = await getCachedProductFacets(input);
     if (cached) return cached;
 
-    const supabase = await getServerSupabaseClient();
+    const supabase = suppliedClient ?? await getServerSupabaseClient();
     const result = await supabase.rpc('list_product_facets', {
         p_search_text: input.q ?? null,
         p_filter_region: input.region ?? null,

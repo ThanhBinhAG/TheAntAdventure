@@ -14,19 +14,10 @@ import type { OverridePatch } from '@/components/tour-design/SelectedExperiences
 import type { TourPackage } from '@/lib/seeds/tourPackages';
 import { customerToBrief } from '@/lib/customers/customer-to-brief';
 import { isExperiencesBlocked } from '@/lib/tour-design/tour-design-gate';
+import { ensureTourDesignLead } from '@/lib/tour-design/tour-design-lead';
 import {
-  ensureTourDesignLead,
-  patchOutlineApproved,
-  patchOutlineResent,
-  patchOutlineRevise,
-  patchOutlineSent,
-} from '@/lib/tour-design/tour-design-lead';
-import { persistCustomerRowsNow, scheduleAutoSync } from '@/lib/db/auto-sync';
-import {
-  ackTourDesignLead,
   getOutlineAwaitingApproval,
   getPendingTourDesignLeads,
-  getTourDraftForLead,
   isPendingTourDesignLead,
 } from '@/lib/tour-design/tour-design-leads';
 import { DEFAULT_TOUR_BRIEF, type TourBrief, type GalleryPhoto } from '@/lib/tour-design/tour-design-types';
@@ -36,6 +27,7 @@ import {
   createOutlineDay,
   resolveExperienceOverrides,
   resolveProposalExportState,
+  toTourDesignContentDraft,
   type ProposalHotelRatesPersist,
   tourDraftIdForLead,
 } from '@/lib/tour-design/tour-draft-utils';
@@ -44,17 +36,41 @@ import { outlineDocFromRows, printOutline } from '@/lib/outline/outline-html';
 import { getBffArray, getBffData } from '@/lib/bff/client';
 import type { ProposalTemplateOverrides } from '@/lib/proposals/proposal-content-overrides';
 import { DEFAULT_PROPOSAL_LAYOUT_ID, type ProposalLayoutId } from '@/lib/proposals/proposal-layouts';
-import type { ExperienceOverride, OutlineStatus, Product, ProductPricing, TourDraft, TourOutlineDay } from '@/lib/types';
+import type {
+  Comm,
+  ExperienceOverride,
+  Lead,
+  OutlineStatus,
+  Product,
+  ProductPricing,
+  TourDraft,
+  TourOutlineDay,
+} from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import { useTourDesignCrmContext } from '@/hooks/useTourDesignCrmContext';
+import { useTourDesignReferenceData } from '@/hooks/useTourDesignReferenceData';
 import { TourDesignQueueCards } from '@/components/tour-design/TourDesignQueueCards';
 
 const STEPS = ['Client Brief', 'Outline', 'Tour Experiences', 'Pricing', 'Export'] as const;
+type OutlineWorkflowAction = 'sent' | 'resent' | 'approved' | 'revised';
+
+type OutlineWorkflowResponse = {
+  ok?: boolean;
+  error?: string;
+  currentSaveRevision?: number;
+  data?: {
+    draft?: TourDraft;
+    lead?: Lead;
+    comm?: Comm | null;
+  };
+};
 
 export default function TourDesignPage() {
   const { canWrite } = usePagePermission('tourdesign');
+  const [step, setStep] = useState(0);
   useTourDesignCrmContext();
+  const { error: referenceDataError } = useTourDesignReferenceData(step === 4);
   const searchParams = useSearchParams();
   const products = useStore((s) => s.products);
   const customers = useStore((s) => s.customers);
@@ -73,7 +89,6 @@ export default function TourDesignPage() {
   const setPhotos = useStore((s) => s.setPhotos);
   const { saveFromForm } = useRegisterCustomer();
 
-  const [step, setStep] = useState(0);
   const [clientFormOpen, setClientFormOpen] = useState(false);
   const [clientType, setClientType] = useState<'b2c' | 'b2b'>('b2c');
   const [custId, setCustId] = useState('');
@@ -100,6 +115,7 @@ export default function TourDesignPage() {
   const urlInitRef = useRef<string | null>(null);
   const lastDraftFingerprintsRef = useRef(new Map<string, string>());
   const saveQueueRef = useRef(new TourDraftSaveQueue());
+  const visibleReadError = referenceDataError ?? readError;
 
   useEffect(() => {
     let active = true;
@@ -259,7 +275,11 @@ export default function TourDesignPage() {
             const response = await fetch('/api/tour-design/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ draft, outlineDays: rows, expectedSaveRevision }),
+              body: JSON.stringify({
+                draft: toTourDesignContentDraft(draft),
+                outlineDays: rows,
+                expectedSaveRevision,
+              }),
             });
             const result = await response.json().catch(() => null) as {
               ok?: boolean;
@@ -332,19 +352,32 @@ export default function TourDesignPage() {
 
   const persistTourDesignAck = useCallback(
     async (lid: string) => {
+      if (!canWrite) return;
       const lead = useStore.getState().leads.find((l) => l.id === lid);
-      if (!lead || !isPendingTourDesignLead(lead)) return;
-      updateLead(lid, { tourDesignAcked: true });
-      const result = await persistCustomerRowsNow({ leads: [ackTourDesignLead(lead)] });
-      if (result.ok) return;
-      if (result.error === 'Auto-sync not allowed') {
-        scheduleAutoSync({ tables: ['leads'] });
-        return;
+      if (!lead || !isPendingTourDesignLead(lead) || lead.stage !== 'Pending') return;
+
+      try {
+        const response = await fetch('/api/tour-design/acknowledgements', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ leadId: lid }),
+        });
+        const body = await response.json() as {
+          ok?: boolean;
+          error?: string;
+          data?: { lead?: typeof lead | null; acknowledged?: boolean };
+        };
+        if (!response.ok || !body.ok || typeof body.data?.acknowledged !== 'boolean') {
+          throw new Error(body.error || 'Could not save the Tour Design task.');
+        }
+        if (body.data.lead?.id === lid) {
+          updateLead(lid, body.data.lead);
+        }
+      } catch {
+        toast.warning('Could not save the Tour Design task. It will stay in the queue.');
       }
-      updateLead(lid, { tourDesignAcked: false });
-      toast.warning('Could not save the Tour Design task. It will stay in the queue.');
     },
-    [updateLead]
+    [canWrite, updateLead]
   );
 
   const openLeadSession = useCallback(
@@ -598,57 +631,76 @@ export default function TourDesignPage() {
   }
 
   function currentDraftSnapshot() {
-    return (
-      getTourDraftForLead(leadId, tourDrafts) ??
-      buildTourDraft({
-        leadId,
-        custId,
-        brief,
-        outlineStatus,
-        outlineNotes,
-        outlineSentAt,
-        outlineApprovedAt,
-        outlineRevision,
-        selectedCodes,
-        selectedPackageId,
-        experienceOverrides,
-        proposalExport: {
-          templateOverrides: proposalTemplateOverrides,
-          specialNotes: proposalSpecialNotes,
-          hotelRates: proposalHotelRates ?? undefined,
-          layoutId: proposalLayoutId,
-        },
-        markupPct,
-        clientType,
-        currentStep: step,
-      })
-    );
+    return buildTourDraft({
+      leadId,
+      custId,
+      brief,
+      outlineStatus,
+      outlineNotes,
+      outlineSentAt,
+      outlineApprovedAt,
+      outlineRevision,
+      saveRevision: saveQueueRef.current.getSaveRevision(tourDraftIdForLead(leadId)),
+      selectedCodes,
+      selectedPackageId,
+      experienceOverrides,
+      proposalExport: {
+        templateOverrides: proposalTemplateOverrides,
+        specialNotes: proposalSpecialNotes,
+        hotelRates: proposalHotelRates ?? undefined,
+        layoutId: proposalLayoutId,
+      },
+      markupPct,
+      clientType,
+      currentStep: step,
+    });
   }
 
-  function applyOutlineWorkflow(
-    patch: ReturnType<typeof patchOutlineSent>,
-    state: {
-      outlineStatus?: OutlineStatus;
-      outlineSentAt?: string;
-      outlineApprovedAt?: string;
-      outlineRevision?: number;
+  async function runOutlineWorkflow(action: OutlineWorkflowAction) {
+    if (!canWrite) {
+      toast.warning('Bạn không có quyền chỉnh sửa Tour Design.');
+      return;
     }
-  ) {
     if (!leadId || !custId) return;
-    if (state.outlineStatus) setOutlineStatus(state.outlineStatus);
-    if (state.outlineSentAt !== undefined) setOutlineSentAt(state.outlineSentAt);
-    if (state.outlineApprovedAt !== undefined) setOutlineApprovedAt(state.outlineApprovedAt);
-    if (state.outlineRevision !== undefined) setOutlineRevision(state.outlineRevision);
-    updateLead(leadId, patch.lead);
-    if (patch.comm) addComm(patch.comm);
-    persistDraft({
-      outlineStatus: state.outlineStatus,
-      outlineSentAt: state.outlineSentAt,
-      outlineApprovedAt: state.outlineApprovedAt,
-      outlineRevision: state.outlineRevision,
-      step,
-      outlineRows,
-    });
+
+    const draft = currentDraftSnapshot();
+    setSaveState('saving');
+    try {
+      const response = await fetch('/api/tour-design/outline-workflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          draft,
+          outlineDays: outlineRows,
+          expectedSaveRevision: draft.saveRevision ?? saveQueueRef.current.getSaveRevision(draft.id),
+        }),
+      });
+      const body = await response.json().catch(() => null) as OutlineWorkflowResponse | null;
+      if (!response.ok || !body?.ok || !body.data?.draft || !body.data.lead) {
+        if (typeof body?.currentSaveRevision === 'number') {
+          saveQueueRef.current.setSaveRevision(draft.id, body.currentSaveRevision);
+        }
+        throw new Error(body?.error ?? 'Không thể cập nhật trạng thái Outline.');
+      }
+
+      const result = body.data as { draft: TourDraft; lead: Lead; comm?: Comm | null };
+      const savedDraft = result.draft;
+      saveQueueRef.current.setSaveRevision(savedDraft.id, savedDraft.saveRevision ?? 0);
+      upsertTourDraft(savedDraft);
+      replaceOutlineDaysForDraft(savedDraft.id, outlineRows);
+      updateLead(result.lead.id, result.lead);
+      if (result.comm) addComm(result.comm);
+
+      setOutlineStatus(savedDraft.outlineStatus);
+      setOutlineSentAt(savedDraft.outlineSentAt);
+      setOutlineApprovedAt(savedDraft.outlineApprovedAt);
+      setOutlineRevision(savedDraft.outlineRevision ?? 0);
+      setSaveState('saved');
+    } catch (error) {
+      setSaveState('error');
+      toast.error(error instanceof Error ? error.message : 'Không thể cập nhật trạng thái Outline.');
+    }
   }
 
   function aiSuggestStyle() {
@@ -706,44 +758,19 @@ export default function TourDesignPage() {
   }
 
   function markOutlineSent() {
-    if (!leadId || !custId) return;
-    const name = custName || brief.clientName || 'Client';
-    const patch = patchOutlineSent(currentDraftSnapshot(), custId, name, brief.salesperson);
-    applyOutlineWorkflow(patch, {
-      outlineStatus: 'sent',
-      outlineSentAt: patch.draft.outlineSentAt,
-      outlineRevision: patch.draft.outlineRevision,
-    });
+    void runOutlineWorkflow('sent');
   }
 
   function resendOutline() {
-    if (!leadId || !custId) return;
-    const name = custName || brief.clientName || 'Client';
-    const patch = patchOutlineResent(currentDraftSnapshot(), custId, name, brief.salesperson);
-    applyOutlineWorkflow(patch, {
-      outlineStatus: 'sent',
-      outlineSentAt: patch.draft.outlineSentAt,
-      outlineRevision: patch.draft.outlineRevision,
-    });
+    void runOutlineWorkflow('resent');
   }
 
   function approveOutline() {
-    if (!leadId || !custId) return;
-    const name = custName || brief.clientName || 'Client';
-    const patch = patchOutlineApproved(currentDraftSnapshot(), custId, name, brief.salesperson);
-    applyOutlineWorkflow(patch, {
-      outlineStatus: 'approved',
-      outlineApprovedAt: patch.draft.outlineApprovedAt,
-    });
+    void runOutlineWorkflow('approved');
   }
 
   function reviseOutline() {
-    if (!leadId || !custId) return;
-    const patch = patchOutlineRevise(currentDraftSnapshot());
-    setOutlineStatus('draft');
-    setOutlineApprovedAt(undefined);
-    updateLead(leadId, patch.lead);
-    persistDraft({ outlineStatus: 'draft', outlineApprovedAt: undefined, step, outlineRows });
+    void runOutlineWorkflow('revised');
   }
 
   function handleStepClick(i: number) {
@@ -753,7 +780,7 @@ export default function TourDesignPage() {
 
   return (
     <div>
-      {readError && <div className="crm-page-hydrate-error" role="alert">{readError}</div>}
+      {visibleReadError && <div className="crm-page-hydrate-error" role="alert">{visibleReadError}</div>}
       <TourDesignQueueCards
         pendingLeads={pendingLeads}
         awaitingOutline={awaitingOutline}

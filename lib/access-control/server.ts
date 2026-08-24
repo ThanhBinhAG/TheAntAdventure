@@ -13,6 +13,9 @@
 import 'server-only';
 
 import { getAuthContext } from '@/lib/auth/session';
+import { setAccessControlAuthUserActive } from '@/lib/auth/access-control-admin';
+import { recordAuthSecurityEvent } from '@/lib/auth/security-audit';
+import { invalidateCachedAuthzState } from '@/lib/redis/authz-state';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
 import { invalidatePermissionCache } from '@/lib/redis/permissions';
 import {
@@ -471,6 +474,7 @@ export async function setAccessControlUserRole(
 
     throwRpcError(result.error);
     await invalidatePermissionCache();
+    await invalidateCachedAuthzState(userId);
     await invalidateAccessControlStaffRolesCache();
 }
 
@@ -499,6 +503,12 @@ export async function setAccessControlUserActive(
 ) {
     const supabase = await createAccessControlServerClient();
 
+    // Ban first: an infrastructure failure must not leave a disabled CRM user
+    // able to refresh an existing Supabase session.
+    if (!isActive) {
+        await setAccessControlAuthUserActive(userId, false);
+    }
+
     const result = await supabase.rpc(
         'set_access_control_user_active',
         {
@@ -507,8 +517,39 @@ export async function setAccessControlUserActive(
         },
     );
 
-    throwRpcError(result.error);
+    if (result.error) {
+        if (!isActive) {
+            try {
+                await setAccessControlAuthUserActive(userId, true);
+            } catch {
+                // The original RPC error is more useful to the caller.
+            }
+        }
+        throwRpcError(result.error);
+        return;
+    }
+
+    if (isActive) {
+        try {
+            await setAccessControlAuthUserActive(userId, true);
+        } catch (error) {
+            // Keep CRM and Supabase Auth aligned if unbanning Auth fails.
+            await supabase.rpc(
+                'set_access_control_user_active',
+                { target_user_id: userId, new_is_active: false },
+            );
+            await invalidatePermissionCache();
+            await invalidateCachedAuthzState(userId);
+            throw error;
+        }
+    }
+
     await invalidatePermissionCache();
+    await invalidateCachedAuthzState(userId);
+    void recordAuthSecurityEvent({
+        eventType: isActive ? 'user_unlocked' : 'user_locked',
+        userId,
+    });
 }
 
 /**
@@ -530,7 +571,20 @@ export async function restoreAccessControlUser(
     );
 
     throwRpcError(result.error);
+    try {
+        await setAccessControlAuthUserActive(userId, true);
+    } catch (error) {
+        await supabase.rpc(
+            'set_access_control_user_active',
+            { target_user_id: userId, new_is_active: false },
+        );
+        await invalidatePermissionCache();
+        await invalidateCachedAuthzState(userId);
+        throw error;
+    }
     await invalidatePermissionCache();
+    await invalidateCachedAuthzState(userId);
+    void recordAuthSecurityEvent({ eventType: 'user_unlocked', userId });
 }
 
 /**

@@ -1,9 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { checkBreakGlassCredentials } from '@/lib/auth/break-glass';
 import { getBreakGlassSupabaseSession } from '@/lib/auth/break-glass-supabase';
-import { createCrmSession, setCrmSessionCookie } from '@/lib/auth/crm-session';
-import { clearSupabaseAuthCookies } from '@/lib/auth/cookie-hygiene';
+import {
+  clearLegacyCrmAuthCookies,
+  createSupabaseRouteClient,
+  setSupabaseAccessCookie,
+} from '@/lib/auth/supabase-ssr';
 import {
   checkLoginRateLimit,
   clearLoginFailures,
@@ -12,8 +14,7 @@ import {
 } from '@/lib/auth/rate-limit';
 import { getLoginClientMetadata } from '@/lib/auth/login-history';
 import { recordSuccessfulLogin } from '@/lib/auth/login-history-store';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
-import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { recordAuthSecurityEvent } from '@/lib/auth/security-audit';
 import { debugLog } from '@/lib/system/debug-logger';
 
 type LoginBody = {
@@ -108,30 +109,26 @@ export async function POST(request: Request) {
     try {
       const supabaseSession = await getBreakGlassSupabaseSession();
       if (!supabaseSession) return fail(500, 'Break-glass session is not available.');
-      let cookieValue: string;
-      try {
-        ({ cookieValue } = await createCrmSession({
-          userId: null,
-          email: null,
-          isBreakGlass: true,
-          supabaseAccessToken: supabaseSession.access_token,
-          supabaseRefreshToken: supabaseSession.refresh_token,
-          supabaseAccessTokenExpiresAt: supabaseSession.expires_at ?? Math.floor(Date.now() / 1000) + supabaseSession.expires_in,
-        }));
-      } catch (error) {
-        debugLog('auth', 'break-glass CRM session create failed', {
-          level: 'error',
-          meta: { message: error instanceof Error ? error.message : 'unknown' },
-        });
-        return fail(503, 'Không thể tạo CRM session. Vui lòng thử lại.');
-      }
       const response = NextResponse.json({ ok: true, mode: 'break_glass' });
-      setCrmSessionCookie(response, cookieValue);
-      clearSupabaseAuthCookies(response, request.headers.get('cookie'));
+      const supabase = createSupabaseRouteClient(request, response);
+      const { data, error } = await supabase.auth.setSession({
+        access_token: supabaseSession.access_token,
+        refresh_token: supabaseSession.refresh_token,
+      });
+      if (error || !data.session) {
+        return fail(503, 'Không thể tạo Supabase session. Vui lòng thử lại.');
+      }
+      setSupabaseAccessCookie(response, data.session);
+      clearLegacyCrmAuthCookies(response);
       await recordSuccessfulLoginSafely({
         userId: null,
         authMethod: 'break_glass',
         request,
+      });
+      void recordAuthSecurityEvent({
+        eventType: 'login_succeeded',
+        userId: data.session.user?.id ?? null,
+        ip,
       });
       return response;
     } catch (error) {
@@ -143,23 +140,21 @@ export async function POST(request: Request) {
     }
   }
 
-  const url = getSupabaseUrl();
-  const key = getSupabaseAnonKey();
-  if (!url || !key) {
-    await recordLoginFailure(ip);
-    return fail(503, 'Supabase Auth chưa được cấu hình.');
-  }
-
   // Normal users must use email.
   if (!identity.includes('@')) {
     await recordLoginFailure(ip);
     return fail(401, 'Tài khoản hoặc mật khẩu không đúng.');
   }
 
-  const supabase = createClient(url, key, {
-    ...getSupabaseGlobalFetchOptions(),
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const response = NextResponse.json({ ok: true, mode: 'crm' });
+  let supabase;
+  try {
+    supabase = createSupabaseRouteClient(request, response);
+  } catch (error) {
+    console.error(error);
+    await recordLoginFailure(ip);
+    return fail(503, 'Supabase Auth chưa được cấu hình.');
+  }
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: identity,
@@ -169,6 +164,7 @@ export async function POST(request: Request) {
 
   if (error) {
     await recordLoginFailure(ip);
+    void recordAuthSecurityEvent({ eventType: 'login_failed', ip });
     const lower = error.message.toLowerCase();
     if (isNetworkOrTlsAuthError(error.message)) {
       return fail(503, authConnectivityMessage(error.message));
@@ -190,29 +186,19 @@ export async function POST(request: Request) {
     return fail(401, 'Không thể tạo phiên đăng nhập.');
   }
 
-  let cookieValue: string;
-  try {
-    ({ cookieValue } = await createCrmSession({
-      userId: data.user.id,
-      email: data.user.email ?? null,
-      isBreakGlass: false,
-      supabaseAccessToken: data.session.access_token,
-      supabaseRefreshToken: data.session.refresh_token,
-      supabaseAccessTokenExpiresAt: data.session.expires_at ?? Math.floor(Date.now() / 1000) + data.session.expires_in,
-    }));
-  } catch {
-    return fail(503, 'Không thể tạo CRM session. Vui lòng thử lại.');
-  }
-
-  const response = NextResponse.json({ ok: true, mode: 'crm' });
-  setCrmSessionCookie(response, cookieValue);
-  clearSupabaseAuthCookies(response, request.headers.get('cookie'));
+  setSupabaseAccessCookie(response, data.session);
+  clearLegacyCrmAuthCookies(response);
 
   // Chạy ngầm ghi lịch sử để không chặn luồng trả về kết quả cho người dùng
   void recordSuccessfulLoginSafely({
     userId: data.user.id,
     authMethod: 'password',
     request,
+  });
+  void recordAuthSecurityEvent({
+    eventType: 'login_succeeded',
+    userId: data.user.id,
+    ip,
   });
 
   return response;

@@ -87,8 +87,10 @@ async function fetchPhotosWithTags(
   return rows.map((row) => mapPhotoRow(row, tagMap.get(String(row.id)) ?? []));
 }
 
-export async function getAllGalleryPhotosServer(): Promise<GalleryPhoto[]> {
-  const supabase = await createGalleryServerClient();
+export async function getAllGalleryPhotosServer(
+  suppliedClient?: GallerySupabaseClient,
+): Promise<GalleryPhoto[]> {
+  const supabase = suppliedClient ?? await createGalleryServerClient();
   const { data, error } = await supabase
     .from('photos')
     .select('*')

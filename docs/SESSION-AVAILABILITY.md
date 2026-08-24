@@ -1,28 +1,28 @@
-# CRM Session Availability
+# Supabase Auth session operation
 
 ## Decision
 
-CRM sessions are stored in PostgreSQL table `crm_sessions`; PostgreSQL is the source of truth for creation, validation, refresh updates, and revocation. Session payloads are AES-256-GCM ciphertext using `CRM_SESSION_SECRET`. The browser only receives the signed opaque `crm_session` cookie.
+CRM does not sign or encrypt its own browser session. Supabase Auth issues ES256 access JWTs and exposes its public JWKS; BFF verifies the JWT locally and uses it for user-scoped RLS/RPC calls.
 
-Redis is optional. It stores short-lived revoke tombstones (`crm:session:revoked:<sid>`) to reject a revoked cookie faster, but no valid session or Supabase token is stored in Redis.
+Login and refresh use `@supabase/ssr` cookies with `HttpOnly`, `Secure` in production, and `SameSite=Lax`. A small HttpOnly `sb-crm-access-token` mirror lets BFF verify the Supabase JWT without decoding the refresh cookie. No credential is returned in JSON, written to `localStorage`, or logged.
 
-## Expected Behavior
+The page proxy refreshes Supabase SSR cookies on navigation. `POST /api/auth/refresh` keeps an open CRM page current; it requires a same-origin request and has a Redis-backed, per-IP rate limit with in-process fallback.
 
-| Dependency state | Existing session | New login | Logout/revoke |
-| --- | --- | --- | --- |
-| Redis unavailable, PostgreSQL healthy | Continues normally | Succeeds | Durable revoke succeeds; Redis tombstone is skipped |
-| PostgreSQL unavailable | Rejected safely | Returns 503 | Cookie is cleared by the client response; durable revoke cannot be confirmed |
-| PostgreSQL healthy, session revoked/expired | Rejected | N/A | Idempotent |
+Each `bffRoute` verifies the JWT and active-profile state once, then shares one user-scoped Supabase client with the permission check and handler/repository.
 
-## Owner-Ops Handoff
+## Authorization and revocation
 
-- Provide `SUPABASE_SERVICE_ROLE_KEY` only to the server runtime; never expose it through `NEXT_PUBLIC_*` variables or browser bundles.
-- Operate PostgreSQL with backups, point-in-time recovery where available, and HA appropriate to CRM availability targets.
-- Monitor database errors/latency for `crm_sessions`, session creation failures, and growth of expired/revoked rows. Purge expired or revoked rows through an approved maintenance job after the audit-retention period.
-- Keep Redis private, authenticated, and fail-fast. Redis health may affect revoke acceleration only, never login or session validation.
+- Supabase validates identity and rotates refresh tokens.
+- CRM permissions remain in the existing role/RPC model. The shared permission-cache version is invalidated after every role, permission, or account-status change.
+- `profiles.authz_version` is incremented by database triggers whenever user role, role permissions, or `is_active` changes.
+- Disabling a user bans its Supabase Auth account; it cannot refresh or sign in again. Existing short-lived JWTs lose CRM permissions after cache invalidation.
+- Auth security events are written server-side to `auth_security_events` with a SHA-256 IP hash only.
 
-## Deployment
+## Operations
 
-1. Apply migration `20260821113000_add_durable_crm_sessions.sql` to every active database.
-2. Configure `CRM_SESSION_SECRET` (at least 32 characters) and `SUPABASE_SERVICE_ROLE_KEY` in the server environment.
-3. Deploy application code, then test login, authenticated request, logout, and Redis-down behavior.
+1. Supabase must expose an asymmetric JWKS endpoint at `/auth/v1/.well-known/jwks.json`; local validation currently confirms ES256.
+2. Keep `SUPABASE_SERVICE_ROLE_KEY` server-only for Admin operations and audit logging. It is unrelated to browser-session signing.
+3. Monitor JWKS verification errors, refresh rate-limit responses, refresh failures, and `auth_security_events`.
+4. Deployment of this cutover clears old `crm_session` cookies. Users with legacy sessions sign in once again through Supabase Auth.
+
+The retired `crm_sessions` table is retained temporarily for data-retention cleanup only; the application no longer reads or writes it. Do not drop it until the agreed retention window has passed.

@@ -3,12 +3,12 @@
 ## Role
 CLI migrations (`db:push`). Incremental SQL dated; do not paste bootstrap copies here.
 
-## Auth / CRM session (Dev A — bắt buộc cho login)
+## Retired CRM session persistence
 
 - File: [`20260821113000_add_durable_crm_sessions.sql`](20260821113000_add_durable_crm_sessions.sql)
-- Tạo bảng `public.crm_sessions` (cookie `crm_session` mã hóa). **Không tạo file trùng** — đây đã là migration canonical.
+- Tạo bảng `public.crm_sessions` cũ (cookie `crm_session` mã hóa). Ứng dụng đã chuyển sang Supabase SSR/JWKS; chỉ giữ bảng theo retention policy.
 - Mỗi **database** apply **một lần**. Repo clone mới + `db:push` trên DB trống sẽ tự chạy; không paste lại trên máy đã có version này.
-- Shared `sb.mitelai.com` nếu PostgREST báo `PGRST205` / thiếu `crm_sessions`: paste đúng nội dung file này trên SQL Editor, rồi `notify pgrst, 'reload schema'`. **Không** `db:push` full nếu còn migration RLS chưa an toàn trên DB đó.
+- Không tạo migration session HMAC mới. Chỉ dọn bảng cũ sau khi Owner-Ops xác nhận hết retention window.
 
 ## Contents (current chain)
 - `20260730042242_02_migrations.sql` — schema CRM (thay baseline cũ)
@@ -25,7 +25,8 @@ CLI migrations (`db:push`). Incremental SQL dated; do not paste bootstrap copies
 - `20260817110000_slim_product_list_facets_rpc.sql` — `list_product_facets` selects filter columns only (no `p.*`)
 - `20260821100600_add_product_catalogue_import_transaction.sql` — transactional Product/Pricing catalogue replacement RPC
 - `20260821110000_add_catalogue_aggregate_transactions.sql` — atomic Product/Attraction aggregate mutation RPCs
-- `20260821113000_add_durable_crm_sessions.sql` — private encrypted PostgreSQL session persistence
+- `20260821113000_add_durable_crm_sessions.sql` — legacy private PostgreSQL session persistence (retired)
+- `20260824043803_add_authz_version_and_security_audit.sql` — per-user authz version + server-only auth audit
 
 ## Boundaries
 - Role helpers / gán user: `supabase/snippets/`.

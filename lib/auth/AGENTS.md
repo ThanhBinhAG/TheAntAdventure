@@ -1,15 +1,15 @@
 # lib/auth/ — Agent overview
 
 ## Role
-Server session, break-glass admin, and rate limiting.
+Supabase JWT verification, break-glass admin, rate limiting, and auth audit.
 
 ## Contents
-- `crm-session.ts`, `crm-session-store.ts` — encrypted PostgreSQL-backed CRM sessions; Redis is optional revoke acceleration only.
-- `session.ts`, `break-glass*.ts`, `rate-limit.ts`, `cookie-hygiene.ts` (clear sb-* chunks + Cookie header size estimate)
-- `break-glass-supabase.ts` — hidden shadow Auth user (`breakglass.internal@invalid`) with technical `super_admin` (excluded from Access Control directory); CRM session `isBreakGlass` remains the privilege source
+- `supabase-jwt.ts`, `supabase-ssr.ts`, `supabase-cookie-names.ts`, `session.ts` — Supabase-issued JWT verification via JWKS and server-only SSR cookie handling.
+- `break-glass*.ts`, `rate-limit.ts`, `request-origin.ts`, `security-audit.ts`, `cookie-hygiene.ts` — recovery access and auth hardening.
+- `break-glass-supabase.ts` — hidden shadow Auth user (`breakglass.internal@invalid`) with technical `super_admin` (excluded from Access Control directory).
 - `access-control-admin.ts` — Supabase Admin API server-only để tạo Auth user từ Access Control.
 
 ## Boundaries
 - API routes: `app/api/auth`; riêng `access-control-admin.ts` chỉ được Route Handler Access Control phía server gọi. Captcha UI: `components/auth`.
-- Session persistence uses a server-only service role; never grant browser roles access to `crm_sessions`.
+- Never return access or refresh credentials in JSON, logs, or client-side storage.
 - Do not assign `super_admin` through Access Control RPCs; only the break-glass shadow bootstrap may upsert that role.

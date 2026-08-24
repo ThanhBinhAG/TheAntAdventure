@@ -8,6 +8,8 @@ type Bucket = {
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_FAILURES = 10;
+const REFRESH_WINDOW_MS = 60 * 1000;
+const MAX_REFRESHES = 30;
 
 const WINDOW_SECONDS = WINDOW_MS / 1000;
 
@@ -19,6 +21,10 @@ function redisRateLimitKey(ip: string): string {
   return `auth:login-rate:${hashClientIp(ip)}`;
 }
 
+function redisRefreshRateLimitKey(ip: string): string {
+  return `auth:refresh-rate:${hashClientIp(ip)}`;
+}
+
 async function getRateLimitRedisClient() {
   if (!process.env.REDIS_URL) return null;
 
@@ -27,6 +33,7 @@ async function getRateLimitRedisClient() {
 }
 
 const buckets = new Map<string, Bucket>();
+const refreshBuckets = new Map<string, Bucket>();
 
 function prune(now: number) {
   for (const [key, bucket] of buckets) {
@@ -133,6 +140,53 @@ export async function clearLoginFailures(ip: string): Promise<void> {
   } catch {
     clearLoginFailuresFallback(ip);
   }
+}
+
+/**
+ * Consume one refresh attempt. Redis uses one atomic counter per IP; when it
+ * is unavailable, an in-process counter keeps a single instance bounded.
+ */
+export async function consumeRefreshRateLimit(
+  ip: string,
+): Promise<{ ok: true } | { ok: false; retryAfterSec: number }> {
+  const now = Date.now();
+  const fallbackKey = hashClientIp(ip);
+  const client = await getRateLimitRedisClient();
+
+  if (client) {
+    try {
+      const count = Number(await client.eval(
+        `
+          local attempts = redis.call('INCR', KEYS[1])
+          if attempts == 1 then
+            redis.call('EXPIRE', KEYS[1], ARGV[1])
+          end
+          return attempts
+        `,
+        {
+          keys: [redisRefreshRateLimitKey(ip)],
+          arguments: [String(REFRESH_WINDOW_MS / 1000)],
+        },
+      ));
+      if (count <= MAX_REFRESHES) return { ok: true };
+      const ttl = await client.ttl(redisRefreshRateLimitKey(ip));
+      return { ok: false, retryAfterSec: Math.max(ttl, 1) };
+    } catch {
+      // Fall through to the local limiter without making Redis a hard dependency.
+    }
+  }
+
+  const bucket = refreshBuckets.get(fallbackKey);
+  if (!bucket || now - bucket.windowStart >= REFRESH_WINDOW_MS) {
+    refreshBuckets.set(fallbackKey, { failures: 1, windowStart: now });
+    return { ok: true };
+  }
+  bucket.failures += 1;
+  if (bucket.failures <= MAX_REFRESHES) return { ok: true };
+  return {
+    ok: false,
+    retryAfterSec: Math.max(1, Math.ceil((REFRESH_WINDOW_MS - (now - bucket.windowStart)) / 1000)),
+  };
 }
 
 export function getClientIp(request: Request): string {

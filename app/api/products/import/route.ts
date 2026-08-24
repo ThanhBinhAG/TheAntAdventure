@@ -1,7 +1,7 @@
-import { z } from 'zod';
 import { bffRoute } from '@/lib/bff/route';
 import { draftToProduct } from '@/lib/products/portfolio-classify';
 import { mergeRequiredProducts } from '@/lib/products/ensure-core-products';
+import { portfolioImportBodySchema } from '@/lib/products/portfolio-import-schema';
 import { buildEmptyPricingStubs } from '@/lib/products/replace-catalogue';
 import { replaceProductCatalogueServer } from '@/lib/products/product-repository';
 import { invalidateProductFacetsCache } from '@/lib/redis/product-facets';
@@ -11,9 +11,7 @@ export const dynamic = 'force-dynamic';
 export const POST = bffRoute(
   {
     requiredPermission: 'products.write',
-    bodySchema: z.object({
-      drafts: z.array(z.any()),
-    }),
+    bodySchema: portfolioImportBodySchema,
   },
   async ({ supabase, body }) => {
     const imported = body.drafts.map(draftToProduct);

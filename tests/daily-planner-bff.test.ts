@@ -16,6 +16,7 @@ require.cache[serverOnlyPath] = {
 let supabaseCalls: { method: string; table: string; data?: any; eqCode?: string }[] = [];
 let plannerUpdateResult: { data: { id: string }[] | null; error: { message: string } | null };
 let plannerDeleteResult: { data: { id: string }[] | null; error: { message: string } | null };
+let plannerWriteAllowed = true;
 
 // Mock dependencies
 mock.module(require.resolve('../lib/auth/session'), {
@@ -33,6 +34,9 @@ mock.module(require.resolve('../lib/auth/session'), {
 mock.module(require.resolve('../lib/auth/permissions-server'), {
   namedExports: {
     checkPermissionForRequest: async (requiredPermission: string) => {
+      if (requiredPermission === 'planner.write' && !plannerWriteAllowed) {
+        return { allowed: false, status: 403 };
+      }
       if (
         requiredPermission === 'planner.read' ||
         requiredPermission === 'planner.write'
@@ -108,6 +112,7 @@ test('Daily Planner BFF APIs - Tests', async (t) => {
     supabaseCalls = [];
     plannerUpdateResult = { data: [{ id: 'TK-001' }], error: null };
     plannerDeleteResult = { data: [{ id: 'TK-001' }], error: null };
+    plannerWriteAllowed = true;
   });
 
   await t.test('GET /api/planner/all - lists all tasks with mapping', async () => {
@@ -238,5 +243,17 @@ test('Daily Planner BFF APIs - Tests', async (t) => {
       body: JSON.stringify({ id: 'TK-001', patch: { status: 'done' } }),
     }));
     assert.equal(response.status, 500);
+  });
+
+  await t.test('rejects mutations when the user lacks planner.write', async () => {
+    plannerWriteAllowed = false;
+    const response = await plannerRoute.POST(new Request('http://localhost/api/planner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: { id: 'TK-READ-ONLY', title: 'Blocked task' } }),
+    }));
+
+    assert.equal(response.status, 403);
+    assert.equal(supabaseCalls.length, 0);
   });
 });

@@ -40,11 +40,6 @@ export function getAuthCaptchaSiteKey() {
   return (process.env.NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY ?? '').trim();
 }
 
-/** Server-only — HMAC key for the opaque CRM session cookie. */
-export function getCrmSessionSecret() {
-  return (process.env.CRM_SESSION_SECRET ?? '').trim();
-}
-
 /** Auto push app → Supabase after edits (default: on when Supabase enabled) */
 export function isAutoSyncEnabled() {
   const v = (process.env.NEXT_PUBLIC_SUPABASE_AUTO_SYNC ?? '').trim().toLowerCase();
@@ -82,15 +77,8 @@ export function getBreakGlassPassword() {
   return (process.env.BREAK_GLASS_PASSWORD ?? '').trim();
 }
 
-/** Server-only — HMAC secret for bg_session cookie */
-export function getBreakGlassSessionSecret() {
-  return (process.env.BREAK_GLASS_SESSION_SECRET ?? '').trim();
-}
-
 export function isBreakGlassConfigured() {
-  return Boolean(
-    getBreakGlassUsername() && getBreakGlassPassword() && getBreakGlassSessionSecret(),
-  );
+  return Boolean(getBreakGlassUsername() && getBreakGlassPassword());
 }
 
 /** Server-only — base URL for absolute asset links in PDF generation */

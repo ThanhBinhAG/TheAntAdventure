@@ -1,7 +1,6 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getServerSupabaseClient } from '@/lib/supabase/server';
 import {
   productToRow,
   productPricingToRow,
@@ -21,8 +20,7 @@ export class ProductNotFoundError extends Error {
 /**
  * Lấy toàn bộ sản phẩm (kèm ảnh) từ server.
  */
-export async function getAllProductsServer(): Promise<Product[]> {
-  const supabase = await getServerSupabaseClient();
+export async function getAllProductsServer(supabase: SupabaseClient): Promise<Product[]> {
   
   // 1. Lấy tất cả hàng trong bảng products
   const { data: baseRows, error: prodError } = await supabase
@@ -43,8 +41,9 @@ export async function getAllProductsServer(): Promise<Product[]> {
 /**
  * Lấy toàn bộ thông tin bảng giá từ server.
  */
-export async function getAllProductPricingServer(): Promise<ProductPricing[]> {
-  const supabase = await getServerSupabaseClient();
+export async function getAllProductPricingServer(
+  supabase: SupabaseClient,
+): Promise<ProductPricing[]> {
   const { data, error } = await supabase
     .from('product_pricing')
     .select('*')

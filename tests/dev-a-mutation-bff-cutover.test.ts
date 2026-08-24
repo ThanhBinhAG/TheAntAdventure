@@ -28,4 +28,13 @@ test('Dev A mutations stay BFF-managed and never enter browser auto-sync', () =>
   assert.match(persistDraft, /onLatestSuccess/);
   assert.ok(persistDraft.indexOf('upsertTourDraft({ ...draft, saveRevision })') > persistDraft.indexOf('await fetch'));
   assert.ok(persistDraft.indexOf('replaceOutlineDaysForDraft') > persistDraft.indexOf('await fetch'));
+
+  const workflowStart = tourDesign.indexOf('async function runOutlineWorkflow');
+  const workflowEnd = tourDesign.indexOf('function aiSuggestStyle', workflowStart);
+  const workflow = tourDesign.slice(workflowStart, workflowEnd);
+  assert.match(workflow, /fetch\('\/api\/tour-design\/outline-workflow'/);
+  assert.doesNotMatch(workflow, /persistDraft\(/);
+  assert.doesNotMatch(workflow, /patchOutline(?:Sent|Resent|Approved|Revise)/);
+  assert.ok(workflow.indexOf('updateLead(result.lead.id') > workflow.indexOf('const result = body.data'));
+  assert.ok(workflow.indexOf('addComm(result.comm)') > workflow.indexOf('const result = body.data'));
 });

@@ -1,8 +1,5 @@
 import 'server-only';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/env';
-import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
-import { getServerSupabaseClient } from '@/lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   emptyCompanyTemplatesMap,
   parseCompanyTemplateFields,
@@ -13,27 +10,9 @@ import {
 import type { ProposalTemplateOverrides } from './proposal-content-overrides';
 import type { ProposalVariant } from './proposal-types';
 
-function getServiceClient(): SupabaseClient | null {
-  const url = getSupabaseUrl();
-  const key = getSupabaseServiceRoleKey();
-  if (!url || !key) return null;
-  return createClient(url, key, {
-    ...getSupabaseGlobalFetchOptions(),
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
-async function getTemplateClient(): Promise<SupabaseClient | null> {
-  const service = getServiceClient();
-  if (service) return service;
-
-  return getServerSupabaseClient();
-}
-
-export async function fetchCompanyProposalTemplates(): Promise<CompanyTemplatesMap> {
-  const client = await getTemplateClient();
-  if (!client) return emptyCompanyTemplatesMap();
-
+export async function fetchCompanyProposalTemplates(
+  client: SupabaseClient
+): Promise<CompanyTemplatesMap> {
   try {
     const { data, error } = await client.from('proposal_templates').select('id, fields, updated_at');
     if (error) return emptyCompanyTemplatesMap();
@@ -55,14 +34,10 @@ export async function fetchCompanyProposalTemplates(): Promise<CompanyTemplatesM
 }
 
 export async function upsertCompanyProposalTemplate(
+  client: SupabaseClient,
   variant: ProposalVariant,
   fields: ProposalTemplateOverrides
 ): Promise<CompanyTemplatesMap> {
-  const client = await getTemplateClient();
-  if (!client) {
-    throw new Error('Database is not configured');
-  }
-
   const payload = serializeCompanyTemplate(fields);
   const { error } = await client.from('proposal_templates').upsert(
     {
@@ -73,5 +48,5 @@ export async function upsertCompanyProposalTemplate(
     { onConflict: 'id' }
   );
   if (error) throw new Error(error.message);
-  return fetchCompanyProposalTemplates();
+  return fetchCompanyProposalTemplates(client);
 }

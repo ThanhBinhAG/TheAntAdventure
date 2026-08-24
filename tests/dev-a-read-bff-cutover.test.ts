@@ -25,6 +25,8 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   assert.doesNotMatch(tourDesignBoot, /'tour_outline_days'/);
   assert.doesNotMatch(tourDesignBoot, /'customers'/);
   assert.doesNotMatch(tourDesignBoot, /'leads'/);
+  assert.doesNotMatch(tourDesignBoot, /'hotels'/);
+  assert.doesNotMatch(tourDesignBoot, /'comms'/);
 
   assert.doesNotMatch(products, /ensureTablesLoaded/);
   assert.match(products, /getBffData<Product>\(/);
@@ -58,4 +60,6 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   assert.doesNotMatch(tourDesign, /\/api\/tour-design\/outlines\/all/);
   assert.match(tourDesign, /getBffArray<GalleryPhoto>\('\/api\/photos\/all'/);
   assert.match(tourDesign, /useTourDesignCrmContext/);
+  assert.match(tourDesign, /useTourDesignReferenceData/);
+  assert.match(tourDesign, /\/api\/tour-design\/outline-workflow/);
 });

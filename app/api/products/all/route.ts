@@ -7,7 +7,7 @@ export const GET = bffRoute(
   {
     requiredPermission: 'products.read',
   },
-  async () => {
-    return await getAllProductsServer();
+  async ({ supabase }) => {
+    return await getAllProductsServer(supabase);
   }
 );

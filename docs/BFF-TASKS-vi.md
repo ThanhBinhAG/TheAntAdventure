@@ -45,7 +45,7 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 | Task | Owner chính | Hoàn thành khi |
 |---|---|---|
 | Ghi nhận baseline Network | A | Có capture login, dashboard và 9 feature hiện tại |
-| Inventory direct Supabase imports | B | Mỗi caller có feature owner và API thay thế — **Clients callers: done** (`Personal/docs/bff-customers-inventory.md`); **Agents: done**; **Sales: done** (`Personal/docs/bff-sales-inventory.md`); còn Gallery/Weather |
+| Inventory direct Supabase imports | B | **Clients/Agents/Sales/Gallery done**; còn Weather |
 | Server-only Supabase client + BFF helper | A | `lib/supabase/server.ts`, auth/permission/error primitives sẵn sàng |
 | CRM-owned HttpOnly session | A | Browser không giữ Supabase token |
 | Shared DTO/test fixtures | B | Feature owner có contract và test fixture dùng chung — **Customers Zod + fixtures: done** (`customer-list-input.ts`, `Personal/tests/customer-*.test.ts`) |
@@ -113,9 +113,11 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 
 ### B4 — Photo Gallery
 
-- [ ] Duy trì upload qua `/api/photos/upload/*`; bảo đảm metadata và delete cũng qua CRM API.
-- [ ] Hoàn thiện repository/API, UI/hook, permission test.
-- [ ] Browser chỉ upload/call CRM origin; gỡ direct Storage/Supabase path.
+- [x] Duy trì upload qua `/api/photos/upload/*`; bảo đảm metadata và delete cũng qua CRM API.
+- [x] Hoàn thiện repository/API, UI/hook, permission test.
+- [x] Browser chỉ upload/call CRM origin; gỡ direct Storage/Supabase path.
+
+> **Done 2026-08-24 (DEV B):** `GET /api/photos`, `PATCH /api/photos/[id]`, `/api/photo-folders` CRUD; upload routes + `gallery.write`; hooks `useGalleryPage`, `useUpdatePhoto`, `useDeletePhoto`, `usePhotoFolderMutations`, `useEnsureGalleryCatalogLoaded`; `PAGE_BOOT_TABLES.gallery: []`; inventory/checklist `Personal/docs/bff-gallery-*`; contract tests `tests/gallery-bff.test.ts`.
 
 ### B5 — Weather Guide
 

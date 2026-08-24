@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useEnsureGalleryTablesLoaded } from '@/hooks/useEnsureGalleryTablesLoaded';
+import { useEnsureGalleryCatalogLoaded } from '@/hooks/useEnsureGalleryCatalogLoaded';
 import {
   DndContext,
   DragOverlay,
@@ -191,7 +191,7 @@ export default function PhotoLibraryPicker({
   const isInline = variant === 'inline';
   const isSingle = mode === 'single';
   const galleryLoadEnabled = isInline || open;
-  const { loading: galleryLoading } = useEnsureGalleryTablesLoaded(galleryLoadEnabled);
+  const { loading: galleryLoading } = useEnsureGalleryCatalogLoaded(galleryLoadEnabled);
   const folders = useMemo(
     () => ensureUnsortedFolder(foldersProp ?? []),
     [foldersProp]

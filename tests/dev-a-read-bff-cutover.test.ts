@@ -18,7 +18,7 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   const tourDesignBoot = config.match(/tourdesign:\s*\[([\s\S]*?)\],\n\s*\/\/ Catalogue/)?.[1] ?? '';
 
   assert.match(config, /planner:\s*\['cal_events'\]/);
-  assert.match(config, /attractions:\s*\['photos', 'photo_folders'\]/);
+  assert.match(config, /attractions:\s*\[\]/);
   assert.match(config, /pricing:\s*\[\]/);
   assert.doesNotMatch(tourDesignBoot, /'products'/);
   assert.doesNotMatch(tourDesignBoot, /'tour_drafts'/);
@@ -38,6 +38,7 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   assert.match(attractions, /getBffArray<Attraction>\(`\/api\/attractions\/all/);
   assert.match(attractions, /setAttractions/);
 
+  assert.match(gallery, /useGalleryPage/);
   assert.doesNotMatch(gallery, /ensureTablesLoaded\(\['attractions'\]\)/);
   assert.match(gallery, /getBffArray<Attraction>\('\/api\/attractions\/all'/);
   assert.match(gallery, /setAttractions/);

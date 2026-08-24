@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/session';
+import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import { createGalleryUploadSession } from '@/lib/image-pipeline/upload-session';
 import { galleryUploadInitSchema } from '@/lib/storage/gallery-upload-meta';
 import { GALLERY_CHUNK_BYTES } from '@/lib/storage/photo-limits';
@@ -8,10 +9,16 @@ import { checkAndRecordGalleryUploadRateLimit } from '@/lib/storage/gallery-uplo
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const auth = await getAuthContext();
-  if (!auth.authenticated) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  const permission = await checkPermissionForRequest('gallery.write');
+  if (!permission.allowed) {
+    return NextResponse.json(
+      { ok: false, error: permission.status === 401 ? 'Unauthorized' : 'Forbidden' },
+      { status: permission.status },
+    );
   }
+
+  const auth = await getAuthContext();
+  const userId = auth.userId ?? auth.email ?? 'authenticated';
 
   let body: unknown;
   try {
@@ -24,17 +31,15 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid init payload' },
-      { status: 400 }
+      { status: 400 },
     );
   }
-
-  const userId = auth.userId ?? auth.email ?? 'authenticated';
 
   const rate = await checkAndRecordGalleryUploadRateLimit(userId, parsed.data.totalBytes);
   if (!rate.ok) {
     return NextResponse.json(
       { ok: false, error: 'Too many uploads. Please wait a bit and try again.' },
-      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec) } }
+      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec) } },
     );
   }
 

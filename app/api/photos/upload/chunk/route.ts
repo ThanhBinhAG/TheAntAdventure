@@ -1,15 +1,21 @@
 import { NextResponse } from 'next/server';
 import { Readable } from 'node:stream';
 import { getAuthContext } from '@/lib/auth/session';
+import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import { appendGalleryUploadChunkStream } from '@/lib/image-pipeline/upload-session';
 
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
-  const auth = await getAuthContext();
-  if (!auth.authenticated) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  const permission = await checkPermissionForRequest('gallery.write');
+  if (!permission.allowed) {
+    return NextResponse.json(
+      { ok: false, error: permission.status === 401 ? 'Unauthorized' : 'Forbidden' },
+      { status: permission.status },
+    );
   }
+
+  const auth = await getAuthContext();
 
   let form: FormData;
   try {

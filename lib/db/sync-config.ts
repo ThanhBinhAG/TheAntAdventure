@@ -64,15 +64,16 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   // Catalogue pages use the paginated server API. The full data set is loaded
   // only when a user opens a detail drawer or enters Manage mode.
   products: [],
-  /** attractions deferred — Gallery lazy-loads for ?attraction= filter / delete unlink */
-  gallery: ['photos', 'photo_folders'],
+  /** Gallery list/folders via `/api/photos/*` and `/api/photo-folders`. */
+  gallery: [],
   /** Pricing loads its catalogue through Product/Pricing BFF routes. */
   pricing: [],
   bookings: ['bookings', 'customers'],
   contracts: ['contracts', 'bookings'],
   suppliers: ['hotels', 'transport', 'restaurants', 'cruises', 'suppliers'],
   guides: ['guides'],
-  attractions: ['photos', 'photo_folders'],
+  /** Pickers load gallery catalog via BFF when opened. */
+  attractions: [],
   /** Covers come from destinations API; no gallery hydrate on this route. */
   weather: [],
   posttour: ['feedback'],

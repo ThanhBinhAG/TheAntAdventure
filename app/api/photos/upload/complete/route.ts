@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/session';
+import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import { sniffImageMimeFromFile } from '@/lib/image-pipeline/mime';
 import {
   assertGalleryUploadComplete,
@@ -21,10 +22,15 @@ import {
 export const maxDuration = 300;
 
 export async function POST(request: Request) {
-  const auth = await getAuthContext();
-  if (!auth.authenticated) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  const permission = await checkPermissionForRequest('gallery.write');
+  if (!permission.allowed) {
+    return NextResponse.json(
+      { ok: false, error: permission.status === 401 ? 'Unauthorized' : 'Forbidden' },
+      { status: permission.status },
+    );
   }
+
+  const auth = await getAuthContext();
 
   const client = await getPhotoStorageClient();
   if (!client) {

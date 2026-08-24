@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useEnsureGalleryTablesLoaded } from '@/hooks/useEnsureGalleryTablesLoaded';
+import { useEnsureGalleryCatalogLoaded } from '@/hooks/useEnsureGalleryCatalogLoaded';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import { photoThumbUrl } from '@/lib/gallery/gallery-helpers';
 import {
@@ -33,7 +33,7 @@ export default function CompanyLogoGalleryPicker({
   onClose,
   onPick,
 }: Props) {
-  const { loading: galleryLoading } = useEnsureGalleryTablesLoaded(open);
+  const { loading: galleryLoading } = useEnsureGalleryCatalogLoaded(open);
   const folders = useMemo(() => ensureUnsortedFolder(foldersProp ?? []), [foldersProp]);
   const [folderId, setFolderId] = useState<string | null>(null);
 

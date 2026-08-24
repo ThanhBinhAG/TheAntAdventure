@@ -6,7 +6,7 @@ Photo library UI: folder browser, picker, upload, tags, and `StorageImage` for S
 ## Contents
 - `GalleryWorkspace.tsx` — main Gallery CRM screen (folders, upload, DnD, lightbox); page shell is `pages/Gallery.tsx`
 - Folder browse/move: `GalleryFolderGrid`, `GalleryFolderBreadcrumb`, `GalleryMovePhotosModal`, `GalleryFolderNameModal`, `GalleryFolderInfoModal`
-- `PhotoLibraryPicker.tsx` — modal/inline pick; **All folders** first with Explorer tiles (pickers only; hide Info/Rename/Delete); lazy-loads gallery tables on open via `useEnsureGalleryTablesLoaded`
+- `PhotoLibraryPicker.tsx` — modal/inline pick; lazy-loads catalog via `useEnsureGalleryCatalogLoaded`
 - Gallery page keeps classic folder tiles + action buttons; Move uses the list modal
 - Picker, upload, tags, lightbox helpers, `StorageImage.tsx`
 

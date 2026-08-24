@@ -13,6 +13,8 @@ export const BFF_MANAGED_TABLES = new Set<SyncArrayTable>([
   'attractions',
   'tour_drafts',
   'tour_outline_days',
+  'photos',
+  'photo_folders',
 ]);
 
 /** Preserves the input table union so callers like `StoreRowPatch` indexing stay typed. */

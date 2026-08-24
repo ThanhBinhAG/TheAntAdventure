@@ -50,11 +50,11 @@ export function fetchCompanyProposalTemplatesClient(): Promise<CompanyTemplatesM
   inflight = (async () => {
     try {
       const res = await fetch('/api/proposals/templates', { cache: 'no-store' });
-      const body = (await res.json()) as { ok?: boolean; templates?: unknown };
+      const body = (await res.json()) as { ok?: boolean; data?: unknown };
       if (!res.ok || !body.ok) {
         return cached ?? emptyCompanyTemplatesMap();
       }
-      const map = parseMap(body.templates);
+      const map = parseMap(body.data);
       cached = map;
       return map;
     } catch {
@@ -76,11 +76,11 @@ export async function saveCompanyProposalTemplateClient(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ variant, fields }),
   });
-  const body = (await res.json()) as { ok?: boolean; templates?: unknown; error?: string };
+  const body = (await res.json()) as { ok?: boolean; data?: unknown; error?: string };
   if (!res.ok || !body.ok) {
     throw new Error(body.error || 'Could not save company template');
   }
-  const map = parseMap(body.templates);
+  const map = parseMap(body.data);
   cached = map;
   return map;
 }

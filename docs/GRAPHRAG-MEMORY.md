@@ -338,7 +338,7 @@ flowchart LR
 | `GET /api/health` | external monitor | public by design | Supabase Auth health |
 | `POST /api/photos/upload/init`, `/chunk`, `/complete`, `/delete` | gallery (chunked → Sharp → Storage) | authenticated only | Storage + `photos` tables |
 | `POST /api/pricing/export`, `/api/proposals/export` | pricing/tour-design | authenticated only; no role/permission export check | Puppeteer/Chromium PDF |
-| `GET,PUT /api/proposals/templates` | Tour Design Step 5 Edit Template | authenticated only | `proposal_templates` (lazy; not page-boot) |
+| `GET,PUT /api/proposals/templates` | Tour Design Step 5 Edit Template | `tour_design.read` for GET; `tour_design.write` for PUT; Zod payload validation | user-scoped `proposal_templates` access (lazy; not page-boot) |
 | `GET,PUT /api/system/*` | debug panel | debug token except debug-log POST | diagnostics/log buffer |
 | `POST /api/weather/refresh` | weather page or cron | authenticated user or cron secret | service-role cache + Open-Meteo |
 | `GET /api/weather/weekly` | weather page | no explicit guard | service-role cache |

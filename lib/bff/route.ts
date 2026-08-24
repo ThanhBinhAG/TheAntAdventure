@@ -47,12 +47,12 @@ export function bffRoute<
       }
       let supabase: SupabaseClient | undefined;
       const getSupabaseClient = async () => {
-        if (!supabase) supabase = await getServerSupabaseClient();
+        if (!supabase) supabase = await getServerSupabaseClient(auth);
         return supabase;
       };
 
       // 2. Phân quyền. Cache hit không cần tạo client trước; cache miss dùng đúng
-      // client mà handler sẽ nhận, tránh đọc/xác minh CRM session lặp lại.
+      // client mà handler sẽ nhận, tránh xác minh Supabase JWT lặp lại.
       if (options.requiredPermission) {
         const permission = await checkPermissionForRequest(options.requiredPermission, {
           auth,

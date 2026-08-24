@@ -14,6 +14,7 @@ require.cache[serverOnlyPath] = {
 let authReads = 0;
 let supabaseCreates = 0;
 let permissionContext: unknown;
+let supabaseAuth: unknown;
 
 mock.module(require.resolve('../lib/auth/session'), {
   namedExports: {
@@ -41,8 +42,9 @@ mock.module(require.resolve('../lib/auth/permissions-server'), {
 
 mock.module(require.resolve('../lib/supabase/server'), {
   namedExports: {
-    getServerSupabaseClient: async () => {
+    getServerSupabaseClient: async (auth: unknown) => {
       supabaseCreates++;
+      supabaseAuth = auth;
       return { kind: 'user-scoped-client' };
     },
   },
@@ -60,6 +62,13 @@ test('bffRoute creates one reusable auth context and lazy user-scoped client', a
   assert.equal(response.status, 200);
   assert.equal(authReads, 1);
   assert.equal(supabaseCreates, 1);
+  assert.deepEqual(supabaseAuth, {
+    authenticated: true,
+    isSuperAdmin: false,
+    isBreakGlass: false,
+    userId: 'user-1',
+    email: 'user@example.com',
+  });
   assert.deepEqual((permissionContext as { auth?: unknown }).auth, {
     authenticated: true,
     isSuperAdmin: false,

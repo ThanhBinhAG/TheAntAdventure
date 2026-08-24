@@ -77,7 +77,7 @@ export const GET = bffRoute(
     }
 
     try {
-      const productPage = await listProductsPage(parsed.data);
+      const productPage = await listProductsPage(parsed.data, supabase);
       return NextResponse.json(
         {
           ok: true,

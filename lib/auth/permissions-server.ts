@@ -91,7 +91,7 @@ export async function getInitialPermissionCodesForCRMLayout(): Promise<
   if (!auth.authenticated) return [];
   if (auth.isBreakGlass && auth.isSuperAdmin) return ['*'];
 
-  return readPermissionCodesFromSupabase();
+  return readPermissionCodesFromSupabase(() => getServerSupabaseClient(auth));
 }
 
 /**
@@ -116,9 +116,12 @@ export async function getCurrentPermissionCodesForRequest(
   // Session break-glass là đường khôi phục khẩn cấp, luôn có toàn quyền.
   if (auth.isBreakGlass && auth.isSuperAdmin) return ['*'];
 
-  // API vẫn gọi auth.getUser() ở trên để phân biệt 401 và 403 chính xác.
-  // Sau đó dùng chung hàm RPC để lấy danh sách quyền.
-  return readPermissionCodesWithCache(auth.userId!, context?.getSupabaseClient);
+  // The JWT/profile state above is already verified. Reuse its private
+  // request-local token when an explicit BFF client was not supplied.
+  return readPermissionCodesWithCache(
+    auth.userId!,
+    context?.getSupabaseClient ?? (() => getServerSupabaseClient(auth)),
+  );
 }
 
 /**

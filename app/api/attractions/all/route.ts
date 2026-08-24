@@ -11,7 +11,7 @@ export const GET = bffRoute(
       region: z.enum(['north', 'central', 'south']).optional(),
     }),
   },
-  async ({ query }) => {
-    return await getAllAttractionsServer(query.region);
+  async ({ supabase, query }) => {
+    return await getAllAttractionsServer(supabase, query.region);
   }
 );

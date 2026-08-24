@@ -19,7 +19,8 @@
 
 create extension if not exists "pgcrypto";
 
--- Private server-owned CRM sessions. Browser roles receive no grants to this table.
+-- Retired server-owned CRM sessions. Kept only for legacy data retention; new
+-- authentication uses Supabase SSR cookies and public JWKS verification.
 create table if not exists crm_sessions (
   sid text primary key,
   payload_ciphertext text not null,
@@ -32,7 +33,7 @@ create index if not exists idx_crm_sessions_active_expiry
   on crm_sessions (expires_at) where revoked_at is null;
 alter table crm_sessions enable row level security;
 comment on table crm_sessions is
-  'Private server-owned CRM sessions. Payload is AES-GCM ciphertext; only the server service role may access it.';
+  'Retired CRM HMAC session persistence. Retain temporarily for migration cleanup only.';
 
 -- ============================================================
 --  MODULE 1 · AGENTS & CUSTOMERS (B2B / B2C)

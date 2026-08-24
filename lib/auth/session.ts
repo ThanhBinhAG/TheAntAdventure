@@ -1,14 +1,12 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import {
-  CRM_ACCESS_COOKIE,
-  CRM_SESSION_COOKIE,
-  CRM_SUPABASE_ACCESS_COOKIE,
-  getCrmSession,
-  getCrmSessionRevocationStatus,
-} from '@/lib/auth/crm-session';
-import { verifyCrmAccessToken } from '@/lib/auth/crm-access-token';
-import { ensureBreakGlassShadowPrivilegesOnce } from '@/lib/auth/break-glass-supabase';
+  ensureBreakGlassShadowPrivilegesOnce,
+  isBreakGlassShadowEmail,
+} from '@/lib/auth/break-glass-supabase';
+import { getCurrentAuthzState } from '@/lib/auth/authz-state';
+import { SUPABASE_ACCESS_COOKIE } from '@/lib/auth/supabase-cookie-names';
+import { verifySupabaseAccessToken } from '@/lib/auth/supabase-jwt';
 
 export type AuthContext = {
   authenticated: boolean;
@@ -18,42 +16,33 @@ export type AuthContext = {
   email: string | null;
 };
 
+/**
+ * Keeps the verified JWT server-side and request-local by associating it with
+ * the context object. It must never be added to `AuthContext`, because route
+ * handlers can return that object in a JSON payload.
+ */
+const verifiedAccessTokens = new WeakMap<AuthContext, string>();
+
 /** Cookie-store based context (Route Handlers / Server Components). */
 export async function getAuthContext(): Promise<AuthContext> {
   const cookieStore = await cookies();
-  const access = await verifyCrmAccessToken(
-    cookieStore.get(CRM_ACCESS_COOKIE)?.value,
-    cookieStore.get(CRM_SUPABASE_ACCESS_COOKIE)?.value,
+  const access = await verifySupabaseAccessToken(
+    cookieStore.get(SUPABASE_ACCESS_COOKIE)?.value,
   );
-  if (access) {
-    const revocation = await getCrmSessionRevocationStatus(access.sid);
-    if (revocation === 'active') {
-      if (access.isBreakGlass) {
-        try {
-          await ensureBreakGlassShadowPrivilegesOnce();
-        } catch {
-          // Recovery session still authenticates; Access Control RPCs need the grant.
-        }
-      }
-      return {
-        authenticated: true,
-        isSuperAdmin: access.isBreakGlass,
-        isBreakGlass: access.isBreakGlass,
-        userId: access.userId,
-        email: access.email,
-      };
-    }
-    if (revocation === 'revoked') {
-      return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
-    }
-    // Redis outage: fall through to the durable session, which remains authoritative.
-  }
-  const session = await getCrmSession(cookieStore.get(CRM_SESSION_COOKIE)?.value);
-  if (!session) {
+  if (!access) {
     return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
   }
 
-  if (session.isBreakGlass) {
+  const authz = await getCurrentAuthzState({
+    userId: access.userId,
+    accessToken: cookieStore.get(SUPABASE_ACCESS_COOKIE)?.value ?? '',
+  });
+  if (!authz?.isActive) {
+    return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
+  }
+
+  const isBreakGlass = isBreakGlassShadowEmail(access.email);
+  if (isBreakGlass) {
     try {
       await ensureBreakGlassShadowPrivilegesOnce();
     } catch {
@@ -61,13 +50,20 @@ export async function getAuthContext(): Promise<AuthContext> {
     }
   }
 
-  return {
+  const context: AuthContext = {
     authenticated: true,
-    isSuperAdmin: session.isBreakGlass,
-    isBreakGlass: session.isBreakGlass,
-    userId: session.userId,
-    email: session.email,
+    isSuperAdmin: isBreakGlass,
+    isBreakGlass,
+    userId: access.userId,
+    email: access.email,
   };
+  verifiedAccessTokens.set(context, cookieStore.get(SUPABASE_ACCESS_COOKIE)?.value ?? '');
+  return context;
+}
+
+/** Internal BFF bridge: returns the JWT only for this verified context object. */
+export function getVerifiedSupabaseAccessToken(context: AuthContext): string | null {
+  return context.authenticated ? verifiedAccessTokens.get(context) ?? null : null;
 }
 
 export async function requireBreakGlass(): Promise<AuthContext | null> {

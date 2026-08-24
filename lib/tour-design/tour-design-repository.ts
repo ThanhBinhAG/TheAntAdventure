@@ -3,7 +3,6 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { rowToCustomer, rowToLead } from '@/lib/db/mappers/crm';
 import type { Row } from '@/lib/db/mappers/shared';
-import { getServerSupabaseClient } from '@/lib/supabase/server';
 import {
   rowToTourDraft,
   tourDraftToRow,
@@ -14,8 +13,9 @@ import type { Lead, TourDraft, TourOutlineDay } from '@/lib/types';
 import type { TourDesignCrmContext } from '@/lib/tour-design/tour-design-types';
 
 /** Customers + leads for Client Brief dropdown and Sales → Tour Design handoff queue. */
-export async function getTourDesignCrmContextServer(): Promise<TourDesignCrmContext> {
-  const supabase = await getServerSupabaseClient();
+export async function getTourDesignCrmContextServer(
+  supabase: SupabaseClient,
+): Promise<TourDesignCrmContext> {
   const [customersRes, leadsRes] = await Promise.all([
     supabase.from('customers').select('*'),
     supabase.from('leads').select('*'),
@@ -93,8 +93,7 @@ function isSaveConflict(error: unknown): boolean {
 /**
  * Lấy toàn bộ danh sách tour drafts từ server.
  */
-export async function getAllTourDraftsServer(): Promise<TourDraft[]> {
-  const supabase = await getServerSupabaseClient();
+export async function getAllTourDraftsServer(supabase: SupabaseClient): Promise<TourDraft[]> {
   const { data, error } = await supabase
     .from('tour_drafts')
     .select('*');
@@ -106,8 +105,9 @@ export async function getAllTourDraftsServer(): Promise<TourDraft[]> {
 /**
  * Lấy toàn bộ danh sách các ngày hành trình (outlines) từ server.
  */
-export async function getAllTourOutlineDaysServer(): Promise<TourOutlineDay[]> {
-  const supabase = await getServerSupabaseClient();
+export async function getAllTourOutlineDaysServer(
+  supabase: SupabaseClient,
+): Promise<TourOutlineDay[]> {
   const { data, error } = await supabase
     .from('tour_outline_days')
     .select('*')

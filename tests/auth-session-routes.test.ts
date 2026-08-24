@@ -12,11 +12,13 @@ require.cache[serverOnlyPath] = {
 } as NodeModule;
 
 let loginError: Error | null = null;
-let crmSessionCreateError: Error | null = null;
-let crmSessionRevokeError: Error | null = null;
-let revokedCookie: string | undefined;
-let sessionCookie: string | null = null;
-let crmSession: Record<string, unknown> | null = null;
+let signOutCalls = 0;
+
+mock.module(require.resolve('next/headers'), {
+  namedExports: {
+    cookies: async () => ({ get: () => undefined }),
+  },
+});
 
 type CookieResponse = {
   cookies: {
@@ -24,9 +26,10 @@ type CookieResponse = {
   };
 };
 
-mock.module(require.resolve('@supabase/supabase-js'), {
+mock.module(require.resolve('../lib/auth/supabase-ssr'), {
   namedExports: {
-    createClient: () => ({
+    SUPABASE_ACCESS_COOKIE: 'sb-crm-access-token',
+    createSupabaseRouteClient: () => ({
       auth: {
         signInWithPassword: async () => ({
           data: loginError
@@ -34,57 +37,36 @@ mock.module(require.resolve('@supabase/supabase-js'), {
             : {
               user: { id: 'user-1', email: 'user@example.com' },
               session: {
-                access_token: 'access-token',
-                refresh_token: 'refresh-token',
-                expires_at: Math.floor(Date.now() / 1000) + 3600,
-                expires_in: 3600,
+                access_token: 'supabase-access-token',
+                refresh_token: 'supabase-refresh-token',
+                expires_at: Math.floor(Date.now() / 1000) + 600,
+                expires_in: 600,
               },
             },
           error: loginError,
         }),
+        signOut: async () => {
+          signOutCalls++;
+          return { error: null };
+        },
       },
     }),
-  },
-});
-
-mock.module(require.resolve('../lib/auth/crm-session'), {
-  namedExports: {
-    CRM_SESSION_COOKIE: 'crm_session',
-    createCrmSession: async (input: Record<string, unknown>) => {
-      if (crmSessionCreateError) throw crmSessionCreateError;
-      return { session: { sid: 'session-1', ...input }, cookieValue: 'signed-crm-session' };
+    setSupabaseAccessCookie: (response: CookieResponse) => {
+      response.cookies.set('sb-crm-access-token', 'supabase-access-token', {
+        httpOnly: true,
+        path: '/',
+      });
     },
-    setCrmSessionCookie: (response: CookieResponse, value: string) => {
-      response.cookies.set('crm_session', value, { httpOnly: true, path: '/' });
+    clearSupabaseAccessCookie: (response: CookieResponse) => {
+      response.cookies.set('sb-crm-access-token', '', { maxAge: 0, path: '/' });
     },
-    revokeCrmSession: async (value: string | undefined) => {
-      revokedCookie = value;
-      if (crmSessionRevokeError) throw crmSessionRevokeError;
-    },
-    clearCrmSessionCookie: (response: CookieResponse) => {
+    clearLegacyCrmAuthCookies: (response: CookieResponse) => {
       response.cookies.set('crm_session', '', { maxAge: 0, path: '/' });
-    },
-    setCrmAccessCookies: async (response: CookieResponse) => {
-      response.cookies.set('crm_access', 'signed-access-token', { httpOnly: true, path: '/' });
-      response.cookies.set('crm_supabase_access', 'supabase-access-token', { httpOnly: true, path: '/' });
-    },
-    clearCrmAccessCookies: (response: CookieResponse) => {
       response.cookies.set('crm_access', '', { maxAge: 0, path: '/' });
       response.cookies.set('crm_supabase_access', '', { maxAge: 0, path: '/' });
     },
-    getCrmSessionRevocationStatus: async () => 'active',
-    getCrmSession: async () => crmSession,
   },
 });
-
-mock.module(require.resolve('next/headers'), {
-  namedExports: {
-    cookies: async () => ({
-      get: () => sessionCookie ? { value: sessionCookie } : undefined,
-    }),
-  },
-});
-
 mock.module(require.resolve('../lib/auth/break-glass'), {
   namedExports: {
     checkBreakGlassCredentials: () => ({
@@ -92,13 +74,14 @@ mock.module(require.resolve('../lib/auth/break-glass'), {
       usernameMatches: false,
       passwordMatches: false,
     }),
-    clearBreakGlassCookie: (response: CookieResponse) => {
-      response.cookies.set('bg_session', '', { maxAge: 0, path: '/' });
-    },
   },
 });
 mock.module(require.resolve('../lib/auth/break-glass-supabase'), {
-  namedExports: { getBreakGlassSupabaseSession: async () => null },
+  namedExports: {
+    getBreakGlassSupabaseSession: async () => null,
+    ensureBreakGlassShadowPrivilegesOnce: async () => {},
+    isBreakGlassShadowEmail: () => false,
+  },
 });
 mock.module(require.resolve('../lib/auth/cookie-hygiene'), {
   namedExports: {
@@ -121,33 +104,21 @@ mock.module(require.resolve('../lib/auth/login-history'), {
 mock.module(require.resolve('../lib/auth/login-history-store'), {
   namedExports: { recordSuccessfulLogin: async () => {} },
 });
-mock.module(require.resolve('../lib/env'), {
-  namedExports: {
-    getSupabaseUrl: () => 'https://supabase.example.test',
-    getSupabaseAnonKey: () => 'anon-key',
-    getCrmAccessTokenSecret: () => '',
-    isBreakGlassConfigured: () => false,
-  },
-});
-mock.module(require.resolve('../lib/supabase/insecure-fetch'), {
-  namedExports: { getSupabaseGlobalFetchOptions: () => ({}) },
+mock.module(require.resolve('../lib/system/debug-logger'), {
+  namedExports: { debugLog: () => {} },
 });
 
-test('CRM auth session routes', async (t) => {
+test('Supabase auth session routes', async (t) => {
   const loginRoute = await import('../app/api/auth/login/route');
   const logoutRoute = await import('../app/api/auth/logout/route');
   const { getAuthContext } = await import('../lib/auth/session');
 
   await t.beforeEach(() => {
     loginError = null;
-    crmSessionCreateError = null;
-    crmSessionRevokeError = null;
-    revokedCookie = undefined;
-    sessionCookie = null;
-    crmSession = null;
+    signOutCalls = 0;
   });
 
-  await t.test('returns an unauthenticated context without a CRM session', async () => {
+  await t.test('returns an unauthenticated context without a Supabase access token', async () => {
     assert.deepEqual(await getAuthContext(), {
       authenticated: false,
       isSuperAdmin: false,
@@ -157,7 +128,7 @@ test('CRM auth session routes', async (t) => {
     });
   });
 
-  await t.test('exchanges a valid password login for a CRM cookie', async () => {
+  await t.test('exchanges a valid password login for Supabase-only cookies', async () => {
     const response = await loginRoute.POST(new Request('http://localhost/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -166,7 +137,7 @@ test('CRM auth session routes', async (t) => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, mode: 'crm' });
-    assert.match(response.headers.get('set-cookie') ?? '', /crm_session=signed-crm-session/);
+    assert.match(response.headers.get('set-cookie') ?? '', /sb-crm-access-token=supabase-access-token/);
   });
 
   await t.test('rejects an invalid password login', async () => {
@@ -183,49 +154,17 @@ test('CRM auth session routes', async (t) => {
     assert.match(body.error, /không đúng/);
   });
 
-  await t.test('returns 503 when the durable session store cannot create a session', async () => {
-    crmSessionCreateError = new Error('durable session store unavailable');
-    const response = await loginRoute.POST(new Request('http://localhost/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identity: 'user@example.com', password: 'correct-password' }),
-    }));
-
-    assert.equal(response.status, 503);
-    assert.deepEqual(await response.json(), {
-      ok: false,
-      error: 'Không thể tạo CRM session. Vui lòng thử lại.',
-    });
-    assert.doesNotMatch(response.headers.get('set-cookie') ?? '', /crm_session=/);
-  });
-
-  await t.test('revokes the CRM session on logout', async () => {
+  await t.test('signs out at Supabase and clears every browser auth cookie', async () => {
     const response = await logoutRoute.POST(new Request('http://localhost/api/auth/logout', {
       method: 'POST',
-      headers: { Cookie: 'crm_session=signed-crm-session' },
+      headers: { Cookie: 'sb-crm-access-token=supabase-access-token; sb-test-auth-token=legacy' },
     }));
 
     assert.equal(response.status, 200);
-    assert.equal(revokedCookie, 'signed-crm-session');
-    assert.match(response.headers.get('set-cookie') ?? '', /crm_session=;/);
-  });
-
-  await t.test('clears every auth cookie and returns 503 when durable revoke fails', async () => {
-    crmSessionRevokeError = new Error('durable session store unavailable');
-    const response = await logoutRoute.POST(new Request('http://localhost/api/auth/logout', {
-      method: 'POST',
-      headers: { Cookie: 'crm_session=signed-crm-session; bg_session=break-glass; sb-test-auth-token=legacy' },
-    }));
-
-    assert.equal(response.status, 503);
-    assert.equal(revokedCookie, 'signed-crm-session');
-    assert.deepEqual(await response.json(), {
-      ok: false,
-      error: 'Không thể thu hồi CRM session. Vui lòng thử lại.',
-    });
+    assert.equal(signOutCalls, 1);
     const setCookie = response.headers.get('set-cookie') ?? '';
-    assert.match(setCookie, /crm_session=;/);
-    assert.match(setCookie, /bg_session=;/);
+    assert.match(setCookie, /sb-crm-access-token=;/);
     assert.match(setCookie, /sb-test-auth-token=;/);
+    assert.match(setCookie, /crm_session=;/);
   });
 });

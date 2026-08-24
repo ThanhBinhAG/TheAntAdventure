@@ -5,5 +5,5 @@ export const dynamic = 'force-dynamic';
 
 export const GET = bffRoute(
   { requiredPermission: 'gallery.read' },
-  async () => getAllGalleryPhotosServer()
+  async ({ supabase }) => getAllGalleryPhotosServer(supabase)
 );

@@ -9,7 +9,7 @@ import { StoreProvider } from '@/components/StoreProvider';
 import { PermissionsProvider } from '@/components/PermissionsProvider';
 import ToastHost from '@/components/ToastHost';
 import ConfirmHost from '@/components/ConfirmHost';
-import { CrmAccessRefresher } from '@/components/auth/CrmAccessRefresher';
+import { SupabaseSessionRefresher } from '@/components/auth/SupabaseSessionRefresher';
 import type { PermissionCode } from '@/lib/auth/permissions';
 
 const PIN_KEY = 'crm.sidebarPinned';
@@ -91,7 +91,7 @@ export default function CRMShell({
     <StoreProvider>
       <PermissionsProvider initialPermissionCodes={initialPermissionCodes}>
         <AiCopilotProvider>
-          <CrmAccessRefresher />
+          <SupabaseSessionRefresher />
           <div className={appClass}>
             <Sidebar
               open={menuOpen}

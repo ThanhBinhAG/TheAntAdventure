@@ -1,7 +1,6 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getServerSupabaseClient } from '@/lib/supabase/server';
 import { rowToTask, taskToRow } from '@/lib/db/mappers';
 import type { Task } from '@/lib/types';
 
@@ -23,8 +22,7 @@ function taskPatchToRow(patch: Partial<Task>): Record<string, unknown> {
 /**
  * Lấy toàn bộ danh sách tasks từ server.
  */
-export async function getAllTasksServer(): Promise<Task[]> {
-  const supabase = await getServerSupabaseClient();
+export async function getAllTasksServer(supabase: SupabaseClient): Promise<Task[]> {
   const { data, error } = await supabase
     .from('tasks')
     .select('*')

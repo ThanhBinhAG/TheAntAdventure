@@ -284,7 +284,7 @@ proxy_pass http://127.0.0.1:3006;
 
 Ghi chú:
 
-- **`large_client_header_buffers`** — tránh 400/502 khi Cookie header phình (Supabase auth JWT chunked `sb-*-auth-token.0/.1` + `bg_session`). `localStorage` / `sessionStorage` **không** gửi lên nginx.
+- **`large_client_header_buffers`** — tránh 400/502 khi Cookie header phình (Supabase auth JWT chunked `sb-*-auth-token.0/.1`). `localStorage` / `sessionStorage` **không** gửi lên nginx.
 - **`proxy_read_timeout` / `proxy_send_timeout`** — gallery `complete` (Sharp) và PDF export có thể >60s; timeout ngắn → 502/504 dù app vẫn chạy.
 - **`client_max_body_size`** — gallery chunk hiện **512 KB**; 20m để dư cho logo/multipart và PDF JSON body.
 - 502 sau PDF/upload dài thường là **timeout hoặc OOM container** (`mem_limit`), không phải “tràn cache” trình duyệt.

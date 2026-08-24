@@ -1,33 +1,28 @@
-# CRM Session Availability
+# Supabase Auth session operation
 
 ## Decision
 
-CRM refresh sessions are stored in PostgreSQL table `crm_sessions`; PostgreSQL is the source of truth for creation, refresh updates, and revocation. Session payloads are AES-256-GCM ciphertext using `CRM_SESSION_SECRET`. The browser always receives the signed opaque `crm_session` refresh cookie.
+CRM does not sign or encrypt its own browser session. Supabase Auth issues ES256 access JWTs and exposes its public JWKS; BFF verifies the JWT locally and uses it for user-scoped RLS/RPC calls.
 
-During the access-token rollout, deployments that set `CRM_ACCESS_TOKEN_SECRET` additionally issue two short-lived (10-minute) HttpOnly cookies: `crm_access` (HS256 JWT) and `crm_supabase_access` (the paired Supabase token). The CRM JWT stores only identity/session claims and a hash binding to the paired Supabase token; it never embeds the Supabase token. A valid access JWT avoids a PostgreSQL `crm_sessions` read on normal BFF requests. The durable session remains the fallback when Redis is unavailable or the access JWT is absent/expired.
+Login and refresh use `@supabase/ssr` cookies with `HttpOnly`, `Secure` in production, and `SameSite=Lax`. A small HttpOnly `sb-crm-access-token` mirror lets BFF verify the Supabase JWT without decoding the refresh cookie. No credential is returned in JSON, written to `localStorage`, or logged.
 
-`bffRoute` creates one request-local authentication context and a lazy user-scoped Supabase client. Permission-cache misses and the route handler share that client; permission-cache hits do not create it before authorization succeeds.
+The page proxy refreshes Supabase SSR cookies on navigation. `POST /api/auth/refresh` keeps an open CRM page current; it requires a same-origin request and has a Redis-backed, per-IP rate limit with in-process fallback.
 
-Redis is optional. It stores short-lived revoke tombstones (`crm:session:revoked:<sid>`) to reject a revoked cookie faster, but no valid session or Supabase token is stored in Redis.
+Each `bffRoute` verifies the JWT and active-profile state once, then shares one user-scoped Supabase client with the permission check and handler/repository.
 
-## Expected Behavior
+## Authorization and revocation
 
-| Dependency state | Existing session | New login | Logout/revoke |
-| --- | --- | --- | --- |
-| Redis unavailable, PostgreSQL healthy | Falls back to durable validation | Succeeds | Durable revoke succeeds; Redis tombstone is skipped |
-| PostgreSQL unavailable | Rejected safely | Returns 503 | Cookie is cleared by the client response; durable revoke cannot be confirmed |
-| PostgreSQL healthy, session revoked/expired | Rejected | N/A | Idempotent |
+- Supabase validates identity and rotates refresh tokens.
+- CRM permissions remain in the existing role/RPC model. The shared permission-cache version is invalidated after every role, permission, or account-status change.
+- `profiles.authz_version` is incremented by database triggers whenever user role, role permissions, or `is_active` changes.
+- Disabling a user bans its Supabase Auth account; it cannot refresh or sign in again. Existing short-lived JWTs lose CRM permissions after cache invalidation.
+- Auth security events are written server-side to `auth_security_events` with a SHA-256 IP hash only.
 
-## Owner-Ops Handoff
+## Operations
 
-- Provide `SUPABASE_SERVICE_ROLE_KEY` only to the server runtime; never expose it through `NEXT_PUBLIC_*` variables or browser bundles.
-- Operate PostgreSQL with backups, point-in-time recovery where available, and HA appropriate to CRM availability targets.
-- Monitor database errors/latency for `crm_sessions`, session creation failures, and growth of expired/revoked rows. Purge expired or revoked rows through an approved maintenance job after the audit-retention period.
-- Keep Redis private, authenticated, and fail-fast. Redis health may affect revoke acceleration only, never login or session validation.
+1. Supabase must expose an asymmetric JWKS endpoint at `/auth/v1/.well-known/jwks.json`; local validation currently confirms ES256.
+2. Keep `SUPABASE_SERVICE_ROLE_KEY` server-only for Admin operations and audit logging. It is unrelated to browser-session signing.
+3. Monitor JWKS verification errors, refresh rate-limit responses, refresh failures, and `auth_security_events`.
+4. Deployment of this cutover clears old `crm_session` cookies. Users with legacy sessions sign in once again through Supabase Auth.
 
-## Deployment
-
-1. Apply migration `20260821113000_add_durable_crm_sessions.sql` to every active database.
-2. Configure `CRM_SESSION_SECRET` (at least 32 characters) and `SUPABASE_SERVICE_ROLE_KEY` in the server environment.
-3. For the opt-in JWT rollout, configure a separate `CRM_ACCESS_TOKEN_SECRET` (at least 32 characters) on every application instance before deploying the new code.
-4. Deploy application code, then test login creates `crm_access`/`crm_supabase_access`, authenticated BFF requests, `POST /api/auth/refresh`, logout, and Redis-down fallback.
+The retired `crm_sessions` table is retained temporarily for data-retention cleanup only; the application no longer reads or writes it. Do not drop it until the agreed retention window has passed.

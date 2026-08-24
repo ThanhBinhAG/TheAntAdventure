@@ -11,51 +11,43 @@ require.cache[serverOnlyPath] = {
   exports: {},
 } as NodeModule;
 
-let durableSessionReads = 0;
-
 mock.module(require.resolve('next/headers'), {
   namedExports: {
     cookies: async () => ({
       get: (name: string) => (
-        name === 'crm_access'
-          ? { value: 'crm-access-jwt' }
-          : name === 'crm_supabase_access'
-            ? { value: 'supabase-access-jwt' }
-            : undefined
+        name === 'sb-crm-access-token'
+          ? { value: 'supabase-access-jwt' }
+          : undefined
       ),
     }),
   },
 });
 
-mock.module(require.resolve('../lib/auth/crm-session'), {
+mock.module(require.resolve('../lib/auth/supabase-jwt'), {
   namedExports: {
-    CRM_ACCESS_COOKIE: 'crm_access',
-    CRM_SESSION_COOKIE: 'crm_session',
-    CRM_SUPABASE_ACCESS_COOKIE: 'crm_supabase_access',
-    getCrmSession: async () => {
-      durableSessionReads++;
-      return null;
-    },
-    getCrmSessionRevocationStatus: async () => 'active',
-  },
-});
-
-mock.module(require.resolve('../lib/auth/crm-access-token'), {
-  namedExports: {
-    verifyCrmAccessToken: async () => ({
-      sid: 'session-1',
+    verifySupabaseAccessToken: async () => ({
       userId: 'user-1',
       email: 'user@example.com',
-      isBreakGlass: false,
+      sessionId: 'session-1',
     }),
   },
 });
 
-mock.module(require.resolve('../lib/auth/break-glass-supabase'), {
-  namedExports: { ensureBreakGlassShadowPrivilegesOnce: async () => {} },
+let authzActive = true;
+mock.module(require.resolve('../lib/auth/authz-state'), {
+  namedExports: {
+    getCurrentAuthzState: async () => ({ isActive: authzActive, version: 1 }),
+  },
 });
 
-test('a valid CRM access JWT avoids a durable CRM session read', async () => {
+mock.module(require.resolve('../lib/auth/break-glass-supabase'), {
+  namedExports: {
+    ensureBreakGlassShadowPrivilegesOnce: async () => {},
+    isBreakGlassShadowEmail: () => false,
+  },
+});
+
+test('a valid Supabase JWT creates auth context without reading a CRM durable session', async () => {
   const { getAuthContext } = await import('../lib/auth/session');
 
   const auth = await getAuthContext();
@@ -67,5 +59,20 @@ test('a valid CRM access JWT avoids a durable CRM session read', async () => {
     userId: 'user-1',
     email: 'user@example.com',
   });
-  assert.equal(durableSessionReads, 0);
+});
+
+test('a disabled CRM profile is rejected even while its Supabase access JWT remains valid', async () => {
+  const { getAuthContext } = await import('../lib/auth/session');
+  authzActive = false;
+  try {
+    assert.deepEqual(await getAuthContext(), {
+      authenticated: false,
+      isSuperAdmin: false,
+      isBreakGlass: false,
+      userId: null,
+      email: null,
+    });
+  } finally {
+    authzActive = true;
+  }
 });

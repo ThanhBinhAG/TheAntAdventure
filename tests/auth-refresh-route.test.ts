@@ -13,29 +13,58 @@ require.cache[serverOnlyPath] = {
 
 let refreshable = true;
 let accessCookieIssued = false;
+let accessCookieCleared = false;
 
-mock.module(require.resolve('../lib/auth/crm-session'), {
+mock.module(require.resolve('../lib/auth/supabase-ssr'), {
   namedExports: {
-    CRM_SESSION_COOKIE: 'crm_session',
-    getCrmSession: async () => refreshable ? { sid: 'session-1' } : null,
-    refreshCrmSessionIfNeeded: async (session: { sid: string }) => refreshable ? session : null,
-    setCrmAccessCookies: async () => { accessCookieIssued = true; },
-    clearCrmAccessCookies: () => {},
+    createSupabaseRouteClient: () => ({
+      auth: {
+        refreshSession: async () => refreshable
+          ? {
+            data: {
+              session: {
+                access_token: 'renewed-access-token',
+                refresh_token: 'renewed-refresh-token',
+                expires_at: Math.floor(Date.now() / 1000) + 600,
+                expires_in: 600,
+              },
+            },
+            error: null,
+          }
+          : { data: { session: null }, error: new Error('session expired') },
+      },
+    }),
+    setSupabaseAccessCookie: () => { accessCookieIssued = true; },
+    clearSupabaseAccessCookie: () => { accessCookieCleared = true; },
+    clearLegacyCrmAuthCookies: () => {},
   },
 });
+mock.module(require.resolve('../lib/auth/rate-limit'), {
+  namedExports: {
+    getClientIp: () => '127.0.0.1',
+    consumeRefreshRateLimit: async () => ({ ok: true }),
+  },
+});
+mock.module(require.resolve('../lib/auth/request-origin'), {
+  namedExports: { hasTrustedRequestOrigin: () => true },
+});
+mock.module(require.resolve('../lib/auth/cookie-hygiene'), {
+  namedExports: { clearSupabaseAuthCookies: () => {} },
+});
 
-test('CRM refresh exchanges only a durable session cookie for renewed HttpOnly access credentials', async (t) => {
+test('Supabase refresh replaces HttpOnly credentials without returning a token in JSON', async (t) => {
   const route = await import('../app/api/auth/refresh/route');
 
   await t.beforeEach(() => {
     refreshable = true;
     accessCookieIssued = false;
+    accessCookieCleared = false;
   });
 
-  await t.test('renews access credentials without returning a token in JSON', async () => {
-    const response = await route.POST(new Request('http://localhost/api/auth/refresh', {
+  await t.test('rotates the Supabase session and returns no credential body', async () => {
+    const response = await route.POST(new Request('https://crm.example.test/api/auth/refresh', {
       method: 'POST',
-      headers: { Cookie: 'crm_session=signed-session' },
+      headers: { Origin: 'https://crm.example.test' },
     }));
 
     assert.equal(response.status, 200);
@@ -43,13 +72,14 @@ test('CRM refresh exchanges only a durable session cookie for renewed HttpOnly a
     assert.equal(accessCookieIssued, true);
   });
 
-  await t.test('returns 401 when the durable refresh session is absent or revoked', async () => {
+  await t.test('returns 401 and clears access credentials when refresh is rejected', async () => {
     refreshable = false;
-    const response = await route.POST(new Request('http://localhost/api/auth/refresh', {
+    const response = await route.POST(new Request('https://crm.example.test/api/auth/refresh', {
       method: 'POST',
+      headers: { Origin: 'https://crm.example.test' },
     }));
 
     assert.equal(response.status, 401);
-    assert.equal(accessCookieIssued, false);
+    assert.equal(accessCookieCleared, true);
   });
 });

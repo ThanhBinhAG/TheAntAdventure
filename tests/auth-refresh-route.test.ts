@@ -15,6 +15,8 @@ let refreshState: 'active' | 'tokensOnlyUserTrap' | 'missing' | 'unavailable' | 
   'active';
 let accessCookieIssued = false;
 let accessCookieCleared = false;
+let refreshFailureLogged = false;
+let refreshAuditUserId: string | null | undefined;
 
 function tokensOnlySession() {
   const session = {
@@ -65,6 +67,14 @@ mock.module(require.resolve('../lib/auth/supabase-ssr'), {
                 refresh_token: 'renewed-refresh-token',
                 expires_at: Math.floor(Date.now() / 1000) + 600,
                 expires_in: 600,
+                user: new Proxy(
+                  {},
+                  {
+                    get: () => {
+                      throw new Error('tokens-only session user is unavailable');
+                    },
+                  },
+                ),
               },
             },
             error: null,
@@ -93,6 +103,22 @@ mock.module(require.resolve('../lib/auth/request-origin'), {
 mock.module(require.resolve('../lib/auth/cookie-hygiene'), {
   namedExports: { clearSupabaseAuthCookies: () => {} },
 });
+mock.module(require.resolve('../lib/auth/security-audit'), {
+  namedExports: {
+    recordAuthSecurityEvent: async (input: { userId?: string | null }) => {
+      refreshAuditUserId = input.userId;
+    },
+  },
+});
+mock.module(require.resolve('../lib/system/server-logger'), {
+  namedExports: {
+    serverLogger: { warn: () => {} },
+    requestLogger: () => ({
+      logger: { warn: () => { refreshFailureLogged = true; } },
+      requestId: 'refresh-test-request-id',
+    }),
+  },
+});
 
 test('Supabase refresh preserves the HttpOnly session without returning a token in JSON', async (t) => {
   const route = await import('../app/api/auth/refresh/route');
@@ -101,6 +127,8 @@ test('Supabase refresh preserves the HttpOnly session without returning a token 
     refreshState = 'active';
     accessCookieIssued = false;
     accessCookieCleared = false;
+    refreshFailureLogged = false;
+    refreshAuditUserId = undefined;
   });
 
   await t.test('updates the access mirror and returns no credential body', async () => {
@@ -114,6 +142,7 @@ test('Supabase refresh preserves the HttpOnly session without returning a token 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true });
     assert.equal(accessCookieIssued, true);
+    assert.equal(refreshAuditUserId, undefined);
   });
 
   await t.test('succeeds when session.user/id getters throw (tokens-only SSR)', async () => {
@@ -171,6 +200,9 @@ test('Supabase refresh preserves the HttpOnly session without returning a token 
 
       assert.equal(response.status, 503);
       assert.equal(accessCookieCleared, false);
+      assert.equal(response.headers.get('retry-after'), '60');
+      assert.equal(response.headers.get('x-request-id'), 'refresh-test-request-id');
+      assert.equal(refreshFailureLogged, true);
     },
   );
 });

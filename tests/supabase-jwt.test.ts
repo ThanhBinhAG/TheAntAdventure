@@ -96,12 +96,55 @@ test('rejects a Supabase token with invalid required claims', async () => {
 
 test('uses the configured public issuer when the server reaches Supabase privately', async () => {
   const previousIssuer = process.env.SUPABASE_JWT_ISSUER;
+  const previousPublic = process.env.NEXT_PUBLIC_SUPABASE_URL;
   process.env.SUPABASE_JWT_ISSUER = issuer;
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://sb.example.test:9001';
   try {
-    const { getSupabaseAuthIssuer } = await import('../lib/auth/supabase-jwt');
+    const {
+      getSupabaseAuthIssuer,
+      getSupabaseAuthIssuers,
+      getSupabaseJwksUrl,
+    } = await import('../lib/auth/supabase-jwt');
     assert.equal(getSupabaseAuthIssuer('http://supabase-gateway:8000'), issuer);
+    assert.deepEqual(getSupabaseAuthIssuers('http://supabase-gateway:8000'), [
+      issuer,
+      'https://sb.example.test:9001/auth/v1',
+    ]);
+    assert.equal(
+      getSupabaseJwksUrl()?.href,
+      'https://sb.example.test:9001/auth/v1/.well-known/jwks.json',
+    );
   } finally {
     if (previousIssuer === undefined) delete process.env.SUPABASE_JWT_ISSUER;
     else process.env.SUPABASE_JWT_ISSUER = previousIssuer;
+    if (previousPublic === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = previousPublic;
+  }
+});
+
+test('fetches JWKS from the public Supabase URL even when issuer is a private LAN host', async () => {
+  const previousIssuer = process.env.SUPABASE_JWT_ISSUER;
+  const previousPublic = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  process.env.SUPABASE_JWT_ISSUER = 'http://192.168.1.75:9001/auth/v1';
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://sb.example.test:9001';
+  try {
+    const { getSupabaseJwksUrl, getSupabaseAuthIssuers } = await import(
+      '../lib/auth/supabase-jwt'
+    );
+    assert.equal(
+      getSupabaseJwksUrl()?.href,
+      'https://sb.example.test:9001/auth/v1/.well-known/jwks.json',
+    );
+    assert.ok(
+      getSupabaseAuthIssuers().includes('http://192.168.1.75:9001/auth/v1'),
+    );
+    assert.ok(
+      getSupabaseAuthIssuers().includes('https://sb.example.test:9001/auth/v1'),
+    );
+  } finally {
+    if (previousIssuer === undefined) delete process.env.SUPABASE_JWT_ISSUER;
+    else process.env.SUPABASE_JWT_ISSUER = previousIssuer;
+    if (previousPublic === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = previousPublic;
   }
 });

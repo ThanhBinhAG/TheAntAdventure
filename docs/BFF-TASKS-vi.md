@@ -45,7 +45,7 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 | Task | Owner chính | Hoàn thành khi |
 |---|---|---|
 | Ghi nhận baseline Network | A | Có capture login, dashboard và 9 feature hiện tại |
-| Inventory direct Supabase imports | B | **Clients/Agents/Sales/Gallery done**; còn Weather |
+| Inventory direct Supabase imports | B | **Done (Dev B scoped 2026-08-24):** Clients/Agents/Sales/Gallery/Weather + Dashboard — `Personal/docs/bff-inventory-index.md` |
 | Server-only Supabase client + BFF helper | A | `lib/supabase/server.ts`, auth/permission/error primitives sẵn sàng |
 | CRM-owned HttpOnly session | A | Browser không giữ Supabase token |
 | Shared DTO/test fixtures | B | Feature owner có contract và test fixture dùng chung — **Customers Zod + fixtures: done** (`customer-list-input.ts`, `Personal/tests/customer-*.test.ts`) |
@@ -99,7 +99,7 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 - [x] Search/pagination ở server; chuyển UI/hook và optimistic update.
 - [x] Test quyền, filter, UI parity; gỡ direct browser-Supabase path.
 
-> **Done 2026-08-21 (DEV B):** `/api/customers` + repo Zod, `useCustomerPage` / register / delete, contract tests, Network filter B2B → CRM API. Notes qua `PATCH`. Hydrate/shared sync `customers` vẫn còn cho route khác (quy tắc #6 — chưa xóa sync chung). Comms / new inquiry profile để B3. Inventory callers: `Personal/docs/bff-customers-inventory.md`. CI script: `npm run check:supabase-leakage` (chưa hard-fail build tới cutover).
+> **Done 2026-08-21 (DEV B):** `/api/customers` + repo Zod, `useCustomerPage` / register / delete, contract tests, Network filter B2B → CRM API. Notes qua `PATCH`. Hydrate/shared sync `customers` vẫn còn cho route khác (quy tắc #6 — chưa xóa sync chung). Profile inquiry/comms: **B7** `POST .../inquiry` + `.../comms`. Inventory callers: `Personal/docs/bff-customers-inventory.md`. CI script: `npm run check:supabase-leakage` (chưa hard-fail build tới cutover).
 
 ### B2 — B2B Agents
 
@@ -136,6 +136,13 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 - [x] UI/hook; `PAGE_BOOT_TABLES.dashboard: []`; gỡ PostgREST hydrate trên `/dashboard`.
 
 > **Done 2026-08-24 (DEV B):** [`/api/dashboard`](app/api/dashboard/route.ts), [`useDashboardPage`](hooks/useDashboardPage.ts), [`dashboard-repository.ts`](lib/dashboard/dashboard-repository.ts); inventory/checklist `Personal/docs/bff-dashboard-*`; contract tests [`tests/dashboard-bff.test.ts`](tests/dashboard-bff.test.ts). Lead writes invalidate dashboard cache. Shared hydrate retained for other routes (rule #6).
+
+### B7 — Hydrate / auto-sync cutover (feature đã migrate)
+
+- [x] Profile inquiry/comms qua `POST /api/customers/:id/inquiry` và `POST /api/customers/:id/comms` (không store dual-write PostgREST).
+- [x] `PAGE_BOOT` Dev B rỗng; `SHELL_HYDRATE` / route-cache denylist bỏ customers/agents/leads/comms (+ bookings khỏi route-cache snapshot).
+- [x] Giữ boot Bookings/Contracts (chưa migrate). Không xóa stack hydrate chung (T6.2 / cutover cuối).
+- [x] Test: `tests/b7-dev-b-hydrate-cutover.test.ts`, `tests/customer-profile-write-bff.test.ts`.
 
 ## Thứ tự làm song song
 

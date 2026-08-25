@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
-import { createInquiryLeadForCustomer } from '@/lib/customers/customer-onboarding';
 import { getClientLeads, getClientPipeline, getCustomerBookings } from '@/lib/core/crm-utils';
 import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
+import { useCustomerProfileMutations } from '@/hooks/useCustomerProfileMutations';
 import { useStore } from '@/hooks/useStore';
 import { usePagePermission } from '@/hooks/usePagePermission';
-import type { Comm, Customer, Lead } from '@/lib/types';
+import type { Customer, Lead } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
 const TABS = ['overview', 'pipeline', 'communications', 'bookings', 'notes', 'feedback'] as const;
@@ -81,9 +81,9 @@ export default function CustomerProfileModal({
     feedback,
     isLoading: profileLoading,
     error: profileError,
+    refresh,
   } = useCustomerProfile(customer.id);
-  const addComm = useStore((s) => s.addComm);
-  const addLead = useStore((s) => s.addLead);
+  const { createInquiry, logComm: logCommRemote } = useCustomerProfileMutations();
   const updateCustomer = useStore((s) => s.updateCustomer);
 
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -117,23 +117,24 @@ export default function CustomerProfileModal({
     [customer, bookings]
   );
 
-  function logComm() {
+  async function logComm() {
     if (!commForm.subj.trim()) {
       toast.warning('Please add a subject.');
       return;
     }
-    const comm: Comm = {
-      id: `CM-${Date.now()}`,
-      cid: customer.id,
-      date: commForm.date,
+    const result = await logCommRemote(customer.id, {
       type: commForm.type,
       dir: commForm.dir,
+      date: commForm.date,
       subj: commForm.subj.trim(),
       body: commForm.body,
-      author: commForm.dir === 'inbound' ? customer.name : 'Tai (The Ant Adventures)',
-    };
-    addComm(comm);
+    });
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
     setCommForm({ ...commForm, subj: '', body: '' });
+    refresh();
   }
 
   async function saveNotes() {
@@ -176,11 +177,15 @@ The Ant Adventures`;
     setTab('communications');
   }
 
-  function startNewInquiry() {
-    const lead = createInquiryLeadForCustomer(customer, leads, { flagTourDesign: true });
-    addLead(lead);
-    setCreatedLead({ leadId: lead.id, custId: customer.id });
+  async function startNewInquiry() {
+    const result = await createInquiry(customer.id, { flagTourDesign: true });
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    setCreatedLead({ leadId: result.lead.id, custId: customer.id });
     setTab('pipeline');
+    refresh();
   }
 
   return (

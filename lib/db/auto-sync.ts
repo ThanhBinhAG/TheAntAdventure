@@ -232,6 +232,8 @@ export function isAutoSyncDebouncePending() {
 /**
  * Upsert only the given CRM rows immediately (create/edit customer).
  * Cancels a pending full-table debounce for those tables.
+ * @deprecated Prefer domain BFF routes (`/api/customers`, `/api/leads`, …). BFF-managed
+ * tables are filtered out, so this is a no-op for customers/leads/comms.
  */
 export async function persistCustomerRowsNow(patch: StoreRowPatch) {
   const tables = filterBffManagedTables(

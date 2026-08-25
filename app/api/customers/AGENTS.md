@@ -7,6 +7,8 @@ CRM BFF for Clients: paginated list, detail, create/update/delete with permissio
 - `route.ts` — GET list (server search/filters), POST create (+ optional lead/comm)
 - `[id]/route.ts` — GET detail, PATCH form/notes, DELETE (booking RESTRICT → 409)
 - `[id]/profile/route.ts` — GET leads/comms/bookings/feedback for profile modal
+- `[id]/inquiry/route.ts` — POST new Inquiry lead from profile modal
+- `[id]/comms/route.ts` — POST log communication from profile modal
 - `email-check/` — GET on-the-fly email uniqueness for the Clients form
 
 ## Boundaries

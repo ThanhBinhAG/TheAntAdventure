@@ -84,10 +84,19 @@ export function createSupabaseRouteClient(request: Request, response: NextRespon
   });
 }
 
+/** Token fields only — avoid reading session.user/id (throws with tokens-only SSR cookies). */
+export type SupabaseAccessCookieSession = Pick<
+  Session,
+  'access_token' | 'expires_at' | 'expires_in'
+>;
+
 /** Mirror the Supabase-issued access JWT into a small server-only cookie for BFF verification. */
-export function setSupabaseAccessCookie(response: NextResponse, session: Session): void {
+export function setSupabaseAccessCookie(
+  response: NextResponse,
+  session: SupabaseAccessCookieSession,
+): void {
   const now = Math.floor(Date.now() / 1000);
-  const maxAge = Math.max(1, (session.expires_at ?? now + session.expires_in) - now);
+  const maxAge = Math.max(1, (session.expires_at ?? now + (session.expires_in ?? 0)) - now);
   response.cookies.set(SUPABASE_ACCESS_COOKIE, session.access_token, accessCookieOptions(maxAge));
 }
 

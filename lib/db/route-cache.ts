@@ -15,10 +15,16 @@ export const ROUTE_CACHE_MAX_BYTES = 1_500_000;
 /**
  * Never persist these in sessionStorage — keep memory / network-only.
  * Photos and chat can blow past the browser quota after a few route visits.
+ * Dev B BFF-managed CRM tables must not snapshot via route cache either.
  */
 export const ROUTE_CACHE_DENYLIST: readonly SyncArrayTable[] = [
   'photos',
   'photo_folders',
+  'customers',
+  'agents',
+  'leads',
+  'comms',
+  'bookings',
 ] as const;
 
 /** Drop order when payload exceeds ROUTE_CACHE_MAX_BYTES (heaviest first). */

@@ -6,6 +6,7 @@ Server code emits newline-delimited JSON through Pino to stdout; the container p
 - `lib/system/client-logger.ts` — development-only browser diagnostics; never use it for operational events.
 - Standard fields: `scope`, `event`, `requestId`, `actorId`, `resourceId`, `durationMs`, and `statusCode`.
 - Do not log request bodies, credentials, cookies, personal data, or user-controlled field names.
+- Error fields are allowlisted to safe `type` and `code`; raw error messages, stacks, causes, and custom properties are never logged.
 - Reuse the Supabase audit trails for authentication and access-control changes; stdout logs are not the audit record.
 - Set `LOG_LEVEL` to `info` in production; temporarily use `debug` only while investigating an incident.
 - Use a child request logger for server routes so every related entry has the same `requestId`.

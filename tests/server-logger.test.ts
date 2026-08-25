@@ -21,14 +21,24 @@ class CapturingStream extends Writable {
   }
 }
 
-test('server logger redacts secrets and preserves structured error details', async () => {
+test('server logger redacts secrets and serializes only safe error details', async () => {
   const { createServerLogger } = await import('../lib/system/server-logger');
   const destination = new CapturingStream();
   const logger = createServerLogger({ level: 'trace', destination });
+  const upstreamError = Object.assign(
+    new Error('Upstream failed: access_token=message-access-token api_token:message-api-token clientSecret=message-client-secret Bearer message-bearer-token'),
+    {
+      access_token: 'property-access-token',
+      api_token: 'property-api-token',
+      clientSecret: 'property-client-secret',
+      code: 'UPSTREAM_AUTH_FAILED',
+    }
+  );
+  upstreamError.stack = 'Error: refresh_token=stack-refresh-token';
 
   logger.error(
     {
-      err: new Error('Supabase request failed'),
+      err: upstreamError,
       password: 'password-must-not-appear',
       headers: {
         authorization: 'Bearer top-secret',
@@ -46,8 +56,9 @@ test('server logger redacts secrets and preserves structured error details', asy
     cookie: '[redacted]',
   });
   assert.deepEqual(entry.payload, { token: '[redacted]' });
-  assert.equal((entry.err as { type?: string }).type, 'Error');
-  assert.match(String((entry.err as { stack?: string }).stack), /Supabase request failed/);
+  assert.deepEqual(entry.err, { type: 'Error', code: 'UPSTREAM_AUTH_FAILED' });
+  const serialized = JSON.stringify(entry);
+  assert.doesNotMatch(serialized, /message-|property-|stack-refresh-token/);
   assert.equal(entry.service, 'the-ant-adventures-crm');
 });
 

@@ -98,6 +98,9 @@ mock.module(require.resolve('../lib/auth/rate-limit'), {
     recordLoginFailure: async () => {},
   },
 });
+mock.module(require.resolve('../lib/auth/request-origin'), {
+  namedExports: { hasTrustedRequestOrigin: () => true },
+});
 mock.module(require.resolve('../lib/auth/login-history'), {
   namedExports: { getLoginClientMetadata: () => ({}) },
 });
@@ -131,7 +134,7 @@ test('Supabase auth session routes', async (t) => {
   await t.test('exchanges a valid password login for Supabase-only cookies', async () => {
     const response = await loginRoute.POST(new Request('http://localhost/api/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
       body: JSON.stringify({ identity: 'user@example.com', password: 'correct-password' }),
     }));
 
@@ -144,7 +147,7 @@ test('Supabase auth session routes', async (t) => {
     loginError = new Error('Invalid login credentials');
     const response = await loginRoute.POST(new Request('http://localhost/api/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
       body: JSON.stringify({ identity: 'user@example.com', password: 'wrong-password' }),
     }));
 
@@ -157,7 +160,10 @@ test('Supabase auth session routes', async (t) => {
   await t.test('signs out at Supabase and clears every browser auth cookie', async () => {
     const response = await logoutRoute.POST(new Request('http://localhost/api/auth/logout', {
       method: 'POST',
-      headers: { Cookie: 'sb-crm-access-token=supabase-access-token; sb-test-auth-token=legacy' },
+      headers: {
+        Cookie: 'sb-crm-access-token=supabase-access-token; sb-test-auth-token=legacy',
+        Origin: 'http://localhost',
+      },
     }));
 
     assert.equal(response.status, 200);

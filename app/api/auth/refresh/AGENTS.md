@@ -1,11 +1,11 @@
 # app/api/auth/refresh — Agent overview
 
 ## Role
-Rotates short-lived CRM access credentials from the durable CRM refresh session.
+Maintains the Supabase SSR cookie session and mirrored short-lived access JWT.
 
 ## Contents
-- `route.ts` — POST validates the durable session, refreshes Supabase credentials when necessary, then issues new access cookies.
+- `route.ts` — POST validates the trusted origin, refreshes Supabase credentials only near expiry, then updates the access mirror cookie.
 
 ## Boundaries
-- Keep refresh credentials server-side in `crm_sessions`; never return tokens in JSON.
-- Preserve the durable session as the Redis-down and revocation fallback during JWT migration.
+- Keep access and refresh credentials in HttpOnly Supabase SSR cookies; never return tokens in JSON.
+- Do not restore the retired `crm_sessions` implementation; profile-state and RLS remain the authorization boundaries.

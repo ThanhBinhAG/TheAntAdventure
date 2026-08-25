@@ -15,6 +15,7 @@ import {
 import { getLoginClientMetadata } from '@/lib/auth/login-history';
 import { recordSuccessfulLogin } from '@/lib/auth/login-history-store';
 import { recordAuthSecurityEvent } from '@/lib/auth/security-audit';
+import { hasTrustedRequestOrigin } from '@/lib/auth/request-origin';
 import { debugLog } from '@/lib/system/debug-logger';
 import { requestLogger } from '@/lib/system/server-logger';
 
@@ -77,6 +78,10 @@ async function recordSuccessfulLoginSafely(input: {
 }
 
 export async function POST(request: Request) {
+  if (!hasTrustedRequestOrigin(request)) {
+    return fail(403, 'Origin không hợp lệ.');
+  }
+
   const { logger } = requestLogger(request, 'auth/login');
   const ip = getClientIp(request);
   const rate = await checkLoginRateLimit(ip);

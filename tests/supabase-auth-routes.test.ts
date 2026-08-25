@@ -53,6 +53,9 @@ mock.module(require.resolve('../lib/auth/rate-limit'), {
     recordLoginFailure: async () => {},
   },
 });
+mock.module(require.resolve('../lib/auth/request-origin'), {
+  namedExports: { hasTrustedRequestOrigin: () => true },
+});
 mock.module(require.resolve('../lib/auth/login-history'), {
   namedExports: { getLoginClientMetadata: () => ({}) },
 });
@@ -70,7 +73,7 @@ test('login persists only Supabase Auth cookies and clears the retired CRM cooki
 
   const response = await POST(new Request('https://crm.example.test/api/auth/login', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Origin: 'https://crm.example.test' },
     body: JSON.stringify({ identity: 'user@example.com', password: 'correct-password' }),
   }));
 

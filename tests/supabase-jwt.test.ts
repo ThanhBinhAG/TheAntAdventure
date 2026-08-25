@@ -27,6 +27,8 @@ const issuer = 'https://supabase.example.test/auth/v1';
 async function signedToken(input: {
   audience?: string;
   expiresAt?: number;
+  issuer?: string;
+  subject?: string | null;
 }) {
   const { privateKey, publicKey } = await generateKeyPair('ES256');
   const publicJwk = await exportJWK(publicKey);
@@ -39,14 +41,13 @@ async function signedToken(input: {
     session_id: 'session-1',
   })
     .setProtectedHeader({ alg: 'ES256', kid: 'test-key' })
-    .setSubject('user-1')
-    .setIssuer(issuer)
+    .setIssuer(input.issuer ?? issuer)
     .setAudience(input.audience ?? 'authenticated')
     .setIssuedAt()
     .setExpirationTime(input.expiresAt ?? '5m')
-    .sign(privateKey);
+  if (input.subject !== null) token.setSubject(input.subject ?? 'user-1');
 
-  return { token, jwks };
+  return { token: await token.sign(privateKey), jwks };
 }
 
 test('verifies a Supabase ES256 access token against its JWKS and required claims', async () => {
@@ -64,9 +65,11 @@ test('verifies a Supabase ES256 access token against its JWKS and required claim
   });
 });
 
-test('rejects a Supabase token with a wrong audience or an expired lifetime', async () => {
+test('rejects a Supabase token with invalid required claims', async () => {
   const wrongAudience = await signedToken({ audience: 'other-app' });
   const expired = await signedToken({ expiresAt: Math.floor(Date.now() / 1000) - 1 });
+  const wrongIssuer = await signedToken({ issuer: 'https://attacker.example.test/auth/v1' });
+  const missingSubject = await signedToken({ subject: null });
 
   assert.equal(await verify(wrongAudience.token, {
     issuer,
@@ -75,5 +78,13 @@ test('rejects a Supabase token with a wrong audience or an expired lifetime', as
   assert.equal(await verify(expired.token, {
     issuer,
     jwks: expired.jwks,
+  }), null);
+  assert.equal(await verify(wrongIssuer.token, {
+    issuer,
+    jwks: wrongIssuer.jwks,
+  }), null);
+  assert.equal(await verify(missingSubject.token, {
+    issuer,
+    jwks: missingSubject.jwks,
   }), null);
 });

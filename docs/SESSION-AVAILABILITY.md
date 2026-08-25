@@ -6,7 +6,7 @@ CRM does not sign or encrypt its own browser session. Supabase Auth issues ES256
 
 Login and refresh use `@supabase/ssr` cookies with `HttpOnly`, `Secure` in production, and `SameSite=Lax`. A small HttpOnly `sb-crm-access-token` mirror lets BFF verify the Supabase JWT without decoding the refresh cookie. No credential is returned in JSON, written to `localStorage`, or logged.
 
-The page proxy refreshes Supabase SSR cookies on navigation. `POST /api/auth/refresh` keeps an open CRM page current; it requires a same-origin request and has a Redis-backed, per-IP rate limit with in-process fallback.
+The page proxy refreshes Supabase SSR cookies on navigation when the access token is near expiry. While the CRM is open, `POST /api/auth/refresh` performs the same near-expiry check on mount, focus, visibility return, and a short fallback interval; it requires a same-origin request and has a Redis-backed, per-IP rate limit with in-process fallback.
 
 Each `bffRoute` verifies the JWT and active-profile state once, then shares one user-scoped Supabase client with the permission check and handler/repository.
 

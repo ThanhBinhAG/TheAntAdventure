@@ -16,6 +16,22 @@ function clearRefreshCredentials(response: NextResponse, cookieHeader: string | 
   clearSupabaseAuthCookies(response, cookieHeader);
 }
 
+function isRejectedSupabaseSession(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('status' in error)) return false;
+  const status = (error as { status?: unknown }).status;
+  return status === 400 || status === 401 || status === 403;
+}
+
+function unauthenticatedResponse(request: Request, ip: string): NextResponse {
+  const failure = NextResponse.json(
+    { ok: false, error: 'Phiên đăng nhập đã hết hạn.' },
+    { status: 401 },
+  );
+  clearRefreshCredentials(failure, request.headers.get('cookie'));
+  void recordAuthSecurityEvent({ eventType: 'refresh_failed', ip });
+  return failure;
+}
+
 export async function POST(request: Request) {
   if (!hasTrustedRequestOrigin(request)) {
     return NextResponse.json({ ok: false, error: 'Origin không hợp lệ.' }, { status: 403 });
@@ -33,8 +49,15 @@ export async function POST(request: Request) {
   const ip = getClientIp(request);
   try {
     const supabase = createSupabaseRouteClient(request, response);
-    const { data, error } = await supabase.auth.refreshSession();
-    if (error || !data.session) throw error ?? new Error('Supabase session missing');
+    // getSession refreshes only when the token is near expiry, avoiding an
+    // unnecessary refresh-token rotation for every active browser tab.
+    const { data, error } = await supabase.auth.getSession();
+    if (!data.session) {
+      if (!error || isRejectedSupabaseSession(error)) {
+        return unauthenticatedResponse(request, ip);
+      }
+      throw error;
+    }
 
     setSupabaseAccessCookie(response, data.session);
     clearLegacyCrmAuthCookies(response);
@@ -46,10 +69,9 @@ export async function POST(request: Request) {
     return response;
   } catch {
     const failure = NextResponse.json(
-      { ok: false, error: 'Không thể làm mới session.' },
-      { status: 401 },
+      { ok: false, error: 'Dịch vụ xác thực tạm thời không khả dụng.' },
+      { status: 503 },
     );
-    clearRefreshCredentials(failure, request.headers.get('cookie'));
     void recordAuthSecurityEvent({ eventType: 'refresh_failed', ip });
     return failure;
   }

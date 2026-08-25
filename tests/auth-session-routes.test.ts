@@ -13,6 +13,26 @@ require.cache[serverOnlyPath] = {
 
 let loginError: Error | null = null;
 let signOutCalls = 0;
+let breakGlassEnabled = false;
+let breakGlassSessionUserThrows = false;
+let lastSecurityAuditUserId: string | null | undefined;
+
+function breakGlassSession() {
+  const session = {
+    access_token: 'break-glass-access-token',
+    refresh_token: 'break-glass-refresh-token',
+    expires_at: Math.floor(Date.now() / 1000) + 600,
+    expires_in: 600,
+  };
+  if (breakGlassSessionUserThrows) {
+    Object.defineProperty(session, 'user', {
+      get() {
+        throw new Error('tokens-only session user is unavailable');
+      },
+    });
+  }
+  return session;
+}
 
 mock.module(require.resolve('next/headers'), {
   namedExports: {
@@ -45,6 +65,10 @@ mock.module(require.resolve('../lib/auth/supabase-ssr'), {
             },
           error: loginError,
         }),
+        setSession: async () => ({
+          data: { session: breakGlassSession() },
+          error: null,
+        }),
         signOut: async () => {
           signOutCalls++;
           return { error: null };
@@ -70,15 +94,17 @@ mock.module(require.resolve('../lib/auth/supabase-ssr'), {
 mock.module(require.resolve('../lib/auth/break-glass'), {
   namedExports: {
     checkBreakGlassCredentials: () => ({
-      configured: false,
-      usernameMatches: false,
-      passwordMatches: false,
+      configured: breakGlassEnabled,
+      usernameMatches: breakGlassEnabled,
+      passwordMatches: breakGlassEnabled,
     }),
   },
 });
 mock.module(require.resolve('../lib/auth/break-glass-supabase'), {
   namedExports: {
-    getBreakGlassSupabaseSession: async () => null,
+    getBreakGlassSupabaseSession: async () => (
+      breakGlassEnabled ? breakGlassSession() : null
+    ),
     ensureBreakGlassShadowPrivilegesOnce: async () => {},
     isBreakGlassShadowEmail: () => false,
   },
@@ -107,6 +133,13 @@ mock.module(require.resolve('../lib/auth/login-history'), {
 mock.module(require.resolve('../lib/auth/login-history-store'), {
   namedExports: { recordSuccessfulLogin: async () => {} },
 });
+mock.module(require.resolve('../lib/auth/security-audit'), {
+  namedExports: {
+    recordAuthSecurityEvent: async (input: { userId?: string | null }) => {
+      lastSecurityAuditUserId = input.userId;
+    },
+  },
+});
 mock.module(require.resolve('../lib/system/debug-logger'), {
   namedExports: { debugLog: () => {} },
 });
@@ -119,6 +152,9 @@ test('Supabase auth session routes', async (t) => {
   await t.beforeEach(() => {
     loginError = null;
     signOutCalls = 0;
+    breakGlassEnabled = false;
+    breakGlassSessionUserThrows = false;
+    lastSecurityAuditUserId = undefined;
   });
 
   await t.test('returns an unauthenticated context without a Supabase access token', async () => {
@@ -141,6 +177,20 @@ test('Supabase auth session routes', async (t) => {
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, mode: 'crm' });
     assert.match(response.headers.get('set-cookie') ?? '', /sb-crm-access-token=supabase-access-token/);
+  });
+
+  await t.test('break-glass login succeeds when tokens-only session.user is unavailable', async () => {
+    breakGlassEnabled = true;
+    breakGlassSessionUserThrows = true;
+    const response = await loginRoute.POST(new Request('http://localhost/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
+      body: JSON.stringify({ identity: 'recovery-admin', password: 'recovery-password' }),
+    }));
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, mode: 'break_glass' });
+    assert.equal(lastSecurityAuditUserId, null);
   });
 
   await t.test('rejects an invalid password login', async () => {

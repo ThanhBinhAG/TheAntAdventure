@@ -22,6 +22,13 @@ async function verify(...args: Parameters<typeof import('../lib/auth/supabase-jw
   return verifySupabaseAccessToken(...args);
 }
 
+async function verifyResult(
+  ...args: Parameters<typeof import('../lib/auth/supabase-jwt').verifySupabaseAccessTokenResult>
+) {
+  const { verifySupabaseAccessTokenResult } = await import('../lib/auth/supabase-jwt');
+  return verifySupabaseAccessTokenResult(...args);
+}
+
 const issuer = 'https://supabase.example.test/auth/v1';
 
 async function signedToken(input: {
@@ -92,6 +99,18 @@ test('rejects a Supabase token with invalid required claims', async () => {
     issuer,
     jwks: missingExpiry.jwks,
   }), null);
+});
+
+test('reports JWKS connectivity failures without classifying the token as invalid', async () => {
+  const { token } = await signedToken({});
+  const result = await verifyResult(token, {
+    issuer,
+    jwks: async () => {
+      throw Object.assign(new Error('DNS lookup failed'), { code: 'ENOTFOUND' });
+    },
+  });
+
+  assert.deepEqual(result, { status: 'unavailable' });
 });
 
 test('uses the configured public issuer when the server reaches Supabase privately', async () => {

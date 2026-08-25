@@ -26,6 +26,17 @@ mock.module(require.resolve('next/headers'), {
 });
 mock.module(require.resolve('../lib/auth/supabase-jwt'), {
   namedExports: {
+    verifySupabaseAccessTokenResult: async () => {
+      jwtVerifications += 1;
+      return {
+        status: 'verified',
+        access: {
+          userId: 'user-1',
+          email: 'user@example.com',
+          sessionId: 'session-1',
+        },
+      };
+    },
     verifySupabaseAccessToken: async () => {
       jwtVerifications += 1;
       return { userId: 'user-1', email: 'user@example.com', sessionId: 'session-1' };

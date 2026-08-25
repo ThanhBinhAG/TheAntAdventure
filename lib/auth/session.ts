@@ -6,7 +6,7 @@ import {
 } from '@/lib/auth/break-glass-supabase';
 import { getCurrentAuthzState } from '@/lib/auth/authz-state';
 import { SUPABASE_ACCESS_COOKIE } from '@/lib/auth/supabase-cookie-names';
-import { verifySupabaseAccessToken } from '@/lib/auth/supabase-jwt';
+import { verifySupabaseAccessTokenResult } from '@/lib/auth/supabase-jwt';
 
 export type AuthContext = {
   authenticated: boolean;
@@ -14,6 +14,8 @@ export type AuthContext = {
   isBreakGlass: boolean;
   userId: string | null;
   email: string | null;
+  /** JWT verification could not reach JWKS/Auth; this is not a logout. */
+  verificationUnavailable?: true;
 };
 
 /**
@@ -26,12 +28,23 @@ const verifiedAccessTokens = new WeakMap<AuthContext, string>();
 /** Cookie-store based context (Route Handlers / Server Components). */
 export async function getAuthContext(): Promise<AuthContext> {
   const cookieStore = await cookies();
-  const access = await verifySupabaseAccessToken(
+  const verification = await verifySupabaseAccessTokenResult(
     cookieStore.get(SUPABASE_ACCESS_COOKIE)?.value,
   );
-  if (!access) {
+  if (verification.status !== 'verified') {
+    if (verification.status === 'unavailable') {
+      return {
+        authenticated: false,
+        isSuperAdmin: false,
+        isBreakGlass: false,
+        userId: null,
+        email: null,
+        verificationUnavailable: true,
+      };
+    }
     return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
   }
+  const access = verification.access;
 
   const authz = await getCurrentAuthzState({
     userId: access.userId,

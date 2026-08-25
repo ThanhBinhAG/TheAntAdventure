@@ -23,13 +23,20 @@ mock.module(require.resolve('next/headers'), {
   },
 });
 
+let verificationUnavailable = false;
 mock.module(require.resolve('../lib/auth/supabase-jwt'), {
   namedExports: {
-    verifySupabaseAccessToken: async () => ({
-      userId: 'user-1',
-      email: 'user@example.com',
-      sessionId: 'session-1',
-    }),
+    verifySupabaseAccessTokenResult: async () => {
+      if (verificationUnavailable) return { status: 'unavailable' };
+      return {
+        status: 'verified',
+        access: {
+          userId: 'user-1',
+          email: 'user@example.com',
+          sessionId: 'session-1',
+        },
+      };
+    },
   },
 });
 
@@ -74,5 +81,22 @@ test('a disabled CRM profile is rejected even while its Supabase access JWT rema
     });
   } finally {
     authzActive = true;
+  }
+});
+
+test('a temporary JWKS failure is marked as unavailable instead of unauthenticated', async () => {
+  const { getAuthContext } = await import('../lib/auth/session');
+  verificationUnavailable = true;
+  try {
+    assert.deepEqual(await getAuthContext(), {
+      authenticated: false,
+      isSuperAdmin: false,
+      isBreakGlass: false,
+      userId: null,
+      email: null,
+      verificationUnavailable: true,
+    });
+  } finally {
+    verificationUnavailable = false;
   }
 });

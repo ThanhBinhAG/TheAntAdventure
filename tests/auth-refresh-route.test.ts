@@ -98,11 +98,7 @@ mock.module(require.resolve('../lib/auth/cookie-hygiene'), {
   namedExports: { clearSupabaseAuthCookies: () => {} },
 });
 mock.module(require.resolve('../lib/auth/security-audit'), {
-  namedExports: {
-    recordAuthSecurityEvent: async (input: { userId?: string | null }) => {
-      refreshAuditUserId = input.userId;
-    },
-  },
+  namedExports: { recordAuthSecurityEvent: async (input: { userId?: string | null }) => { refreshAuditUserId = input.userId; } },
 });
 mock.module(require.resolve('../lib/system/server-logger'), {
   namedExports: {

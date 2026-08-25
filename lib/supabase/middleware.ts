@@ -37,6 +37,40 @@ function redirectToLogin(request: NextRequest) {
   return NextResponse.redirect(redirectUrl);
 }
 
+function isInvalidJwtVerificationError(error: unknown): boolean {
+  return (
+    typeof error === 'object'
+    && error !== null
+    && 'name' in error
+    && (error as { name?: unknown }).name === 'AuthInvalidJwtError'
+  );
+}
+
+/**
+ * A JWKS/Auth outage must not be treated as a logout. Preserve any cookie
+ * changes Supabase made before verification and let the browser retry later.
+ */
+function claimsVerificationUnavailableResponse(
+  response: NextResponse,
+  pathname: string,
+  error: unknown,
+) {
+  debugLog('middleware', 'Supabase claims verification temporarily unavailable', {
+    level: 'warn',
+    meta: {
+      pathname,
+      errorName: error instanceof Error ? error.name : 'unknown',
+    },
+  });
+
+  const unavailable = new NextResponse(null, {
+    status: 503,
+    headers: { 'Retry-After': '30' },
+  });
+  for (const cookie of response.cookies.getAll()) unavailable.cookies.set(cookie);
+  return unavailable;
+}
+
 /**
  * Proxy refreshes Supabase SSR cookies only for page navigation. BFF routes
  * verify the mirrored Supabase JWT themselves so API requests stay stateless.
@@ -99,8 +133,15 @@ export async function updateSession(request: NextRequest) {
   const session = sessionData.session;
   let claimsSubject: string | null = null;
   if (session) {
-    const { data: claimsData } = await supabase.auth.getClaims(session.access_token);
-    claimsSubject = typeof claimsData?.claims?.sub === 'string' ? claimsData.claims.sub : null;
+    try {
+      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(session.access_token);
+      if (claimsError && !isInvalidJwtVerificationError(claimsError)) {
+        return claimsVerificationUnavailableResponse(response, pathname, claimsError);
+      }
+      claimsSubject = typeof claimsData?.claims?.sub === 'string' ? claimsData.claims.sub : null;
+    } catch (error) {
+      return claimsVerificationUnavailableResponse(response, pathname, error);
+    }
   }
 
   if (!session || !claimsSubject) {

@@ -13,6 +13,10 @@ require.cache[serverOnlyPath] = {
 
 let cachedState: unknown = null;
 let cachedUserId: string | null = null;
+let profileResult: { data: { is_active: boolean; authz_version: number } | null; error: Error | null } = {
+  data: { is_active: true, authz_version: 4 },
+  error: null,
+};
 
 mock.module(require.resolve('../lib/redis/authz-state'), {
   namedExports: {
@@ -30,10 +34,7 @@ mock.module(require.resolve('@supabase/supabase-js'), {
       from: () => ({
         select: () => ({
           eq: () => ({
-            maybeSingle: async () => ({
-              data: { is_active: true, authz_version: 4 },
-              error: null,
-            }),
+            maybeSingle: async () => profileResult,
           }),
         }),
       }),
@@ -63,4 +64,17 @@ test('loads the active authorization state once and caches its database version'
   assert.deepEqual(state, { isActive: true, version: 4 });
   assert.equal(cachedUserId, 'user-1');
   assert.deepEqual(cachedState, { isActive: true, version: 4 });
+});
+
+test('reports an unavailable authorization lookup separately from an inactive account', async () => {
+  const { getCurrentAuthzStateResult } = await import('../lib/auth/authz-state');
+  profileResult = { data: null, error: new Error('Supabase unavailable') };
+  try {
+    assert.deepEqual(await getCurrentAuthzStateResult({
+      userId: 'user-1',
+      accessToken: 'supabase-access-token',
+    }), { status: 'unavailable' });
+  } finally {
+    profileResult = { data: { is_active: true, authz_version: 4 }, error: null };
+  }
 });

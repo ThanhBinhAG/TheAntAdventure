@@ -14,9 +14,20 @@ require.cache[serverOnlyPath] = {
 } as NodeModule;
 
 // Mock dependencies before importing route handler
+let authenticationUnavailable = false;
 mock.module(require.resolve('../lib/auth/session'), {
   namedExports: {
     getAuthContext: async () => {
+      if (authenticationUnavailable) {
+        return {
+          authenticated: false,
+          isSuperAdmin: false,
+          isBreakGlass: false,
+          userId: null,
+          email: null,
+          authenticationUnavailable: true,
+        };
+      }
       // Mock default: authenticated but no special role
       return {
         authenticated: true,
@@ -60,6 +71,23 @@ mock.module(require.resolve('../lib/supabase/server'), {
 
 test('BFF Request Primitives - Route Wrapper Tests', async (t) => {
   const { bffRoute } = await import('../lib/bff/route');
+
+  await t.test('503 Service Unavailable - when JWKS verification is temporarily unavailable', async () => {
+    authenticationUnavailable = true;
+    try {
+      const handler = bffRoute({}, async () => ({ data: 'should not reach here' }));
+      const response = await handler(new Request('http://localhost/api/test'));
+
+      assert.equal(response.status, 503);
+      assert.equal(response.headers.get('retry-after'), '30');
+      assert.deepEqual(await response.json(), {
+        ok: false,
+        error: 'Dịch vụ xác thực tạm thời không khả dụng.',
+      });
+    } finally {
+      authenticationUnavailable = false;
+    }
+  });
 
   await t.test('401 Unauthorized - when session is not valid', async () => {
     // Override permission check to simulate unauthenticated user (401)

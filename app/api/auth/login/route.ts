@@ -139,7 +139,10 @@ export async function POST(request: Request) {
       });
       void recordAuthSecurityEvent({
         eventType: 'login_succeeded',
-        userId: data.session.user?.id ?? null,
+        // Route SSR uses tokens-only storage, where session.user can be an
+        // intentionally unavailable proxy. The break-glass audit remains
+        // useful without a user ID and must never break recovery login.
+        userId: null,
         ip,
       });
       return response;

@@ -23,20 +23,34 @@ mock.module(require.resolve('next/headers'), {
   },
 });
 
+let verificationUnavailable = false;
 mock.module(require.resolve('../lib/auth/supabase-jwt'), {
   namedExports: {
-    verifySupabaseAccessToken: async () => ({
-      userId: 'user-1',
-      email: 'user@example.com',
-      sessionId: 'session-1',
-    }),
+    verifySupabaseAccessTokenResult: async () => {
+      if (verificationUnavailable) return { status: 'unavailable' };
+      return {
+        status: 'verified',
+        access: {
+          userId: 'user-1',
+          email: 'user@example.com',
+          sessionId: 'session-1',
+        },
+      };
+    },
   },
 });
 
 let authzActive = true;
+let authzUnavailable = false;
 mock.module(require.resolve('../lib/auth/authz-state'), {
   namedExports: {
-    getCurrentAuthzState: async () => ({ isActive: authzActive, version: 1 }),
+    getCurrentAuthzStateResult: async () => {
+      if (authzUnavailable) return { status: 'unavailable' };
+      return {
+        status: authzActive ? 'active' : 'inactive',
+        state: { isActive: authzActive, version: 1 },
+      };
+    },
   },
 });
 
@@ -74,5 +88,39 @@ test('a disabled CRM profile is rejected even while its Supabase access JWT rema
     });
   } finally {
     authzActive = true;
+  }
+});
+
+test('a temporary JWKS failure is marked as unavailable instead of unauthenticated', async () => {
+  const { getAuthContext } = await import('../lib/auth/session');
+  verificationUnavailable = true;
+  try {
+    assert.deepEqual(await getAuthContext(), {
+      authenticated: false,
+      isSuperAdmin: false,
+      isBreakGlass: false,
+      userId: null,
+      email: null,
+      authenticationUnavailable: true,
+    });
+  } finally {
+    verificationUnavailable = false;
+  }
+});
+
+test('a temporary Authz lookup failure is marked as unavailable instead of inactive', async () => {
+  const { getAuthContext } = await import('../lib/auth/session');
+  authzUnavailable = true;
+  try {
+    assert.deepEqual(await getAuthContext(), {
+      authenticated: false,
+      isSuperAdmin: false,
+      isBreakGlass: false,
+      userId: null,
+      email: null,
+      authenticationUnavailable: true,
+    });
+  } finally {
+    authzUnavailable = false;
   }
 });

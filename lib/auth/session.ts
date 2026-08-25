@@ -4,9 +4,9 @@ import {
   ensureBreakGlassShadowPrivilegesOnce,
   isBreakGlassShadowEmail,
 } from '@/lib/auth/break-glass-supabase';
-import { getCurrentAuthzState } from '@/lib/auth/authz-state';
+import { getCurrentAuthzStateResult } from '@/lib/auth/authz-state';
 import { SUPABASE_ACCESS_COOKIE } from '@/lib/auth/supabase-cookie-names';
-import { verifySupabaseAccessToken } from '@/lib/auth/supabase-jwt';
+import { verifySupabaseAccessTokenResult } from '@/lib/auth/supabase-jwt';
 
 export type AuthContext = {
   authenticated: boolean;
@@ -14,6 +14,8 @@ export type AuthContext = {
   isBreakGlass: boolean;
   userId: string | null;
   email: string | null;
+  /** JWT/Authz infrastructure is temporarily unavailable; this is not a logout. */
+  authenticationUnavailable?: true;
 };
 
 /**
@@ -26,18 +28,39 @@ const verifiedAccessTokens = new WeakMap<AuthContext, string>();
 /** Cookie-store based context (Route Handlers / Server Components). */
 export async function getAuthContext(): Promise<AuthContext> {
   const cookieStore = await cookies();
-  const access = await verifySupabaseAccessToken(
+  const verification = await verifySupabaseAccessTokenResult(
     cookieStore.get(SUPABASE_ACCESS_COOKIE)?.value,
   );
-  if (!access) {
+  if (verification.status !== 'verified') {
+    if (verification.status === 'unavailable') {
+      return {
+        authenticated: false,
+        isSuperAdmin: false,
+        isBreakGlass: false,
+        userId: null,
+        email: null,
+        authenticationUnavailable: true,
+      };
+    }
     return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
   }
+  const access = verification.access;
 
-  const authz = await getCurrentAuthzState({
+  const authz = await getCurrentAuthzStateResult({
     userId: access.userId,
     accessToken: cookieStore.get(SUPABASE_ACCESS_COOKIE)?.value ?? '',
   });
-  if (!authz?.isActive) {
+  if (authz.status === 'unavailable') {
+    return {
+      authenticated: false,
+      isSuperAdmin: false,
+      isBreakGlass: false,
+      userId: null,
+      email: null,
+      authenticationUnavailable: true,
+    };
+  }
+  if (authz.status === 'inactive') {
     return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
   }
 

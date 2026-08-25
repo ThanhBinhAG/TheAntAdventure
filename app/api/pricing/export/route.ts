@@ -13,14 +13,24 @@ import { pricingExportFilename } from '@/lib/pricing/pricing-export';
 import { renderPricingPdf, type PricingPdfInput } from '@/lib/pricing/pricing-pdf';
 import type { PricingTableRow } from '@/lib/products/product-pricing-helpers';
 import type { PlCurrency } from '@/lib/pricing/pricing-utils';
-import { requestLogger } from '@/lib/system/server-logger';
+import { createHttpRequestLogger } from '@/lib/system/server-logger';
 
 export async function POST(request: Request) {
-  const { logger, requestId } = requestLogger(request, 'pricing/export');
+  const requestLog = createHttpRequestLogger(request, {
+    scope: 'pricing/export',
+    route: '/api/pricing/export',
+  });
+  const { logger: baseLogger, requestId, logCompletion } = requestLog;
   const startedAt = Date.now();
   const auth = await getAuthContext();
+  const actorId = auth.authenticated ? auth.userId ?? undefined : undefined;
+  const logger = actorId ? baseLogger.child({ actorId }) : baseLogger;
+  const logResponse = (statusCode: number) => {
+    logCompletion({ statusCode, durationMs: Date.now() - startedAt, actorId });
+  };
 
   if (!auth.authenticated) {
+    logResponse(401);
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401, headers: { 'X-Request-Id': requestId } },
@@ -37,11 +47,13 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
+    logResponse(400);
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400, headers: { 'X-Request-Id': requestId } });
   }
 
   const rows = body.rows;
   if (!Array.isArray(rows) || rows.length === 0) {
+    logResponse(400);
     return NextResponse.json({ error: 'rows array is required' }, { status: 400, headers: { 'X-Request-Id': requestId } });
   }
 
@@ -65,6 +77,7 @@ export async function POST(request: Request) {
       { event: 'pricing_pdf.export_completed', currency, rowCount: rows.length, durationMs: Date.now() - startedAt },
       'Pricing PDF exported'
     );
+    logResponse(200);
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,
       headers: {
@@ -77,6 +90,7 @@ export async function POST(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'PDF generation failed';
     logger.error({ event: 'pricing_pdf.export_failed', err }, 'Pricing PDF export failed');
+    logResponse(500);
     return NextResponse.json({ error: message }, { status: 500, headers: { 'X-Request-Id': requestId } });
   }
 }

@@ -26,6 +26,17 @@ mock.module(require.resolve('next/headers'), {
 });
 mock.module(require.resolve('../lib/auth/supabase-jwt'), {
   namedExports: {
+    verifySupabaseAccessTokenResult: async () => {
+      jwtVerifications += 1;
+      return {
+        status: 'verified',
+        access: {
+          userId: 'user-1',
+          email: 'user@example.com',
+          sessionId: 'session-1',
+        },
+      };
+    },
     verifySupabaseAccessToken: async () => {
       jwtVerifications += 1;
       return { userId: 'user-1', email: 'user@example.com', sessionId: 'session-1' };
@@ -34,6 +45,10 @@ mock.module(require.resolve('../lib/auth/supabase-jwt'), {
 });
 mock.module(require.resolve('../lib/auth/authz-state'), {
   namedExports: {
+    getCurrentAuthzStateResult: async () => {
+      authzReads += 1;
+      return { status: 'active', state: { isActive: true, version: 1 } };
+    },
     getCurrentAuthzState: async () => {
       authzReads += 1;
       return { isActive: true, version: 1 };

@@ -23,6 +23,11 @@ export type VerifiedSupabaseAccessToken = {
   sessionId: string | null;
 };
 
+export type SupabaseAccessTokenVerification =
+  | { status: 'verified'; access: VerifiedSupabaseAccessToken }
+  | { status: 'invalid' }
+  | { status: 'unavailable' };
+
 type VerifyOptions = {
   issuer?: string | string[];
   audience?: string;
@@ -84,17 +89,40 @@ function getRemoteJwks(): JWTVerifyGetKey | null {
   return jwks;
 }
 
-/** Verify a Supabase-issued access token using its public JWKS. */
-export async function verifySupabaseAccessToken(
+function isJwksUnavailableError(error: unknown): boolean {
+  if (error instanceof TypeError) return true;
+  if (!error || typeof error !== 'object') return false;
+
+  const candidate = error as { name?: unknown; code?: unknown; message?: unknown };
+  const name = typeof candidate.name === 'string' ? candidate.name : '';
+  if (name === 'JWKSTimeout' || name === 'JWKSInvalid') return true;
+
+  const code = typeof candidate.code === 'string' ? candidate.code : '';
+  if (['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', 'EAI_AGAIN'].includes(code)) {
+    return true;
+  }
+
+  const message = typeof candidate.message === 'string' ? candidate.message.toLowerCase() : '';
+  return /fetch|network|socket|connect|dns|tls|certificate/.test(message);
+}
+
+/**
+ * Verifies a Supabase-issued access token and distinguishes a bad token from a
+ * temporary JWKS/Auth connectivity failure. Callers must not log users out for
+ * the latter case.
+ */
+export async function verifySupabaseAccessTokenResult(
   token: string | undefined,
   options: VerifyOptions = {},
-): Promise<VerifiedSupabaseAccessToken | null> {
-  if (!token) return null;
+): Promise<SupabaseAccessTokenVerification> {
+  if (!token) return { status: 'invalid' };
   const issuer = options.issuer ?? getSupabaseAuthIssuers();
-  if (!issuer || (Array.isArray(issuer) && issuer.length === 0)) return null;
+  if (!issuer || (Array.isArray(issuer) && issuer.length === 0)) {
+    return { status: 'unavailable' };
+  }
 
   const jwks = options.jwks ?? getRemoteJwks();
-  if (!jwks) return null;
+  if (!jwks) return { status: 'unavailable' };
 
   try {
     const { payload } = await jwtVerify(token, jwks, {
@@ -106,14 +134,26 @@ export async function verifySupabaseAccessToken(
       typeof payload.exp !== 'number'
       || typeof payload.sub !== 'string'
       || !payload.sub
-    ) return null;
+    ) return { status: 'invalid' };
 
     return {
-      userId: payload.sub,
-      email: typeof payload.email === 'string' ? payload.email : null,
-      sessionId: typeof payload.session_id === 'string' ? payload.session_id : null,
+      status: 'verified',
+      access: {
+        userId: payload.sub,
+        email: typeof payload.email === 'string' ? payload.email : null,
+        sessionId: typeof payload.session_id === 'string' ? payload.session_id : null,
+      },
     };
-  } catch {
-    return null;
+  } catch (error) {
+    return isJwksUnavailableError(error) ? { status: 'unavailable' } : { status: 'invalid' };
   }
+}
+
+/** Backward-compatible helper for callers that only need a valid access token. */
+export async function verifySupabaseAccessToken(
+  token: string | undefined,
+  options: VerifyOptions = {},
+): Promise<VerifiedSupabaseAccessToken | null> {
+  const result = await verifySupabaseAccessTokenResult(token, options);
+  return result.status === 'verified' ? result.access : null;
 }

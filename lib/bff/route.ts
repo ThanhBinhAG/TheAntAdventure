@@ -40,7 +40,7 @@ export function bffRoute<
       // 1. Xác thực một lần, sau đó lazily tạo một user-scoped client cho quyền/handler.
       const auth = await getAuthContext();
       if (!auth.authenticated) {
-        if (auth.verificationUnavailable) {
+        if (auth.authenticationUnavailable) {
           return NextResponse.json(
             { ok: false, error: 'Dịch vụ xác thực tạm thời không khả dụng.' },
             { status: 503, headers: { 'Retry-After': '30' } },

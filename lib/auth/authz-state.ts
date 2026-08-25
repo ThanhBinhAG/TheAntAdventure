@@ -11,20 +11,29 @@ import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 export type AuthzState = CachedAuthzState;
 
+export type AuthzStateResolution =
+  | { status: 'active'; state: AuthzState }
+  | { status: 'inactive'; state: AuthzState }
+  | { status: 'unavailable' };
+
+function resolveState(state: AuthzState): AuthzStateResolution {
+  return state.isActive ? { status: 'active', state } : { status: 'inactive', state };
+}
+
 /**
- * Check the user's own profile only on a Redis miss. Account status remains
- * server-authoritative without putting permissions or active state in JWTs.
+ * Check the user's own profile only on a Redis miss. An unavailable Authz
+ * lookup must not be treated as a disabled account or an expired JWT.
  */
-export async function getCurrentAuthzState(input: {
+export async function getCurrentAuthzStateResult(input: {
   userId: string;
   accessToken: string;
-}): Promise<AuthzState | null> {
+}): Promise<AuthzStateResolution> {
   const cached = await getCachedAuthzState(input.userId);
-  if (cached) return cached;
+  if (cached) return resolveState(cached);
 
   const url = getServerSupabaseUrl();
   const key = getServerSupabaseAnonKey();
-  if (!url || !key) return null;
+  if (!url || !key) return { status: 'unavailable' };
 
   try {
     const supabase = createClient(url, key, {
@@ -37,15 +46,25 @@ export async function getCurrentAuthzState(input: {
       .select('is_active, authz_version')
       .eq('id', input.userId)
       .maybeSingle();
-    if (error || !data || typeof data.is_active !== 'boolean') return null;
+    if (error) return { status: 'unavailable' };
+    if (!data || typeof data.is_active !== 'boolean') return { status: 'inactive', state: { isActive: false, version: 1 } };
 
     const state: AuthzState = {
       isActive: data.is_active,
       version: Number.isFinite(Number(data.authz_version)) ? Number(data.authz_version) : 1,
     };
     await setCachedAuthzState(input.userId, state);
-    return state;
+    return resolveState(state);
   } catch {
-    return null;
+    return { status: 'unavailable' };
   }
+}
+
+/** Backward-compatible helper for callers that only need resolved account state. */
+export async function getCurrentAuthzState(input: {
+  userId: string;
+  accessToken: string;
+}): Promise<AuthzState | null> {
+  const result = await getCurrentAuthzStateResult(input);
+  return result.status === 'unavailable' ? null : result.state;
 }

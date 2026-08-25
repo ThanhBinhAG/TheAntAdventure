@@ -45,6 +45,10 @@ mock.module(require.resolve('../lib/auth/supabase-jwt'), {
 });
 mock.module(require.resolve('../lib/auth/authz-state'), {
   namedExports: {
+    getCurrentAuthzStateResult: async () => {
+      authzReads += 1;
+      return { status: 'active', state: { isActive: true, version: 1 } };
+    },
     getCurrentAuthzState: async () => {
       authzReads += 1;
       return { isActive: true, version: 1 };

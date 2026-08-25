@@ -41,9 +41,16 @@ mock.module(require.resolve('../lib/auth/supabase-jwt'), {
 });
 
 let authzActive = true;
+let authzUnavailable = false;
 mock.module(require.resolve('../lib/auth/authz-state'), {
   namedExports: {
-    getCurrentAuthzState: async () => ({ isActive: authzActive, version: 1 }),
+    getCurrentAuthzStateResult: async () => {
+      if (authzUnavailable) return { status: 'unavailable' };
+      return {
+        status: authzActive ? 'active' : 'inactive',
+        state: { isActive: authzActive, version: 1 },
+      };
+    },
   },
 });
 
@@ -94,9 +101,26 @@ test('a temporary JWKS failure is marked as unavailable instead of unauthenticat
       isBreakGlass: false,
       userId: null,
       email: null,
-      verificationUnavailable: true,
+      authenticationUnavailable: true,
     });
   } finally {
     verificationUnavailable = false;
+  }
+});
+
+test('a temporary Authz lookup failure is marked as unavailable instead of inactive', async () => {
+  const { getAuthContext } = await import('../lib/auth/session');
+  authzUnavailable = true;
+  try {
+    assert.deepEqual(await getAuthContext(), {
+      authenticated: false,
+      isSuperAdmin: false,
+      isBreakGlass: false,
+      userId: null,
+      email: null,
+      authenticationUnavailable: true,
+    });
+  } finally {
+    authzUnavailable = false;
   }
 });

@@ -4,7 +4,7 @@ import {
   ensureBreakGlassShadowPrivilegesOnce,
   isBreakGlassShadowEmail,
 } from '@/lib/auth/break-glass-supabase';
-import { getCurrentAuthzState } from '@/lib/auth/authz-state';
+import { getCurrentAuthzStateResult } from '@/lib/auth/authz-state';
 import { SUPABASE_ACCESS_COOKIE } from '@/lib/auth/supabase-cookie-names';
 import { verifySupabaseAccessTokenResult } from '@/lib/auth/supabase-jwt';
 
@@ -14,8 +14,8 @@ export type AuthContext = {
   isBreakGlass: boolean;
   userId: string | null;
   email: string | null;
-  /** JWT verification could not reach JWKS/Auth; this is not a logout. */
-  verificationUnavailable?: true;
+  /** JWT/Authz infrastructure is temporarily unavailable; this is not a logout. */
+  authenticationUnavailable?: true;
 };
 
 /**
@@ -39,18 +39,28 @@ export async function getAuthContext(): Promise<AuthContext> {
         isBreakGlass: false,
         userId: null,
         email: null,
-        verificationUnavailable: true,
+        authenticationUnavailable: true,
       };
     }
     return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
   }
   const access = verification.access;
 
-  const authz = await getCurrentAuthzState({
+  const authz = await getCurrentAuthzStateResult({
     userId: access.userId,
     accessToken: cookieStore.get(SUPABASE_ACCESS_COOKIE)?.value ?? '',
   });
-  if (!authz?.isActive) {
+  if (authz.status === 'unavailable') {
+    return {
+      authenticated: false,
+      isSuperAdmin: false,
+      isBreakGlass: false,
+      userId: null,
+      email: null,
+      authenticationUnavailable: true,
+    };
+  }
+  if (authz.status === 'inactive') {
     return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
   }
 

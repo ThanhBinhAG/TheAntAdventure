@@ -144,6 +144,15 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 - [x] Giữ boot Bookings/Contracts (chưa migrate). Không xóa stack hydrate chung (T6.2 / cutover cuối).
 - [x] Test: `tests/b7-dev-b-hydrate-cutover.test.ts`, `tests/customer-profile-write-bff.test.ts`.
 
+### B8 — Acceptance cuối (Dev B)
+
+- [x] Playwright browser-network (Fetch/XHR CRM-only) cho Dashboard/Clients/Agents/Sales/Gallery/Weather.
+- [x] Playwright permission 401/403 + smoke CRUD/parity cho API Dev B.
+- [x] Unit Redis-down cho Dashboard + Weather cache; invalidate soft-fail.
+- [x] Checklist tổng: `Personal/docs/bff-b8-final-acceptance.md`.
+
+> **Done 2026-08-25 (DEV B):** `e2e/dev-b-network-origin.spec.ts`, `e2e/dev-b-domains.spec.ts`, `tests/dashboard-redis-down.test.ts`, `tests/weather-redis-down.test.ts`. Out of scope: T6.2 / A6 / Owner-Ops private Docker.
+
 ## Thứ tự làm song song
 
 | Đợt | Developer A | Developer B | Checkpoint |

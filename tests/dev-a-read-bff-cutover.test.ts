@@ -17,7 +17,7 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   const tourDesign = source('components/tour-design/TourDesignPage.tsx');
   const tourDesignBoot = config.match(/tourdesign:\s*\[([\s\S]*?)\],\n\s*\/\/ Catalogue/)?.[1] ?? '';
 
-  assert.match(config, /planner:\s*\['cal_events'\]/);
+  assert.match(config, /planner:\s*\[\]/);
   assert.match(config, /attractions:\s*\[\]/);
   assert.match(config, /pricing:\s*\[\]/);
   assert.doesNotMatch(tourDesignBoot, /'products'/);

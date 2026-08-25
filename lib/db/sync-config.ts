@@ -54,7 +54,8 @@ export const SIDEBAR_BADGE_TABLES: readonly SyncArrayTable[] = [
 export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[]>> = {
   /** Metrics via GET /api/dashboard — no PostgREST hydrate on this route. */
   dashboard: [],
-  planner: ['cal_events'],
+  /** Tasks via GET /api/planner/all — no PostgREST hydrate on this route. */
+  planner: [],
   /** Clients list/CRUD via `/api/customers`; profile modal loads related rows via `/api/customers/:id/profile`. */
   customers: [],
   /** Agents list/catalog via `/api/agents`; pipeline/commission leads wait for Sales BFF. */

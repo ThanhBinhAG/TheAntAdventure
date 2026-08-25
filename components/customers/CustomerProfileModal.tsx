@@ -32,37 +32,45 @@ interface CustomerProfileModalProps {
   onDelete: () => void;
 }
 
-function PipelineLeadRow({ lead, customerId }: { lead: Lead; customerId: string }) {
+function PipelineLeadCard({ lead, customerId }: { lead: Lead; customerId: string }) {
   return (
-    <tr>
-      <td>
-        <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{lead.id}</code>
-      </td>
-      <td style={{ fontSize: 12, maxWidth: 180 }}>{lead.tour}</td>
-      <td>
-        <span className={`bdg ${STAGE_COLORS[lead.stage] || 'bdg-w'}`} style={{ fontSize: 10 }}>
-          {lead.stage}
-        </span>
-      </td>
-      <td style={{ fontWeight: 600, color: 'var(--g)' }}>{lead.value > 0 ? `$${fmt(lead.value)}` : '—'}</td>
-      <td style={{ fontSize: 12, color: 'var(--m)' }}>{lead.month || '—'}</td>
-      <td style={{ fontSize: 12 }}>{lead.owner || '—'}</td>
-      <td style={{ whiteSpace: 'nowrap' }}>
+    <article className="prof-lead-card">
+      <div className="prof-lead-card-top">
+        <div className="prof-lead-card-main">
+          <div className="prof-lead-tour">{lead.tour?.trim() || 'Untitled inquiry'}</div>
+          <code className="prof-lead-id">{lead.id}</code>
+        </div>
+        <span className={`bdg ${STAGE_COLORS[lead.stage] || 'bdg-w'}`}>{lead.stage}</span>
+      </div>
+      <dl className="prof-lead-meta">
+        <div>
+          <dt>Value</dt>
+          <dd>{lead.value > 0 ? `$${fmt(lead.value)}` : '—'}</dd>
+        </div>
+        <div>
+          <dt>Travel</dt>
+          <dd>{lead.month || '—'}</dd>
+        </div>
+        <div>
+          <dt>Owner</dt>
+          <dd>{lead.owner || '—'}</dd>
+        </div>
+      </dl>
+      <div className="prof-lead-actions">
         <Link
           href={`/sales?custId=${encodeURIComponent(customerId)}&leadId=${encodeURIComponent(lead.id)}&tab=list`}
           className="btn btn-s btn-sm"
-          style={{ marginRight: 4 }}
         >
-          Pipeline
+          Open in Sales
         </Link>
         <Link
           href={`/tourdesign?leadId=${encodeURIComponent(lead.id)}&custId=${encodeURIComponent(customerId)}`}
-          className="btn btn-s btn-sm"
+          className="btn btn-p btn-sm"
         >
           Tour Design
         </Link>
-      </td>
-    </tr>
+      </div>
+    </article>
   );
 }
 
@@ -301,9 +309,9 @@ The Ant Adventures`;
 
           {tab === 'pipeline' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div className="prof-tab-toolbar">
                 <div className="prof-section-lbl" style={{ marginBottom: 0 }}>
-                  Quotes & Pipeline ({activeLeads.length})
+                  Inquiries & quotes ({activeLeads.length})
                 </div>
                 <button className="btn btn-p btn-sm" type="button" onClick={startNewInquiry} disabled={!canWrite}>
                   + Start New Inquiry
@@ -312,68 +320,34 @@ The Ant Adventures`;
 
               {activeLeads.length === 0 ? (
                 <div className="prof-empty" style={{ textAlign: 'center', padding: 28 }}>
-                  <div style={{ fontSize: 13, marginBottom: 12 }}>No quotes yet for this client.</div>
+                  <div style={{ fontSize: 13, marginBottom: 12 }}>No inquiries yet for this client.</div>
                   <button className="btn btn-p btn-sm" type="button" onClick={startNewInquiry} disabled={!canWrite}>
                     Start New Inquiry
                   </button>
                 </div>
               ) : (
-                <div className="card" style={{ marginBottom: 14 }}>
-                  <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
-                    <table className="tbl">
-                      <thead>
-                        <tr>
-                          <th>Lead ID</th>
-                          <th>Tour</th>
-                          <th>Stage</th>
-                          <th>Value</th>
-                          <th>Travel Month</th>
-                          <th>Owner</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {activeLeads.map((lead) => (
-                          <PipelineLeadRow key={lead.id} lead={lead} customerId={customer.id} />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                <div className="prof-lead-stack">
+                  {activeLeads.map((lead) => (
+                    <PipelineLeadCard key={lead.id} lead={lead} customerId={customer.id} />
+                  ))}
                 </div>
               )}
 
               {lostLeads.length > 0 && (
-                <div>
+                <div style={{ marginTop: 16 }}>
                   <button
                     type="button"
                     className="btn btn-s btn-sm"
-                    style={{ marginBottom: 8 }}
+                    style={{ marginBottom: 10 }}
                     onClick={() => setShowLostLeads((v) => !v)}
                   >
                     {showLostLeads ? 'Hide' : 'Show'} lost leads ({lostLeads.length})
                   </button>
                   {showLostLeads && (
-                    <div className="card">
-                      <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
-                        <table className="tbl">
-                          <thead>
-                            <tr>
-                              <th>Lead ID</th>
-                              <th>Tour</th>
-                              <th>Stage</th>
-                              <th>Value</th>
-                              <th>Travel Month</th>
-                              <th>Owner</th>
-                              <th>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {lostLeads.map((lead) => (
-                              <PipelineLeadRow key={lead.id} lead={lead} customerId={customer.id} />
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                    <div className="prof-lead-stack prof-lead-stack-muted">
+                      {lostLeads.map((lead) => (
+                        <PipelineLeadCard key={lead.id} lead={lead} customerId={customer.id} />
+                      ))}
                     </div>
                   )}
                 </div>
@@ -439,19 +413,31 @@ The Ant Adventures`;
               {custComms.length === 0 ? (
                 <div className="prof-empty">No communications logged yet.</div>
               ) : (
-                custComms.map((cm) => (
-                  <div key={cm.id} className={`comm-card ${cm.dir === 'outbound' ? 'comm-out' : 'comm-in'}`}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
-                      <span className={`comm-dir-badge ${cm.dir}`}>{cm.dir === 'outbound' ? '↑ OUT' : '↓ IN'}</span>
-                      <span className="comm-type-badge">{cm.type}</span>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, flex: 1 }}>{cm.subj}</span>
-                      <span style={{ fontSize: 10.5, color: 'var(--m)', whiteSpace: 'nowrap' }}>
-                        {cm.date} · {cm.author}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 12.5, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{cm.body}</div>
-                  </div>
-                ))
+                <div className="comm-timeline">
+                  {custComms.map((cm) => (
+                    <article
+                      key={cm.id}
+                      className={`comm-card ${cm.dir === 'outbound' ? 'comm-out' : 'comm-in'}`}
+                    >
+                      <header className="comm-card-hd">
+                        <div className="comm-card-badges">
+                          <span className={`comm-dir-badge ${cm.dir}`}>
+                            {cm.dir === 'outbound' ? '↑ Out' : '↓ In'}
+                          </span>
+                          <span className="comm-type-badge">{cm.type}</span>
+                        </div>
+                        <time className="comm-card-when">
+                          {cm.date}
+                          {cm.author ? ` · ${cm.author}` : ''}
+                        </time>
+                      </header>
+                      <h4 className="comm-card-subj">{cm.subj || '(No subject)'}</h4>
+                      {cm.body?.trim() ? (
+                        <div className="comm-card-body">{cm.body}</div>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
               )}
             </div>
           )}

@@ -73,7 +73,7 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
 - [x] B5. Complete Photo Gallery end-to-end: gallery metadata plus existing upload/delete CRM APIs, UI/hooks, tests, and direct-path removal.
 - [x] B6. Complete Weather Guide end-to-end: weather API/repository, refresh authorization, UI/hooks, tests, and direct-path removal.
 - [x] B7. Replace generic browser hydrate and auto-sync only for fully migrated scoped features. *(Profile inquiry/comms via `/api/customers/:id/inquiry|comms`; empty Dev B `PAGE_BOOT`; shell/route-cache denylist; cutover tests `tests/b7-dev-b-hydrate-cutover.test.ts`.)*
-- [ ] B8. Build browser-network, parity, permission, and Redis-down regression coverage; lead final UI acceptance.
+- [x] B8. Build browser-network, parity, permission, and Redis-down regression coverage; lead final UI acceptance. *(2026-08-25: `e2e/dev-b-*.spec.ts`, `tests/dashboard-redis-down.test.ts`, `tests/weather-redis-down.test.ts`, `Personal/docs/bff-b8-final-acceptance.md`.)*
 
 ### Shared rules and handoffs
 

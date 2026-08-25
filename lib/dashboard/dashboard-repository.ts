@@ -43,7 +43,12 @@ function cacheKey(filters: DashboardFilters): string {
 }
 
 export async function invalidateDashboardCache(): Promise<void> {
-  await cacheInvalidatePattern(`${DASHBOARD_CACHE_PREFIX}*`);
+  try {
+    await cacheInvalidatePattern(`${DASHBOARD_CACHE_PREFIX}*`);
+  } catch (error) {
+    // Cache is optional: a completed mutation must still succeed.
+    console.warn('[Redis Cache Error] Dashboard cache invalidation failed:', error);
+  }
 }
 
 async function createDashboardClient() {

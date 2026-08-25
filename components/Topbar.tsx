@@ -9,6 +9,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
 import { useSupabasePanel } from '@/lib/context/SupabaseContext';
 import { isAutoSyncEnabled } from '@/lib/env';
+import { cancelSessionRefreshRequest } from '@/lib/auth/refresh-request-control';
 import { AiCopilotTrigger } from '@/components/AiCopilot';
 import type { PageSlug } from '@/lib/types';
 import { toast } from '@/lib/toast';
@@ -99,6 +100,7 @@ export default function Topbar({ onMenuToggle, showMenuToggle = false }: TopbarP
   };
 
   const handleLogout = async () => {
+    cancelSessionRefreshRequest();
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {

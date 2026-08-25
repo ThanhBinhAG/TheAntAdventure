@@ -6,6 +6,10 @@ import {
   getSessionRefreshDelayMs,
   SESSION_REFRESH_INTERVAL_MS,
 } from '@/lib/auth/refresh-backoff';
+import {
+  cancelSessionRefreshRequest,
+  registerSessionRefreshRequest,
+} from '@/lib/auth/refresh-request-control';
 
 // Supabase starts proactive renewal 90 seconds before expiry. Checking every
 // minute guarantees at least one check inside that window for 5- and 15-minute JWTs.
@@ -31,10 +35,13 @@ export function SupabaseSessionRefresher() {
         return;
       }
       refreshing = true;
+      const controller = new AbortController();
+      const unregisterRequest = registerSessionRefreshRequest(controller);
       try {
         const response = await fetch('/api/auth/refresh', {
           method: 'POST',
           credentials: 'same-origin',
+          signal: controller.signal,
         });
         if (response.status === 401) {
           router.replace('/login');
@@ -50,9 +57,11 @@ export function SupabaseSessionRefresher() {
         failedAttempts = 0;
         schedule(SESSION_REFRESH_INTERVAL_MS);
       } catch {
+        if (controller.signal.aborted) return;
         failedAttempts += 1;
         schedule(getSessionRefreshDelayMs(failedAttempts));
       } finally {
+        unregisterRequest();
         refreshing = false;
       }
     };
@@ -69,6 +78,7 @@ export function SupabaseSessionRefresher() {
     document.addEventListener('visibilitychange', refreshOnVisible);
     return () => {
       if (timer !== undefined) window.clearTimeout(timer);
+      cancelSessionRefreshRequest();
       window.removeEventListener('focus', refreshOnVisible);
       document.removeEventListener('visibilitychange', refreshOnVisible);
     };

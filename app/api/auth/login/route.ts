@@ -16,6 +16,7 @@ import { getLoginClientMetadata } from '@/lib/auth/login-history';
 import { recordSuccessfulLogin } from '@/lib/auth/login-history-store';
 import { recordAuthSecurityEvent } from '@/lib/auth/security-audit';
 import { debugLog } from '@/lib/system/debug-logger';
+import { requestLogger } from '@/lib/system/server-logger';
 
 type LoginBody = {
   identity?: string;
@@ -59,6 +60,7 @@ async function recordSuccessfulLoginSafely(input: {
   userId: string | null;
   authMethod: 'password' | 'break_glass';
   request: Request;
+  logger: ReturnType<typeof requestLogger>['logger'];
 }): Promise<void> {
   try {
     await recordSuccessfulLogin({
@@ -66,12 +68,16 @@ async function recordSuccessfulLoginSafely(input: {
       authMethod: input.authMethod,
       metadata: getLoginClientMetadata(input.request),
     });
-  } catch {
-    console.error('Không thể ghi lịch sử đăng nhập.');
+  } catch (err) {
+    input.logger.warn(
+      { event: 'auth_login_history.write_failed', authMethod: input.authMethod, err },
+      'Login history write failed'
+    );
   }
 }
 
 export async function POST(request: Request) {
+  const { logger } = requestLogger(request, 'auth/login');
   const ip = getClientIp(request);
   const rate = await checkLoginRateLimit(ip);
   if (!rate.ok) {
@@ -124,6 +130,7 @@ export async function POST(request: Request) {
         userId: null,
         authMethod: 'break_glass',
         request,
+        logger,
       });
       void recordAuthSecurityEvent({
         eventType: 'login_succeeded',
@@ -136,6 +143,7 @@ export async function POST(request: Request) {
         level: 'error',
         meta: { message: error instanceof Error ? error.message : 'unknown' },
       });
+      logger.error({ event: 'auth.break_glass_login_failed', err: error }, 'Break-glass login failed');
       return fail(500, 'Break-glass session is not available.');
     }
   }
@@ -151,7 +159,7 @@ export async function POST(request: Request) {
   try {
     supabase = createSupabaseRouteClient(request, response);
   } catch (error) {
-    console.error(error);
+    logger.error({ event: 'auth.supabase_client_create_failed', err: error }, 'Supabase Auth client creation failed');
     await recordLoginFailure(ip);
     return fail(503, 'Supabase Auth chưa được cấu hình.');
   }
@@ -194,6 +202,7 @@ export async function POST(request: Request) {
     userId: data.user.id,
     authMethod: 'password',
     request,
+    logger,
   });
   void recordAuthSecurityEvent({
     eventType: 'login_succeeded',

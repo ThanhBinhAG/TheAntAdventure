@@ -8,7 +8,7 @@ Health, diagnostics, and app/debug logging.
 - `process-memory.ts` — V8/process heap snapshot for health diagnostics
 - `semaphore.ts` — shared FIFO semaphore (Sharp + PDF)
 - `pdf-concurrency.ts` — `pdfBrowserGate` (max 1 Chromium PDF at a time)
-- `run-diagnostics.ts`, `app-logger.ts`, `debug-*.ts`
+- `server-logger.ts` (Pino stdout), `client-logger.ts`, `run-diagnostics.ts`, `debug-*.ts`
 
 ## Boundaries
 - UI: `components/system`. APIs: `app/api/system`, `app/api/health`.

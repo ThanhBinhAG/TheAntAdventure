@@ -1,5 +1,5 @@
 import { isRemoteDataEnabled as remoteEnabled } from '../../env';
-import { appLog } from '../../system/app-logger';
+import { clientLog } from '../../system/client-logger';
 import { useStore } from '../../store';
 import type { PageSlug } from '../../types';
 import {
@@ -82,7 +82,7 @@ async function runPageBoot(slug: PageSlug): Promise<boolean> {
     if (!bootTables.length) {
       markReadyFromStore();
       if (isBootStillActive(slug)) {
-        appLog('hydrate', 'Route boot skipped (no tables)', { meta: { slug } });
+        clientLog('hydrate', 'Route boot skipped (no tables)', { meta: { slug } });
       }
       if (slug === 'teamchat' && isBootStillActive(slug)) {
         await ensureMessagesLoaded();
@@ -110,7 +110,7 @@ async function runPageBoot(slug: PageSlug): Promise<boolean> {
 
       markReadyFromStore();
       persistRouteCache(slug);
-      appLog('hydrate', 'Route boot from cache', {
+      clientLog('hydrate', 'Route boot from cache', {
         meta: {
           slug,
           tables: bootTables.length,
@@ -128,7 +128,7 @@ async function runPageBoot(slug: PageSlug): Promise<boolean> {
 
       markReadyFromStore();
       persistRouteCache(slug);
-      appLog('hydrate', 'Route boot from network', {
+      clientLog('hydrate', 'Route boot from network', {
         meta: { slug, tables: bootTables.length, source: 'network' },
       });
     }
@@ -140,7 +140,7 @@ async function runPageBoot(slug: PageSlug): Promise<boolean> {
   } catch (e) {
     if (!isBootStillActive(slug)) return routeBootSatisfied(slug);
     const message = e instanceof Error ? e.message : 'Hydrate failed';
-    appLog('hydrate', 'Route boot failed', { level: 'warn', error: e, meta: { slug } });
+    clientLog('hydrate', 'Route boot failed', { level: 'warn', error: e, meta: { slug } });
     markHydrationFailed(message);
     return false;
   }
@@ -207,7 +207,7 @@ export async function ensureTablesLoaded(tables: readonly SyncArrayTable[]): Pro
       markTablesHydrated(missing);
       const backup = useStore.getState().exportBackup();
       updateBaselineCounts(baselineForTables(missing, backup));
-      appLog('hydrate', 'ensureTablesLoaded applied', { meta: { tables: missing } });
+      clientLog('hydrate', 'ensureTablesLoaded applied', { meta: { tables: missing } });
     } finally {
       ensureInFlight.delete(key);
     }

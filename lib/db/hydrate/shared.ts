@@ -1,5 +1,5 @@
 import { withoutAutoSyncAsync } from '../auto-sync';
-import { appLog } from '../../system/app-logger';
+import { clientLog } from '../../system/client-logger';
 import { mergeAttractionSeeds } from '../../attractions/ensure-attraction-seeds';
 import { mergeRequiredProducts } from '../../products/ensure-core-products';
 import { mergeSupplierSeeds } from '../../suppliers/ensure-supplier-seeds';
@@ -243,9 +243,9 @@ async function revalidateTablesInBackground(tables: readonly SyncArrayTable[]): 
     // Force refetch even when tables are already marked hydrated (boot-from-cache path).
     await fetchAndApplyTables(toFetch, 'Route revalidate', { force: true });
     persistRouteCache();
-    appLog('hydrate', 'Route background revalidate done', { meta: { tables: toFetch } });
+    clientLog('hydrate', 'Route background revalidate done', { meta: { tables: toFetch } });
   } catch (e) {
-    appLog('hydrate', 'Route background revalidate failed — keeping cache', {
+    clientLog('hydrate', 'Route background revalidate failed — keeping cache', {
       level: 'warn',
       error: e,
     });

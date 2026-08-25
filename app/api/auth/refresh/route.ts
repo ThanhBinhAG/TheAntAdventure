@@ -76,7 +76,8 @@ export async function POST(request: Request) {
 
     stage = 'set_access_cookie';
     // `tokens-only` storage has no safe session.user/session.id. This helper
-    // reads only access-token expiry fields, so proactive refresh cannot fail.
+    // reads only access-token expiry fields, so proactive refresh cannot fail
+    // because of the absent user object.
     setSupabaseAccessCookie(response, session);
     clearLegacyCrmAuthCookies(response);
     void recordAuthSecurityEvent({ eventType: 'refresh_succeeded', ip });

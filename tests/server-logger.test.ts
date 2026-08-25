@@ -77,3 +77,72 @@ test('server logger applies safe log levels and request IDs', async () => {
     /^[0-9a-f-]{36}$/
   );
 });
+
+test('HTTP logging contract adds request context and selects the completion level', async () => {
+  const { createHttpRequestLogger, createServerLogger } = await import('../lib/system/server-logger');
+  const destination = new CapturingStream();
+  const logger = createServerLogger({ level: 'trace', destination });
+  const request = new Request('https://crm.test/api/products', {
+    method: 'POST',
+    headers: { 'x-request-id': 'request-42' },
+  });
+
+  const httpLogger = createHttpRequestLogger(
+    request,
+    {
+      scope: 'catalog/products',
+      route: '/api/products',
+    },
+    logger
+  );
+  httpLogger.logCompletion({ statusCode: 201, durationMs: 27, resourceId: 'product-42', actorId: 'user-42' });
+  httpLogger.logCompletion({ statusCode: 302, durationMs: 2 });
+  httpLogger.logCompletion({ statusCode: 401, durationMs: 3 });
+  httpLogger.logCompletion({ statusCode: 503, durationMs: 8 });
+
+  const healthLogger = createHttpRequestLogger(
+    new Request('https://crm.test/api/health'),
+    { scope: 'system/health', route: '/api/health', healthCheck: true },
+    logger
+  );
+  healthLogger.logCompletion({ statusCode: 200, durationMs: 1 });
+  healthLogger.logCompletion({ statusCode: 503, durationMs: 1 });
+
+  const entries = destination.lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+  assert.deepEqual(entries.map((entry) => entry.level), [30, 30, 40, 50, 20, 50]);
+  assert.deepEqual(entries[0], {
+    level: 30,
+    time: entries[0].time,
+    service: 'the-ant-adventures-crm',
+    environment: process.env.NODE_ENV ?? 'development',
+    version: process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown',
+    scope: 'catalog/products',
+    requestId: 'request-42',
+    route: '/api/products',
+    method: 'POST',
+    actorId: 'user-42',
+    event: 'http.request.completed',
+    statusCode: 201,
+    durationMs: 27,
+    resourceId: 'product-42',
+    msg: 'HTTP request completed',
+  });
+});
+
+test('HTTP logging contract rejects unsafe actor and resource identifiers', async () => {
+  const { createHttpRequestLogger, createServerLogger } = await import('../lib/system/server-logger');
+  const destination = new CapturingStream();
+  const logger = createServerLogger({ level: 'trace', destination });
+  const httpLogger = createHttpRequestLogger(
+    new Request('https://crm.test/api/products'),
+    { scope: 'catalog/products', route: '/api/products', actorId: 'person@example.test' },
+    logger
+  );
+
+  httpLogger.logCompletion({ statusCode: 200, durationMs: -4, resourceId: 'Bearer unsafe-token' });
+
+  const entry = JSON.parse(destination.lines.join('')) as Record<string, unknown>;
+  assert.equal(entry.actorId, undefined);
+  assert.equal(entry.resourceId, undefined);
+  assert.equal(entry.durationMs, 0);
+});

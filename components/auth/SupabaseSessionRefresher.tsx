@@ -3,7 +3,9 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-const REFRESH_CHECK_INTERVAL_MS = 4 * 60 * 1000;
+// Supabase starts proactive renewal 90 seconds before expiry. Checking every
+// minute guarantees at least one check inside that window for 5- and 15-minute JWTs.
+const REFRESH_CHECK_INTERVAL_MS = 60 * 1000;
 
 /** Keeps the HttpOnly Supabase SSR session current while the CRM is open. */
 export function SupabaseSessionRefresher() {

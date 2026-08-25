@@ -26,7 +26,7 @@ const issuer = 'https://supabase.example.test/auth/v1';
 
 async function signedToken(input: {
   audience?: string;
-  expiresAt?: number;
+  expiresAt?: number | null;
   issuer?: string;
   subject?: string | null;
 }) {
@@ -43,8 +43,8 @@ async function signedToken(input: {
     .setProtectedHeader({ alg: 'ES256', kid: 'test-key' })
     .setIssuer(input.issuer ?? issuer)
     .setAudience(input.audience ?? 'authenticated')
-    .setIssuedAt()
-    .setExpirationTime(input.expiresAt ?? '5m')
+    .setIssuedAt();
+  if (input.expiresAt !== null) token.setExpirationTime(input.expiresAt ?? '5m');
   if (input.subject !== null) token.setSubject(input.subject ?? 'user-1');
 
   return { token: await token.sign(privateKey), jwks };
@@ -70,6 +70,7 @@ test('rejects a Supabase token with invalid required claims', async () => {
   const expired = await signedToken({ expiresAt: Math.floor(Date.now() / 1000) - 1 });
   const wrongIssuer = await signedToken({ issuer: 'https://attacker.example.test/auth/v1' });
   const missingSubject = await signedToken({ subject: null });
+  const missingExpiry = await signedToken({ expiresAt: null });
 
   assert.equal(await verify(wrongAudience.token, {
     issuer,
@@ -87,4 +88,20 @@ test('rejects a Supabase token with invalid required claims', async () => {
     issuer,
     jwks: missingSubject.jwks,
   }), null);
+  assert.equal(await verify(missingExpiry.token, {
+    issuer,
+    jwks: missingExpiry.jwks,
+  }), null);
+});
+
+test('uses the configured public issuer when the server reaches Supabase privately', async () => {
+  const previousIssuer = process.env.SUPABASE_JWT_ISSUER;
+  process.env.SUPABASE_JWT_ISSUER = issuer;
+  try {
+    const { getSupabaseAuthIssuer } = await import('../lib/auth/supabase-jwt');
+    assert.equal(getSupabaseAuthIssuer('http://supabase-gateway:8000'), issuer);
+  } finally {
+    if (previousIssuer === undefined) delete process.env.SUPABASE_JWT_ISSUER;
+    else process.env.SUPABASE_JWT_ISSUER = previousIssuer;
+  }
 });

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { createHash } from 'node:crypto';
 import { getAdminSupabaseClient } from '@/lib/supabase/server';
+import { serverLogger } from '@/lib/system/server-logger';
 
 export type AuthSecurityEventType =
   | 'login_succeeded'
@@ -32,7 +33,10 @@ export async function recordAuthSecurityEvent(input: {
         session_id: input.sessionId ?? null,
         ip_hash: ipHash,
       });
-  } catch {
-    // Deliberately silent: audit must not expose auth internals or block users.
+  } catch (err) {
+    serverLogger.warn(
+      { scope: 'auth/security-audit', event: 'auth_security_audit.write_failed', auditEvent: input.eventType, err },
+      'Auth security audit write failed'
+    );
   }
 }

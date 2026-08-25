@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { clearSupabaseAuthCookies } from '@/lib/auth/cookie-hygiene';
 import { getClientIp } from '@/lib/auth/rate-limit';
+import { hasTrustedRequestOrigin } from '@/lib/auth/request-origin';
 import { recordAuthSecurityEvent } from '@/lib/auth/security-audit';
 import {
   clearLegacyCrmAuthCookies,
@@ -21,6 +22,10 @@ function copyCookies(source: NextResponse, target: NextResponse): void {
 }
 
 export async function POST(request: Request) {
+  if (!hasTrustedRequestOrigin(request)) {
+    return NextResponse.json({ ok: false, error: 'Origin không hợp lệ.' }, { status: 403 });
+  }
+
   const cookieHeader = request.headers.get('cookie');
   const ip = getClientIp(request);
   const response = NextResponse.json({ ok: true });

@@ -5,8 +5,8 @@ Browser Supabase client factory and session helpers for [`proxy.ts`](../../proxy
 
 ## Contents
 - `client.ts`, `index.ts`, `middleware.ts` — `updateSession` used by root `proxy.ts` (chunk upload and self-authorizing Products APIs skip duplicate proxy Auth)
-- `tls-config.ts` — TLS insecure flags (no undici; safe for proxy)
-- `insecure-fetch.ts` — Node/`server-only` undici Agent for company Supabase TLS
+- `tls-config.ts` — development-only TLS escape hatch (no undici; safe for proxy)
+- `insecure-fetch.ts` — Node/`server-only` undici Agent for an explicitly opted-in local self-signed Supabase
 
 ## Boundaries
 - Hydrate/push: `lib/db`. React sync context: `lib/context`.

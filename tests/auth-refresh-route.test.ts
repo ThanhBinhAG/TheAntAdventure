@@ -11,7 +11,7 @@ require.cache[serverOnlyPath] = {
   exports: {},
 } as NodeModule;
 
-let refreshable = true;
+let refreshState: 'active' | 'missing' | 'unavailable' | 'rejected' = 'active';
 let accessCookieIssued = false;
 let accessCookieCleared = false;
 
@@ -19,8 +19,16 @@ mock.module(require.resolve('../lib/auth/supabase-ssr'), {
   namedExports: {
     createSupabaseRouteClient: () => ({
       auth: {
-        refreshSession: async () => refreshable
-          ? {
+        getSession: async () => {
+          if (refreshState === 'unavailable') throw new Error('Supabase network unavailable');
+          if (refreshState === 'missing') return { data: { session: null }, error: null };
+          if (refreshState === 'rejected') {
+            return {
+              data: { session: null },
+              error: Object.assign(new Error('Invalid refresh token'), { status: 401 }),
+            };
+          }
+          return {
             data: {
               session: {
                 access_token: 'renewed-access-token',
@@ -30,8 +38,8 @@ mock.module(require.resolve('../lib/auth/supabase-ssr'), {
               },
             },
             error: null,
-          }
-          : { data: { session: null }, error: new Error('session expired') },
+          };
+        },
       },
     }),
     setSupabaseAccessCookie: () => { accessCookieIssued = true; },
@@ -52,16 +60,16 @@ mock.module(require.resolve('../lib/auth/cookie-hygiene'), {
   namedExports: { clearSupabaseAuthCookies: () => {} },
 });
 
-test('Supabase refresh replaces HttpOnly credentials without returning a token in JSON', async (t) => {
+test('Supabase refresh preserves the HttpOnly session without returning a token in JSON', async (t) => {
   const route = await import('../app/api/auth/refresh/route');
 
   await t.beforeEach(() => {
-    refreshable = true;
+    refreshState = 'active';
     accessCookieIssued = false;
     accessCookieCleared = false;
   });
 
-  await t.test('rotates the Supabase session and returns no credential body', async () => {
+  await t.test('updates the access mirror and returns no credential body', async () => {
     const response = await route.POST(new Request('https://crm.example.test/api/auth/refresh', {
       method: 'POST',
       headers: { Origin: 'https://crm.example.test' },
@@ -72,8 +80,8 @@ test('Supabase refresh replaces HttpOnly credentials without returning a token i
     assert.equal(accessCookieIssued, true);
   });
 
-  await t.test('returns 401 and clears access credentials when refresh is rejected', async () => {
-    refreshable = false;
+  await t.test('returns 401 and clears access credentials when the session is missing', async () => {
+    refreshState = 'missing';
     const response = await route.POST(new Request('https://crm.example.test/api/auth/refresh', {
       method: 'POST',
       headers: { Origin: 'https://crm.example.test' },
@@ -81,5 +89,27 @@ test('Supabase refresh replaces HttpOnly credentials without returning a token i
 
     assert.equal(response.status, 401);
     assert.equal(accessCookieCleared, true);
+  });
+
+  await t.test('returns 401 and clears access credentials when Supabase rejects the refresh token', async () => {
+    refreshState = 'rejected';
+    const response = await route.POST(new Request('https://crm.example.test/api/auth/refresh', {
+      method: 'POST',
+      headers: { Origin: 'https://crm.example.test' },
+    }));
+
+    assert.equal(response.status, 401);
+    assert.equal(accessCookieCleared, true);
+  });
+
+  await t.test('returns 503 without clearing credentials when Supabase is temporarily unavailable', async () => {
+    refreshState = 'unavailable';
+    const response = await route.POST(new Request('https://crm.example.test/api/auth/refresh', {
+      method: 'POST',
+      headers: { Origin: 'https://crm.example.test' },
+    }));
+
+    assert.equal(response.status, 503);
+    assert.equal(accessCookieCleared, false);
   });
 });

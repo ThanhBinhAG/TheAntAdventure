@@ -22,6 +22,11 @@ export function getServerSupabaseAnonKey() {
   return (process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
 }
 
+/** Server-only public JWT issuer; needed when the server uses a private Supabase URL. */
+export function getSupabaseJwtIssuer() {
+  return (process.env.SUPABASE_JWT_ISSUER ?? '').trim();
+}
+
 
 export function isUseSupabaseEnabled() {
   const v = (process.env.NEXT_PUBLIC_USE_SUPABASE ?? '').trim().toLowerCase();

@@ -1,4 +1,4 @@
-import { appLog } from '../../system/app-logger';
+import { clientLog } from '../../system/client-logger';
 import { isRemoteDataEnabled as remoteEnabled } from '../../env';
 import { useStore } from '../../store';
 import { clearRouteCache } from '../route-cache';
@@ -78,7 +78,7 @@ export async function hydrateFromSupabase(): Promise<boolean> {
     return true;
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Hydrate failed';
-    appLog('hydrate', 'Full hydrate failed', { level: 'warn', error: e });
+    clientLog('hydrate', 'Full hydrate failed', { level: 'warn', error: e });
     markHydrationFailed(message);
     return false;
   }

@@ -37,7 +37,7 @@ function buildImageRemotePatterns() {
 }
 
 /** Native / heavy server packages — do not webpack-bundle (dev memory + runtime). */
-const SERVER_EXTERNAL_PACKAGES = ['sharp', 'puppeteer-core', '@sparticuz/chromium', 'xlsx'];
+const SERVER_EXTERNAL_PACKAGES = ['sharp', 'puppeteer-core', '@sparticuz/chromium', 'xlsx', 'pino'];
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',

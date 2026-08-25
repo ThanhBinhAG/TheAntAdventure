@@ -207,7 +207,7 @@ npm run dev
 
 ### JWT access / refresh (khuyến nghị)
 
-App dùng **Supabase Auth JWT** trong cookie HttpOnly (`@supabase/ssr`). Middleware gọi `getUser()` để refresh session — không tự mint access/refresh riêng cho user thường.
+App dùng **Supabase Auth JWT** trong cookie HttpOnly (`@supabase/ssr`). Proxy gọi `getSession()` để refresh khi token sắp hết hạn, rồi `getClaims()` để xác minh identity — không tự mint access/refresh riêng cho user thường.
 
 Trên Supabase Dashboard → **Authentication** → **Settings** (hoặc **Sessions**):
 
@@ -217,6 +217,8 @@ Trên Supabase Dashboard → **Authentication** → **Settings** (hoặc **Sessi
 | Refresh token | Giữ mặc định Supabase | Dùng để cấp access mới khi hết hạn |
 
 Sau khi đổi JWT expiry, user đang đăng nhập có thể cần **logout rồi login lại**.
+
+Nếu CRM server gọi Supabase qua hostname nội bộ (`SUPABASE_URL=http://supabase-gateway:8000`), đặt thêm `SUPABASE_JWT_ISSUER` bằng issuer public mà Auth ghi vào JWT, ví dụ `https://sb.example.com/auth/v1`. Không đưa biến này ra browser.
 
 Login đi qua `POST /api/auth/login` (rate-limit theo IP: tối đa ~10 lần thất bại / 15 phút). Logout: `POST /api/auth/logout`.
 

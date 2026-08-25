@@ -14,7 +14,7 @@ import {
   galleryThumbPath,
   PHOTOS_BUCKET,
 } from '@/lib/storage/photo-paths';
-import { appLog } from '@/lib/system/app-logger';
+import { serverLogger } from '@/lib/system/server-logger';
 
 export type GalleryUploadResult = {
   url: string;
@@ -194,9 +194,9 @@ export async function deleteGalleryPhotoFilesServer(
   const paths = galleryDeleteCandidatePaths(photoId, storagePath);
   const { error } = await client.storage.from(PHOTOS_BUCKET).remove(paths);
   if (error) {
-    appLog('storage', 'deleteGalleryPhotoFilesServer failed', {
-      level: 'warn',
-      meta: { photoId, error: error.message },
-    });
+    serverLogger.warn(
+      { scope: 'storage/gallery', event: 'gallery_photo_files.delete_failed', photoId, err: error },
+      'Gallery photo file deletion failed'
+    );
   }
 }

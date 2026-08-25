@@ -6,7 +6,7 @@ import {
   jwtVerify,
   type JWTVerifyGetKey,
 } from 'jose';
-import { getServerSupabaseUrl } from '@/lib/env';
+import { getServerSupabaseUrl, getSupabaseJwtIssuer } from '@/lib/env';
 import { getSupabaseFetch } from '@/lib/supabase/insecure-fetch';
 
 const SUPABASE_AUDIENCE = 'authenticated';
@@ -28,6 +28,9 @@ type VerifyOptions = {
 const remoteJwksByIssuer = new Map<string, JWTVerifyGetKey>();
 
 export function getSupabaseAuthIssuer(supabaseUrl = getServerSupabaseUrl()): string | null {
+  const configuredIssuer = getSupabaseJwtIssuer().replace(/\/$/, '');
+  if (configuredIssuer) return configuredIssuer;
+
   const origin = supabaseUrl.replace(/\/$/, '');
   return origin ? `${origin}/auth/v1` : null;
 }
@@ -60,7 +63,11 @@ export async function verifySupabaseAccessToken(
       audience: options.audience ?? SUPABASE_AUDIENCE,
       algorithms: ['ES256', 'EdDSA', 'RS256'],
     });
-    if (typeof payload.sub !== 'string' || !payload.sub) return null;
+    if (
+      typeof payload.exp !== 'number'
+      || typeof payload.sub !== 'string'
+      || !payload.sub
+    ) return null;
 
     return {
       userId: payload.sub,

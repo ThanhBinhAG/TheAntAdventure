@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getRedisClient } from '@/lib/redis/client';
+import { serverLogger } from '@/lib/system/server-logger';
 
 const INVALIDATION_DELETE_BATCH_SIZE = 100;
 
@@ -18,7 +19,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
 
     return JSON.parse(raw) as T;
   } catch (error) {
-    console.warn(`[Redis Cache Error] Không thể đọc key "${key}":`, error);
+    serverLogger.warn({ scope: 'redis/cache', event: 'redis.cache.read_failed', err: error }, 'Redis cache read failed');
     return null;
   }
 }
@@ -44,7 +45,7 @@ export async function cacheSet<T>(
     }
     return true;
   } catch (error) {
-    console.warn(`[Redis Cache Error] Không thể ghi key "${key}":`, error);
+    serverLogger.warn({ scope: 'redis/cache', event: 'redis.cache.write_failed', err: error }, 'Redis cache write failed');
     return false;
   }
 }
@@ -64,7 +65,7 @@ export async function cacheDel(key: string | string[]): Promise<boolean> {
     await client.del(keysToDelete);
     return true;
   } catch (error) {
-    console.warn(`[Redis Cache Error] Không thể xóa key(s) "${key}":`, error);
+    serverLogger.warn({ scope: 'redis/cache', event: 'redis.cache.delete_failed', err: error }, 'Redis cache delete failed');
     return false;
   }
 }
@@ -80,7 +81,7 @@ export async function cacheIncr(key: string): Promise<number | null> {
 
     return await client.incr(key);
   } catch (error) {
-    console.warn(`[Redis Cache Error] Không thể tăng key "${key}":`, error);
+    serverLogger.warn({ scope: 'redis/cache', event: 'redis.cache.increment_failed', err: error }, 'Redis cache increment failed');
     return null;
   }
 }
@@ -105,6 +106,6 @@ export async function cacheInvalidatePattern(pattern: string): Promise<void> {
       }
     }
   } catch (error) {
-    console.warn(`[Redis Cache Error] Không thể invalidate pattern "${pattern}":`, error);
+    serverLogger.warn({ scope: 'redis/cache', event: 'redis.cache.invalidate_failed', err: error }, 'Redis cache invalidation failed');
   }
 }

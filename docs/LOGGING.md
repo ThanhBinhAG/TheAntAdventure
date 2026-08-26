@@ -16,6 +16,8 @@ Server code emits newline-delimited JSON through Pino to stdout; the container p
 - Set `LOG_LEVEL` to `info` in production; temporarily use `debug` only while investigating an incident.
 - Use the returned child logger for related server events so they share the same request context.
 - Sensitive routes emit stable, searchable domain events under `auth.`, `access_control.`, `gallery.`, `branding.`, `dashboard.`, `sidebar.`, or `weather.`. Record outcome/status and safe error identifiers only; never attach request bodies, user-entered queries, email addresses, cookies, or media paths.
+- Redis cache failures use stable `redis.cache.*_failed` / `redis.connection.failed` events with an infrastructure scope. Do not log Redis keys, patterns, values, URLs, or credentials. Dashboard and product-cache invalidation failures use their own domain events and preserve cache fallback behavior.
+- `debug-logger` retains its bounded in-memory diagnostic buffer; its optional stdout signal is Pino `debug` (`system.debug.emitted`) with a fixed message and no debug payload. `client-logger` remains browser-only and development-only.
 
 ## Boundaries
 

@@ -1,4 +1,5 @@
 import { isSystemDebugEnabled, maskSecret } from './debug-config';
+import { serverLogger } from './server-logger';
 
 export type DebugLogLevel = 'info' | 'warn' | 'error';
 export type DebugLogCategory = 'middleware' | 'auth' | 'diagnostics' | 'supabase';
@@ -55,11 +56,15 @@ export function debugLog(
   buffer.push(entry);
   if (buffer.length > MAX_ENTRIES) buffer.shift();
 
-  console.log(
-    JSON.stringify({
-      tag: 'system-debug',
-      ...entry,
-    })
+  serverLogger.debug(
+    {
+      scope: 'system/debug',
+      event: 'system.debug.emitted',
+      category,
+      debugId: entry.id,
+      debugLevel: level,
+    },
+    'System debug event emitted',
   );
 }
 

@@ -5,10 +5,7 @@ import {
   optionalProductQueryParam,
   productListQuerySchema,
 } from '@/lib/products/product-list-input';
-import {
-  listProductsPage,
-  ProductListError,
-} from '@/lib/products/product-list-server';
+import { listProductsPage } from '@/lib/products/product-list-server';
 import {
   createProductServer,
   updateProductServer,
@@ -45,7 +42,7 @@ export const GET = bffRoute(
     logging: { scope: 'products', route: '/api/products' },
     requiredPermission: 'products.read',
   },
-  async ({ request, supabase }) => {
+  async ({ request, supabase, logger }) => {
     const url = new URL(request.url);
     const code = url.searchParams.get('code');
     if (code) {
@@ -91,17 +88,7 @@ export const GET = bffRoute(
         }
       );
     } catch (error) {
-      if (error instanceof ProductListError) {
-        console.error(
-          'Không thể lấy danh sách product phân trang:',
-          error.message
-        );
-      } else {
-        console.error(
-          'Lỗi không xác định khi lấy danh sách product:',
-          error
-        );
-      }
+      logger.error({ event: 'products.list.failed', err: error }, 'Product list failed');
 
       return NextResponse.json(
         {

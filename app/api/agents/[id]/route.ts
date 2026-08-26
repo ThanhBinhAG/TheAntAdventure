@@ -52,9 +52,9 @@ export const GET = withHttpRequestLogging<RouteContext>(
           { status: 404 },
         );
       }
-      logger.error({ event: 'agents.get.failed', err: error, resourceId: id }, 'Agent lookup failed');
+      logger.error({ event: 'agents.get.failed', err: error }, 'Agent lookup failed');
     } else {
-      logger.error({ event: 'agents.get.failed', err: error, resourceId: id }, 'Agent lookup failed');
+      logger.error({ event: 'agents.get.failed', err: error }, 'Agent lookup failed');
     }
 
     return NextResponse.json(
@@ -117,9 +117,9 @@ export const PATCH = withHttpRequestLogging<RouteContext>(
           { status: 404 },
         );
       }
-      logger.error({ event: 'agents.update.failed', err: error, resourceId: id }, 'Agent update failed');
+      logger.error({ event: 'agents.update.failed', err: error }, 'Agent update failed');
     } else {
-      logger.error({ event: 'agents.update.failed', err: error, resourceId: id }, 'Agent update failed');
+      logger.error({ event: 'agents.update.failed', err: error }, 'Agent update failed');
     }
 
     return NextResponse.json(
@@ -170,9 +170,9 @@ export const DELETE = withHttpRequestLogging<RouteContext>(
           { status: 409 },
         );
       }
-      logger.error({ event: 'agents.delete.failed', err: error, resourceId: id }, 'Agent deletion failed');
+      logger.error({ event: 'agents.delete.failed', err: error }, 'Agent deletion failed');
     } else {
-      logger.error({ event: 'agents.delete.failed', err: error, resourceId: id }, 'Agent deletion failed');
+      logger.error({ event: 'agents.delete.failed', err: error }, 'Agent deletion failed');
     }
 
     return NextResponse.json(

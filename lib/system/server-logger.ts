@@ -164,9 +164,10 @@ export function withHttpRequestLogging<TContext>(
     routeContext: TContext,
     requestLog: HttpRequestLogger,
   ) => Promise<Response>,
+  parentLogger: Logger = serverLogger,
 ): (request: Request, routeContext: TContext) => Promise<Response> {
   return async (request, routeContext) => {
-    const requestLog = createHttpRequestLogger(request, context);
+    const requestLog = createHttpRequestLogger(request, context, parentLogger);
     const response = await handler(request, routeContext, requestLog);
     return requestLog.completeResponse(response);
   };

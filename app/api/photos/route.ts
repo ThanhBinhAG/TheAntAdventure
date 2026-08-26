@@ -4,14 +4,14 @@ import {
   galleryListQuerySchema,
   optionalGalleryQueryParam,
 } from '@/lib/gallery/gallery-list-input';
-import {
-  GalleryRepositoryError,
-  listPhotosPage,
-} from '@/lib/gallery/photo-repository';
+import { listPhotosPage } from '@/lib/gallery/photo-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'gallery/photos', route: '/api/photos' },
+  async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('gallery.read');
 
   if (!permission.allowed) {
@@ -57,11 +57,7 @@ export async function GET(request: Request) {
       },
     );
   } catch (error) {
-    if (error instanceof GalleryRepositoryError) {
-      console.error('Không thể lấy danh sách ảnh:', error.message);
-    } else {
-      console.error('Lỗi không xác định khi lấy danh sách ảnh:', error);
-    }
+    logger.error({ event: 'gallery.photos.list.failed', err: error }, 'Photo list failed');
 
     return NextResponse.json(
       {
@@ -71,4 +67,5 @@ export async function GET(request: Request) {
       { status: 500 },
     );
   }
-}
+  },
+);

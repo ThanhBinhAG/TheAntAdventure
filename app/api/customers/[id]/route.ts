@@ -7,6 +7,7 @@ import {
   getCustomerById,
   updateCustomer,
 } from '@/lib/customers/customer-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,9 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function GET(_request: Request, context: RouteContext) {
+export const GET = withHttpRequestLogging<RouteContext>(
+  { scope: 'customers/detail', route: '/api/customers/[id]' },
+  async (_request, context, { logger }) => {
   const permission = await checkPermissionForRequest('customers.read');
 
   if (!permission.allowed) {
@@ -49,9 +52,9 @@ export async function GET(_request: Request, context: RouteContext) {
           { status: 404 },
         );
       }
-      console.error('Không thể lấy khách hàng:', error.message);
+      logger.error({ event: 'customers.get.failed', err: error }, 'Customer lookup failed');
     } else {
-      console.error('Lỗi không xác định khi lấy khách hàng:', error);
+      logger.error({ event: 'customers.get.failed', err: error }, 'Customer lookup failed');
     }
 
     return NextResponse.json(
@@ -59,9 +62,12 @@ export async function GET(_request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);
 
-export async function PATCH(request: Request, context: RouteContext) {
+export const PATCH = withHttpRequestLogging<RouteContext>(
+  { scope: 'customers/detail', route: '/api/customers/[id]' },
+  async (request, context, { logger }) => {
   const permission = await checkPermissionForRequest('customers.write');
 
   if (!permission.allowed) {
@@ -128,9 +134,9 @@ export async function PATCH(request: Request, context: RouteContext) {
           { status: 409 },
         );
       }
-      console.error('Không thể cập nhật khách hàng:', error.message);
+      logger.error({ event: 'customers.update.failed', err: error }, 'Customer update failed');
     } else {
-      console.error('Lỗi không xác định khi cập nhật khách hàng:', error);
+      logger.error({ event: 'customers.update.failed', err: error }, 'Customer update failed');
     }
 
     return NextResponse.json(
@@ -138,9 +144,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export const DELETE = withHttpRequestLogging<RouteContext>(
+  { scope: 'customers/detail', route: '/api/customers/[id]' },
+  async (_request, context, { logger }) => {
   const permission = await checkPermissionForRequest('customers.write');
 
   if (!permission.allowed) {
@@ -178,9 +187,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
           { status: 409 },
         );
       }
-      console.error('Không thể xóa khách hàng:', error.message);
+      logger.error({ event: 'customers.delete.failed', err: error }, 'Customer deletion failed');
     } else {
-      console.error('Lỗi không xác định khi xóa khách hàng:', error);
+      logger.error({ event: 'customers.delete.failed', err: error }, 'Customer deletion failed');
     }
 
     return NextResponse.json(
@@ -188,4 +197,5 @@ export async function DELETE(_request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);

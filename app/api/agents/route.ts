@@ -5,16 +5,12 @@ import {
   agentListQuerySchema,
   optionalAgentQueryParam,
 } from '@/lib/agents/agent-list-input';
-import {
-  AgentRepositoryError,
-  createAgent,
-  listAgentsPage,
-} from '@/lib/agents/agent-repository';
+import { createAgent, listAgentsPage } from '@/lib/agents/agent-repository';
 import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
-export const GET = withHttpRequestLogging<void>(
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
   { scope: 'agents', route: '/api/agents' },
   async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('agents.read');
@@ -73,7 +69,7 @@ export const GET = withHttpRequestLogging<void>(
   },
 );
 
-export const POST = withHttpRequestLogging<void>(
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
   { scope: 'agents', route: '/api/agents' },
   async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('agents.write');

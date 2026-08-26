@@ -21,6 +21,18 @@ test.describe.serial('CRM session acceptance', () => {
     expect((await page.request.get('/api/products')).status()).toBe(401);
   });
 
+  test('reload during the initial refresh keeps an authenticated user in CRM', async ({ page }) => {
+    const state = await readE2eState();
+    await login(page, state.admin);
+    // A browser reload is allowed to abort the old document's in-flight
+    // refresh. Chromium reports that expected navigation as ERR_ABORTED.
+    await page.reload({ waitUntil: 'domcontentloaded' }).catch((error: Error) => {
+      if (!/ERR_ABORTED/.test(error.message)) throw error;
+    });
+    await expect(page).not.toHaveURL(/\/login(?:\?|$)/);
+    expect((await page.request.get('/api/products')).status()).toBe(200);
+  });
+
   test('a logged-in user without an assigned role receives 403', async ({ page }) => {
     const state = await readE2eState();
     await login(page, state.unassigned);

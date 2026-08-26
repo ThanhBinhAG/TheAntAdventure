@@ -24,6 +24,7 @@ const taskSchema = z.object({
 // POST: Tạo một task mới
 export const POST = bffRoute(
   {
+    logging: { scope: 'planner', route: '/api/planner' },
     requiredPermission: 'planner.write',
     bodySchema: z.object({
       task: taskSchema,
@@ -38,6 +39,7 @@ export const POST = bffRoute(
 // PATCH: Cập nhật thông tin chi tiết một task
 export const PATCH = bffRoute(
   {
+    logging: { scope: 'planner', route: '/api/planner' },
     requiredPermission: 'planner.write',
     bodySchema: z.object({
       id: z.string().min(1),
@@ -56,6 +58,7 @@ export const PATCH = bffRoute(
 // DELETE: Xóa một task
 export const DELETE = bffRoute(
   {
+    logging: { scope: 'planner', route: '/api/planner' },
     requiredPermission: 'planner.write',
     bodySchema: z.object({
       id: z.string().min(1),

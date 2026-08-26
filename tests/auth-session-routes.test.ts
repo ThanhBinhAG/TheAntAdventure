@@ -16,6 +16,7 @@ let signOutCalls = 0;
 let breakGlassEnabled = false;
 let breakGlassSessionUserThrows = false;
 let lastSecurityAuditUserId: string | null | undefined;
+const loginLogs: Array<{ level: 'info' | 'warn' | 'error'; entry: Record<string, unknown>; message: string }> = [];
 
 function breakGlassSession() {
   const session = {
@@ -143,6 +144,18 @@ mock.module(require.resolve('../lib/auth/security-audit'), {
 mock.module(require.resolve('../lib/system/debug-logger'), {
   namedExports: { debugLog: () => {} },
 });
+mock.module(require.resolve('../lib/system/server-logger'), {
+  namedExports: {
+    requestLogger: () => ({
+      requestId: 'login-request-42',
+      logger: {
+        info: (entry: Record<string, unknown>, message: string) => loginLogs.push({ level: 'info', entry, message }),
+        warn: (entry: Record<string, unknown>, message: string) => loginLogs.push({ level: 'warn', entry, message }),
+        error: (entry: Record<string, unknown>, message: string) => loginLogs.push({ level: 'error', entry, message }),
+      },
+    }),
+  },
+});
 
 test('Supabase auth session routes', async (t) => {
   const loginRoute = await import('../app/api/auth/login/route');
@@ -155,6 +168,7 @@ test('Supabase auth session routes', async (t) => {
     breakGlassEnabled = false;
     breakGlassSessionUserThrows = false;
     lastSecurityAuditUserId = undefined;
+    loginLogs.length = 0;
   });
 
   await t.test('returns an unauthenticated context without a Supabase access token', async () => {
@@ -177,6 +191,11 @@ test('Supabase auth session routes', async (t) => {
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, mode: 'crm' });
     assert.match(response.headers.get('set-cookie') ?? '', /sb-crm-access-token=supabase-access-token/);
+    assert.deepEqual(loginLogs, [{
+      level: 'info',
+      entry: { event: 'auth.login.succeeded', authMethod: 'password', actorId: 'user-1' },
+      message: 'Login succeeded',
+    }]);
   });
 
   await t.test('break-glass login succeeds when tokens-only session.user is unavailable', async () => {
@@ -191,6 +210,11 @@ test('Supabase auth session routes', async (t) => {
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, mode: 'break_glass' });
     assert.equal(lastSecurityAuditUserId, null);
+    assert.deepEqual(loginLogs, [{
+      level: 'info',
+      entry: { event: 'auth.login.succeeded', authMethod: 'break_glass' },
+      message: 'Login succeeded',
+    }]);
   });
 
   await t.test('rejects an invalid password login', async () => {
@@ -205,6 +229,17 @@ test('Supabase auth session routes', async (t) => {
     const body = await response.json();
     assert.equal(body.ok, false);
     assert.match(body.error, /không đúng/);
+    assert.deepEqual(loginLogs, [{
+      level: 'warn',
+      entry: {
+        event: 'auth.login.rejected',
+        statusCode: 401,
+        authMethod: 'password',
+        reason: 'invalid_credentials',
+      },
+      message: 'Login rejected',
+    }]);
+    assert.doesNotMatch(JSON.stringify(loginLogs), /user@example\.com|wrong-password/);
   });
 
   await t.test('signs out at Supabase and clears every browser auth cookie', async () => {

@@ -24,6 +24,10 @@ export type HttpRequestLogger = {
   logger: Logger;
   requestId: string;
   logCompletion: (completion: HttpCompletionLog) => void;
+  completeResponse: (
+    response: Response,
+    completion?: Omit<HttpCompletionLog, 'statusCode' | 'durationMs'>,
+  ) => Response;
 };
 
 const REDACTED = '[redacted]';
@@ -115,6 +119,7 @@ export function createHttpRequestLogger(
   parentLogger: Logger = serverLogger
 ): HttpRequestLogger {
   const requestId = getOrCreateRequestId(request);
+  const startedAt = Date.now();
   const actorId = safeLogIdentifier(context.actorId);
   const logger = parentLogger.child({
     scope: context.scope,
@@ -123,20 +128,27 @@ export function createHttpRequestLogger(
     method: request.method,
     ...(actorId ? { actorId } : {}),
   });
+  const writeCompletion = ({ statusCode, durationMs, resourceId, actorId: completionActorId }: HttpCompletionLog) => {
+    const safeActorId = safeLogIdentifier(completionActorId) ?? actorId;
+    const safeResourceId = safeLogIdentifier(resourceId);
+    const entry = {
+      event: 'http.request.completed',
+      statusCode,
+      durationMs: normalizeDurationMs(durationMs),
+      ...(safeActorId ? { actorId: safeActorId } : {}),
+      ...(safeResourceId ? { resourceId: safeResourceId } : {}),
+    };
+    logger[completionLevel(statusCode, context.healthCheck === true)](entry, 'HTTP request completed');
+  };
 
   return {
     logger,
     requestId,
-    logCompletion: ({ statusCode, durationMs, resourceId, actorId: completionActorId }) => {
-      const safeActorId = safeLogIdentifier(completionActorId) ?? actorId;
-      const entry = {
-        event: 'http.request.completed',
-        statusCode,
-        durationMs: normalizeDurationMs(durationMs),
-        ...(safeActorId ? { actorId: safeActorId } : {}),
-        ...(safeLogIdentifier(resourceId) ? { resourceId } : {}),
-      };
-      logger[completionLevel(statusCode, context.healthCheck === true)](entry, 'HTTP request completed');
+    logCompletion: writeCompletion,
+    completeResponse: (response, completion = {}) => {
+      writeCompletion({ ...completion, statusCode: response.status, durationMs: Date.now() - startedAt });
+      response.headers.set('X-Request-Id', requestId);
+      return response;
     },
   };
 }

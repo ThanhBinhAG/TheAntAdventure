@@ -37,6 +37,7 @@ const tourOutlineDaySchema = z.object({
 
 export const POST = bffRoute(
   {
+    logging: { scope: 'tour-design/save', route: '/api/tour-design/save' },
     requiredPermission: 'tour_design.write',
     bodySchema: z.object({
       draft: tourDraftSchema,

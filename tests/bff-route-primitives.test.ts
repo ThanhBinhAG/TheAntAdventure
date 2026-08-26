@@ -41,6 +41,7 @@ mock.module(require.resolve('../lib/auth/session'), {
 });
 
 let permissionOverride: { allowed: boolean; status?: 401 | 403 } | null = null;
+const testLogging = { logging: { scope: 'test/bff', route: '/api/test' } };
 
 mock.module(require.resolve('../lib/auth/permissions-server'), {
   namedExports: {
@@ -75,7 +76,7 @@ test('BFF Request Primitives - Route Wrapper Tests', async (t) => {
   await t.test('503 Service Unavailable - when JWKS verification is temporarily unavailable', async () => {
     authenticationUnavailable = true;
     try {
-      const handler = bffRoute({}, async () => ({ data: 'should not reach here' }));
+      const handler = bffRoute({ ...testLogging }, async () => ({ data: 'should not reach here' }));
       const response = await handler(new Request('http://localhost/api/test'));
 
       assert.equal(response.status, 503);
@@ -97,7 +98,7 @@ test('BFF Request Primitives - Route Wrapper Tests', async (t) => {
     };
 
     const handler = bffRoute(
-      { requiredPermission: 'dashboard.read' },
+      { ...testLogging, requiredPermission: 'dashboard.read' },
       async () => {
         return { data: 'should not reach here' };
       }
@@ -115,7 +116,7 @@ test('BFF Request Primitives - Route Wrapper Tests', async (t) => {
 
   await t.test('403 Forbidden - when user lacks required permission', async () => {
     const handler = bffRoute(
-      { requiredPermission: 'hr.write' }, // We mocked permissions-server to deny anything except dashboard.read
+      { ...testLogging, requiredPermission: 'hr.write' }, // We mocked permissions-server to deny anything except dashboard.read
       async () => {
         return { data: 'should not reach here' };
       }
@@ -131,6 +132,7 @@ test('BFF Request Primitives - Route Wrapper Tests', async (t) => {
   await t.test('400 Bad Request - when query parameters fail Zod validation', async () => {
     const handler = bffRoute(
       {
+        ...testLogging,
         requiredPermission: 'dashboard.read',
         querySchema: z.object({
           id: z.string().uuid(), // Expecting a UUID
@@ -153,6 +155,7 @@ test('BFF Request Primitives - Route Wrapper Tests', async (t) => {
   await t.test('422 Unprocessable Entity - when body fails Zod validation', async () => {
     const handler = bffRoute(
       {
+        ...testLogging,
         requiredPermission: 'dashboard.read',
         bodySchema: z.object({
           age: z.number().min(18), // Age must be >= 18
@@ -181,7 +184,7 @@ test('BFF Request Primitives - Route Wrapper Tests', async (t) => {
 
   await t.test('500 Internal Server Error - when handler throws error', async () => {
     const handler = bffRoute(
-      { requiredPermission: 'dashboard.read' },
+      { ...testLogging, requiredPermission: 'dashboard.read' },
       async () => {
         throw new Error('Database connection failed');
       }
@@ -197,6 +200,7 @@ test('BFF Request Primitives - Route Wrapper Tests', async (t) => {
   await t.test('200 OK - when permission and input are valid', async () => {
     const handler = bffRoute(
       {
+        ...testLogging,
         requiredPermission: 'dashboard.read',
         querySchema: z.object({
           name: z.string(),

@@ -53,7 +53,10 @@ mock.module(require.resolve('../lib/supabase/server'), {
 test('bffRoute creates one reusable auth context and lazy user-scoped client', async () => {
   const { bffRoute } = await import('../lib/bff/route');
   const handler = bffRoute(
-    { requiredPermission: 'tour_design.read' },
+    {
+      logging: { scope: 'test/bff-request-context', route: '/api/test' },
+      requiredPermission: 'tour_design.read',
+    },
     async ({ auth, supabase }) => ({ auth, supabase }),
   );
 

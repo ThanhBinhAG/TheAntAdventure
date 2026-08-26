@@ -24,7 +24,10 @@ const patchSchema = z.discriminatedUnion('table', [
 ]);
 
 export const GET = bffRoute(
-  { requiredPermission: 'pricing_essentials.read' },
+  {
+    logging: { scope: 'pricing/essentials', route: '/api/pricing/essentials' },
+    requiredPermission: 'pricing_essentials.read',
+  },
   async ({ supabase }) => {
     const [catalog, lastImport] = await Promise.all([
       loadEssentialsCatalog(supabase),
@@ -35,7 +38,11 @@ export const GET = bffRoute(
 );
 
 export const PATCH = bffRoute(
-  { requiredPermission: 'pricing_essentials.write', bodySchema: patchSchema },
+  {
+    logging: { scope: 'pricing/essentials', route: '/api/pricing/essentials' },
+    requiredPermission: 'pricing_essentials.write',
+    bodySchema: patchSchema,
+  },
   async ({ supabase, body }) => {
     if (body.table === 'costLines') {
       await updateCostLine(supabase, body.id, body.patch);
@@ -48,6 +55,7 @@ export const PATCH = bffRoute(
 
 export const POST = bffRoute(
   {
+    logging: { scope: 'pricing/essentials', route: '/api/pricing/essentials' },
     requiredPermission: 'pricing_essentials.write',
     bodySchema: z.object({ catalog: essentialsCatalogSchema, meta: catalogImportMetaSchema }),
   },

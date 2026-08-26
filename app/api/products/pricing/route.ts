@@ -43,6 +43,7 @@ const pricingSchema = z.object({
 
 export const GET = bffRoute(
   {
+    logging: { scope: 'products/pricing', route: '/api/products/pricing' },
     requiredPermission: 'products.read',
     querySchema: z.object({ productCode: z.string().min(1) }),
   },
@@ -58,6 +59,7 @@ export const GET = bffRoute(
 // PATCH: Cập nhật chi tiết bảng giá cho một sản phẩm
 export const PATCH = bffRoute(
   {
+    logging: { scope: 'products/pricing', route: '/api/products/pricing' },
     requiredPermission: 'pricing.write',
     bodySchema: z.object({
       pricing: pricingSchema,

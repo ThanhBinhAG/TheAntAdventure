@@ -42,12 +42,16 @@ const proposalTemplateFieldsSchema = z.object({
 }).strict();
 
 export const GET = bffRoute(
-  { requiredPermission: 'tour_design.read' },
+  {
+    logging: { scope: 'proposals/templates', route: '/api/proposals/templates' },
+    requiredPermission: 'tour_design.read',
+  },
   async ({ supabase }) => fetchCompanyProposalTemplates(supabase)
 );
 
 export const PUT = bffRoute(
   {
+    logging: { scope: 'proposals/templates', route: '/api/proposals/templates' },
     requiredPermission: 'tour_design.write',
     bodySchema: z.object({
       variant: z.enum(['b2c', 'b2b']),

@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export const POST = bffRoute(
   {
+    logging: { scope: 'products/import', route: '/api/products/import' },
     requiredPermission: 'products.write',
     bodySchema: portfolioImportBodySchema,
   },

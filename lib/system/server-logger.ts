@@ -172,8 +172,3 @@ export function withHttpRequestLogging<TContext>(
     return requestLog.completeResponse(response);
   };
 }
-
-export function requestLogger(request: Request, scope: string): { logger: Logger; requestId: string } {
-  const requestId = getOrCreateRequestId(request);
-  return { logger: serverLogger.child({ scope, requestId }), requestId };
-}

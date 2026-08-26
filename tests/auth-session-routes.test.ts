@@ -152,14 +152,6 @@ mock.module(require.resolve('../lib/system/debug-logger'), {
 });
 mock.module(require.resolve('../lib/system/server-logger'), {
   namedExports: {
-    requestLogger: () => ({
-      requestId: 'login-request-42',
-      logger: {
-        info: (entry: Record<string, unknown>, message: string) => loginLogs.push({ level: 'info', entry, message }),
-        warn: (entry: Record<string, unknown>, message: string) => loginLogs.push({ level: 'warn', entry, message }),
-        error: (entry: Record<string, unknown>, message: string) => loginLogs.push({ level: 'error', entry, message }),
-      },
-    }),
     withHttpRequestLogging: (
       _context: Record<string, unknown>,
       handler: (
@@ -209,7 +201,7 @@ test('Supabase auth session routes', async (t) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
       body: JSON.stringify({ identity: 'user@example.com', password: 'correct-password' }),
-    }));
+    }), { params: Promise.resolve({}) });
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, mode: 'crm' });
@@ -228,7 +220,7 @@ test('Supabase auth session routes', async (t) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
       body: JSON.stringify({ identity: 'recovery-admin', password: 'recovery-password' }),
-    }));
+    }), { params: Promise.resolve({}) });
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, mode: 'break_glass' });
@@ -246,7 +238,7 @@ test('Supabase auth session routes', async (t) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
       body: JSON.stringify({ identity: 'user@example.com', password: 'wrong-password' }),
-    }));
+    }), { params: Promise.resolve({}) });
 
     assert.equal(response.status, 401);
     const body = await response.json();

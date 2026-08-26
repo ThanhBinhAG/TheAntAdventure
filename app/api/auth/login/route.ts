@@ -17,7 +17,7 @@ import { recordSuccessfulLogin } from '@/lib/auth/login-history-store';
 import { recordAuthSecurityEvent } from '@/lib/auth/security-audit';
 import { hasTrustedRequestOrigin } from '@/lib/auth/request-origin';
 import { debugLog } from '@/lib/system/debug-logger';
-import { requestLogger } from '@/lib/system/server-logger';
+import { type HttpRequestLogger, withHttpRequestLogging } from '@/lib/system/server-logger';
 
 type LoginBody = {
   identity?: string;
@@ -52,7 +52,7 @@ function authConnectivityMessage(raw: string): string {
 }
 
 function logLoginRejected(
-  logger: ReturnType<typeof requestLogger>['logger'],
+  logger: HttpRequestLogger['logger'],
   statusCode: number,
   reason: string,
   authMethod?: 'password' | 'break_glass',
@@ -78,7 +78,7 @@ async function recordSuccessfulLoginSafely(input: {
   userId: string | null;
   authMethod: 'password' | 'break_glass';
   request: Request;
-  logger: ReturnType<typeof requestLogger>['logger'];
+  logger: HttpRequestLogger['logger'];
 }): Promise<void> {
   try {
     await recordSuccessfulLogin({
@@ -94,8 +94,9 @@ async function recordSuccessfulLoginSafely(input: {
   }
 }
 
-export async function POST(request: Request) {
-  const { logger } = requestLogger(request, 'auth/login');
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'auth/login', route: '/api/auth/login' },
+  async (request, _context, { logger }) => {
   if (!hasTrustedRequestOrigin(request)) {
     logLoginRejected(logger, 403, 'origin_invalid');
     return fail(403, 'Origin không hợp lệ.');
@@ -262,4 +263,5 @@ export async function POST(request: Request) {
   );
 
   return response;
-}
+  },
+);

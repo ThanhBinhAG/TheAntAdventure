@@ -617,6 +617,11 @@ type UserUpdateRequest =
         isActive: boolean;
     }
     | {
+        action: 'change_password';
+        userId: string;
+        password: string;
+    }
+    | {
         action: 'restore';
         userId: string;
     };

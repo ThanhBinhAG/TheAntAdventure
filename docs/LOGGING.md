@@ -19,6 +19,28 @@ Server code emits newline-delimited JSON through Pino to stdout; the container p
 - Redis cache failures use stable `redis.cache.*_failed` / `redis.connection.failed` events with an infrastructure scope. Do not log Redis keys, patterns, values, URLs, or credentials. Dashboard and product-cache invalidation failures use their own domain events and preserve cache fallback behavior.
 - `debug-logger` retains its bounded in-memory diagnostic buffer; its optional stdout signal is Pino `debug` (`system.debug.emitted`) with a fixed message and no debug payload. `client-logger` remains browser-only and development-only.
 
+## Event catalog
+
+Every API route emits `http.request.completed`; filter it by the stable `scope`, `route`, `method`, `statusCode`, and `requestId` fields. Domain events add the operational reason for an important outcome, but are not a replacement for the completion event.
+
+| Domain | Event names | Safe fields / intent |
+| --- | --- | --- |
+| HTTP | `http.request.completed` | Required completion event; status and duration for all 75 API routes. |
+| Auth | `auth.login.*`, `auth.logout.*`, `auth.refresh_unavailable` | Authentication outcome, stable reason/status, and a validated `actorId` only after it is known. |
+| Access control | `access_control.*permission_denied`, `access_control.*role_*`, `access_control.*permission_*`, `access_control.*user_*` | Authorization denial and privileged mutation outcomes; audit trail remains the source of record. |
+| Gallery / branding | `gallery.*`, `branding.*` | Upload, delete, folder, and logo outcomes; use an internal resource ID only, never a storage path. |
+| Product / BFF | `bff.request.failed`, `products.*`, `pricing.*`, `proposal.*` | BFF failure and catalog/export outcomes; static route metadata makes aggregation safe. |
+| Dashboard / weather | `dashboard.*`, `sidebar.*`, `weather.*` | Read/cache/refresh outcomes without user-entered filters or destination text. |
+| Infrastructure | `redis.cache.*_failed`, `redis.connection.failed`, `dashboard.cache.invalidate_failed` | Cache/connection failure identifiers only; never Redis keys, patterns, URLs, values, or credentials. |
+| Diagnostics | `system.debug.emitted` | Fixed, debug-only Pino message; the debug endpoint still never writes client payload to stdout. |
+
+## Rollout and rollback
+
+1. Deploy to staging with `LOG_LEVEL=info`, exercise login, one BFF read/write, one upload, and a weather request, then verify one `http.request.completed` record per request by `requestId` and the returned `X-Request-Id`.
+2. Compare staging log volume grouped by `event=http.request.completed`, `scope`, `route`, and `statusCode`. Confirm 4xx records are warnings, 5xx records are errors, and no body, cookie, token, email, or raw error message is present.
+3. Roll out production in three monitored waves: BFF; auth/write/upload; then high-volume reads and weather. Pause a wave if its error rate or log volume materially exceeds the staging baseline.
+4. To reduce non-error noise during an incident, set `LOG_LEVEL=warn` and redeploy/restart the workload. This retains warning/error evidence while suppressing normal `info` completions. Revert the logging release and redeploy if the issue persists.
+
 ## Boundaries
 
 Pino remains server-only. Add log collection, retention, RBAC, and alerting in deployment infrastructure, not on the request path.

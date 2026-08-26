@@ -6,6 +6,7 @@ import {
   GalleryRepositoryError,
   updatePhotoFolder,
 } from '@/lib/gallery/photo-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,9 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function PATCH(request: Request, context: RouteContext) {
+export const PATCH = withHttpRequestLogging<RouteContext>(
+  { scope: 'gallery/photo-folders', route: '/api/photo-folders/[id]' },
+  async (request, context) => {
   const permission = await checkPermissionForRequest('gallery.write');
 
   if (!permission.allowed) {
@@ -59,9 +62,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export const DELETE = withHttpRequestLogging<RouteContext>(
+  { scope: 'gallery/photo-folders', route: '/api/photo-folders/[id]' },
+  async (_request, context) => {
   const permission = await checkPermissionForRequest('gallery.write');
 
   if (!permission.allowed) {
@@ -92,4 +98,5 @@ export async function DELETE(_request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);

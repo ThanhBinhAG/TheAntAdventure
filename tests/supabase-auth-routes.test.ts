@@ -75,7 +75,7 @@ test('login persists only Supabase Auth cookies and clears the retired CRM cooki
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: 'https://crm.example.test' },
     body: JSON.stringify({ identity: 'user@example.com', password: 'correct-password' }),
-  }));
+  }), { params: Promise.resolve({}) });
 
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { ok: true, mode: 'crm' });

@@ -17,6 +17,7 @@ variables:
   IMAGE_LATEST: 'the-ant-adventures-crm:latest'
   MNT_FDATA: '/mnt/fdata/the_ant_adventures_crm'
   COMPOSE_PROJECT_NAME: 'the-ant-adventures-crm'
+  APP_URL: 'https://crm.theantadventures.com'
 
 verify:
   stage: verify
@@ -102,6 +103,7 @@ docker:
       ensure_generated_env "$BASE_ENV_FILE" "BREAK_GLASS_USERNAME" "breakglass-$(openssl rand -hex 8)"
       ensure_generated_env "$BASE_ENV_FILE" "BREAK_GLASS_PASSWORD" "$(random_secret)"
       ensure_generated_env "$BASE_ENV_FILE" "BREAK_GLASS_SESSION_SECRET" "$(random_secret)"
+      upsert_env "$BASE_ENV_FILE" "APP_URL" "$APP_URL"
 
       DEPLOY_ENV_FILE="$(mktemp)"
       SUPABASE_ENV_FILE="$(mktemp)"

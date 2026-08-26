@@ -1,7 +1,17 @@
 import { expect, test } from '@playwright/test';
 import { login, readE2eState } from './support';
 
-const devAPages = ['/products', '/planner', '/attractions', '/tourdesign'];
+test.setTimeout(90_000);
+
+const devAPages = [
+  '/products',
+  '/pricing',
+  '/pricing-essentials',
+  '/pricing-accommodation',
+  '/planner',
+  '/attractions',
+  '/tourdesign',
+];
 
 test('Dev A screens issue HTTP(S) requests only to the CRM origin', async ({ page, baseURL }) => {
   const state = await readE2eState();
@@ -24,9 +34,11 @@ test('Dev A screens issue HTTP(S) requests only to the CRM origin', async ({ pag
   offOriginRequests.clear();
   for (const path of devAPages) {
     activePath = path;
-    await page.goto(path);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
+    // `load` can wait on unrelated deferred assets. DOM readiness is enough to
+    // observe every browser request initiated by this CRM screen.
+    await page.goto(path, { waitUntil: 'domcontentloaded' });
+    // Pricing catalog and route-level BFF callers can start after first paint.
+    await page.waitForTimeout(1_500);
   }
 
   expect(Object.fromEntries([...offOriginRequests].map(([path, origins]) => [path, [...origins]]))).toEqual({});

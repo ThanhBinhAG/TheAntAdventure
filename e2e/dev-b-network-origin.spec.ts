@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { login, readE2eState } from './support';
 
+test.setTimeout(90_000);
+
 /** Dev B BFF screens — Fetch/XHR only (Storage CDN `<img>` is out of scope). */
 const devBPages = [
   '/dashboard',
@@ -34,9 +36,9 @@ test('Dev B screens issue Fetch/XHR only to the CRM origin', async ({ page, base
   offOriginRequests.clear();
   for (const path of devBPages) {
     activePath = path;
-    await page.goto(path);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
+    await page.goto(path, { waitUntil: 'domcontentloaded' });
+    // Keep the capture open long enough to observe deferred BFF requests.
+    await page.waitForTimeout(1_500);
   }
 
   expect(Object.fromEntries([...offOriginRequests].map(([path, origins]) => [path, [...origins]]))).toEqual({});

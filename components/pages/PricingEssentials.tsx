@@ -10,7 +10,7 @@ import EssentialsProducts from '@/components/pricing/essentials/EssentialsProduc
 import EssentialsServices from '@/components/pricing/essentials/EssentialsServices';
 import EssentialsTransport from '@/components/pricing/essentials/EssentialsTransport';
 import { useEssentialsCatalog } from '@/hooks/usePricingCatalog';
-import { updateCatalogRow, updateCostLine } from '@/lib/pricing/catalog-db';
+import { updateCostLine, updateEssentialsCatalogRow } from '@/lib/pricing/catalog-api';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import type {
   EssCarRate,
@@ -61,7 +61,7 @@ export default function PricingEssentials() {
           ...prev,
           products: prev.products.map((p) => (p.code === code ? { ...p, ...patch } : p)),
         }),
-        () => updateCatalogRow('products', code, patch)
+        () => updateEssentialsCatalogRow('products', code, patch)
       ),
     [persist]
   );
@@ -85,7 +85,7 @@ export default function PricingEssentials() {
           ...prev,
           services: prev.services.map((s) => (s.id === id ? { ...s, ...patch } : s)),
         }),
-        () => updateCatalogRow('services', id, patch)
+        () => updateEssentialsCatalogRow('services', id, patch)
       ),
     [persist]
   );
@@ -94,7 +94,7 @@ export default function PricingEssentials() {
     (id: string, patch: Partial<EssCarRate>) =>
       persist(
         (prev) => ({ ...prev, cars: prev.cars.map((c) => (c.id === id ? { ...c, ...patch } : c)) }),
-        () => updateCatalogRow('cars', id, patch)
+        () => updateEssentialsCatalogRow('cars', id, patch)
       ),
     [persist]
   );
@@ -103,7 +103,7 @@ export default function PricingEssentials() {
     (id: string, patch: Partial<EssHotelRate>) =>
       persist(
         (prev) => ({ ...prev, hotels: prev.hotels.map((h) => (h.id === id ? { ...h, ...patch } : h)) }),
-        () => updateCatalogRow('hotels', id, patch)
+        () => updateEssentialsCatalogRow('hotels', id, patch)
       ),
     [persist]
   );
@@ -112,7 +112,7 @@ export default function PricingEssentials() {
     (id: string, patch: Partial<EssNote>) =>
       persist(
         (prev) => ({ ...prev, notes: prev.notes.map((n) => (n.id === id ? { ...n, ...patch } : n)) }),
-        () => updateCatalogRow('notes', id, patch)
+        () => updateEssentialsCatalogRow('notes', id, patch)
       ),
     [persist]
   );
@@ -124,7 +124,7 @@ export default function PricingEssentials() {
           ...prev,
           settings: prev.settings.map((s) => (s.id === id ? { ...s, ...patch } : s)),
         }),
-        () => updateCatalogRow('settings', id, patch)
+        () => updateEssentialsCatalogRow('settings', id, patch)
       ),
     [persist]
   );

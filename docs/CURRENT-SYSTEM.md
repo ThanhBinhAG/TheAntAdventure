@@ -44,7 +44,7 @@ This is a mixed architecture: some operations are mediated by CRM, while generic
 
 ## Redis already in source
 
-`lib/redis/client.ts` is server-only and returns `null` on a connection failure, so callers must continue without cache. It uses `REDIS_URL`, defaults its connection timeout to one second, and retries a connection up to three times.
+`lib/redis/client.ts` is server-only and returns `null` on a connection failure, so callers must continue without cache. It uses `REDIS_URL`, defaults its connection timeout to one second, and fails a connection attempt without reconnect retries on the request path.
 
 The current implemented cache is Product facets:
 

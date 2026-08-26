@@ -12,7 +12,7 @@
 | Dữ liệu CRM | `lib/store.ts`, `lib/types.ts` | `components/StoreProvider.tsx` → `lib/db/hydrate.ts` / `lib/db/sync-push.ts` → `lib/db/supabase.ts` |
 | Supabase/schema & RLS | `supabase/schema.sql`, `supabase/migrations/20260730042242_02_migrations.sql`, `docs/DATABASE.md` | table → mapper trong `lib/db/mappers.ts` → `lib/db/supabase.ts`; RLS chuyển tiếp ở `supabase/rls-authenticated.sql` |
 | Đăng nhập/session | `app/api/auth/login/route.ts` | `lib/auth/*`, `lib/env.ts`, `proxy.ts` |
-| Quyền và Access Control | `lib/auth/permissions.ts` | `app/(crm)/layout.tsx` → `getInitialPermissionCodesForCRMLayout()` → `current_permission_codes()` → `PermissionsProvider`; `/access-control` → `components/access-control/*` → `/api/access-control/*` → RPC Supabase |
+| Quyền và Access Control | `lib/auth/permissions.ts` | `app/(crm)/layout.tsx` → `getCRMLayoutBoot()` → `current_permission_codes()` → `PermissionsProvider` (+ masked email for Topbar); `/access-control` → `components/access-control/*` → `/api/access-control/*` → RPC Supabase |
 | Sales đến booking | `components/pages/Sales.tsx` | `lib/customers/*`, `lib/sales/*`, `components/pages/Bookings.tsx` |
 | Thiết kế tour/proposal | `components/pages/TourDesign.tsx` | `components/tour-design/*` → `lib/tour-design/*` / `lib/proposals/*` |
 | Bảng giá/XLSX | `components/pages/Pricing*.tsx` | `components/pricing/*` → `lib/pricing/*` → bảng `pricing_*` |
@@ -240,9 +240,9 @@ sequenceDiagram
   participant DB as Access Control RPC
 
   B->>L: navigate to protected CRM route with session cookie
-  L->>RPC: getInitialPermissionCodesForCRMLayout()
-  RPC-->>L: permission codes, e.g. users.manage or *
-  L-->>PP: initialPermissionCodes prop
+  L->>RPC: getCRMLayoutBoot()
+  RPC-->>L: permission codes + masked session email
+  L-->>PP: initialPermissionCodes + sessionEmailMasked props
   PP->>AC: PermissionGate checks PAGE_READ_PERMISSION
   alt Has users.manage or *
     AC->>DB: manage users/roles/audit through protected API

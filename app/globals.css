@@ -59,7 +59,10 @@ html,body{height:100%;width:100%;max-width:none;margin:0;padding:0;font-family:'
 /* ── MAIN ── */
 #main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
 #topbar{background:var(--s);border-bottom:1px solid var(--b);padding:0 22px;height:50px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.tb-heading{min-width:0;max-width:min(520px,58vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tb-title{font-size:15px;font-weight:600}
+.tb-welcome{font-size:12.5px;font-weight:500;color:var(--m)}
+.tb-welcome-id{color:var(--gd);font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:0.02em}
 #content{flex:1;overflow-y:auto;padding:20px 22px;-webkit-overflow-scrolling:touch;}
 .page{display:none}.page.active{display:block}
 
@@ -263,13 +266,6 @@ kbd{font-family:inherit}
 .sup-tag{display:inline-flex;align-items:center;padding:4px 11px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid var(--b);background:var(--bg);transition:all .12s;user-select:none}
 .sup-tag.tag-on,.sup-tag:hover{background:var(--g);color:#fff;border-color:var(--g)}
 .sup-tag.tag-on:hover{background:var(--gd)}
-/* ── QUICK NAV STRIP ── */
-#quicknav{background:var(--s);border-bottom:2px solid var(--b);padding:0 22px;display:flex;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0}
-#quicknav a.qnav-btn,#quicknav a.qnav-btn:visited,#quicknav a.qnav-btn:hover{text-decoration:none!important}
-.qnav-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;font-size:12.5px;font-weight:600;color:var(--m);background:transparent;border:none;border-bottom:3px solid transparent;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s;margin-bottom:-2px;text-decoration:none}
-.qnav-btn:hover{color:var(--g);background:var(--gl)}
-.qnav-btn.active{color:var(--g);background:var(--gl);border-bottom-color:transparent}
-
 /* ── RESPONSIVE ── */
 
 /* ── MOBILE OVERLAY SIDEBAR ── */
@@ -285,6 +281,8 @@ kbd{font-family:inherit}
   #menu-toggle,#menu-toggle.menu-toggle-visible{display:flex;}
   #content{overflow-y:visible;padding:12px;height:auto;}
   .tb-title{font-size:14px;}
+  .tb-heading{max-width:min(420px,70vw)}
+  .tb-welcome{font-size:11.5px}
   .pipeline{grid-template-columns:1fr 1fr;gap:8px;}
   .form-grid,.form-grid.c3,.form-grid.c4{grid-template-columns:1fr!important;}
   .fin-kpi{grid-template-columns:1fr 1fr!important;}
@@ -2422,11 +2420,22 @@ kbd{font-family:inherit}
 
 /* ── SIDEBAR NESTED GROUP ── */
 .sb-group{display:block}
-.sb-group-head{background:transparent;border:none;font:inherit;text-align:left}
-.sb-caret{margin-left:auto;font-size:10px;opacity:.75;transition:transform .15s}
+/* Keep .sbi left border — `border:none` was shifting the Pricing row vs siblings. */
+.sb-group-head{
+  background:transparent;
+  border-top:none;
+  border-right:none;
+  border-bottom:none;
+  font:inherit;
+  text-align:left;
+  color:inherit;
+  cursor:pointer;
+  width:100%;
+}
+.sb-caret{margin-left:auto;flex-shrink:0;font-size:10px;opacity:.75;transition:transform .15s;line-height:1}
 .sb-caret.open{transform:rotate(90deg)}
 .sb-subnav{padding-bottom:4px;background:rgba(0,0,0,.12)}
-.sb-subitem{padding-left:26px;font-size:12px}
+.sb-subitem{padding-left:36px;font-size:12px}
 .sb-subicon{font-size:11px}
 
 /* ── PRICING CATALOGS (Essentials + Accommodation) ── */

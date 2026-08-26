@@ -10,6 +10,7 @@
 import 'server-only';
 
 import { getAuthContext, type AuthContext } from '@/lib/auth/session';
+import { maskEmailForDisplay } from '@/lib/auth/mask-email';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
@@ -20,6 +21,12 @@ import {
   hasPermission,
   type PermissionCode,
 } from '@/lib/auth/permissions';
+
+export type CRMLayoutBoot = {
+  permissionCodes: PermissionCode[];
+  /** Server-masked identity for topbar; never the raw email. */
+  sessionEmailMasked: string | null;
+};
 
 
 /** Kiểu một dòng do RPC current_permission_codes() trả về. */
@@ -79,19 +86,36 @@ async function readPermissionCodesWithCache(
 /**
  * Dùng riêng cho app/(crm)/layout.tsx.
  *
- * Middleware đã xác thực user trước đó, nên không cần gọi auth.getUser() lần nữa.
- * Nếu session không hợp lệ, RPC trả mảng rỗng và PermissionGate sẽ chặn giao diện.
+ * Một lần getAuthContext(): quyền + email đã che cho Topbar.
+ * Middleware đã xác thực user trước đó; session không hợp lệ → permissions [].
  *
  * Không dùng hàm này cho API, vì API cần phân biệt lỗi 401 và 403.
  */
+export async function getCRMLayoutBoot(): Promise<CRMLayoutBoot> {
+  const auth = await getAuthContext();
+
+  if (!auth.authenticated) {
+    return { permissionCodes: [], sessionEmailMasked: null };
+  }
+
+  const sessionEmailMasked = maskEmailForDisplay(auth.email);
+
+  if (auth.isBreakGlass && auth.isSuperAdmin) {
+    return { permissionCodes: ['*'], sessionEmailMasked };
+  }
+
+  const permissionCodes = await readPermissionCodesFromSupabase(() =>
+    getServerSupabaseClient(auth),
+  );
+  return { permissionCodes, sessionEmailMasked };
+}
+
+/** Prefer getCRMLayoutBoot() when the layout also needs the masked welcome identity. */
 export async function getInitialPermissionCodesForCRMLayout(): Promise<
   PermissionCode[]
 > {
-  const auth = await getAuthContext();
-  if (!auth.authenticated) return [];
-  if (auth.isBreakGlass && auth.isSuperAdmin) return ['*'];
-
-  return readPermissionCodesFromSupabase(() => getServerSupabaseClient(auth));
+  const boot = await getCRMLayoutBoot();
+  return boot.permissionCodes;
 }
 
 /**

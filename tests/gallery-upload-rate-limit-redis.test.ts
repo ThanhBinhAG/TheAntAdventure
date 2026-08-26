@@ -39,5 +39,8 @@ test('Gallery upload quota uses a Redis Hash with a one-hour TTL', async (contex
   } finally {
     await client.del(key);
     if (client.isOpen) await client.quit();
+    const { getRedisClient } = await import('../lib/redis/client');
+    const sharedClient = await getRedisClient();
+    if (sharedClient?.isOpen) await sharedClient.quit();
   }
 });

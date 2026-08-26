@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import {
   replaceAccommodationCatalog,
   replaceEssentialsCatalog,
-} from '@/lib/pricing/catalog-db';
+} from '@/lib/pricing/catalog-api';
 import { parseAccommodationFile } from '@/lib/pricing/accommodation-xlsx';
 import { parseEssentialsFile } from '@/lib/pricing/essentials-xlsx';
 import type {

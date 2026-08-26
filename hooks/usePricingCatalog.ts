@@ -2,11 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  isCatalogConfigured,
   loadAccommodationCatalog,
   loadEssentialsCatalog,
-  loadLatestImport,
-} from '@/lib/pricing/catalog-db';
+} from '@/lib/pricing/catalog-api';
 import {
   emptyAccommodationCatalog,
   emptyEssentialsCatalog,
@@ -33,12 +31,12 @@ const catalogLoadInflight = new Map<CatalogWorkbook, Promise<CatalogLoadResult<u
 
 function loadCatalogOnce<T>(
   workbook: CatalogWorkbook,
-  loader: () => Promise<T>
+  loader: () => Promise<{ catalog: T; lastImport: CatalogImportRecord | null }>,
 ): Promise<CatalogLoadResult<T>> {
   const existing = catalogLoadInflight.get(workbook);
   if (existing) return existing as Promise<CatalogLoadResult<T>>;
-  const work = Promise.all([loader(), loadLatestImport(workbook)])
-    .then(([loaded, imported]) => ({ loaded, imported }))
+  const work = loader()
+    .then(({ catalog: loaded, lastImport: imported }) => ({ loaded, imported }))
     .finally(() => {
       catalogLoadInflight.delete(workbook);
     });
@@ -48,10 +46,11 @@ function loadCatalogOnce<T>(
 
 function useCatalog<T>(
   workbook: CatalogWorkbook,
-  loader: () => Promise<T>,
+  loader: () => Promise<{ catalog: T; lastImport: CatalogImportRecord | null }>,
   fallback: () => T
 ): CatalogState<T> {
-  const configured = isCatalogConfigured();
+  // The browser no longer knows Supabase configuration; the CRM BFF owns it.
+  const configured = true;
   const [data, setDataState] = useState<T>(fallback);
   const [lastImport, setLastImport] = useState<CatalogImportRecord | null>(null);
   const [loading, setLoading] = useState(configured);
@@ -59,11 +58,6 @@ function useCatalog<T>(
 
   const reload = useCallback(async () => {
     await Promise.resolve();
-    if (!configured) {
-      setLoading(false);
-      setError('Supabase is not configured — imported pricing cannot be loaded.');
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
@@ -75,7 +69,7 @@ function useCatalog<T>(
     } finally {
       setLoading(false);
     }
-    // loader/fallback are module-level functions and stable per hook instance
+    // loader/fallback are module-level functions and stable per hook instance.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configured, workbook]);
 

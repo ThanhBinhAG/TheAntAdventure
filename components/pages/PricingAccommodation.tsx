@@ -9,7 +9,7 @@ import AccOverview from '@/components/pricing/accommodation/AccOverview';
 import AccPropertyTable from '@/components/pricing/accommodation/AccPropertyTable';
 import AccRateSheet from '@/components/pricing/accommodation/AccRateSheet';
 import { useAccommodationCatalog } from '@/hooks/usePricingCatalog';
-import { updateCatalogRow } from '@/lib/pricing/catalog-db';
+import { updateAccommodationCatalogRow } from '@/lib/pricing/catalog-api';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import type {
   AccCruiseRate,
@@ -77,7 +77,7 @@ export default function PricingAccommodation() {
           ...prev,
           properties: prev.properties.map((p) => (p.id === id ? { ...p, ...patch } : p)),
         }),
-        () => updateCatalogRow('properties', id, patch)
+        () => updateAccommodationCatalogRow('properties', id, patch)
       ),
     [persist]
   );
@@ -89,7 +89,7 @@ export default function PricingAccommodation() {
           ...prev,
           roomRates: prev.roomRates.map((r) => (r.id === id ? { ...r, ...patch } : r)),
         }),
-        () => updateCatalogRow('roomRates', id, patch)
+        () => updateAccommodationCatalogRow('roomRates', id, patch)
       ),
     [persist]
   );
@@ -101,7 +101,7 @@ export default function PricingAccommodation() {
           ...prev,
           cruiseRates: prev.cruiseRates.map((c) => (c.id === id ? { ...c, ...patch } : c)),
         }),
-        () => updateCatalogRow('cruiseRates', id, patch)
+        () => updateAccommodationCatalogRow('cruiseRates', id, patch)
       ),
     [persist]
   );
@@ -113,7 +113,7 @@ export default function PricingAccommodation() {
           ...prev,
           settings: prev.settings.map((s) => (s.id === id ? { ...s, ...patch } : s)),
         }),
-        () => updateCatalogRow('settings', id, patch)
+        () => updateAccommodationCatalogRow('settings', id, patch)
       ),
     [persist]
   );

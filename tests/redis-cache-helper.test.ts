@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import test, { mock } from 'node:test';
+import test from 'node:test';
 
 // Bypass server-only warning/error in tests
 const require = createRequire(import.meta.url);
@@ -73,38 +73,41 @@ test('Redis Cache Helper - Core Operations & Invalidation', async (t) => {
 
     await cacheDel(key3);
   });
+
+  // The app cache uses a process-global Redis client. Close it here so this
+  // integration test does not keep Node's test worker alive after completion.
+  const { getRedisClient } = await import('../lib/redis/client');
+  const sharedClient = await getRedisClient();
+  if (sharedClient?.isOpen) await sharedClient.quit();
 });
 
 test('Redis Cache Helper - Graceful Degradation (Redis Offline)', async (t) => {
-  // Mock client module to simulate a Redis connection error / module failure
-  mock.module(require.resolve('../lib/redis/client'), {
-    namedExports: {
-      getRedisClient: async () => {
-        throw new Error('Simulated Redis network timeout/failure');
-      },
-    },
-  });
+  const originalRedisUrl = process.env.REDIS_URL;
+  delete process.env.REDIS_URL;
+  try {
+    const { cacheGet, cacheSet, cacheDel, cacheIncr } = await import('../lib/redis/cache-helper');
 
-  // Dynamically import cache helpers to bind them to the mocked client module
-  const { cacheGet, cacheSet, cacheDel, cacheIncr } = await import('../lib/redis/cache-helper');
+    await t.test('cacheGet returns null without a Redis connection', async () => {
+      const value = await cacheGet('some-key');
+      assert.equal(value, null, 'should return null gracefully without Redis');
+    });
 
-  await t.test('cacheGet returns null on connection failure', async () => {
-    const value = await cacheGet('some-key');
-    assert.equal(value, null, 'should return null gracefully on connection failure');
-  });
+    await t.test('cacheSet returns false without a Redis connection', async () => {
+      const success = await cacheSet('some-key', { value: 1 });
+      assert.equal(success, false, 'should return false gracefully without Redis');
+    });
 
-  await t.test('cacheSet returns false on connection failure', async () => {
-    const success = await cacheSet('some-key', { value: 1 });
-    assert.equal(success, false, 'should return false gracefully on connection failure');
-  });
+    await t.test('cacheDel returns false without a Redis connection', async () => {
+      const success = await cacheDel('some-key');
+      assert.equal(success, false, 'should return false gracefully without Redis');
+    });
 
-  await t.test('cacheDel returns false on connection failure', async () => {
-    const success = await cacheDel('some-key');
-    assert.equal(success, false, 'should return false gracefully on connection failure');
-  });
-
-  await t.test('cacheIncr returns null on connection failure', async () => {
-    const value = await cacheIncr('some-key');
-    assert.equal(value, null, 'should return null gracefully on connection failure');
-  });
+    await t.test('cacheIncr returns null without a Redis connection', async () => {
+      const value = await cacheIncr('some-key');
+      assert.equal(value, null, 'should return null gracefully without Redis');
+    });
+  } finally {
+    if (originalRedisUrl === undefined) delete process.env.REDIS_URL;
+    else process.env.REDIS_URL = originalRedisUrl;
+  }
 });

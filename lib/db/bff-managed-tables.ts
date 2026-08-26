@@ -4,6 +4,7 @@ import type { SyncArrayTable } from './sync-config';
 export const BFF_MANAGED_TABLES = new Set<SyncArrayTable>([
   'customers',
   'agents',
+  'guides',
   'leads',
   'comms',
   'bookings',

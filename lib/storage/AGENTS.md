@@ -11,7 +11,7 @@ Supabase photo path helpers, gallery persist layer, avatar/logo uploads.
 - `upload-gallery-photo-server.ts` — Sharp orchestration + `persistGalleryPhotoRow` (`photos` + `photo_tags`)
 - `photo-paths.ts` — `gallery/{photoId}/{display,thumb}.webp` + logo/avatar paths
 - `photo-variants.ts` — **avatar only** (`avatarImageFileSchema`, 20 MB cap)
-- `upload-guide-avatar.ts`, `upload-company-logo.ts`
+- `upload-company-logo.ts` — server-only branding object persistence
 - `company-logo-client.ts` — browser GET/POST/DELETE for branding logo; in-flight
   dedupe + module cache + localStorage last-known URL (Sidebar reads cache via
   `useSyncExternalStore` so SSR/hydration match; then session GET once)
@@ -19,4 +19,5 @@ Supabase photo path helpers, gallery persist layer, avatar/logo uploads.
 ## Boundaries
 - Chunk sessions + Sharp worker: `lib/image-pipeline`. Gallery client: `lib/gallery/photo-api.ts`.
 - UI image component: `components/gallery/StorageImage`.
+- Guide avatars: `lib/guides` + `app/api/guides/avatar`; browser uses the CRM BFF.
 - Sidebar logo UI: `components/Sidebar` + `components/sidebar` (use `company-logo-client`).

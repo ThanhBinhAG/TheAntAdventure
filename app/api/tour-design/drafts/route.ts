@@ -16,6 +16,7 @@ const querySchema = z.object({
 
 export const GET = bffRoute(
   {
+    logging: { scope: 'tour-design/drafts', route: '/api/tour-design/drafts' },
     requiredPermission: 'tour_design.read',
     querySchema,
   },

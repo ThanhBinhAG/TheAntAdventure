@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export const GET = bffRoute(
   {
+    logging: { scope: 'tour-design/outlines/all', route: '/api/tour-design/outlines/all' },
     requiredPermission: 'tour_design.read',
   },
   async ({ supabase }) => {

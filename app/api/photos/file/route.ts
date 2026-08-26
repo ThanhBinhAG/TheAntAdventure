@@ -13,7 +13,10 @@ const galleryAssetQuerySchema = z.object({
 });
 
 export const GET = bffRoute(
-  { querySchema: galleryAssetQuerySchema },
+  {
+    logging: { scope: 'gallery/photo-file', route: '/api/photos/file' },
+    querySchema: galleryAssetQuerySchema,
+  },
   async ({ supabase, query }) => {
     const { data, error } = await supabase.storage.from(PHOTOS_BUCKET).download(query.path);
     if (error || !data) {

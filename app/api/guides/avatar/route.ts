@@ -17,7 +17,11 @@ const avatarQuerySchema = z.object({ guideId: z.string().trim().min(1).max(64) }
 const ALLOWED_MIME = new Set<string>(ALLOWED_IMAGE_MIME);
 
 export const GET = bffRoute(
-  { requiredPermission: 'guides.read', querySchema: avatarQuerySchema },
+  {
+    logging: { scope: 'guides/avatar', route: '/api/guides/avatar' },
+    requiredPermission: 'guides.read',
+    querySchema: avatarQuerySchema,
+  },
   async ({ supabase, query }) => {
     const { data, error } = await supabase.storage.from(PHOTOS_BUCKET).download(guideAvatarPath(query.guideId));
     if (error || !data) {

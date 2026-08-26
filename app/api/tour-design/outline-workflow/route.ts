@@ -40,6 +40,7 @@ const tourOutlineDaySchema = z.object({
 
 export const POST = bffRoute(
   {
+    logging: { scope: 'tour-design/outline-workflow', route: '/api/tour-design/outline-workflow' },
     requiredPermission: 'tour_design.write',
     bodySchema: z.object({
       action: z.enum(['sent', 'resent', 'approved', 'revised']),

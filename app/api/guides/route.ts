@@ -11,17 +11,25 @@ import type { Guide } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 export const GET = bffRoute(
-  { requiredPermission: 'guides.read' },
+  { logging: { scope: 'guides', route: '/api/guides' }, requiredPermission: 'guides.read' },
   async ({ supabase }) => listGuidesServer(supabase),
 );
 
 export const POST = bffRoute(
-  { requiredPermission: 'guides.write', bodySchema: guideRequestSchema },
+  {
+    logging: { scope: 'guides', route: '/api/guides' },
+    requiredPermission: 'guides.write',
+    bodySchema: guideRequestSchema,
+  },
   async ({ supabase, body }) => createGuideServer(supabase, body.guide as Guide),
 );
 
 export const PATCH = bffRoute(
-  { requiredPermission: 'guides.write', bodySchema: guideRequestSchema },
+  {
+    logging: { scope: 'guides', route: '/api/guides' },
+    requiredPermission: 'guides.write',
+    bodySchema: guideRequestSchema,
+  },
   async ({ supabase, body }) => {
     const guide = await updateGuideServer(supabase, body.guide as Guide);
     if (!guide) {

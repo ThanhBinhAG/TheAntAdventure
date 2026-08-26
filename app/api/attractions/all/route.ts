@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export const GET = bffRoute(
   {
+    logging: { scope: 'attractions/all', route: '/api/attractions/all' },
     requiredPermission: 'attractions.read',
     querySchema: z.object({
       region: z.enum(['north', 'central', 'south']).optional(),

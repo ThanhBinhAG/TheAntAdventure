@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 // GET: Yêu cầu dashboard.read, validate query string { name }
 export const GET = bffRoute(
   {
+    logging: { scope: 'bff/sample', route: '/api/bff/sample' },
     requiredPermission: 'dashboard.read',
     querySchema: z.object({
       name: z.string().min(1),
@@ -23,6 +24,7 @@ export const GET = bffRoute(
 // POST: Yêu cầu hr.write (quyền nhạy cảm hơn), validate JSON body { value }
 export const POST = bffRoute(
   {
+    logging: { scope: 'bff/sample', route: '/api/bff/sample' },
     requiredPermission: 'hr.write',
     bodySchema: z.object({
       value: z.number().min(0),

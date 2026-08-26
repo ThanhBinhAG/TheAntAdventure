@@ -42,6 +42,7 @@ const productSchema = z.object({
 // GET: Lấy danh sách sản phẩm phân trang và có bộ lọc
 export const GET = bffRoute(
   {
+    logging: { scope: 'products', route: '/api/products' },
     requiredPermission: 'products.read',
   },
   async ({ request, supabase }) => {
@@ -116,6 +117,7 @@ export const GET = bffRoute(
 // POST: Tạo một sản phẩm mới
 export const POST = bffRoute(
   {
+    logging: { scope: 'products', route: '/api/products' },
     requiredPermission: 'products.write',
     bodySchema: z.object({
       product: productSchema,
@@ -131,6 +133,7 @@ export const POST = bffRoute(
 // PATCH: Cập nhật chi tiết một sản phẩm
 export const PATCH = bffRoute(
   {
+    logging: { scope: 'products', route: '/api/products' },
     requiredPermission: 'products.write',
     bodySchema: z.object({
       product: productSchema,
@@ -154,6 +157,7 @@ export const PATCH = bffRoute(
 // DELETE: Xóa sản phẩm
 export const DELETE = bffRoute(
   {
+    logging: { scope: 'products', route: '/api/products' },
     requiredPermission: 'products.write',
     bodySchema: z.object({
       code: z.string().min(1),

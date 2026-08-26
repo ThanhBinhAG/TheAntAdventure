@@ -146,3 +146,31 @@ test('HTTP logging contract rejects unsafe actor and resource identifiers', asyn
   assert.equal(entry.resourceId, undefined);
   assert.equal(entry.durationMs, 0);
 });
+
+test('HTTP response helper returns the request ID and emits one completion event', async () => {
+  const { createHttpRequestLogger, createServerLogger } = await import('../lib/system/server-logger');
+  const destination = new CapturingStream();
+  const logger = createServerLogger({ level: 'trace', destination });
+  const httpLogger = createHttpRequestLogger(
+    new Request('https://crm.test/api/products', {
+      method: 'PATCH',
+      headers: { 'x-request-id': 'response-42' },
+    }),
+    { scope: 'catalog/products', route: '/api/products' },
+    logger,
+  );
+
+  const response = httpLogger.completeResponse(new Response(null, { status: 302 }), {
+    actorId: 'user-42',
+    resourceId: 'product-42',
+  });
+
+  assert.equal(response.headers.get('x-request-id'), 'response-42');
+  const entry = JSON.parse(destination.lines.join('')) as Record<string, unknown>;
+  assert.equal(entry.level, 30);
+  assert.equal(entry.event, 'http.request.completed');
+  assert.equal(entry.statusCode, 302);
+  assert.equal(entry.actorId, 'user-42');
+  assert.equal(entry.resourceId, 'product-42');
+  assert.equal(typeof entry.durationMs, 'number');
+});

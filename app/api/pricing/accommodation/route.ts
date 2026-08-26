@@ -21,7 +21,10 @@ const patchSchema = z.object({
 });
 
 export const GET = bffRoute(
-  { requiredPermission: 'pricing_accommodation.read' },
+  {
+    logging: { scope: 'pricing/accommodation', route: '/api/pricing/accommodation' },
+    requiredPermission: 'pricing_accommodation.read',
+  },
   async ({ supabase }) => {
     const [catalog, lastImport] = await Promise.all([
       loadAccommodationCatalog(supabase),
@@ -32,7 +35,11 @@ export const GET = bffRoute(
 );
 
 export const PATCH = bffRoute(
-  { requiredPermission: 'pricing_accommodation.write', bodySchema: patchSchema },
+  {
+    logging: { scope: 'pricing/accommodation', route: '/api/pricing/accommodation' },
+    requiredPermission: 'pricing_accommodation.write',
+    bodySchema: patchSchema,
+  },
   async ({ supabase, body }) => {
     await updateCatalogRow(supabase, body.table, body.id, body.patch);
     return { saved: true };
@@ -41,6 +48,7 @@ export const PATCH = bffRoute(
 
 export const POST = bffRoute(
   {
+    logging: { scope: 'pricing/accommodation', route: '/api/pricing/accommodation' },
     requiredPermission: 'pricing_accommodation.write',
     bodySchema: z.object({ catalog: accommodationCatalogSchema, meta: catalogImportMetaSchema }),
   },

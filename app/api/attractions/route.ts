@@ -34,6 +34,7 @@ const attractionSchema = z.object({
 // POST: Tạo mới địa điểm tham quan
 export const POST = bffRoute(
   {
+    logging: { scope: 'attractions', route: '/api/attractions' },
     requiredPermission: 'attractions.write',
     bodySchema: z.object({
       attraction: attractionSchema,
@@ -48,6 +49,7 @@ export const POST = bffRoute(
 // PATCH: Cập nhật thông tin địa điểm tham quan
 export const PATCH = bffRoute(
   {
+    logging: { scope: 'attractions', route: '/api/attractions' },
     requiredPermission: 'attractions.write',
     bodySchema: z.object({
       attraction: attractionSchema,
@@ -65,6 +67,7 @@ export const PATCH = bffRoute(
 // DELETE: Xóa địa điểm tham quan
 export const DELETE = bffRoute(
   {
+    logging: { scope: 'attractions', route: '/api/attractions' },
     requiredPermission: 'attractions.write',
     bodySchema: z.object({
       id: z.string().min(1),

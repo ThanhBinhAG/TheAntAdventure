@@ -51,6 +51,23 @@ function authConnectivityMessage(raw: string): string {
   return 'Không kết nối được Supabase Auth — kiểm tra mạng, firewall, hoặc chứng chỉ TLS trên server.';
 }
 
+function logLoginRejected(
+  logger: ReturnType<typeof requestLogger>['logger'],
+  statusCode: number,
+  reason: string,
+  authMethod?: 'password' | 'break_glass',
+): void {
+  logger.warn(
+    {
+      event: 'auth.login.rejected',
+      statusCode,
+      reason,
+      ...(authMethod ? { authMethod } : {}),
+    },
+    'Login rejected',
+  );
+}
+
 /**
  * Audit không được làm thất bại đăng nhập.
  *
@@ -78,14 +95,16 @@ async function recordSuccessfulLoginSafely(input: {
 }
 
 export async function POST(request: Request) {
+  const { logger } = requestLogger(request, 'auth/login');
   if (!hasTrustedRequestOrigin(request)) {
+    logLoginRejected(logger, 403, 'origin_invalid');
     return fail(403, 'Origin không hợp lệ.');
   }
 
-  const { logger } = requestLogger(request, 'auth/login');
   const ip = getClientIp(request);
   const rate = await checkLoginRateLimit(ip);
   if (!rate.ok) {
+    logLoginRejected(logger, 429, 'rate_limited');
     return fail(429, 'Quá nhiều lần đăng nhập thất bại. Thử lại sau 1 phút.', {
       'Retry-After': String(rate.retryAfterSec),
     });
@@ -95,6 +114,7 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as LoginBody;
   } catch {
+    logLoginRejected(logger, 400, 'invalid_body');
     return fail(400, 'Invalid request body.');
   }
 
@@ -102,6 +122,7 @@ export async function POST(request: Request) {
   const password = body.password ?? '';
   if (!identity || !password) {
     await recordLoginFailure(ip);
+    logLoginRejected(logger, 400, 'missing_credentials');
     return fail(400, 'Vui lòng nhập tài khoản và mật khẩu.');
   }
 
@@ -119,7 +140,10 @@ export async function POST(request: Request) {
     await clearLoginFailures(ip);
     try {
       const supabaseSession = await getBreakGlassSupabaseSession();
-      if (!supabaseSession) return fail(500, 'Break-glass session is not available.');
+      if (!supabaseSession) {
+        logger.error({ event: 'auth.break_glass_login_unavailable' }, 'Break-glass login unavailable');
+        return fail(500, 'Break-glass session is not available.');
+      }
       const response = NextResponse.json({ ok: true, mode: 'break_glass' });
       const supabase = createSupabaseRouteClient(request, response);
       const { data, error } = await supabase.auth.setSession({
@@ -127,6 +151,10 @@ export async function POST(request: Request) {
         refresh_token: supabaseSession.refresh_token,
       });
       if (error || !data.session) {
+        logger.error(
+          { event: 'auth.break_glass_login_unavailable', err: error },
+          'Break-glass login unavailable',
+        );
         return fail(503, 'Không thể tạo Supabase session. Vui lòng thử lại.');
       }
       setSupabaseAccessCookie(response, data.session);
@@ -145,6 +173,7 @@ export async function POST(request: Request) {
         userId: null,
         ip,
       });
+      logger.info({ event: 'auth.login.succeeded', authMethod: 'break_glass' }, 'Login succeeded');
       return response;
     } catch (error) {
       debugLog('auth', 'break-glass login failed', {
@@ -159,6 +188,7 @@ export async function POST(request: Request) {
   // Normal users must use email.
   if (!identity.includes('@')) {
     await recordLoginFailure(ip);
+    logLoginRejected(logger, 401, 'identity_format', 'password');
     return fail(401, 'Tài khoản hoặc mật khẩu không đúng.');
   }
 
@@ -183,6 +213,7 @@ export async function POST(request: Request) {
     void recordAuthSecurityEvent({ eventType: 'login_failed', ip });
     const lower = error.message.toLowerCase();
     if (isNetworkOrTlsAuthError(error.message)) {
+      logger.error({ event: 'auth.login.unavailable', authMethod: 'password', err: error }, 'Login unavailable');
       return fail(503, authConnectivityMessage(error.message));
     }
     let message = error.message || 'Đăng nhập thất bại.';
@@ -193,12 +224,20 @@ export async function POST(request: Request) {
     } else if (lower.includes('captcha')) {
       message = 'Xác minh CAPTCHA thất bại. Vui lòng thử lại.';
     }
+    logLoginRejected(logger, 401, lower.includes('invalid login credentials')
+      ? 'invalid_credentials'
+      : lower.includes('email not confirmed')
+        ? 'email_unconfirmed'
+        : lower.includes('captcha')
+          ? 'captcha_rejected'
+          : 'authentication_rejected', 'password');
     return NextResponse.json({ ok: false, error: message }, { status: 401 });
   }
 
   await clearLoginFailures(ip);
 
   if (!data.user || !data.session) {
+    logLoginRejected(logger, 401, 'missing_session', 'password');
     return fail(401, 'Không thể tạo phiên đăng nhập.');
   }
 
@@ -217,6 +256,10 @@ export async function POST(request: Request) {
     userId: data.user.id,
     ip,
   });
+  logger.info(
+    { event: 'auth.login.succeeded', authMethod: 'password', actorId: data.user.id },
+    'Login succeeded',
+  );
 
   return response;
 }

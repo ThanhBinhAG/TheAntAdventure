@@ -61,5 +61,28 @@ test.describe.serial('Tour Design transaction acceptance', () => {
     expect(rows.status).toBe(200);
     expect(JSON.stringify(rows.body)).toContain('Newest arrival');
     expect(JSON.stringify(rows.body)).not.toContain('must-not-commit');
+
+    const invalidWorkflowDays = [
+      newestOutlineDays[0],
+      { ...newestOutlineDays[1], id: newId(), dayNumber: 1 },
+    ];
+    expect((await browserJson(page, '/api/tour-design/outline-workflow', {
+      method: 'POST',
+      body: { action: 'sent', draft: newestDraft, outlineDays: invalidWorkflowDays, expectedSaveRevision: 2 },
+    })).status).toBe(500);
+    expect((await assertRow('leads', 'id', state.leadId))?.stage).toBe('Inquiry');
+
+    const sent = await browserJson(page, '/api/tour-design/outline-workflow', {
+      method: 'POST',
+      body: { action: 'sent', draft: newestDraft, outlineDays: newestOutlineDays, expectedSaveRevision: 2 },
+    });
+    expect(sent.status).toBe(200);
+    const result = sent.body as { data: { draft: { outlineStatus: string }; lead: { stage: string }; comm: { id: string } | null } };
+    expect(result.data.draft.outlineStatus).toBe('sent');
+    expect(result.data.lead.stage).toBe('Pending');
+    expect(result.data.comm?.id).toBeTruthy();
+    expect((await assertRow('tour_drafts', 'id', draftId))?.outline_status).toBe('sent');
+    expect((await assertRow('leads', 'id', state.leadId))?.stage).toBe('Pending');
+    expect(await assertRow('comms', 'id', result.data.comm!.id)).not.toBeNull();
   });
 });

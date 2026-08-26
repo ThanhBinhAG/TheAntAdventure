@@ -17,6 +17,7 @@ test('Dev B screens issue Fetch/XHR only to the CRM origin', async ({ page, base
   const state = await readE2eState();
   const crmOrigin = new URL(baseURL ?? 'http://localhost:3006').origin;
   const offOriginRequests = new Map<string, Set<string>>();
+  const offOriginWebSockets = new Map<string, Set<string>>();
   let activePath = '/login';
 
   page.on('request', (request) => {
@@ -27,6 +28,15 @@ test('Dev B screens issue Fetch/XHR only to the CRM origin', async ({ page, base
       const origins = offOriginRequests.get(activePath) ?? new Set<string>();
       origins.add(url.origin);
       offOriginRequests.set(activePath, origins);
+    }
+  });
+  page.on('websocket', (webSocket) => {
+    const url = new URL(webSocket.url());
+    const expectedProtocol = crmOrigin.startsWith('https:') ? 'wss:' : 'ws:';
+    if (url.protocol !== expectedProtocol || url.host !== new URL(crmOrigin).host) {
+      const origins = offOriginWebSockets.get(activePath) ?? new Set<string>();
+      origins.add(webSocket.url());
+      offOriginWebSockets.set(activePath, origins);
     }
   });
 
@@ -42,4 +52,5 @@ test('Dev B screens issue Fetch/XHR only to the CRM origin', async ({ page, base
   }
 
   expect(Object.fromEntries([...offOriginRequests].map(([path, origins]) => [path, [...origins]]))).toEqual({});
+  expect(Object.fromEntries([...offOriginWebSockets].map(([path, origins]) => [path, [...origins]]))).toEqual({});
 });

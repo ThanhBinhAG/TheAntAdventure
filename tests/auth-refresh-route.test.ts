@@ -17,6 +17,7 @@ let accessCookieIssued = false;
 let accessCookieCleared = false;
 let refreshFailureLogged = false;
 let refreshAuditUserId: string | null | undefined;
+let refreshRateLimited = false;
 
 function tokensOnlySession() {
   const session = {
@@ -89,7 +90,12 @@ mock.module(require.resolve('../lib/auth/supabase-ssr'), {
   },
 });
 mock.module(require.resolve('../lib/auth/rate-limit'), {
-  namedExports: { getClientIp: () => '127.0.0.1', consumeRefreshRateLimit: async () => ({ ok: true }) },
+  namedExports: {
+    getClientIp: () => '127.0.0.1',
+    consumeRefreshRateLimit: async () => refreshRateLimited
+      ? { ok: false, retryAfterSec: 42 }
+      : { ok: true },
+  },
 });
 mock.module(require.resolve('../lib/auth/request-origin'), {
   namedExports: { hasTrustedRequestOrigin: () => true },
@@ -122,6 +128,7 @@ test('Supabase refresh preserves the HttpOnly session without returning a token 
     accessCookieCleared = false;
     refreshFailureLogged = false;
     refreshAuditUserId = undefined;
+    refreshRateLimited = false;
   });
 
   await t.test('updates the access mirror and returns no credential body', async () => {
@@ -155,5 +162,13 @@ test('Supabase refresh preserves the HttpOnly session without returning a token 
     assert.equal(response.headers.get('retry-after'), '60');
     assert.equal(response.headers.get('x-request-id'), 'refresh-test-request-id');
     assert.equal(refreshFailureLogged, true);
+  });
+
+  await t.test('returns 429 before contacting Supabase when refresh is rate limited', async () => {
+    refreshRateLimited = true;
+    const response = await POST(request());
+    assert.equal(response.status, 429);
+    assert.equal(response.headers.get('retry-after'), '42');
+    assert.equal(accessCookieIssued, false);
   });
 });

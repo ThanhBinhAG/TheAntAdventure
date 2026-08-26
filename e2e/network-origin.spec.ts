@@ -17,6 +17,7 @@ test('Dev A screens issue HTTP(S) requests only to the CRM origin', async ({ pag
   const state = await readE2eState();
   const crmOrigin = new URL(baseURL ?? 'http://localhost:3006').origin;
   const offOriginRequests = new Map<string, Set<string>>();
+  const offOriginWebSockets = new Map<string, Set<string>>();
   let activePath = '/login';
 
   page.on('request', (request) => {
@@ -25,6 +26,15 @@ test('Dev A screens issue HTTP(S) requests only to the CRM origin', async ({ pag
       const origins = offOriginRequests.get(activePath) ?? new Set<string>();
       origins.add(url.origin);
       offOriginRequests.set(activePath, origins);
+    }
+  });
+  page.on('websocket', (webSocket) => {
+    const url = new URL(webSocket.url());
+    const expectedProtocol = crmOrigin.startsWith('https:') ? 'wss:' : 'ws:';
+    if (url.protocol !== expectedProtocol || url.host !== new URL(crmOrigin).host) {
+      const origins = offOriginWebSockets.get(activePath) ?? new Set<string>();
+      origins.add(webSocket.url());
+      offOriginWebSockets.set(activePath, origins);
     }
   });
 
@@ -42,4 +52,5 @@ test('Dev A screens issue HTTP(S) requests only to the CRM origin', async ({ pag
   }
 
   expect(Object.fromEntries([...offOriginRequests].map(([path, origins]) => [path, [...origins]]))).toEqual({});
+  expect(Object.fromEntries([...offOriginWebSockets].map(([path, origins]) => [path, [...origins]]))).toEqual({});
 });

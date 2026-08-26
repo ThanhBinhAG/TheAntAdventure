@@ -18,13 +18,29 @@ async function productCacheKeys(redis: RedisScanClient): Promise<string[]> {
 test.describe.serial('Product, pricing, planner, and attraction acceptance', () => {
   test('Planner and Attractions enforce unauthenticated and forbidden access', async ({ page }) => {
     await page.goto('/login');
-    expect((await browserJson(page, '/api/planner/all')).status).toBe(401);
-    expect((await browserJson(page, '/api/attractions/all')).status).toBe(401);
+    const protectedReads = [
+      '/api/products?page=1&pageSize=12',
+      '/api/products/pricing?productCode=missing',
+      '/api/planner/all',
+      '/api/attractions/all',
+    ];
+    for (const path of protectedReads) {
+      expect((await browserJson(page, path)).status, path).toBe(401);
+    }
 
     const state = await readE2eState();
     await login(page, state.unassigned);
-    expect((await browserJson(page, '/api/planner/all')).status).toBe(403);
-    expect((await browserJson(page, '/api/attractions/all')).status).toBe(403);
+    for (const path of protectedReads) {
+      expect((await browserJson(page, path)).status, path).toBe(403);
+    }
+    for (const [path, method, body] of [
+      ['/api/products/import', 'POST', { drafts: [] }],
+      ['/api/products/pricing', 'PATCH', { pricing: { productCode: 'missing', incl: {} } }],
+      ['/api/planner', 'POST', { task: {} }],
+      ['/api/attractions', 'POST', { attraction: {} }],
+    ] as const) {
+      expect((await browserJson(page, path, { method, body })).status, path).toBe(403);
+    }
   });
 
   test('Product CRUD, pricing update, and rejected import preserve existing data', async ({ page }) => {
@@ -175,6 +191,10 @@ test.describe.serial('Product, pricing, planner, and attraction acceptance', () 
         method: 'DELETE',
         body: { id: `${northId}-MISSING` },
       })).status).toBe(404);
+      expect((await browserJson(page, '/api/attractions', {
+        method: 'DELETE', body: { id: centralId },
+      })).status).toBe(200);
+      expect(await assertRow('attractions', 'id', centralId)).toBeNull();
     } finally {
       await admin.from('photos').delete().eq('id', existingPhotoId);
     }

@@ -28,9 +28,10 @@ import {
 } from '@/lib/access-control/role-input';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import {
-    accessControlError,
-    accessControlPermissionError,
+  accessControlError,
+  accessControlPermissionError,
 } from '@/lib/access-control/api-error';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,10 +77,13 @@ function errorResponse(error: unknown) {
 }
 
 /** Lấy dữ liệu cho màn hình Quản lý người dùng & phân quyền. */
-export async function GET() {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'access-control', route: '/api/access-control' },
+  async (_request, _context, { logger }) => {
     const permission = await checkPermissionForRequest('users.manage');
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -99,15 +103,20 @@ export async function GET() {
             },
         );
     } catch (error) {
+        logger.error({ event: 'access_control.data_load.failed', err: error }, 'Access Control data load failed');
         return errorResponse(error);
     }
-}
+  },
+);
 
 /** Đổi role user hoặc cập nhật permission của role. */
-export async function PATCH(request: Request) {
+export const PATCH = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'access-control', route: '/api/access-control' },
+  async (request, _context, { logger }) => {
     const permission = await checkPermissionForRequest('users.manage');
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -139,17 +148,23 @@ export async function PATCH(request: Request) {
                 parsed.data.permissionCodes,
             );
         }
+        logger.info({ event: 'access_control.role_or_permission.updated', action: parsed.data.action }, 'Access Control mutation succeeded');
         return NextResponse.json({ ok: true });
     } catch (error) {
+        logger.error({ event: 'access_control.role_or_permission.update.failed', err: error }, 'Access Control mutation failed');
         return errorResponse(error);
     }
-}
+  },
+);
 
-export async function POST(request: Request) {
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'access-control', route: '/api/access-control' },
+  async (request, _context, { logger }) => {
     // UI có thể bị sửa bằng DevTools, nên vẫn kiểm tra quyền ở API và RPC.
     const permission = await checkPermissionForRequest('users.manage');
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -172,8 +187,11 @@ export async function POST(request: Request) {
     try {
         await createAccessControlPermission(parsed.data);
 
+        logger.info({ event: 'access_control.permission.created' }, 'Access Control permission created');
         return NextResponse.json({ ok: true }, { status: 201 });
     } catch (error) {
+        logger.error({ event: 'access_control.permission.create.failed', err: error }, 'Access Control permission creation failed');
         return errorResponse(error);
     }
-}
+  },
+);

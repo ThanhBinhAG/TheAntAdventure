@@ -38,6 +38,7 @@ import {
     accessControlError,
     accessControlPermissionError,
 } from '@/lib/access-control/api-error';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,12 +97,15 @@ function errorResponse(error: unknown) {
 // 3. RPC cập nhật tên và gán role bằng session người quản trị hiện tại.
  * 4. Nếu bước 2 hoặc 3 lỗi, xóa Auth user vừa tạo để tránh dữ liệu dở dang.
  */
-export async function POST(request: Request) {
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+    { scope: 'access-control/users', route: '/api/access-control/users' },
+    async (request, _context, { logger }) => {
     const permission = await checkPermissionForRequest(
         'users.manage',
     );
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -141,6 +145,7 @@ export async function POST(request: Request) {
             parsed.data.roleCode,
         );
 
+        logger.info({ event: 'access_control.user.created' }, 'Access Control user created');
         return NextResponse.json(
             {
                 ok: true,
@@ -149,6 +154,7 @@ export async function POST(request: Request) {
             { status: 201 },
         );
     } catch (error) {
+        logger.error({ event: 'access_control.user.create.failed', err: error }, 'Access Control user creation failed');
         if (createdUserId) {
             try {
                 await rollbackNewAccessControlAuthUser(createdUserId);
@@ -159,14 +165,18 @@ export async function POST(request: Request) {
 
         return errorResponse(error);
     }
-}
+    },
+);
 
-export async function GET(request: Request) {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+    { scope: 'access-control/users', route: '/api/access-control/users' },
+    async (request, _context, { logger }) => {
     const permission = await checkPermissionForRequest(
         'users.manage',
     );
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -221,21 +231,26 @@ export async function GET(request: Request) {
             },
         );
     } catch (error) {
+        logger.error({ event: 'access_control.user.list.failed', err: error }, 'Access Control user list failed');
         return errorResponse(error);
     }
-}
+    },
+);
 
 /**
  * Sửa tên, thay đổi trạng thái hoặc khôi phục user.
  *
  * Database RPC tự kiểm tra users.manage thêm một lần nữa.
  */
-export async function PATCH(request: Request) {
+export const PATCH = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+    { scope: 'access-control/users', route: '/api/access-control/users' },
+    async (request, _context, { logger }) => {
     const permission = await checkPermissionForRequest(
         'users.manage',
     );
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -283,8 +298,11 @@ export async function PATCH(request: Request) {
             );
         }
 
+        logger.info({ event: 'access_control.user.updated', action: parsed.data.action }, 'Access Control user updated');
         return NextResponse.json({ ok: true });
     } catch (error) {
+        logger.error({ event: 'access_control.user.update.failed', err: error }, 'Access Control user update failed');
         return errorResponse(error);
     }
-}
+    },
+);

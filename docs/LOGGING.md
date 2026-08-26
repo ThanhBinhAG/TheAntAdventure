@@ -15,6 +15,7 @@ Server code emits newline-delimited JSON through Pino to stdout; the container p
 - Reuse the Supabase audit trails for authentication and access-control changes; stdout logs are not the audit record.
 - Set `LOG_LEVEL` to `info` in production; temporarily use `debug` only while investigating an incident.
 - Use the returned child logger for related server events so they share the same request context.
+- Sensitive routes emit stable, searchable domain events under `auth.`, `access_control.`, `gallery.`, `branding.`, `dashboard.`, `sidebar.`, or `weather.`. Record outcome/status and safe error identifiers only; never attach request bodies, user-entered queries, email addresses, cookies, or media paths.
 
 ## Boundaries
 

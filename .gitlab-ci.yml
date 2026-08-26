@@ -113,6 +113,7 @@ docker:
       share-supabase app-env ant-crm --show-secrets > "$SUPABASE_ENV_FILE"
       ANON_KEY="$(sed -n 's/^ANON_KEY=//p' "$SUPABASE_ENV_FILE" | tail -n 1)"
       SERVICE_ROLE_KEY="$(sed -n 's/^SERVICE_ROLE_KEY=//p' "$SUPABASE_ENV_FILE" | tail -n 1)"
+      JWT_ISSUER="$(sed -n 's/^SUPABASE_JWT_ISSUER=//p' "$SUPABASE_ENV_FILE" | tail -n 1)"
       if [ -z "$ANON_KEY" ] || [ -z "$SERVICE_ROLE_KEY" ]; then
         echo "ERROR: ant-crm secrets must include ANON_KEY and SERVICE_ROLE_KEY." >&2
         exit 1
@@ -130,10 +131,11 @@ docker:
       upsert_env "$BASE_ENV_FILE" "NEXT_PUBLIC_SUPABASE_URL" "http://supabase-ant-crm-gateway:8000"
       upsert_env "$BASE_ENV_FILE" "NEXT_PUBLIC_SUPABASE_ANON_KEY" "$ANON_KEY"
       upsert_env "$BASE_ENV_FILE" "SUPABASE_SERVICE_ROLE_KEY" "$SERVICE_ROLE_KEY"
+      upsert_env "$BASE_ENV_FILE" "SUPABASE_JWT_ISSUER" "$JWT_ISSUER"
       if [ -n "$DB_URL" ]; then
         upsert_env "$BASE_ENV_FILE" "SUPABASE_DB_URL" "$DB_URL"
       fi
-      unset ANON_KEY SERVICE_ROLE_KEY DB_URL
+      unset ANON_KEY SERVICE_ROLE_KEY JWT_ISSUER DB_URL
       cp "$BASE_ENV_FILE" "$DEPLOY_ENV_FILE"
 
       # Use VM06's persistent shared Redis, rather than creating a per-CRM Redis.

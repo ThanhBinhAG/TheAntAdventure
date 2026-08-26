@@ -158,5 +158,8 @@ test('Weather Redis Cache Integration Test', async (context) => {
     if (client.isOpen) {
       await client.quit();
     }
+    const { getRedisClient } = await import('../lib/redis/client');
+    const sharedClient = await getRedisClient();
+    if (sharedClient?.isOpen) await sharedClient.quit();
   }
 });

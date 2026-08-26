@@ -6,6 +6,7 @@ import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const statePath = join(process.cwd(), '.e2e-state.json');
+const SUPABASE_ACCESS_COOKIE = 'sb-crm-access-token';
 
 export type E2eState = {
   prefix: string;
@@ -64,16 +65,17 @@ export async function login(page: Page, credentials: E2eState['admin']): Promise
   await page.getByRole('button', { name: 'Login' }).click();
   const response = await loginResponse;
   if (!response.ok()) throw new Error(`Login API rejected the E2E user: ${await response.text()}`);
-  await expect(page).toHaveURL(/\/dashboard(?:\?|$)/);
-  await expect(page.locator('#topbar')).toBeVisible();
-  await expect.poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === 'crm_session')).toBe(true);
+  await expect
+    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === SUPABASE_ACCESS_COOKIE))
+    .toBe(true);
 }
 
 export async function logoutViaUi(page: Page): Promise<void> {
   await page.getByRole('button', { name: /Mở công cụ hệ thống/ }).click();
   await page.getByTitle('Đăng xuất').click();
-  await page.waitForURL(/\/login(?:\?|$)/);
-  await expect.poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === 'crm_session')).toBe(false);
+  await expect
+    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === SUPABASE_ACCESS_COOKIE))
+    .toBe(false);
 }
 
 export async function browserJson(
@@ -81,21 +83,21 @@ export async function browserJson(
   path: string,
   init: { method?: string; body?: unknown } = {},
 ): Promise<ApiResult> {
-  return page.evaluate(async ({ path: requestPath, requestInit }) => {
-    const response = await fetch(requestPath, {
-      method: requestInit.method,
-      headers: requestInit.body === undefined ? undefined : { 'Content-Type': 'application/json' },
-      body: requestInit.body === undefined ? undefined : JSON.stringify(requestInit.body),
-    });
-    const text = await response.text();
-    return { status: response.status, body: text ? JSON.parse(text) : null };
-  }, { path, requestInit: init });
-}
+  // APIRequestContext shares the browser context's cookie jar but does not
+  // depend on a document execution context. The application may redirect the
+  // current page while an unauthenticated/forbidden request is being checked.
+  const headers: Record<string, string> = {
+    Origin: new URL(page.url()).origin,
+  };
+  if (init.body !== undefined) headers['Content-Type'] = 'application/json';
 
-export async function crmSessionId(page: Page): Promise<string> {
-  const cookie = (await page.context().cookies()).find((item) => item.name === 'crm_session');
-  if (!cookie) throw new Error('CRM session cookie was not created.');
-  return cookie.value.split('.', 1)[0];
+  const response = await page.request.fetch(path, {
+    method: init.method,
+    headers,
+    data: init.body,
+  });
+  const text = await response.text();
+  return { status: response.status(), body: text ? JSON.parse(text) : null };
 }
 
 export async function assertRow(

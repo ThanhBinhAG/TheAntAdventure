@@ -1,8 +1,8 @@
-import { getSupabaseClient } from '../supabase';
+import 'server-only';
+
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   ESS_PAX_COLUMNS,
-  emptyAccommodationCatalog,
-  emptyEssentialsCatalog,
   type AccCruiseRate,
   type AccProperty,
   type AccRoomRate,
@@ -23,18 +23,6 @@ type Row = Record<string, unknown>;
 
 /** Supabase rejects very large payloads; imported sheets are pushed in slices. */
 const INSERT_CHUNK = 400;
-
-const client = () => getSupabaseClient();
-
-export function isCatalogConfigured(): boolean {
-  return client() !== null;
-}
-
-function requireClient() {
-  const supabase = client();
-  if (!supabase) throw new Error('Supabase is not configured — set the environment keys first.');
-  return supabase;
-}
 
 // -------------------------------------------------------------- field maps
 
@@ -305,8 +293,12 @@ const EMPTY_ACC_CRUISE: AccCruiseRate = {
 // ------------------------------------------------------------------- reads
 
 /** Supabase caps a single select at 1000 rows; rate sheets exceed that. */
-async function selectAll(table: string, order: string, filter?: { column: string; value: string }): Promise<Row[]> {
-  const supabase = requireClient();
+async function selectAll(
+  supabase: SupabaseClient,
+  table: string,
+  order: string,
+  filter?: { column: string; value: string },
+): Promise<Row[]> {
   const rows: Row[] = [];
   const pageSize = 1000;
 
@@ -327,17 +319,15 @@ async function selectAll(table: string, order: string, filter?: { column: string
   return rows;
 }
 
-export async function loadEssentialsCatalog(): Promise<EssentialsCatalog> {
-  if (!isCatalogConfigured()) return emptyEssentialsCatalog();
-
+export async function loadEssentialsCatalog(supabase: SupabaseClient): Promise<EssentialsCatalog> {
   const [settings, products, costLines, services, cars, hotels, notes] = await Promise.all([
-    selectAll(CATALOG_TABLES.settings, 'sort_order', { column: 'workbook', value: 'essentials' }),
-    selectAll(CATALOG_TABLES.products, 'sort_order'),
-    selectAll(CATALOG_TABLES.costLines, 'sort_order'),
-    selectAll(CATALOG_TABLES.services, 'sort_order'),
-    selectAll(CATALOG_TABLES.cars, 'sort_order'),
-    selectAll(CATALOG_TABLES.hotels, 'sort_order'),
-    selectAll(CATALOG_TABLES.notes, 'sort_order'),
+    selectAll(supabase, CATALOG_TABLES.settings, 'sort_order', { column: 'workbook', value: 'essentials' }),
+    selectAll(supabase, CATALOG_TABLES.products, 'sort_order'),
+    selectAll(supabase, CATALOG_TABLES.costLines, 'sort_order'),
+    selectAll(supabase, CATALOG_TABLES.services, 'sort_order'),
+    selectAll(supabase, CATALOG_TABLES.cars, 'sort_order'),
+    selectAll(supabase, CATALOG_TABLES.hotels, 'sort_order'),
+    selectAll(supabase, CATALOG_TABLES.notes, 'sort_order'),
   ]);
 
   return {
@@ -351,14 +341,12 @@ export async function loadEssentialsCatalog(): Promise<EssentialsCatalog> {
   };
 }
 
-export async function loadAccommodationCatalog(): Promise<AccommodationCatalog> {
-  if (!isCatalogConfigured()) return emptyAccommodationCatalog();
-
+export async function loadAccommodationCatalog(supabase: SupabaseClient): Promise<AccommodationCatalog> {
   const [settings, properties, roomRates, cruiseRates] = await Promise.all([
-    selectAll(CATALOG_TABLES.settings, 'sort_order', { column: 'workbook', value: 'accommodation' }),
-    selectAll(CATALOG_TABLES.properties, 'sort_order'),
-    selectAll(CATALOG_TABLES.roomRates, 'sort_order'),
-    selectAll(CATALOG_TABLES.cruiseRates, 'sort_order'),
+    selectAll(supabase, CATALOG_TABLES.settings, 'sort_order', { column: 'workbook', value: 'accommodation' }),
+    selectAll(supabase, CATALOG_TABLES.properties, 'sort_order'),
+    selectAll(supabase, CATALOG_TABLES.roomRates, 'sort_order'),
+    selectAll(supabase, CATALOG_TABLES.cruiseRates, 'sort_order'),
   ]);
 
   return {
@@ -369,9 +357,10 @@ export async function loadAccommodationCatalog(): Promise<AccommodationCatalog> 
   };
 }
 
-export async function loadLatestImport(workbook: CatalogWorkbook): Promise<CatalogImportRecord | null> {
-  if (!isCatalogConfigured()) return null;
-  const supabase = requireClient();
+export async function loadLatestImport(
+  supabase: SupabaseClient,
+  workbook: CatalogWorkbook,
+): Promise<CatalogImportRecord | null> {
   const { data, error } = await supabase
     .from(CATALOG_TABLES.imports)
     .select('*')
@@ -401,10 +390,10 @@ export async function loadLatestImport(workbook: CatalogWorkbook): Promise<Catal
  * comparison against the primary key stands in for "all rows".
  */
 async function clearTable(
+  supabase: SupabaseClient,
   table: string,
   options: { filter?: { column: string; value: string }; pk?: string } = {}
 ) {
-  const supabase = requireClient();
   const { filter, pk = 'id' } = options;
   let query = supabase.from(table).delete();
   query = filter ? query.eq(filter.column, filter.value) : query.neq(pk, '__never__');
@@ -412,9 +401,8 @@ async function clearTable(
   if (error) throw new Error(`Clearing ${table} failed: ${error.message}`);
 }
 
-async function insertRows(table: string, rows: Row[]) {
+async function insertRows(supabase: SupabaseClient, table: string, rows: Row[]) {
   if (!rows.length) return;
-  const supabase = requireClient();
   for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
     const { error } = await supabase.from(table).insert(rows.slice(i, i + INSERT_CHUNK));
     if (error) throw new Error(`Writing ${table} failed: ${error.message}`);
@@ -422,13 +410,13 @@ async function insertRows(table: string, rows: Row[]) {
 }
 
 async function recordImport(
+  supabase: SupabaseClient,
   workbook: CatalogWorkbook,
   fileName: string,
   sheetCount: number,
   rowCount: number,
   warningCount: number
 ) {
-  const supabase = requireClient();
   const { error } = await supabase.from(CATALOG_TABLES.imports).insert({
     id: `imp-${workbook}-${Date.now()}`,
     workbook,
@@ -448,25 +436,29 @@ export interface ReplaceMeta {
 }
 
 /** Replaces the whole Essentials catalog: clear every table, then reload from the workbook. */
-export async function replaceEssentialsCatalog(catalog: EssentialsCatalog, meta: ReplaceMeta): Promise<number> {
-  await clearTable(CATALOG_TABLES.costLines);
-  await clearTable(CATALOG_TABLES.products, { pk: 'code' });
+export async function replaceEssentialsCatalog(
+  supabase: SupabaseClient,
+  catalog: EssentialsCatalog,
+  meta: ReplaceMeta,
+): Promise<number> {
+  await clearTable(supabase, CATALOG_TABLES.costLines);
+  await clearTable(supabase, CATALOG_TABLES.products, { pk: 'code' });
   await Promise.all([
-    clearTable(CATALOG_TABLES.services),
-    clearTable(CATALOG_TABLES.cars),
-    clearTable(CATALOG_TABLES.hotels),
-    clearTable(CATALOG_TABLES.notes),
-    clearTable(CATALOG_TABLES.settings, { filter: { column: 'workbook', value: 'essentials' } }),
+    clearTable(supabase, CATALOG_TABLES.services),
+    clearTable(supabase, CATALOG_TABLES.cars),
+    clearTable(supabase, CATALOG_TABLES.hotels),
+    clearTable(supabase, CATALOG_TABLES.notes),
+    clearTable(supabase, CATALOG_TABLES.settings, { filter: { column: 'workbook', value: 'essentials' } }),
   ]);
 
-  await insertRows(CATALOG_TABLES.products, catalog.products.map((p) => toRow(p, PRODUCT_MAP)));
+  await insertRows(supabase, CATALOG_TABLES.products, catalog.products.map((p) => toRow(p, PRODUCT_MAP)));
   await Promise.all([
-    insertRows(CATALOG_TABLES.costLines, catalog.costLines.map(costLineToRow)),
-    insertRows(CATALOG_TABLES.services, catalog.services.map((s) => toRow(s, SERVICE_MAP))),
-    insertRows(CATALOG_TABLES.cars, catalog.cars.map((c) => toRow(c, CAR_MAP))),
-    insertRows(CATALOG_TABLES.hotels, catalog.hotels.map((h) => toRow(h, HOTEL_MAP))),
-    insertRows(CATALOG_TABLES.notes, catalog.notes.map((n) => toRow(n, NOTE_MAP))),
-    insertRows(CATALOG_TABLES.settings, catalog.settings.map((s) => toRow(s, SETTING_MAP))),
+    insertRows(supabase, CATALOG_TABLES.costLines, catalog.costLines.map(costLineToRow)),
+    insertRows(supabase, CATALOG_TABLES.services, catalog.services.map((s) => toRow(s, SERVICE_MAP))),
+    insertRows(supabase, CATALOG_TABLES.cars, catalog.cars.map((c) => toRow(c, CAR_MAP))),
+    insertRows(supabase, CATALOG_TABLES.hotels, catalog.hotels.map((h) => toRow(h, HOTEL_MAP))),
+    insertRows(supabase, CATALOG_TABLES.notes, catalog.notes.map((n) => toRow(n, NOTE_MAP))),
+    insertRows(supabase, CATALOG_TABLES.settings, catalog.settings.map((s) => toRow(s, SETTING_MAP))),
   ]);
 
   const rowCount =
@@ -478,26 +470,27 @@ export async function replaceEssentialsCatalog(catalog: EssentialsCatalog, meta:
     catalog.notes.length +
     catalog.settings.length;
 
-  await recordImport('essentials', meta.fileName, meta.sheetCount, rowCount, meta.warningCount);
+  await recordImport(supabase, 'essentials', meta.fileName, meta.sheetCount, rowCount, meta.warningCount);
   return rowCount;
 }
 
 export async function replaceAccommodationCatalog(
+  supabase: SupabaseClient,
   catalog: AccommodationCatalog,
   meta: ReplaceMeta
 ): Promise<number> {
   await Promise.all([
-    clearTable(CATALOG_TABLES.properties),
-    clearTable(CATALOG_TABLES.roomRates),
-    clearTable(CATALOG_TABLES.cruiseRates),
-    clearTable(CATALOG_TABLES.settings, { filter: { column: 'workbook', value: 'accommodation' } }),
+    clearTable(supabase, CATALOG_TABLES.properties),
+    clearTable(supabase, CATALOG_TABLES.roomRates),
+    clearTable(supabase, CATALOG_TABLES.cruiseRates),
+    clearTable(supabase, CATALOG_TABLES.settings, { filter: { column: 'workbook', value: 'accommodation' } }),
   ]);
 
   await Promise.all([
-    insertRows(CATALOG_TABLES.properties, catalog.properties.map((p) => toRow(p, ACC_PROPERTY_MAP))),
-    insertRows(CATALOG_TABLES.roomRates, catalog.roomRates.map((r) => toRow(r, ACC_RATE_MAP))),
-    insertRows(CATALOG_TABLES.cruiseRates, catalog.cruiseRates.map((c) => toRow(c, ACC_CRUISE_MAP))),
-    insertRows(CATALOG_TABLES.settings, catalog.settings.map((s) => toRow(s, SETTING_MAP))),
+    insertRows(supabase, CATALOG_TABLES.properties, catalog.properties.map((p) => toRow(p, ACC_PROPERTY_MAP))),
+    insertRows(supabase, CATALOG_TABLES.roomRates, catalog.roomRates.map((r) => toRow(r, ACC_RATE_MAP))),
+    insertRows(supabase, CATALOG_TABLES.cruiseRates, catalog.cruiseRates.map((c) => toRow(c, ACC_CRUISE_MAP))),
+    insertRows(supabase, CATALOG_TABLES.settings, catalog.settings.map((s) => toRow(s, SETTING_MAP))),
   ]);
 
   const rowCount =
@@ -506,22 +499,23 @@ export async function replaceAccommodationCatalog(
     catalog.cruiseRates.length +
     catalog.settings.length;
 
-  await recordImport('accommodation', meta.fileName, meta.sheetCount, rowCount, meta.warningCount);
+  await recordImport(supabase, 'accommodation', meta.fileName, meta.sheetCount, rowCount, meta.warningCount);
   return rowCount;
 }
 
 /** Persists an edit to one imported row. `patch` uses app field names. */
 export async function updateCatalogRow(
+  supabase: SupabaseClient,
   tableKey: CatalogTableKey,
   id: string,
   patch: Record<string, unknown>
 ): Promise<void> {
-  const supabase = requireClient();
   const map = MAPS[tableKey];
   if (!map) throw new Error(`No column map for ${tableKey}`);
 
   const row: Row = {};
   for (const [field, value] of Object.entries(patch)) {
+    if (field === 'id' || field === 'code' || field === 'workbook') continue;
     const column = map[field];
     if (column) row[column] = value === '' && typeof value === 'string' ? '' : value;
   }
@@ -534,8 +528,11 @@ export async function updateCatalogRow(
 }
 
 /** Cost lines need bespoke handling for the p1..p20 pax columns. */
-export async function updateCostLine(id: string, patch: Partial<EssCostLine>): Promise<void> {
-  const supabase = requireClient();
+export async function updateCostLine(
+  supabase: SupabaseClient,
+  id: string,
+  patch: Partial<EssCostLine>,
+): Promise<void> {
   const row: Row = { updated_at: new Date().toISOString() };
 
   if (patch.label !== undefined) row.label = patch.label;

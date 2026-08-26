@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { browserJson, crmSessionId, getAdminClient, login, logoutViaUi, readE2eState } from './support';
+import { browserJson, login, logoutViaUi, readE2eState } from './support';
 
 test.describe.serial('CRM session acceptance', () => {
-  test('login creates an HttpOnly CRM cookie and UI logout revokes it', async ({ page }) => {
+  test('login creates an HttpOnly Supabase access cookie and UI logout clears it', async ({ page }) => {
     const state = await readE2eState();
     await login(page, state.admin);
     await logoutViaUi(page);
@@ -10,25 +10,34 @@ test.describe.serial('CRM session acceptance', () => {
     expect(response.status).toBe(401);
   });
 
-  test('revoked and expired durable sessions are rejected by the BFF', async ({ page }) => {
+  test('a request without the Supabase access cookie is rejected by the BFF', async ({ page }) => {
     const state = await readE2eState();
-    const admin = getAdminClient();
 
     await login(page, state.admin);
-    const revokedSid = await crmSessionId(page);
-    await admin.from('crm_sessions').update({ revoked_at: new Date().toISOString() }).eq('sid', revokedSid);
-    expect((await browserJson(page, '/api/products')).status).toBe(401);
-
     await page.context().clearCookies();
+    // Clearing the cookie also makes the browser refresher navigate to login.
+    // Use the same browser context's request client so that navigation cannot
+    // destroy a `page.evaluate` while this assertion is running.
+    expect((await page.request.get('/api/products')).status()).toBe(401);
+  });
+
+  test('reload during the initial refresh keeps an authenticated user in CRM', async ({ page }) => {
+    const state = await readE2eState();
     await login(page, state.admin);
-    const expiredSid = await crmSessionId(page);
-    await admin.from('crm_sessions').update({ expires_at: new Date(0).toISOString() }).eq('sid', expiredSid);
-    expect((await browserJson(page, '/api/products')).status).toBe(401);
+    // A browser reload is allowed to abort the old document's in-flight
+    // refresh. Chromium reports that expected navigation as ERR_ABORTED.
+    await page.reload({ waitUntil: 'domcontentloaded' }).catch((error: Error) => {
+      if (!/ERR_ABORTED/.test(error.message)) throw error;
+    });
+    await expect(page).not.toHaveURL(/\/login(?:\?|$)/);
+    expect((await page.request.get('/api/products')).status()).toBe(200);
   });
 
   test('a logged-in user without an assigned role receives 403', async ({ page }) => {
     const state = await readE2eState();
     await login(page, state.unassigned);
-    expect((await browserJson(page, '/api/products')).status).toBe(403);
+    // The shell redirects an unassigned user to its access-denied view as soon
+    // as it hydrates, so make the BFF assertion through the shared context.
+    expect((await page.request.get('/api/products')).status()).toBe(403);
   });
 });

@@ -27,13 +27,9 @@ function createRedisClient(): RedisClient {
         url: process.env.REDIS_URL,
         socket: {
             connectTimeout: getConnectTimeoutMs(),
-            reconnectStrategy: (retries) => {
-                // Thử kết nối lại tối đa 3 lần với khoảng cách 1 giây để xử lý các sự cố mạng tạm thời
-                if (retries >= 3) {
-                    return false; // Ngừng thử và kích hoạt lỗi kết nối thất bại hẳn
-                }
-                return 1000;
-            },
+            // Redis is best-effort cache infrastructure. A request must fall
+            // back to PostgreSQL immediately instead of queuing reconnects.
+            reconnectStrategy: () => false,
         },
     });
 

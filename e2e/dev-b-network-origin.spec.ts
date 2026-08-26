@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { login, readE2eState } from './support';
 
+test.setTimeout(90_000);
+
 /** Dev B BFF screens — Fetch/XHR only (Storage CDN `<img>` is out of scope). */
 const devBPages = [
   '/dashboard',
@@ -15,6 +17,7 @@ test('Dev B screens issue Fetch/XHR only to the CRM origin', async ({ page, base
   const state = await readE2eState();
   const crmOrigin = new URL(baseURL ?? 'http://localhost:3006').origin;
   const offOriginRequests = new Map<string, Set<string>>();
+  const offOriginWebSockets = new Map<string, Set<string>>();
   let activePath = '/login';
 
   page.on('request', (request) => {
@@ -27,6 +30,15 @@ test('Dev B screens issue Fetch/XHR only to the CRM origin', async ({ page, base
       offOriginRequests.set(activePath, origins);
     }
   });
+  page.on('websocket', (webSocket) => {
+    const url = new URL(webSocket.url());
+    const expectedProtocol = crmOrigin.startsWith('https:') ? 'wss:' : 'ws:';
+    if (url.protocol !== expectedProtocol || url.host !== new URL(crmOrigin).host) {
+      const origins = offOriginWebSockets.get(activePath) ?? new Set<string>();
+      origins.add(webSocket.url());
+      offOriginWebSockets.set(activePath, origins);
+    }
+  });
 
   await login(page, state.admin);
   // Let the legacy dashboard boot finish so only each target page is audited below.
@@ -34,10 +46,11 @@ test('Dev B screens issue Fetch/XHR only to the CRM origin', async ({ page, base
   offOriginRequests.clear();
   for (const path of devBPages) {
     activePath = path;
-    await page.goto(path);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(500);
+    await page.goto(path, { waitUntil: 'domcontentloaded' });
+    // Keep the capture open long enough to observe deferred BFF requests.
+    await page.waitForTimeout(1_500);
   }
 
   expect(Object.fromEntries([...offOriginRequests].map(([path, origins]) => [path, [...origins]]))).toEqual({});
+  expect(Object.fromEntries([...offOriginWebSockets].map(([path, origins]) => [path, [...origins]]))).toEqual({});
 });

@@ -73,7 +73,8 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   bookings: ['bookings', 'customers'],
   contracts: ['contracts', 'bookings'],
   suppliers: ['hotels', 'transport', 'restaurants', 'cruises', 'suppliers'],
-  guides: ['guides'],
+  /** Guides use `/api/guides`; do not hydrate them through browser Supabase. */
+  guides: [],
   /** Pickers load gallery catalog via BFF when opened. */
   attractions: [],
   /** Covers come from destinations API; no gallery hydrate on this route. */
@@ -87,12 +88,10 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   teamchat: [],
 };
 
-/** @deprecated Use PAGE_BOOT_TABLES — kept for wave-1 full hydrate / shell-cache shim. Dev B CRM tables excluded (BFF). */
+/** @deprecated Use PAGE_BOOT_TABLES — kept for wave-1 full hydrate / shell-cache shim. Scoped BFF tables excluded. */
 export const SHELL_HYDRATE_TABLES: readonly SyncArrayTable[] = [
   'bookings',
   'feedback',
-  'tasks',
-  'tour_drafts',
 ] as const;
 
 /** @deprecated Messages only on teamchat / manual load. */

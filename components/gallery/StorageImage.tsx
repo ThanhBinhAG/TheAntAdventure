@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
-import { isNextImageOptimizable } from '@/lib/gallery/storage-image-src';
+import { isNextImageOptimizable, toCrmPhotoAssetUrl } from '@/lib/gallery/storage-image-src';
 
 type Props = {
   src?: string;
@@ -63,7 +63,9 @@ export default function StorageImage({
         if (!cancelled) setShownSrc(src);
       }, 500);
     };
-    probe.src = src;
+    // Keep preloading on the CRM origin too. Otherwise a dynamic image update
+    // would bypass the authenticated BFF media route even though rendering does not.
+    probe.src = toCrmPhotoAssetUrl(src);
     return () => {
       cancelled = true;
       if (fallbackTimer) clearTimeout(fallbackTimer);
@@ -74,7 +76,9 @@ export default function StorageImage({
 
   if (!activeSrc) return null;
 
-  const useNext = !unoptimized && isNextImageOptimizable(activeSrc);
+  const renderedSrc = toCrmPhotoAssetUrl(activeSrc);
+
+  const useNext = !unoptimized && isNextImageOptimizable(renderedSrc);
 
   const fillClass = className?.includes('gallery-img-contain')
     ? className
@@ -83,11 +87,11 @@ export default function StorageImage({
   if (!useNext) {
     if (fill) {
       return (
-        // Raw storage URLs are intentionally rendered without Next optimization.
+        // This image is intentionally rendered without Next optimization.
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          key={activeSrc}
-          src={activeSrc}
+          key={renderedSrc}
+          src={renderedSrc}
           alt={alt}
           className={fillClass}
           loading={loading}
@@ -106,11 +110,11 @@ export default function StorageImage({
       );
     }
     return (
-      // Raw storage URLs are intentionally rendered without Next optimization.
+      // This image is intentionally rendered without Next optimization.
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        key={activeSrc}
-        src={activeSrc}
+        key={renderedSrc}
+        src={renderedSrc}
         alt={alt}
         className={className}
         width={width ?? 480}
@@ -124,7 +128,7 @@ export default function StorageImage({
   }
 
   const shared = {
-    src: activeSrc,
+    src: renderedSrc,
     alt,
     className: fill ? fillClass : className,
     style,
@@ -133,8 +137,8 @@ export default function StorageImage({
   };
 
   if (fill) {
-    return <Image key={activeSrc} {...shared} alt={alt} fill />;
+    return <Image key={renderedSrc} {...shared} alt={alt} fill />;
   }
 
-  return <Image key={activeSrc} {...shared} alt={alt} width={width ?? 480} height={height ?? 320} />;
+  return <Image key={renderedSrc} {...shared} alt={alt} width={width ?? 480} height={height ?? 320} />;
 }

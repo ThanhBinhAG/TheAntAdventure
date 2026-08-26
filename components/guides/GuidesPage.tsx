@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import GuideCalendar from '@/components/guides/GuideCalendar';
 import PaginationBar from '@/components/PaginationBar';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { useStore } from '@/hooks/useStore';
-import { createClient } from '@/lib/supabase/client';
-import { uploadGuideAvatar } from '@/lib/storage/upload-guide-avatar';
+import { getBffArray } from '@/lib/bff/client';
+import { uploadGuideAvatarClient } from '@/lib/guides/guide-avatar-client';
 import type { Guide } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
@@ -50,6 +50,7 @@ const emptyGuide = (): Partial<Guide> => ({
 export default function Guides() {
   const { canWrite } = usePagePermission('guides');
   const guides = useStore((s) => s.guides);
+  const setGuides = useStore((s) => s.setGuides);
   const addGuide = useStore((s) => s.addGuide);
   const updateGuide = useStore((s) => s.updateGuide);
 
@@ -63,6 +64,23 @@ export default function Guides() {
   const [form, setForm] = useState<Partial<Guide>>(emptyGuide());
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getBffArray<Guide>('/api/guides', 'Không thể tải danh sách hướng dẫn viên.')
+      .then((rows) => {
+        if (!active) return;
+        setGuides(rows);
+        setLoadError(null);
+      })
+      .catch((error: unknown) => {
+        if (active) setLoadError(error instanceof Error ? error.message : 'Không thể tải danh sách hướng dẫn viên.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [setGuides]);
 
   const filtered = useMemo(
     () =>
@@ -107,14 +125,22 @@ export default function Guides() {
     }
     setSaving(true);
     try {
-      let photo = form.photo || '';
-      if (avatarFile) {
-        const supabase = createClient();
-        photo = await uploadGuideAvatar(supabase, form.id, avatarFile);
+      const payload = { ...(form as Guide), photo: form.photo || '' };
+      const response = await fetch('/api/guides', {
+        method: editId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guide: payload }),
+        credentials: 'same-origin',
+      });
+      const body = await response.json().catch(() => null) as { ok?: boolean; data?: Guide; error?: string } | null;
+      if (!response.ok || !body?.ok || !body.data) {
+        throw new Error(body?.error ?? 'Không thể lưu hướng dẫn viên.');
       }
-      const payload = { ...(form as Guide), photo };
-      if (editId) updateGuide(editId, payload);
-      else addGuide(payload);
+      const saved = avatarFile
+        ? { ...body.data, photo: await uploadGuideAvatarClient(body.data.id, avatarFile) }
+        : body.data;
+      if (editId) updateGuide(editId, saved);
+      else addGuide(saved);
       setShowAdd(false);
       setAvatarFile(null);
     } catch (err) {
@@ -126,6 +152,7 @@ export default function Guides() {
 
   return (
     <div>
+      {loadError && <div className="crm-page-hydrate-error" role="alert">{loadError}</div>}
       <div className="pt-banner">
         <span style={{ fontSize: 12.5, color: 'var(--gd)' }}>
           📋 <b>Post-tour?</b> Log guide reports and debrief here:

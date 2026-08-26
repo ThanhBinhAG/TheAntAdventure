@@ -73,7 +73,8 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   bookings: ['bookings', 'customers'],
   contracts: ['contracts', 'bookings'],
   suppliers: ['hotels', 'transport', 'restaurants', 'cruises', 'suppliers'],
-  guides: ['guides'],
+  /** Guides use `/api/guides`; do not hydrate them through browser Supabase. */
+  guides: [],
   /** Pickers load gallery catalog via BFF when opened. */
   attractions: [],
   /** Covers come from destinations API; no gallery hydrate on this route. */

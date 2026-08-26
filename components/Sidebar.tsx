@@ -165,18 +165,19 @@ export default function Sidebar({ open, onClose, pinned, onPinnedChange }: Sideb
   const { activeTasks: activeTaskCount, tourDesignAttention: pendingTourDesign } =
     useSidebarBadges(permissionCodes);
 
-  // Chỉ giữ các menu mà user có quyền xem.
+  // Chỉ giữ các menu mà user có quyền xem (và chưa bị ẩn tạm).
   const visibleSections = useMemo(
     () =>
       NAV_SECTIONS
         .map((section) => ({
           ...section,
           items: section.items
+            .filter((item) => !item.hidden)
             .map((item) => {
-              // Menu nhóm: chỉ giữ các menu con được phép.
+              // Menu nhóm: chỉ giữ các menu con được phép và chưa ẩn.
               if (item.children?.length) {
-                const children = item.children.filter((child) =>
-                  canReadPage(permissionCodes, child.page),
+                const children = item.children.filter(
+                  (child) => !child.hidden && canReadPage(permissionCodes, child.page),
                 );
 
                 return children.length > 0

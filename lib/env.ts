@@ -22,6 +22,11 @@ export function getServerSupabaseAnonKey() {
   return (process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
 }
 
+/** Server-only public JWT issuer; needed when the server uses a private Supabase URL. */
+export function getSupabaseJwtIssuer() {
+  return (process.env.SUPABASE_JWT_ISSUER ?? '').trim();
+}
+
 
 export function isUseSupabaseEnabled() {
   const v = (process.env.NEXT_PUBLIC_USE_SUPABASE ?? '').trim().toLowerCase();
@@ -38,11 +43,6 @@ export function isRemoteDataEnabled() {
 
 export function getAuthCaptchaSiteKey() {
   return (process.env.NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY ?? '').trim();
-}
-
-/** Server-only — HMAC key for the opaque CRM session cookie. */
-export function getCrmSessionSecret() {
-  return (process.env.CRM_SESSION_SECRET ?? '').trim();
 }
 
 /** Auto push app → Supabase after edits (default: on when Supabase enabled) */
@@ -82,15 +82,8 @@ export function getBreakGlassPassword() {
   return (process.env.BREAK_GLASS_PASSWORD ?? '').trim();
 }
 
-/** Server-only — HMAC secret for bg_session cookie */
-export function getBreakGlassSessionSecret() {
-  return (process.env.BREAK_GLASS_SESSION_SECRET ?? '').trim();
-}
-
 export function isBreakGlassConfigured() {
-  return Boolean(
-    getBreakGlassUsername() && getBreakGlassPassword() && getBreakGlassSessionSecret(),
-  );
+  return Boolean(getBreakGlassUsername() && getBreakGlassPassword());
 }
 
 /** Server-only — base URL for absolute asset links in PDF generation */

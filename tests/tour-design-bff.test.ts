@@ -171,7 +171,6 @@ test('Tour Design BFF APIs - Tests', async (t) => {
       id: 'TD-002',
       leadId: 'L-002',
       custId: 'C-002',
-      outlineStatus: 'approved' as const,
       clientType: 'b2b' as const,
     };
 
@@ -200,12 +199,32 @@ test('Tour Design BFF APIs - Tests', async (t) => {
 
     assert.equal(supabaseCalls.length, 1);
     assert.equal(supabaseCalls[0].method, 'rpc');
-    assert.equal(supabaseCalls[0].table, 'save_tour_design_versioned_transaction');
+    assert.equal(supabaseCalls[0].table, 'save_tour_design_content_versioned_transaction');
     assert.equal(supabaseCalls[0].data.p_draft.id, 'TD-002');
     assert.equal(supabaseCalls[0].data.p_draft.lead_id, 'L-002');
     assert.equal(supabaseCalls[0].data.p_outline_days[0].id, 'TOD-002');
     assert.equal(supabaseCalls[0].data.p_outline_days[0].outline_date, '2026-08-21');
     assert.equal(supabaseCalls[0].data.p_expected_save_revision, 0);
+  });
+
+  await t.test('POST /api/tour-design/save rejects workflow status fields', async () => {
+    const response = await saveRoute.POST(new Request('http://localhost/api/tour-design/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        draft: {
+          id: 'TD-WORKFLOW-BYPASS',
+          leadId: 'L-004',
+          custId: 'C-004',
+          outlineStatus: 'approved',
+        },
+        outlineDays: [],
+        expectedSaveRevision: 0,
+      }),
+    }));
+
+    assert.equal(response.status, 422);
+    assert.equal(supabaseCalls.length, 0);
   });
 
   await t.test('POST /api/tour-design/save fails atomically when the transaction rejects', async () => {

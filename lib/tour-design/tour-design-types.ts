@@ -1,4 +1,4 @@
-import type { Customer, Lead } from '@/lib/types';
+import type { Customer, Hotel, Lead } from '@/lib/types';
 
 export interface TourBrief {
   clientName: string;
@@ -94,4 +94,9 @@ export type GalleryPhoto = {
 export type TourDesignCrmContext = {
   customers: Customer[];
   leads: Lead[];
+};
+
+/** Hotel catalog needed by the Tour Design export and pricing steps. */
+export type TourDesignReferenceData = {
+  hotels: Hotel[];
 };

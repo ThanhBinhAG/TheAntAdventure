@@ -1,14 +1,14 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { PAGE_TITLES, QUICK_NAV_PAGES } from '@/lib/constants';
+import { PAGE_TITLES } from '@/lib/constants';
 import { localTodayIso } from '@/lib/core/date-utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
 import { useSupabasePanel } from '@/lib/context/SupabaseContext';
 import { isAutoSyncEnabled } from '@/lib/env';
+import { cancelSessionRefreshRequest } from '@/lib/auth/refresh-request-control';
 import { AiCopilotTrigger } from '@/components/AiCopilot';
 import type { PageSlug } from '@/lib/types';
 import { toast } from '@/lib/toast';
@@ -17,13 +17,19 @@ interface TopbarProps {
   onMenuToggle: () => void;
   /** When true, show the sidebar hamburger on desktop (unpinned mode). Mobile always shows via CSS. */
   showMenuToggle?: boolean;
+  /** Server-masked login email (e.g. nv***************); omit welcome when null. */
+  sessionEmailMasked?: string | null;
 }
 
-export default function Topbar({ onMenuToggle, showMenuToggle = false }: TopbarProps) {
+export default function Topbar({
+  onMenuToggle,
+  showMenuToggle = false,
+  sessionEmailMasked = null,
+}: TopbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const page = (pathname.split('/').pop() || 'dashboard') as PageSlug;
-  const { language, setLanguage, pageTitle } = useLanguage();
+  const { language, setLanguage, pageTitle, t } = useLanguage();
   const exportBackup = useStore((s) => s.exportBackup);
   const importBackup = useStore((s) => s.importBackup);
   const setLastBackup = useStore((s) => s.setLastBackup);
@@ -99,6 +105,7 @@ export default function Topbar({ onMenuToggle, showMenuToggle = false }: TopbarP
   };
 
   const handleLogout = async () => {
+    cancelSessionRefreshRequest();
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {
@@ -120,7 +127,15 @@ export default function Topbar({ onMenuToggle, showMenuToggle = false }: TopbarP
       >
         ☰
       </button>
-      <span className="tb-title">{title}</span>
+      <div className="tb-heading">
+        <span className="tb-title">{title}</span>
+        {sessionEmailMasked ? (
+          <span className="tb-welcome" title={sessionEmailMasked}>
+            {' '}
+            {t('Welcome', 'Chào mừng')}, <span className="tb-welcome-id">{sessionEmailMasked}</span>
+          </span>
+        ) : null}
+      </div>
       <div style={{ flex: 1 }} />
       <div id="gsearch-wrap" style={{ position: 'relative', maxWidth: 280, flex: 1 }}>
         <input
@@ -246,35 +261,6 @@ export default function Topbar({ onMenuToggle, showMenuToggle = false }: TopbarP
           </span>
         </button>
       </div>
-    </div>
-  );
-}
-
-export function QuickNav() {
-  const pathname = usePathname();
-  const current = (pathname.split('/').pop() || 'dashboard') as PageSlug;
-  const { t } = useLanguage();
-
-  const labels: Record<string, { en: string; vi: string; icon: string }> = {
-    dashboard: { en: 'Dashboard', vi: 'Bảng điều hành', icon: '◈' },
-    sales: { en: 'Sales Pipeline', vi: 'Kênh bán hàng', icon: '◉' },
-    tourdesign: { en: 'Tour Design', vi: 'Thiết kế tour', icon: '✦' },
-    bookings: { en: 'Bookings', vi: 'Đặt tour', icon: '▣' },
-  };
-
-  return (
-    <div id="quicknav">
-      {QUICK_NAV_PAGES.map((p) => (
-        <Link
-          key={p}
-          href={`/${p}`}
-          prefetch={false}
-          id={`qnav-${p}`}
-          className={`qnav-btn${current === p ? ' active' : ''}`}
-        >
-          {labels[p]?.icon} {labels[p] ? t(labels[p].en, labels[p].vi) : p}
-        </Link>
-      ))}
     </div>
   );
 }

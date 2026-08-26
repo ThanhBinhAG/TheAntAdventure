@@ -17,7 +17,7 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   const tourDesign = source('components/tour-design/TourDesignPage.tsx');
   const tourDesignBoot = config.match(/tourdesign:\s*\[([\s\S]*?)\],\n\s*\/\/ Catalogue/)?.[1] ?? '';
 
-  assert.match(config, /planner:\s*\['cal_events'\]/);
+  assert.match(config, /planner:\s*\[\]/);
   assert.match(config, /attractions:\s*\[\]/);
   assert.match(config, /pricing:\s*\[\]/);
   assert.doesNotMatch(tourDesignBoot, /'products'/);
@@ -25,6 +25,8 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   assert.doesNotMatch(tourDesignBoot, /'tour_outline_days'/);
   assert.doesNotMatch(tourDesignBoot, /'customers'/);
   assert.doesNotMatch(tourDesignBoot, /'leads'/);
+  assert.doesNotMatch(tourDesignBoot, /'hotels'/);
+  assert.doesNotMatch(tourDesignBoot, /'comms'/);
 
   assert.doesNotMatch(products, /ensureTablesLoaded/);
   assert.match(products, /getBffData<Product>\(/);
@@ -58,4 +60,6 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   assert.doesNotMatch(tourDesign, /\/api\/tour-design\/outlines\/all/);
   assert.match(tourDesign, /getBffArray<GalleryPhoto>\('\/api\/photos\/all'/);
   assert.match(tourDesign, /useTourDesignCrmContext/);
+  assert.match(tourDesign, /useTourDesignReferenceData/);
+  assert.match(tourDesign, /\/api\/tour-design\/outline-workflow/);
 });

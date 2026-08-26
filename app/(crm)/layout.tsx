@@ -2,25 +2,26 @@
  * Layout chung cho các trang CRM đã đăng nhập.
  *
  * Chức năng:
- * - Lấy quyền hiệu lực ở server trước khi giao diện CRM xuất hiện.
- * - Truyền quyền xuống CRMShell để giao diện không phải gọi lại API quyền.
+ * - Lấy quyền hiệu lực + email đã che ở server trước khi giao diện CRM xuất hiện.
+ * - Truyền xuống CRMShell để giao diện không phải gọi lại API quyền/profile.
  * - Không áp dụng cho /login.
  */
 import CRMShell from '@/components/CRMShell';
-import { getInitialPermissionCodesForCRMLayout } from '@/lib/auth/permissions-server';
+import { getCRMLayoutBoot } from '@/lib/auth/permissions-server';
 
 export default async function CRMLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Lấy quyền từ database bằng session cookie hiện tại.
-  // Middleware đã bảo vệ route; null chỉ được đổi thành mảng rỗng để an toàn.
-  const initialPermissionCodes =
-    (await getInitialPermissionCodesForCRMLayout()) ?? [];
+  // Một lần getAuthContext trong getCRMLayoutBoot (permissions + masked email).
+  const { permissionCodes, sessionEmailMasked } = await getCRMLayoutBoot();
 
   return (
-    <CRMShell initialPermissionCodes={initialPermissionCodes}>
+    <CRMShell
+      initialPermissionCodes={permissionCodes}
+      sessionEmailMasked={sessionEmailMasked}
+    >
       {children}
     </CRMShell>
   );

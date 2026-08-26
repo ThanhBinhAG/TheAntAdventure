@@ -34,8 +34,8 @@ export const SYNC_ARRAY_TABLES = [
 
 export type SyncArrayTable = (typeof SYNC_ARRAY_TABLES)[number];
 
-/** Customer profile modal — lazy on open. */
-export const PROFILE_LAZY_TABLES: readonly SyncArrayTable[] = ['comms', 'bookings'] as const;
+/** Customer profile modal — historically lazy-loaded; profile now uses BFF (`GET /api/customers/:id/profile`). @deprecated */
+export const PROFILE_LAZY_TABLES: readonly SyncArrayTable[] = [] as const;
 
 /**
  * Tables mirrored by route boot when visiting Tour Design / Planner / Sales.
@@ -52,15 +52,17 @@ export const SIDEBAR_BADGE_TABLES: readonly SyncArrayTable[] = [
  * Omitted slugs load nothing until explicitly needed (e.g. pricing catalog APIs).
  */
 export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[]>> = {
-  dashboard: ['customers', 'leads', 'bookings', 'agents', 'feedback'],
-  planner: ['cal_events'],
+  /** Metrics via GET /api/dashboard — no PostgREST hydrate on this route. */
+  dashboard: [],
+  /** Tasks via GET /api/planner/all — no PostgREST hydrate on this route. */
+  planner: [],
   /** Clients list/CRUD via `/api/customers`; profile modal loads related rows via `/api/customers/:id/profile`. */
   customers: [],
   /** Agents list/catalog via `/api/agents`; pipeline/commission leads wait for Sales BFF. */
   agents: [],
   sales: [],
-  /** Customers/leads via `/api/tour-design/crm-context`; hotels/comms still boot here. */
-  tourdesign: ['hotels', 'comms'],
+  /** Every Tour Design read uses its permissioned BFF routes. */
+  tourdesign: [],
   // Catalogue pages use the paginated server API. The full data set is loaded
   // only when a user opens a detail drawer or enters Manage mode.
   products: [],
@@ -85,12 +87,9 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   teamchat: [],
 };
 
-/** @deprecated Use PAGE_BOOT_TABLES — kept for wave-1 full hydrate. */
+/** @deprecated Use PAGE_BOOT_TABLES — kept for wave-1 full hydrate / shell-cache shim. Dev B CRM tables excluded (BFF). */
 export const SHELL_HYDRATE_TABLES: readonly SyncArrayTable[] = [
-  'customers',
-  'leads',
   'bookings',
-  'agents',
   'feedback',
   'tasks',
   'tour_drafts',

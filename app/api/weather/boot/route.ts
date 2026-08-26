@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getAuthContext } from '@/lib/auth/session';
+import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import { getWeatherPageBoot } from '@/lib/weather/boot';
 import { getWeatherCache, setWeatherCache } from '@/lib/weather/redis-cache';
 import { isWeatherBackendConfigured } from '@/lib/weather/supabase-admin';
+import { weatherDeniedJson } from '@/lib/weather/auth';
 
 export async function GET() {
   if (!isWeatherBackendConfigured()) {
@@ -12,12 +13,11 @@ export async function GET() {
     );
   }
 
-  const auth = await getAuthContext();
-  if (!auth.authenticated) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const permission = await checkPermissionForRequest('weather.read');
+  if (!permission.allowed) {
+    return weatherDeniedJson(permission);
   }
 
-  // Try to read the cached payload from Redis.
   const cached = await getWeatherCache();
   if (cached) {
     return NextResponse.json(cached, {
@@ -25,7 +25,6 @@ export async function GET() {
     });
   }
 
-  // If cache miss, generate fresh data and store it.
   try {
     const boot = await getWeatherPageBoot();
     await setWeatherCache(boot);

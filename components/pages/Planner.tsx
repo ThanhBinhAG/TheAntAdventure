@@ -24,10 +24,12 @@ function TaskStatusSelect({
   value,
   onChange,
   compact,
+  disabled = false,
 }: {
   value: string;
   onChange: (status: TaskStatusValue) => void;
   compact?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <select
@@ -35,6 +37,8 @@ function TaskStatusSelect({
       value={value || 'todo'}
       onChange={(e) => onChange(e.target.value as TaskStatusValue)}
       aria-label="Tiến độ công việc"
+      disabled={disabled}
+      title={disabled ? 'You need write permission for Planner to update a task' : undefined}
     >
       {TASK_STATUSES.map((s) => (
         <option key={s.value} value={s.value}>
@@ -97,6 +101,10 @@ export default function Planner() {
   }
 
   async function saveNoteTask() {
+    if (!canWrite) {
+      toast.warning('Bạn không có quyền chỉnh sửa Planner.');
+      return;
+    }
     if (!noteText.trim()) return;
     const newTask = buildNoteTask(noteText, today, newTaskStatus);
     try {
@@ -124,6 +132,10 @@ export default function Planner() {
   }
 
   async function changeTaskStatus(id: string, status: TaskStatusValue) {
+    if (!canWrite) {
+      toast.warning('Bạn không có quyền chỉnh sửa Planner.');
+      return;
+    }
     try {
       const res = await fetch('/api/planner', {
         method: 'PATCH',
@@ -170,7 +182,12 @@ export default function Planner() {
           <div className="planner-task-expand">
             <div className="planner-task-expand-text">{display}</div>
             <div className="planner-task-expand-actions">
-              <TaskStatusSelect value={t.status || 'todo'} onChange={(s) => t.id && changeTaskStatus(t.id, s)} compact />
+              <TaskStatusSelect
+                value={t.status || 'todo'}
+                onChange={(s) => t.id && changeTaskStatus(t.id, s)}
+                compact
+                disabled={!canWrite}
+              />
             </div>
           </div>
         )}
@@ -287,10 +304,18 @@ export default function Planner() {
               onChange={(e) => setNoteText(e.target.value)}
               placeholder="Add today's tasks..."
               rows={6}
+              disabled={!canWrite}
+              title={!canWrite ? 'You need write permission for Planner to add a task' : undefined}
             />
             <div className="planner-note-board-actions">
-              <TaskStatusSelect value={newTaskStatus} onChange={setNewTaskStatus} />
-              <button className="btn btn-p btn-sm" type="button" onClick={saveNoteTask} disabled={!noteText.trim()}>
+              <TaskStatusSelect value={newTaskStatus} onChange={setNewTaskStatus} disabled={!canWrite} />
+              <button
+                className="btn btn-p btn-sm"
+                type="button"
+                onClick={saveNoteTask}
+                disabled={!noteText.trim() || !canWrite}
+                title={!canWrite ? 'You need write permission for Planner to add a task' : undefined}
+              >
                 Add task
               </button>
             </div>
@@ -306,7 +331,12 @@ export default function Planner() {
                       <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>{t.assignee}</div>
                     )}
                   </div>
-                  <TaskStatusSelect value={t.status || 'todo'} onChange={(s) => t.id && changeTaskStatus(t.id, s)} compact />
+                  <TaskStatusSelect
+                    value={t.status || 'todo'}
+                    onChange={(s) => t.id && changeTaskStatus(t.id, s)}
+                    compact
+                    disabled={!canWrite}
+                  />
                 </div>
               ))
             ) : (
@@ -316,7 +346,7 @@ export default function Planner() {
             )}
           </div>
 
-          <CompletedTasksPanel tasks={allTasks} onStatusChange={changeTaskStatus} />
+          <CompletedTasksPanel tasks={allTasks} onStatusChange={changeTaskStatus} canWrite={canWrite} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="card">

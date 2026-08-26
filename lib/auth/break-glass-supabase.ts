@@ -12,7 +12,8 @@ function publicError(error: { message?: string; code?: string; status?: number }
 
 /**
  * Hidden Auth user so break-glass gets a real JWT for RLS/RPC.
- * Privilege comes from bg_session plus this user's `super_admin` role.
+ * Privilege comes from verified recovery credentials plus this user's
+ * `super_admin` role.
  */
 export const BREAK_GLASS_SHADOW_EMAIL = 'breakglass.internal@invalid';
 export const BREAK_GLASS_SHADOW_DISPLAY_NAME = 'Break-glass';
@@ -156,7 +157,7 @@ export function ensureBreakGlassShadowPrivilegesOnce(): Promise<boolean> {
 
 /**
  * Create a real Supabase session for the shadow user so CRM RLS/RPC work.
- * The caller stores its tokens only in the server-side CRM session.
+ * The caller stores tokens only in Supabase SSR HttpOnly cookies.
  * Also grants the hidden `super_admin` role used by Access Control and core RLS.
  */
 export async function getBreakGlassSupabaseSession(): Promise<Session | null> {

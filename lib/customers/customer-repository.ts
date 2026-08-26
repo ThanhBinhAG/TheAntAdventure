@@ -9,18 +9,21 @@ import {
   resolveAgentId,
 } from '@/lib/customers/customer-onboarding';
 import type { CustomerFormData } from '@/lib/customers/customer-form';
-import { formToCustomer } from '@/lib/customers/customer-form';
+import { customerToForm, formToCustomer } from '@/lib/customers/customer-form';
 import {
   customerDeleteBlockedMessage,
   type CustomerDeleteBlockReason,
 } from '@/lib/customers/customer-delete';
 import type {
+  CustomerCommCreateBody,
   CustomerCreateBody,
+  CustomerInquiryBody,
   CustomerListItem,
   CustomerListQuery,
   CustomerPageResponse,
   CustomerPatchBody,
 } from '@/lib/customers/customer-list-input';
+import { invalidateDashboardCache } from '@/lib/dashboard/dashboard-repository';
 import {
   commToRow,
   customerToRow,
@@ -607,6 +610,80 @@ function mapBookingSummaryRow(r: Row): Booking {
     changes: [],
     guideAlertPending: Boolean(r.guide_alert_pending),
   };
+}
+
+/** Create an Inquiry lead for an existing customer (profile “New inquiry”). */
+export async function createCustomerInquiry(
+  customerId: string,
+  body: CustomerInquiryBody = { flagTourDesign: true },
+): Promise<Lead> {
+  const supabase = await createCustomerServerClient();
+
+  const { data: customerRow, error: customerError } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('id', customerId)
+    .maybeSingle();
+
+  if (customerError) throw new CustomerRepositoryError(customerError.message);
+  if (!customerRow) {
+    throw new CustomerRepositoryError('Không tìm thấy khách hàng.', 'not_found');
+  }
+
+  const customer = rowToCustomer(customerRow as Row);
+  if (customer.agentId) {
+    const names = await loadAgentsMap(supabase, [customer.agentId]);
+    customer.agentName = names.get(customer.agentId) ?? customer.agentName;
+  }
+
+  const leads = await fetchAllLeads(supabase);
+  const form = customerToForm(customer);
+  const lead = buildInquiryLead(customer, form, nextLeadId(leads), {
+    flagTourDesign: body.flagTourDesign ?? true,
+  });
+
+  const { error: leadError } = await supabase.from('leads').insert(leadToRow(lead));
+  if (leadError) throw new CustomerRepositoryError(leadError.message);
+
+  await invalidateDashboardCache();
+  return lead;
+}
+
+/** Log a communication for an existing customer (profile Communications tab). */
+export async function createCustomerComm(
+  customerId: string,
+  body: CustomerCommCreateBody,
+): Promise<Comm> {
+  const supabase = await createCustomerServerClient();
+
+  const { data: customerRow, error: customerError } = await supabase
+    .from('customers')
+    .select('id, name')
+    .eq('id', customerId)
+    .maybeSingle();
+
+  if (customerError) throw new CustomerRepositoryError(customerError.message);
+  if (!customerRow) {
+    throw new CustomerRepositoryError('Không tìm thấy khách hàng.', 'not_found');
+  }
+
+  const customerName = String((customerRow as Row).name ?? '');
+  const comm: Comm = {
+    id: `CM-${Date.now()}`,
+    cid: customerId,
+    date: body.date,
+    type: body.type,
+    dir: body.dir,
+    subj: body.subj,
+    body: body.body ?? '',
+    author:
+      body.dir === 'inbound' ? customerName || 'Client' : 'Tai (The Ant Adventures)',
+  };
+
+  const { error: commError } = await supabase.from('comms').insert(commToRow(comm));
+  if (commError) throw new CustomerRepositoryError(commError.message);
+
+  return comm;
 }
 
 /** Related rows for the Clients profile modal (server-only; no browser PostgREST). */

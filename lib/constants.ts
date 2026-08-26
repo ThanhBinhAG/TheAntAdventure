@@ -150,6 +150,8 @@ export interface NavItem {
   vi: string;
   badge?: string;
   badgeType?: 'ceo' | 'new';
+  /** Hide from sidebar until the feature is ready (route may still exist). */
+  hidden?: boolean;
   /** Renders the item as an expandable group in the sidebar. */
   children?: NavItem[];
 }
@@ -173,6 +175,19 @@ export const NAV_SECTIONS: NavSection[] = [
       { page: 'tourdesign', icon: '✦', en: 'Tour Design', vi: 'Thiết kế tour', badge: 'AI', badgeType: 'new' },
       { page: 'products', icon: '◆', en: 'Tour Products', vi: 'Sản phẩm tour' },
       { page: 'gallery', icon: '🖼', en: 'Photo Gallery', vi: 'Thư viện ảnh' },
+      { page: 'weather', icon: '☁', en: 'Weather Guide', vi: 'Thời tiết' },
+      { page: 'attractions', icon: '🏛', en: 'Attraction Schedule', vi: 'Lịch điểm tham quan', badge: 'NEW', badgeType: 'new' },
+    ],
+  },
+  {
+    en: 'Operations',
+    vi: 'Vận hành',
+    items: [
+      { page: 'bookings', icon: '▣', en: 'Bookings', vi: 'Đặt tour' },
+      { page: 'contracts', icon: '📄', en: 'Contracts', vi: 'Hợp đồng' },
+      { page: 'suppliers', icon: '◫', en: 'Suppliers', vi: 'Nhà cung cấp' },
+      { page: 'guides', icon: '◑', en: 'Guides', vi: 'Hướng dẫn viên' },
+      { page: 'posttour', icon: '⭐', en: 'Post-Tour & Feedback', vi: 'Hậu tour & Phản hồi', badge: 'NEW', badgeType: 'new' },
       {
         page: 'pricing',
         icon: '◈',
@@ -198,19 +213,6 @@ export const NAV_SECTIONS: NavSection[] = [
           },
         ],
       },
-      { page: 'weather', icon: '☁', en: 'Weather Guide', vi: 'Thời tiết' },
-      { page: 'attractions', icon: '🏛', en: 'Attraction Schedule', vi: 'Lịch điểm tham quan', badge: 'NEW', badgeType: 'new' },
-    ],
-  },
-  {
-    en: 'Operations',
-    vi: 'Vận hành',
-    items: [
-      { page: 'bookings', icon: '▣', en: 'Bookings', vi: 'Đặt tour' },
-      { page: 'contracts', icon: '📄', en: 'Contracts', vi: 'Hợp đồng' },
-      { page: 'suppliers', icon: '◫', en: 'Suppliers', vi: 'Nhà cung cấp' },
-      { page: 'guides', icon: '◑', en: 'Guides', vi: 'Hướng dẫn viên' },
-      { page: 'posttour', icon: '⭐', en: 'Post-Tour & Feedback', vi: 'Hậu tour & Phản hồi', badge: 'NEW', badgeType: 'new' },
     ],
   },
   {
@@ -248,8 +250,6 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
 ];
-
-export const QUICK_NAV_PAGES: PageSlug[] = ['dashboard', 'sales', 'tourdesign', 'bookings'];
 
 export const VALID_PAGES = Array.from(
   new Set(

@@ -259,26 +259,55 @@ export function ListFollowUpCell({
   const [fupDate, setFupDate] = useState(lead.followUpDate || '');
   const [fupAction, setFupAction] = useState(lead.nextAction || '');
   const overdue = isFollowUpOverdue(lead, today);
+  const hasDate = Boolean(lead.followUpDate);
 
   return (
-    <td style={{ fontSize: 12, color: overdue ? 'var(--red)' : 'var(--m)', fontWeight: overdue ? 600 : 400 }}>
-      <div>{lead.followUpDate || '—'}</div>
-      <button type="button" className="pipe-fup-btn" style={{ marginTop: 4 }} onClick={() => setOpen(!open)}>
-        📅 {lead.followUpDate ? tc('editFollowUp') : tc('setFollowUp')}
-      </button>
+    <td className={`sales-list-fup${overdue ? ' is-overdue' : ''}${open ? ' is-open' : ''}`}>
+      <div className="sales-list-fup-row">
+        <span className="sales-list-fup-date" title={lead.nextAction || undefined}>
+          {lead.followUpDate || '—'}
+        </span>
+        <button
+          type="button"
+          className="sales-list-fup-link"
+          onClick={() => {
+            setFupDate(lead.followUpDate || '');
+            setFupAction(lead.nextAction || '');
+            setOpen((v) => !v);
+          }}
+        >
+          {hasDate ? tc('editFollowUp') : tc('setFollowUp')}
+        </button>
+      </div>
+      {lead.nextAction && !open ? (
+        <div className="sales-list-fup-hint" title={lead.nextAction}>
+          {lead.nextAction}
+        </div>
+      ) : null}
       {open && (
-        <div className="pipe-fup-form" style={{ marginTop: 6 }}>
+        <div className="sales-list-fup-popover" role="dialog" aria-label={tc('setFollowUp')}>
           <input type="date" value={fupDate} onChange={(e) => setFupDate(e.target.value)} />
-          <input type="text" value={fupAction} onChange={(e) => setFupAction(e.target.value)} placeholder={`${tc('nextAction')}…`} />
-          <button
-            type="button"
-            onClick={() => {
-              onUpdate(lead.id, { followUpDate: fupDate, nextAction: fupAction });
-              setOpen(false);
-            }}
-          >
-            ✓ {tc('save')}
-          </button>
+          <input
+            type="text"
+            value={fupAction}
+            onChange={(e) => setFupAction(e.target.value)}
+            placeholder={`${tc('nextAction')}…`}
+          />
+          <div className="sales-list-fup-actions">
+            <button type="button" className="btn btn-s btn-sm" onClick={() => setOpen(false)}>
+              {tc('cancel')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-p btn-sm"
+              onClick={() => {
+                onUpdate(lead.id, { followUpDate: fupDate, nextAction: fupAction });
+                setOpen(false);
+              }}
+            >
+              {tc('save')}
+            </button>
+          </div>
         </div>
       )}
     </td>

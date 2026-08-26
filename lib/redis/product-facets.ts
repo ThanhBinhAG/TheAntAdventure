@@ -52,5 +52,10 @@ export async function setCachedProductFacets(
 }
 
 export async function invalidateProductFacetsCache(): Promise<void> {
-    await cacheInvalidatePattern('cache:products:*:v1:*');
+    try {
+        await cacheInvalidatePattern('cache:products:*:v1:*');
+    } catch (error) {
+        // Cache is optional: a completed Product mutation must still succeed.
+        console.warn('[Redis Cache Error] Product cache invalidation failed:', error);
+    }
 }

@@ -2,6 +2,8 @@ import 'server-only';
 
 import { getRedisClient } from '@/lib/redis/client';
 
+const INVALIDATION_DELETE_BATCH_SIZE = 100;
+
 /**
  * Lấy dữ liệu từ Redis cache.
  * Tự động parse JSON. Trả về null nếu có lỗi hoặc không có cache.
@@ -84,24 +86,23 @@ export async function cacheIncr(key: string): Promise<number | null> {
 }
 
 /**
- * Tìm và xóa toàn bộ các key khớp với pattern (sử dụng scanIterator).
+ * Tìm và xóa các key khớp với pattern theo từng SCAN/DEL batch. Không gom
+ * toàn bộ key vào RAM, và Redis lỗi không được làm hỏng mutation chính.
  */
 export async function cacheInvalidatePattern(pattern: string): Promise<void> {
   try {
     const client = await getRedisClient();
     if (!client) return;
 
-    const keys: string[] = [];
     for await (const batch of client.scanIterator({
       MATCH: pattern,
       COUNT: 100,
     })) {
       const scannedKeys = Array.isArray(batch) ? batch : [batch];
-      keys.push(...scannedKeys.map((key) => String(key)));
-    }
-
-    if (keys.length > 0) {
-      await client.del(keys);
+      const keys = scannedKeys.map((key) => String(key));
+      for (let offset = 0; offset < keys.length; offset += INVALIDATION_DELETE_BATCH_SIZE) {
+        await client.del(keys.slice(offset, offset + INVALIDATION_DELETE_BATCH_SIZE));
+      }
     }
   } catch (error) {
     console.warn(`[Redis Cache Error] Không thể invalidate pattern "${pattern}":`, error);

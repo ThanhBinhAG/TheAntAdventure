@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getAuthContext } from '@/lib/auth/session';
+import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import { isWeatherBackendConfigured } from '@/lib/weather/supabase-admin';
 import { getDestinationWeather } from '@/lib/weather/refresh';
+import { weatherDeniedJson } from '@/lib/weather/auth';
 
 const CACHE_CONTROL = 'private, max-age=60, stale-while-revalidate=300';
 
@@ -13,9 +14,9 @@ export async function GET(request: Request) {
     );
   }
 
-  const auth = await getAuthContext();
-  if (!auth.authenticated) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const permission = await checkPermissionForRequest('weather.read');
+  if (!permission.allowed) {
+    return weatherDeniedJson(permission);
   }
 
   const { searchParams } = new URL(request.url);
@@ -25,13 +26,21 @@ export async function GET(request: Request) {
   }
 
   const force = searchParams.get('force') === '1' || searchParams.get('force') === 'true';
+  if (force) {
+    return NextResponse.json(
+      {
+        error: 'Deprecated. Use POST /api/weather/destination/refresh (weather.write).',
+        deprecated: true,
+      },
+      { status: 410 },
+    );
+  }
 
   try {
-    // Catalog seed runs on list GET / refresh — not on every forecast read.
-    const { detail, fromCache } = await getDestinationWeather(id, { force });
+    const { detail, fromCache } = await getDestinationWeather(id, { force: false });
     return NextResponse.json(
       { ...detail, fromCache },
-      { headers: { 'Cache-Control': fromCache && !force ? CACHE_CONTROL : 'no-store' } }
+      { headers: { 'Cache-Control': fromCache ? CACHE_CONTROL : 'no-store' } }
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -7,7 +7,7 @@ export const GET = bffRoute(
   {
     requiredPermission: 'tour_design.read',
   },
-  async () => {
-    return await getAllTourDraftsServer();
+  async ({ supabase }) => {
+    return await getAllTourDraftsServer(supabase);
   }
 );

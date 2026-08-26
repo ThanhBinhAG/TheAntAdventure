@@ -6,14 +6,6 @@ import { FormEvent, useCallback, useState } from 'react';
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
 import { getAuthCaptchaSiteKey } from '@/lib/env';
 
-function logAuthEvent(message: string, meta?: Record<string, unknown>, level: 'info' | 'warn' | 'error' = 'info') {
-  void fetch('/api/system/log', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ category: 'auth', message, level, meta }),
-  }).catch(() => { });
-}
-
 function authErrorMessage(message: string): string {
   const lower = message.toLowerCase();
   if (
@@ -71,10 +63,6 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
 
     setLoading(true);
     const trimmed = identity.trim();
-    // Do not log raw identity when it might be break-glass username.
-    logAuthEvent('signIn attempt', {
-      hasAt: trimmed.includes('@'),
-    });
 
     try {
       const res = await fetch('/api/auth/login', {
@@ -95,26 +83,17 @@ export function LoginForm({ showDebugLink = false }: LoginFormProps) {
 
       if (!res.ok || !data.ok) {
         const msg = authErrorMessage(data.error || 'Login failed.');
-        logAuthEvent(
-          'signIn failed',
-          { status: res.status, mode: data.mode },
-          'error',
-        );
         setError(msg);
         setCaptchaToken(null);
         return;
       }
 
-      logAuthEvent('signIn success', {
-        mode: data.mode === 'break_glass' ? 'break_glass' : 'supabase',
-      });
       const next = searchParams.get('next');
       const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
       // A full navigation avoids a prefetched unauthenticated CRM response after the cookie changes.
       window.location.assign(safeNext);
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Login failed.';
-      logAuthEvent('signIn exception', { error: raw }, 'error');
       setError(authErrorMessage(raw));
     } finally {
       setLoading(false);

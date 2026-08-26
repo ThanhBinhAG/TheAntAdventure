@@ -357,12 +357,16 @@ test('Tour Product BFF APIs - Tests', async (t) => {
   await t.test('POST /api/products/import - replaces full catalog through one transaction', async () => {
     const draft = {
       region: 'north',
-      duration: '1 day',
-      category: 'Adventure',
       code: 'AA-NV-TEST-01',
       name: 'Imported Product',
       desc: 'Imported Description',
       notesToSales: 'Imported Notes',
+      dur: 'Full Day',
+      cat: 'Adventure',
+      dest: 'Hanoi',
+      lvl: 'Easy & Comfortable',
+      needsReview: false,
+      reviewReasons: [],
     };
 
     const req = new Request('http://localhost/api/products/import', {
@@ -389,12 +393,68 @@ test('Tour Product BFF APIs - Tests', async (t) => {
     assert.equal(cacheInvalidated, true);
   });
 
+  await t.test('POST /api/products/import rejects malformed portfolio drafts before the transaction', async () => {
+    const response = await importRoute.POST(new Request('http://localhost/api/products/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drafts: [{
+          code: 'AA-NV-BAD-01',
+          name: 'Bad Product',
+          desc: '',
+          notesToSales: '',
+          dur: 'Full Day',
+          cat: 'Adventure',
+          dest: 'Hanoi',
+          lvl: 'Easy & Comfortable',
+          region: 'unknown-region',
+          needsReview: 'false',
+          reviewReasons: [],
+          unexpected: true,
+        }],
+      }),
+    }));
+
+    assert.equal(response.status, 422);
+    assert.equal(supabaseCalls.length, 0);
+    assert.equal(cacheInvalidated, false);
+  });
+
+  await t.test('POST /api/products/import rejects duplicate product codes before the transaction', async () => {
+    const response = await importRoute.POST(new Request('http://localhost/api/products/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drafts: [
+          {
+            code: 'AA-NV-DUP-01', name: 'First', desc: '', notesToSales: '', dur: 'Full Day',
+            cat: 'Adventure', dest: 'Hanoi', region: 'north', lvl: 'Easy & Comfortable',
+            needsReview: false, reviewReasons: [],
+          },
+          {
+            code: ' aa-nv-dup-01 ', name: 'Second', desc: '', notesToSales: '', dur: 'Half Day',
+            cat: 'Cultural', dest: 'Hanoi', region: 'north', lvl: 'Easy & Comfortable',
+            needsReview: false, reviewReasons: [],
+          },
+        ],
+      }),
+    }));
+
+    assert.equal(response.status, 422);
+    assert.equal(supabaseCalls.length, 0);
+    assert.equal(cacheInvalidated, false);
+  });
+
   await t.test('POST /api/products/import - preserves the current catalogue when transaction fails', async () => {
     productImportRpcError = { message: 'pricing insert failed' };
     const req = new Request('http://localhost/api/products/import', {
       method: 'POST',
       body: JSON.stringify({
-        drafts: [{ region: 'north', duration: '1 day', category: 'Adventure', code: 'AA-NV-FAIL-01', name: 'Failed Import' }],
+        drafts: [{
+          region: 'north', code: 'AA-NV-FAIL-01', name: 'Failed Import', desc: '', notesToSales: '',
+          dur: 'Full Day', cat: 'Adventure', dest: 'Hanoi', lvl: 'Easy & Comfortable',
+          needsReview: false, reviewReasons: [],
+        }],
       }),
     });
 

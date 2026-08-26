@@ -321,6 +321,29 @@ export function buildTourDraft(input: {
   };
 }
 
+/** Fields that ordinary autosave may change. Outline lifecycle belongs to the workflow endpoint. */
+export type TourDesignContentDraft = Omit<
+  TourDraft,
+  'outlineStatus' | 'outlineSentAt' | 'outlineApprovedAt' | 'outlineRevision' | 'saveRevision'
+>;
+
+export function toTourDesignContentDraft(draft: TourDraft): TourDesignContentDraft {
+  const {
+    outlineStatus: _outlineStatus,
+    outlineSentAt: _outlineSentAt,
+    outlineApprovedAt: _outlineApprovedAt,
+    outlineRevision: _outlineRevision,
+    saveRevision: _saveRevision,
+    ...contentDraft
+  } = draft;
+  void _outlineStatus;
+  void _outlineSentAt;
+  void _outlineApprovedAt;
+  void _outlineRevision;
+  void _saveRevision;
+  return contentDraft;
+}
+
 export function briefFromDraft(draft?: TourDraft | null): Partial<TourBrief> | undefined {
   if (!draft?.briefJson) return undefined;
   const brief = { ...draft.briefJson };

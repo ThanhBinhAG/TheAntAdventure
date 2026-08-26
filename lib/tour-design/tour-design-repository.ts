@@ -1,21 +1,26 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { rowToCustomer, rowToLead } from '@/lib/db/mappers/crm';
+import { rowToComm, rowToCustomer, rowToLead } from '@/lib/db/mappers/crm';
+import { assembleHotels } from '@/lib/db/mappers/ops-content';
 import type { Row } from '@/lib/db/mappers/shared';
-import { getServerSupabaseClient } from '@/lib/supabase/server';
 import {
   rowToTourDraft,
   tourDraftToRow,
   rowToTourOutlineDay,
   tourOutlineDayToRow,
 } from '@/lib/db/mappers/tour';
-import type { TourDraft, TourOutlineDay } from '@/lib/types';
-import type { TourDesignCrmContext } from '@/lib/tour-design/tour-design-types';
+import type { Comm, Hotel, Lead, TourDraft, TourOutlineDay } from '@/lib/types';
+import type {
+  TourDesignCrmContext,
+  TourDesignReferenceData,
+} from '@/lib/tour-design/tour-design-types';
+import type { TourDesignContentDraft } from '@/lib/tour-design/tour-draft-utils';
 
 /** Customers + leads for Client Brief dropdown and Sales → Tour Design handoff queue. */
-export async function getTourDesignCrmContextServer(): Promise<TourDesignCrmContext> {
-  const supabase = await getServerSupabaseClient();
+export async function getTourDesignCrmContextServer(
+  supabase: SupabaseClient,
+): Promise<TourDesignCrmContext> {
   const [customersRes, leadsRes] = await Promise.all([
     supabase.from('customers').select('*'),
     supabase.from('leads').select('*'),
@@ -30,12 +35,88 @@ export async function getTourDesignCrmContextServer(): Promise<TourDesignCrmCont
   };
 }
 
+/** Hotel catalog for Tour Design. Never load communications when opening this page. */
+export async function getTourDesignReferenceDataServer(
+  supabase: SupabaseClient,
+): Promise<TourDesignReferenceData> {
+  const { data, error } = await supabase.from('hotels').select('*, hotel_rooms(*)');
+  if (error) throw error;
+
+  const hotelRows: Row[] = [];
+  const roomRows: Row[] = [];
+  for (const raw of (data ?? []) as Row[]) {
+    const rooms = (raw.hotel_rooms as Row[] | undefined) ?? [];
+    const { hotel_rooms: _rooms, ...hotel } = raw;
+    void _rooms;
+    hotelRows.push(hotel);
+    roomRows.push(...rooms);
+  }
+
+  return { hotels: assembleHotels(hotelRows, roomRows) as unknown as Hotel[] };
+}
+
+export type TourDesignAcknowledgement = {
+  acknowledged: boolean;
+  lead: Lead | null;
+};
+
+/**
+ * Mark a Sales handoff as received exactly once. The predicate makes repeated
+ * or concurrent requests a harmless no-op after the first Pending lead update.
+ */
+export async function acknowledgeTourDesignLeadServer(
+  supabase: SupabaseClient,
+  leadId: string,
+): Promise<TourDesignAcknowledgement> {
+  const { data, error } = await supabase
+    .from('leads')
+    .update({ tour_design_acked: true })
+    .eq('id', leadId)
+    .eq('needs_tour_design', true)
+    .eq('tour_design_acked', false)
+    .eq('stage', 'Pending')
+    .select('*')
+    .maybeSingle();
+  if (error) throw error;
+
+  if (data) {
+    return { acknowledged: true, lead: rowToLead(data as Row) };
+  }
+
+  const { data: current, error: currentError } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('id', leadId)
+    .maybeSingle();
+  if (currentError) throw currentError;
+
+  return {
+    acknowledged: false,
+    lead: current ? rowToLead(current as Row) : null,
+  };
+}
+
 export class TourDesignSaveConflictError extends Error {
   constructor(readonly currentSaveRevision?: number) {
     super('Thiết kế tour đã được thay đổi bởi một lượt lưu mới hơn.');
     this.name = 'TourDesignSaveConflictError';
   }
 }
+
+export type TourDesignOutlineWorkflowAction = 'sent' | 'resent' | 'approved' | 'revised';
+
+export type TourDesignOutlineWorkflowInput = {
+  action: TourDesignOutlineWorkflowAction;
+  draft: TourDraft;
+  outlineDays: TourOutlineDay[];
+  expectedSaveRevision: number;
+};
+
+export type TourDesignOutlineWorkflowResult = {
+  draft: TourDraft;
+  lead: Lead;
+  comm: Comm | null;
+};
 
 function currentSaveRevisionFromRpcError(error: unknown): number | undefined {
   if (!error || typeof error !== 'object') return undefined;
@@ -50,10 +131,45 @@ function isSaveConflict(error: unknown): boolean {
 }
 
 /**
+ * Persist a state transition of the Outline plus its Lead and Communication
+ * effects in one server-side PostgreSQL transaction.
+ */
+export async function applyTourDesignOutlineWorkflowServer(
+  supabase: SupabaseClient,
+  input: TourDesignOutlineWorkflowInput,
+): Promise<TourDesignOutlineWorkflowResult> {
+  const { data, error } = await supabase.rpc('apply_tour_design_outline_workflow', {
+    p_action: input.action,
+    p_draft: tourDraftToRow(input.draft),
+    p_outline_days: input.outlineDays.map((day) => tourOutlineDayToRow(day)),
+    p_expected_save_revision: input.expectedSaveRevision,
+  });
+  if (error) {
+    if (isSaveConflict(error)) {
+      throw new TourDesignSaveConflictError(currentSaveRevisionFromRpcError(error));
+    }
+    throw error;
+  }
+
+  if (!data || typeof data !== 'object') {
+    throw new Error('Tour Design workflow transaction did not return data.');
+  }
+  const result = data as { draft?: Row; lead?: Row; comm?: Row | null };
+  if (!result.draft || !result.lead) {
+    throw new Error('Tour Design workflow transaction returned an incomplete result.');
+  }
+
+  return {
+    draft: rowToTourDraft(result.draft),
+    lead: rowToLead(result.lead),
+    comm: result.comm ? rowToComm(result.comm) : null,
+  };
+}
+
+/**
  * Lấy toàn bộ danh sách tour drafts từ server.
  */
-export async function getAllTourDraftsServer(): Promise<TourDraft[]> {
-  const supabase = await getServerSupabaseClient();
+export async function getAllTourDraftsServer(supabase: SupabaseClient): Promise<TourDraft[]> {
   const { data, error } = await supabase
     .from('tour_drafts')
     .select('*');
@@ -65,8 +181,9 @@ export async function getAllTourDraftsServer(): Promise<TourDraft[]> {
 /**
  * Lấy toàn bộ danh sách các ngày hành trình (outlines) từ server.
  */
-export async function getAllTourOutlineDaysServer(): Promise<TourOutlineDay[]> {
-  const supabase = await getServerSupabaseClient();
+export async function getAllTourOutlineDaysServer(
+  supabase: SupabaseClient,
+): Promise<TourOutlineDay[]> {
   const { data, error } = await supabase
     .from('tour_outline_days')
     .select('*')
@@ -140,6 +257,39 @@ export async function saveTourDesignServer(
   const saveRevision = Number(data);
   if (!Number.isInteger(saveRevision) || saveRevision < 1) {
     throw new Error('Tour Design save transaction did not return a valid revision.');
+  }
+  return saveRevision;
+}
+
+/** Save editable draft content while preserving the server-owned Outline lifecycle. */
+export async function saveTourDesignContentServer(
+  supabase: SupabaseClient,
+  draft: TourDesignContentDraft,
+  outlineDays: TourOutlineDay[],
+  expectedSaveRevision: number,
+): Promise<number> {
+  const contentRow = tourDraftToRow({ ...draft, outlineStatus: 'draft' } as TourDraft);
+  delete contentRow.outline_status;
+  delete contentRow.outline_sent_at;
+  delete contentRow.outline_approved_at;
+  delete contentRow.outline_revision;
+  delete contentRow.save_revision;
+
+  const { data, error } = await supabase.rpc('save_tour_design_content_versioned_transaction', {
+    p_draft: contentRow,
+    p_outline_days: outlineDays.map((day) => tourOutlineDayToRow(day)),
+    p_expected_save_revision: expectedSaveRevision,
+  });
+  if (error) {
+    if (isSaveConflict(error)) {
+      throw new TourDesignSaveConflictError(currentSaveRevisionFromRpcError(error));
+    }
+    throw error;
+  }
+
+  const saveRevision = Number(data);
+  if (!Number.isInteger(saveRevision) || saveRevision < 1) {
+    throw new Error('Tour Design content save transaction did not return a valid revision.');
   }
   return saveRevision;
 }

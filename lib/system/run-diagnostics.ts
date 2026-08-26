@@ -282,8 +282,7 @@ export { isExpectedUnauthenticatedSessionError } from './session-diag';
 async function checkCookieHeaderSize(): Promise<DiagnosticCheck> {
   const h = await headers();
   const cookieHeader = h.get('cookie');
-  const { bytes, cookieCount, authChunkCount, hasBreakGlass } =
-    estimateCookieHeaderBytes(cookieHeader);
+  const { bytes, cookieCount, authChunkCount } = estimateCookieHeaderBytes(cookieHeader);
 
   // Default nginx large_client_header_buffers is often 4×8k; warn before that.
   const WARN_BYTES = 6 * 1024;
@@ -313,7 +312,6 @@ async function checkCookieHeaderSize(): Promise<DiagnosticCheck> {
       bytes,
       cookieCount,
       authChunkCount,
-      hasBreakGlass,
       warnBytes: WARN_BYTES,
       failBytes: FAIL_BYTES,
     },

@@ -7,7 +7,7 @@ export const GET = bffRoute(
   {
     requiredPermission: 'planner.read',
   },
-  async () => {
-    return await getAllTasksServer();
+  async ({ supabase }) => {
+    return await getAllTasksServer(supabase);
   }
 );

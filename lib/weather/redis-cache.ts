@@ -47,7 +47,11 @@ export async function setWeatherCache(payload: WeatherPageBoot): Promise<boolean
 export async function invalidateWeatherCache(): Promise<void> {
   const client = await getRedisClient();
   if (!client) return; // nothing to do if Redis is down
-  await client.del(WEATHER_GUIDE_KEY);
+  try {
+    await client.del(WEATHER_GUIDE_KEY);
+  } catch {
+    // Redis errors must not fail weather mutations / refresh.
+  }
 }
 
 export type DestinationCachePayload = {
@@ -102,7 +106,11 @@ export async function setDestinationWeatherCache(
 export async function invalidateDestinationWeatherCache(destinationId: string): Promise<void> {
   const client = await getRedisClient();
   if (!client) return;
-  await client.del(getDestinationKey(destinationId));
+  try {
+    await client.del(getDestinationKey(destinationId));
+  } catch {
+    // Redis errors must not fail weather mutations / refresh.
+  }
 }
 
 const WEATHER_LAST_FETCH_SUCCESS_KEY = 'weather:last_fetch_success';

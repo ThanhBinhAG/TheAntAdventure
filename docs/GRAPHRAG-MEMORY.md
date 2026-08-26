@@ -12,7 +12,7 @@
 | Dữ liệu CRM | `lib/store.ts`, `lib/types.ts` | `components/StoreProvider.tsx` → `lib/db/hydrate.ts` / `lib/db/sync-push.ts` → `lib/db/supabase.ts` |
 | Supabase/schema & RLS | `supabase/schema.sql`, `supabase/migrations/20260730042242_02_migrations.sql`, `docs/DATABASE.md` | table → mapper trong `lib/db/mappers.ts` → `lib/db/supabase.ts`; RLS chuyển tiếp ở `supabase/rls-authenticated.sql` |
 | Đăng nhập/session | `app/api/auth/login/route.ts` | `lib/auth/*`, `lib/env.ts`, `proxy.ts` |
-| Quyền và Access Control | `lib/auth/permissions.ts` | `app/(crm)/layout.tsx` → `getInitialPermissionCodesForCRMLayout()` → `current_permission_codes()` → `PermissionsProvider`; `/access-control` → `components/access-control/*` → `/api/access-control/*` → RPC Supabase |
+| Quyền và Access Control | `lib/auth/permissions.ts` | `app/(crm)/layout.tsx` → `getCRMLayoutBoot()` → `current_permission_codes()` → `PermissionsProvider` (+ masked email for Topbar); `/access-control` → `components/access-control/*` → `/api/access-control/*` → RPC Supabase |
 | Sales đến booking | `components/pages/Sales.tsx` | `lib/customers/*`, `lib/sales/*`, `components/pages/Bookings.tsx` |
 | Thiết kế tour/proposal | `components/pages/TourDesign.tsx` | `components/tour-design/*` → `lib/tour-design/*` / `lib/proposals/*` |
 | Bảng giá/XLSX | `components/pages/Pricing*.tsx` | `components/pricing/*` → `lib/pricing/*` → bảng `pricing_*` |
@@ -216,8 +216,8 @@ sequenceDiagram
   B->>L: email/password (+ optional CAPTCHA)
   L->>A: POST credentials
   alt break-glass credentials
-    A->>BG: sign bg_session cookie
-    A->>SA: optionally attach shadow session
+    A->>BG: verify recovery credentials
+    A->>SA: create shadow-user Supabase session
   else standard account
     A->>SA: signInWithPassword
     SA-->>A: auth cookies
@@ -226,7 +226,7 @@ sequenceDiagram
   B->>CRM: navigate to protected CRM route
 ```
 
-Implemented session bridge: [`proxy.ts`](proxy.ts) calls `updateSession` from `lib/supabase/middleware.ts`; `lib/supabase/index.ts` caches the browser client created by `lib/supabase/client.ts`. Proxy keeps `/api/health`, login/logout and configured debug paths public, refreshes Supabase cookies, and redirects unauthenticated CRM traffic to `/login`. Break-glass sessions can also attach a shadow Supabase session for authenticated RLS access.
+Implemented session bridge: [`proxy.ts`](proxy.ts) calls `updateSession` from `lib/supabase/middleware.ts`; `lib/supabase/index.ts` caches the browser client created by `lib/supabase/client.ts`. Proxy keeps `/api/health`, login/logout and configured debug paths public, refreshes Supabase cookies, and redirects unauthenticated CRM traffic to `/login`. Break-glass uses a shadow Supabase session for authenticated RLS access; CRM does not sign a separate break-glass cookie.
 
 ### Permission load and Access Control
 
@@ -240,9 +240,9 @@ sequenceDiagram
   participant DB as Access Control RPC
 
   B->>L: navigate to protected CRM route with session cookie
-  L->>RPC: getInitialPermissionCodesForCRMLayout()
-  RPC-->>L: permission codes, e.g. users.manage or *
-  L-->>PP: initialPermissionCodes prop
+  L->>RPC: getCRMLayoutBoot()
+  RPC-->>L: permission codes + masked session email
+  L-->>PP: initialPermissionCodes + sessionEmailMasked props
   PP->>AC: PermissionGate checks PAGE_READ_PERMISSION
   alt Has users.manage or *
     AC->>DB: manage users/roles/audit through protected API
@@ -338,7 +338,7 @@ flowchart LR
 | `GET /api/health` | external monitor | public by design | Supabase Auth health |
 | `POST /api/photos/upload/init`, `/chunk`, `/complete`, `/delete` | gallery (chunked → Sharp → Storage) | authenticated only | Storage + `photos` tables |
 | `POST /api/pricing/export`, `/api/proposals/export` | pricing/tour-design | authenticated only; no role/permission export check | Puppeteer/Chromium PDF |
-| `GET,PUT /api/proposals/templates` | Tour Design Step 5 Edit Template | authenticated only | `proposal_templates` (lazy; not page-boot) |
+| `GET,PUT /api/proposals/templates` | Tour Design Step 5 Edit Template | `tour_design.read` for GET; `tour_design.write` for PUT; Zod payload validation | user-scoped `proposal_templates` access (lazy; not page-boot) |
 | `GET,PUT /api/system/*` | debug panel | debug token except debug-log POST | diagnostics/log buffer |
 | `POST /api/weather/refresh` | weather page or cron | authenticated user or cron secret | service-role cache + Open-Meteo |
 | `GET /api/weather/weekly` | weather page | no explicit guard | service-role cache |

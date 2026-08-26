@@ -261,17 +261,19 @@ export default function SalesPage() {
         data-lead-id={l.id}
         className={l.id === highlightLeadId ? 'sales-lead-highlight' : undefined}
       >
-        <td>
-          <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{l.id}</code>
+        <td className="sales-list-id">
+          <code>{l.id}</code>
         </td>
-        <td>
-          <b>{l.customerName}</b>
+        <td className="sales-list-customer">
+          <span className="sales-list-customer-name">{l.customerName}</span>
         </td>
-        <td style={{ fontSize: 12, maxWidth: 200 }}>{l.tour}</td>
-        <td>{l.pax || '—'}</td>
-        <td style={{ fontWeight: 600, color: 'var(--g)' }}>{l.value > 0 ? `$${fmt(l.value)}` : '—'}</td>
-        <td style={{ fontWeight: 700, color: 'var(--pur)' }}>{weighted > 0 ? `$${fmt(weighted)}` : '—'}</td>
-        <td style={{ fontSize: 12, color: 'var(--m)' }}>{l.month || '—'}</td>
+        <td className="sales-list-tour" title={l.tour || undefined}>
+          {l.tour || '—'}
+        </td>
+        <td className="sales-list-num">{l.pax || '—'}</td>
+        <td className="sales-list-money">{l.value > 0 ? `$${fmt(l.value)}` : '—'}</td>
+        <td className="sales-list-weighted">{weighted > 0 ? `$${fmt(weighted)}` : '—'}</td>
+        <td className="sales-list-muted">{l.month || '—'}</td>
         <ListFollowUpCell
           lead={l}
           today={today}
@@ -284,7 +286,7 @@ export default function SalesPage() {
         />
         <td>
           <select
-            className="pipe-stage-select"
+            className="sales-list-stage-select"
             value={l.stage}
             onChange={(e) => void moveStage(l.id, e.target.value)}
             aria-label={tc('stage')}
@@ -296,8 +298,10 @@ export default function SalesPage() {
             ))}
           </select>
         </td>
-        <td style={{ fontSize: 12 }}>{l.owner || 'Tai Pham'}</td>
-        <td style={{ fontSize: 11.5, color: 'var(--m)' }}>{lostReason ? tLostReason(lostReason) : '—'}</td>
+        <td className="sales-list-muted">{l.owner || 'Tai Pham'}</td>
+        <td className="sales-list-muted sales-list-lost">
+          {lostReason ? tLostReason(lostReason) : '—'}
+        </td>
       </tr>
     );
   }
@@ -533,14 +537,14 @@ export default function SalesPage() {
       )}
 
       {!isLoading && tab === 'list' && (
-        <div className="card">
+        <div className="card sales-list-card">
           <div className="sales-list-toolbar">
             <label>
               <input type="checkbox" checked={groupByMonth} onChange={(e) => setGroupByMonth(e.target.checked)} />
               {tsf('groupByTravelMonth')}
             </label>
           </div>
-          <div className="card-body" style={{ padding: 0 }}>
+          <div className="card-body sales-list-body">
             {listLeads.length === 0 ? (
               <EmptyState
                 className="sales-empty-state crm-empty-state--table"
@@ -566,35 +570,37 @@ export default function SalesPage() {
                 }
               />
             ) : (
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>{tsf('leadId')}</th>
-                    <SortableTh field="customer" label={tsf('customer')} listSort={listSort} onSort={handleSortClick} />
-                    <th>{tc('tour')}</th>
-                    <th>{tc('pax')}</th>
-                    <SortableTh field="value" label={tc('value')} listSort={listSort} onSort={handleSortClick} />
-                    <SortableTh field="weighted" label={tc('weighted')} listSort={listSort} onSort={handleSortClick} style={{ color: 'var(--pur)' }} />
-                    <SortableTh field="travelDate" label={tsf('travelDate')} listSort={listSort} onSort={handleSortClick} />
-                    <SortableTh field="followUp" label={tsf('followUp')} listSort={listSort} onSort={handleSortClick} />
-                    <SortableTh field="stage" label={tc('stage')} listSort={listSort} onSort={handleSortClick} />
-                    <th>{tc('owner')}</th>
-                    <th>{tc('lostReason')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupByMonth
-                    ? groupLeadsByTravelMonth(pageLeads).flatMap((group) => [
-                        <tr key={`group-${group.label}`} className="sales-group-row">
-                          <td colSpan={11}>
-                            {group.label === 'TBD' ? tsf('travelMonthUndetermined') : group.label} ({group.leads.length})
-                          </td>
-                        </tr>,
-                        ...group.leads.map((l) => renderLeadRow(l as LeadListItem)),
-                      ])
-                    : pageLeads.map((l) => renderLeadRow(l as LeadListItem))}
-                </tbody>
-              </table>
+              <div className="sales-list-scroll">
+                <table className="tbl sales-list-tbl">
+                  <thead>
+                    <tr>
+                      <th>{tsf('leadId')}</th>
+                      <SortableTh field="customer" label={tsf('customer')} listSort={listSort} onSort={handleSortClick} />
+                      <th>{tc('tour')}</th>
+                      <th>{tc('pax')}</th>
+                      <SortableTh field="value" label={tc('value')} listSort={listSort} onSort={handleSortClick} />
+                      <SortableTh field="weighted" label={tc('weighted')} listSort={listSort} onSort={handleSortClick} />
+                      <SortableTh field="travelDate" label={tsf('travelDate')} listSort={listSort} onSort={handleSortClick} />
+                      <SortableTh field="followUp" label={tsf('followUp')} listSort={listSort} onSort={handleSortClick} />
+                      <SortableTh field="stage" label={tc('stage')} listSort={listSort} onSort={handleSortClick} />
+                      <th>{tc('owner')}</th>
+                      <th>{tc('lostReason')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groupByMonth
+                      ? groupLeadsByTravelMonth(pageLeads).flatMap((group) => [
+                          <tr key={`group-${group.label}`} className="sales-group-row">
+                            <td colSpan={11}>
+                              {group.label === 'TBD' ? tsf('travelMonthUndetermined') : group.label} ({group.leads.length})
+                            </td>
+                          </tr>,
+                          ...group.leads.map((l) => renderLeadRow(l as LeadListItem)),
+                        ])
+                      : pageLeads.map((l) => renderLeadRow(l as LeadListItem))}
+                  </tbody>
+                </table>
+              </div>
             )}
             <PaginationBar
               page={listPage}

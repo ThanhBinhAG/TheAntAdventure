@@ -126,6 +126,24 @@ export const customerEmailCheckQuerySchema = z.object({
 
 export type CustomerEmailCheckQuery = z.infer<typeof customerEmailCheckQuerySchema>;
 
+/** POST /api/customers/:id/inquiry — new Inquiry lead from profile modal. */
+export const customerInquiryBodySchema = z.object({
+  flagTourDesign: z.boolean().optional().default(true),
+});
+
+export type CustomerInquiryBody = z.infer<typeof customerInquiryBodySchema>;
+
+/** POST /api/customers/:id/comms — log a communication from profile modal. */
+export const customerCommCreateBodySchema = z.object({
+  type: z.string().trim().min(1).max(50),
+  dir: z.enum(['inbound', 'outbound']),
+  date: z.string().trim().min(1).max(20),
+  subj: z.string().trim().min(1).max(500),
+  body: z.string().max(8000).default(''),
+});
+
+export type CustomerCommCreateBody = z.infer<typeof customerCommCreateBodySchema>;
+
 export function optionalCustomerQueryParam(
   url: URL,
   name: string,

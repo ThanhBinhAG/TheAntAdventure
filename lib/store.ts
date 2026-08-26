@@ -1,6 +1,6 @@
 import { create, type StateCreator } from 'zustand';
 import { applyLocalCustomerDelete } from './customers/customer-delete';
-import { appLog } from './system/app-logger';
+import { clientLog } from './system/client-logger';
 import { rolloverTasks } from './planner/planner-task-utils';
 import { localTodayIso } from './core/date-utils';
 import type {
@@ -439,7 +439,7 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         }),
 
       resetToSeeds: () => {
-        appLog('store', 'resetToSeeds is disabled — data is stored in Supabase only', {
+        clientLog('store', 'resetToSeeds is disabled — data is stored in Supabase only', {
           level: 'warn',
         });
       },

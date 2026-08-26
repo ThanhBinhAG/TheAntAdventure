@@ -2,7 +2,19 @@ import 'server-only';
 import { withPhotoCacheBust } from '@/lib/gallery/gallery-helpers';
 import { FEATURED_WEEKLY_IDS, WEATHER_DESTINATIONS, type WeatherRegion } from './coordinates';
 import { getWeatherAdminClient } from './supabase-admin';
+import { invalidateWeatherCache } from './redis-cache';
 import type { WeatherDestinationMeta } from './types';
+
+const REGION_DEFAULT_EMOJI: Record<WeatherRegion, string> = {
+  north: '⛰',
+  central: '🏯',
+  south: '🌾',
+};
+
+function coerceDestinationEmoji(emoji: string | null | undefined, region: WeatherRegion): string {
+  const trimmed = emoji?.trim();
+  return trimmed || REGION_DEFAULT_EMOJI[region];
+}
 
 export type DestinationInput = {
   id?: string;
@@ -75,7 +87,7 @@ function mapRow(
     id: row.id,
     name: row.name,
     region: row.region,
-    emoji: row.emoji,
+    emoji: coerceDestinationEmoji(row.emoji, row.region),
     latitude: Number(row.latitude),
     longitude: Number(row.longitude),
     elevationM: row.elevation_m != null ? Number(row.elevation_m) : null,
@@ -230,7 +242,7 @@ export async function createDestination(input: DestinationInput): Promise<Weathe
     id,
     name,
     region: input.region,
-    emoji: input.emoji ?? null,
+    emoji: coerceDestinationEmoji(input.emoji, input.region),
     latitude: input.latitude,
     longitude: input.longitude,
     elevation_m: input.elevationM ?? null,
@@ -248,6 +260,7 @@ export async function createDestination(input: DestinationInput): Promise<Weathe
 
   const created = await getDestinationById(id);
   if (!created) throw new Error('Create destination failed: row missing after insert.');
+  await invalidateWeatherCache();
   return created;
 }
 
@@ -286,7 +299,11 @@ export async function updateDestination(
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.name != null) row.name = patch.name.trim();
   if (patch.region != null) row.region = patch.region;
-  if (patch.emoji !== undefined) row.emoji = patch.emoji;
+  if (patch.emoji !== undefined) {
+    row.emoji = coerceDestinationEmoji(patch.emoji, patch.region ?? existing.region);
+  } else if (patch.region != null) {
+    row.emoji = coerceDestinationEmoji(existing.emoji, patch.region);
+  }
   if (patch.latitude != null) row.latitude = patch.latitude;
   if (patch.longitude != null) row.longitude = patch.longitude;
   if (patch.elevationM !== undefined) row.elevation_m = patch.elevationM;
@@ -302,6 +319,7 @@ export async function updateDestination(
 
   const updated = await getDestinationById(id);
   if (!updated) throw new Error('Update destination failed: row missing.');
+  await invalidateWeatherCache();
   return updated;
 }
 
@@ -355,6 +373,7 @@ export async function setFeaturedDestinationIds(ids: string[]): Promise<WeatherD
     if (error) throw new Error(`Set featured ${id} failed: ${error.message}`);
   }
 
+  await invalidateWeatherCache();
   return listDestinations({ activeOnly: true });
 }
 

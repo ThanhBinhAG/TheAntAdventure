@@ -25,7 +25,7 @@ function FeaturedSlot({
   onEdit?: (id: string) => void;
   cacheVersion?: number;
 }) {
-  const { data, loading, error, refresh, reload } = useDestinationWeather(meta.id, {
+  const { data, loading, error, reload } = useDestinationWeather(meta.id, {
     enabled: true,
   });
 
@@ -41,7 +41,7 @@ function FeaturedSlot({
         loading={loading && !data}
         error={error}
         onOpenDetail={() => onOpenDetail(meta.id)}
-        onRetry={() => void refresh()}
+        onRetry={() => void reload()}
       />
       {onEdit && (
         <button

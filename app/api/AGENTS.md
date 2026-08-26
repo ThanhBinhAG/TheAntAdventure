@@ -15,6 +15,7 @@ Next.js Route Handlers for server-side auth, media, exports, weather, and diagno
 - `planner/` — daily planner (tasks) CRUD and hydration endpoints
 - `attractions/` — province attractions CRUD and hydration endpoints
 - `tour-design/` — tour drafts and outlines safe saving and hydration endpoints
+- `dashboard/` — aggregate Dashboard KPIs / charts (`dashboard.read`)
 - `pricing/` — pricing PDF export (`export/`)
 - `proposals/` — proposal PDF export (`export/`) + company templates (`templates/`)
 - `weather/` — boot, weekly, refresh, destination(s), featured

@@ -9,8 +9,10 @@
 
 import 'server-only';
 
-import { getAuthContext } from '@/lib/auth/session';
+import { getAuthContext, type AuthContext } from '@/lib/auth/session';
+import { maskEmailForDisplay } from '@/lib/auth/mask-email';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   getCachedPermissionCodes,
   setCachedPermissionCodes,
@@ -20,9 +22,20 @@ import {
   type PermissionCode,
 } from '@/lib/auth/permissions';
 
+export type CRMLayoutBoot = {
+  permissionCodes: PermissionCode[];
+  /** Server-masked identity for topbar; never the raw email. */
+  sessionEmailMasked: string | null;
+};
+
 
 /** Kiểu một dòng do RPC current_permission_codes() trả về. */
 type PermissionRow = { code: string };
+
+export type PermissionRequestContext = {
+  auth: AuthContext;
+  getSupabaseClient: () => Promise<SupabaseClient>;
+};
 
 /**
  * Gọi RPC để lấy permission từ cookie session hiện tại.
@@ -32,8 +45,10 @@ type PermissionRow = { code: string };
  * - tài khoản còn hoạt động
  * - tài khoản chưa bị xóa mềm
  */
-async function readPermissionCodesFromSupabase(): Promise<PermissionCode[]> {
-  const supabase = await getServerSupabaseClient();
+async function readPermissionCodesFromSupabase(
+  getSupabaseClient: () => Promise<SupabaseClient> = getServerSupabaseClient,
+): Promise<PermissionCode[]> {
+  const supabase = await getSupabaseClient();
 
   const { data, error } = await supabase.rpc('current_permission_codes');
 
@@ -48,6 +63,7 @@ async function readPermissionCodesFromSupabase(): Promise<PermissionCode[]> {
 
 async function readPermissionCodesWithCache(
   userId: string,
+  getSupabaseClient?: () => Promise<SupabaseClient>,
 ): Promise<PermissionCode[]> {
   const cached = await getCachedPermissionCodes(userId);
 
@@ -55,7 +71,7 @@ async function readPermissionCodesWithCache(
     return cached.permissionCodes;
   }
 
-  const permissionCodes = await readPermissionCodesFromSupabase();
+  const permissionCodes = await readPermissionCodesFromSupabase(getSupabaseClient);
 
   await setCachedPermissionCodes(
     userId,
@@ -70,19 +86,36 @@ async function readPermissionCodesWithCache(
 /**
  * Dùng riêng cho app/(crm)/layout.tsx.
  *
- * Middleware đã xác thực user trước đó, nên không cần gọi auth.getUser() lần nữa.
- * Nếu session không hợp lệ, RPC trả mảng rỗng và PermissionGate sẽ chặn giao diện.
+ * Một lần getAuthContext(): quyền + email đã che cho Topbar.
+ * Middleware đã xác thực user trước đó; session không hợp lệ → permissions [].
  *
  * Không dùng hàm này cho API, vì API cần phân biệt lỗi 401 và 403.
  */
+export async function getCRMLayoutBoot(): Promise<CRMLayoutBoot> {
+  const auth = await getAuthContext();
+
+  if (!auth.authenticated) {
+    return { permissionCodes: [], sessionEmailMasked: null };
+  }
+
+  const sessionEmailMasked = maskEmailForDisplay(auth.email);
+
+  if (auth.isBreakGlass && auth.isSuperAdmin) {
+    return { permissionCodes: ['*'], sessionEmailMasked };
+  }
+
+  const permissionCodes = await readPermissionCodesFromSupabase(() =>
+    getServerSupabaseClient(auth),
+  );
+  return { permissionCodes, sessionEmailMasked };
+}
+
+/** Prefer getCRMLayoutBoot() when the layout also needs the masked welcome identity. */
 export async function getInitialPermissionCodesForCRMLayout(): Promise<
   PermissionCode[]
 > {
-  const auth = await getAuthContext();
-  if (!auth.authenticated) return [];
-  if (auth.isBreakGlass && auth.isSuperAdmin) return ['*'];
-
-  return readPermissionCodesFromSupabase();
+  const boot = await getCRMLayoutBoot();
+  return boot.permissionCodes;
 }
 
 /**
@@ -93,17 +126,26 @@ export async function getInitialPermissionCodesForCRMLayout(): Promise<
  */
 export async function getCurrentPermissionCodesForRequest(): Promise<
   PermissionCode[] | null
-> {
-  const auth = await getAuthContext();
+>;
+export async function getCurrentPermissionCodesForRequest(
+  context: PermissionRequestContext,
+): Promise<PermissionCode[] | null>;
+export async function getCurrentPermissionCodesForRequest(
+  context?: PermissionRequestContext,
+): Promise<PermissionCode[] | null> {
+  const auth = context?.auth ?? await getAuthContext();
 
   if (!auth.authenticated) return null;
 
   // Session break-glass là đường khôi phục khẩn cấp, luôn có toàn quyền.
   if (auth.isBreakGlass && auth.isSuperAdmin) return ['*'];
 
-  // API vẫn gọi auth.getUser() ở trên để phân biệt 401 và 403 chính xác.
-  // Sau đó dùng chung hàm RPC để lấy danh sách quyền.
-  return readPermissionCodesWithCache(auth.userId!);
+  // The JWT/profile state above is already verified. Reuse its private
+  // request-local token when an explicit BFF client was not supplied.
+  return readPermissionCodesWithCache(
+    auth.userId!,
+    context?.getSupabaseClient ?? (() => getServerSupabaseClient(auth)),
+  );
 }
 
 /**
@@ -129,8 +171,11 @@ export type RequestPermissionResult =
 
 export async function checkPermissionForRequest(
   requiredPermission: PermissionCode,
+  context?: PermissionRequestContext,
 ): Promise<RequestPermissionResult> {
-  const permissionCodes = await getCurrentPermissionCodesForRequest();
+  const permissionCodes = context
+    ? await getCurrentPermissionCodesForRequest(context)
+    : await getCurrentPermissionCodesForRequest();
 
   // Không có session hợp lệ.
   if (permissionCodes == null) {

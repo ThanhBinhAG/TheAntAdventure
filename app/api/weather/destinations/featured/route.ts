@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { isRefreshAuthorized } from '@/lib/weather/auth';
+import { checkRefreshAuthorized, weatherDeniedJson } from '@/lib/weather/auth';
 import { isWeatherBackendConfigured } from '@/lib/weather/supabase-admin';
 import { setFeaturedDestinationIds } from '@/lib/weather/destinations';
+import { featuredIdsBodySchema } from '@/lib/weather/destination-input';
 
 /** PUT { ids: string[] } — set exactly the featured destinations (max 2). */
 export async function PUT(request: Request) {
@@ -12,21 +13,28 @@ export async function PUT(request: Request) {
     );
   }
 
-  const allowed = await isRefreshAuthorized(request);
-  if (!allowed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const permission = await checkRefreshAuthorized(request);
+  if (!permission.allowed) {
+    return weatherDeniedJson(permission);
   }
 
-  let ids: string[] = [];
+  let raw: unknown;
   try {
-    const body = await request.json();
-    ids = Array.isArray(body?.ids) ? body.ids.map(String) : [];
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
+  const parsed = featuredIdsBodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'Invalid body.' },
+      { status: 400 }
+    );
+  }
+
   try {
-    const destinations = await setFeaturedDestinationIds(ids);
+    const destinations = await setFeaturedDestinationIds(parsed.data.ids);
     return NextResponse.json({ destinations });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

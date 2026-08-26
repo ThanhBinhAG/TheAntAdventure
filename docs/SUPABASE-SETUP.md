@@ -207,7 +207,7 @@ npm run dev
 
 ### JWT access / refresh (khuyến nghị)
 
-App dùng **Supabase Auth JWT** trong cookie HttpOnly (`@supabase/ssr`). Middleware gọi `getUser()` để refresh session — không tự mint access/refresh riêng cho user thường.
+App dùng **Supabase Auth JWT** trong cookie HttpOnly (`@supabase/ssr`). Proxy gọi `getSession()` để refresh khi token sắp hết hạn, rồi `getClaims()` để xác minh identity — không tự mint access/refresh riêng cho user thường.
 
 Trên Supabase Dashboard → **Authentication** → **Settings** (hoặc **Sessions**):
 
@@ -217,6 +217,8 @@ Trên Supabase Dashboard → **Authentication** → **Settings** (hoặc **Sessi
 | Refresh token | Giữ mặc định Supabase | Dùng để cấp access mới khi hết hạn |
 
 Sau khi đổi JWT expiry, user đang đăng nhập có thể cần **logout rồi login lại**.
+
+Nếu CRM server gọi Supabase qua hostname nội bộ (`SUPABASE_URL=http://supabase-gateway:8000`), đặt thêm `SUPABASE_JWT_ISSUER` bằng issuer mà Auth ghi vào JWT `iss` (public hoặc LAN). JWKS luôn được fetch từ `NEXT_PUBLIC_SUPABASE_URL` (không từ host issuer riêng), vì host LAN/Docker thường unreachable từ máy dev. Không đưa biến này ra browser.
 
 Login đi qua `POST /api/auth/login` (rate-limit theo IP: tối đa ~10 lần thất bại / 15 phút). Logout: `POST /api/auth/logout`.
 
@@ -284,7 +286,7 @@ proxy_pass http://127.0.0.1:3006;
 
 Ghi chú:
 
-- **`large_client_header_buffers`** — tránh 400/502 khi Cookie header phình (Supabase auth JWT chunked `sb-*-auth-token.0/.1` + `bg_session`). `localStorage` / `sessionStorage` **không** gửi lên nginx.
+- **`large_client_header_buffers`** — tránh 400/502 khi Cookie header phình (Supabase auth JWT chunked `sb-*-auth-token.0/.1`). `localStorage` / `sessionStorage` **không** gửi lên nginx.
 - **`proxy_read_timeout` / `proxy_send_timeout`** — gallery `complete` (Sharp) và PDF export có thể >60s; timeout ngắn → 502/504 dù app vẫn chạy.
 - **`client_max_body_size`** — gallery chunk hiện **512 KB**; 20m để dư cho logo/multipart và PDF JSON body.
 - 502 sau PDF/upload dài thường là **timeout hoặc OOM container** (`mem_limit`), không phải “tràn cache” trình duyệt.

@@ -1,70 +1,59 @@
-/**
- * Company proposal templates (B2C / B2B commercial + legal copy).
- * Authenticated only — same bar as PDF export. Missing table → empty (system defaults).
- */
+/** Company-wide B2C/B2B commercial and legal proposal copy. */
 
-import { NextResponse } from 'next/server';
-import { getAuthContext } from '@/lib/auth/session';
+import { z } from 'zod';
+import { bffRoute } from '@/lib/bff/route';
 import {
   fetchCompanyProposalTemplates,
   upsertCompanyProposalTemplate,
 } from '@/lib/proposals/proposal-company-template-server';
 import { parseCompanyTemplateFields } from '@/lib/proposals/proposal-company-template';
-import type { ProposalVariant } from '@/lib/proposals/proposal-types';
-import { captureAppError } from '@/lib/system/app-logger';
 
 export const dynamic = 'force-dynamic';
 
-const NO_STORE = { 'Cache-Control': 'no-store' } as const;
+const templateText = z.string().trim().max(12_000);
+const templateLine = z.string().trim().min(1).max(1_000);
 
-function json(body: unknown, status = 200) {
-  return NextResponse.json(body, { status, headers: NO_STORE });
-}
+const proposalTemplateFieldsSchema = z.object({
+  tagline: templateText.max(1_000).optional(),
+  bookingFields: z.object({
+    'Payment Terms': templateText.optional(),
+    Commission: templateText.optional(),
+    'Valid Until': templateText.optional(),
+  }).strict().optional(),
+  inclusions: z.array(templateLine).max(100).optional(),
+  exclusions: z.array(templateLine).max(100).optional(),
+  pricingText: z.object({
+    footnote: templateText.optional(),
+    b2bGroundDesc: templateText.optional(),
+    b2bFlightsDesc: templateText.optional(),
+  }).strict().optional(),
+  legalText: z.object({
+    paymentTerms: templateText.optional(),
+    cancellation: templateText.optional(),
+    amendment: templateText.optional(),
+    importantNotes: templateText.optional(),
+  }).strict().optional(),
+  theme: z.object({
+    brand: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    brandDark: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    tableHeader: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    rowAlt: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  }).strict().optional(),
+}).strict();
 
-function parseVariant(raw: unknown): ProposalVariant | null {
-  return raw === 'b2c' || raw === 'b2b' ? raw : null;
-}
+export const GET = bffRoute(
+  { requiredPermission: 'tour_design.read' },
+  async ({ supabase }) => fetchCompanyProposalTemplates(supabase)
+);
 
-export async function GET() {
-  const auth = await getAuthContext();
-  if (!auth.authenticated) {
-    return json({ ok: false, error: 'Unauthorized' }, 401);
-  }
-
-  try {
-    const templates = await fetchCompanyProposalTemplates();
-    return json({ ok: true, templates });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load templates';
-    captureAppError('proposals/templates GET', err, message);
-    return json({ ok: true, templates: { b2c: { fields: {}, source: 'system' }, b2b: { fields: {}, source: 'system' } } });
-  }
-}
-
-export async function PUT(request: Request) {
-  const auth = await getAuthContext();
-  if (!auth.authenticated) {
-    return json({ ok: false, error: 'Unauthorized' }, 401);
-  }
-
-  let body: { variant?: unknown; fields?: unknown };
-  try {
-    body = await request.json();
-  } catch {
-    return json({ ok: false, error: 'Invalid JSON body' }, 400);
-  }
-
-  const variant = parseVariant(body.variant);
-  if (!variant) {
-    return json({ ok: false, error: 'variant must be b2c or b2b' }, 400);
-  }
-
-  try {
-    const templates = await upsertCompanyProposalTemplate(variant, parseCompanyTemplateFields(body.fields));
-    return json({ ok: true, templates });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to save template';
-    captureAppError('proposals/templates PUT', err, message);
-    return json({ ok: false, error: message }, 500);
-  }
-}
+export const PUT = bffRoute(
+  {
+    requiredPermission: 'tour_design.write',
+    bodySchema: z.object({
+      variant: z.enum(['b2c', 'b2b']),
+      fields: proposalTemplateFieldsSchema,
+    }).strict(),
+  },
+  async ({ supabase, body }) =>
+    upsertCompanyProposalTemplate(supabase, body.variant, parseCompanyTemplateFields(body.fields))
+);

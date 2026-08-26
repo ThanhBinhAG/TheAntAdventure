@@ -3,12 +3,13 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import Sidebar from '@/components/Sidebar';
-import Topbar, { QuickNav } from '@/components/Topbar';
+import Topbar from '@/components/Topbar';
 import { AiCopilotProvider, useAiCopilot } from '@/components/AiCopilotContext';
 import { StoreProvider } from '@/components/StoreProvider';
 import { PermissionsProvider } from '@/components/PermissionsProvider';
 import ToastHost from '@/components/ToastHost';
 import ConfirmHost from '@/components/ConfirmHost';
+import { SupabaseSessionRefresher } from '@/components/auth/SupabaseSessionRefresher';
 import type { PermissionCode } from '@/lib/auth/permissions';
 
 const PIN_KEY = 'crm.sidebarPinned';
@@ -56,11 +57,14 @@ type CRMShellProps = {
 
   // Quyền đã được lấy từ server trong app/(crm)/layout.tsx.
   initialPermissionCodes: PermissionCode[];
+  /** Server-masked login identity for the topbar welcome line. */
+  sessionEmailMasked?: string | null;
 };
 
 export default function CRMShell({
   children,
   initialPermissionCodes,
+  sessionEmailMasked = null,
 }: CRMShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const sidebarPinned = useSyncExternalStore(subscribePinned, readPinned, () => true);
@@ -90,6 +94,7 @@ export default function CRMShell({
     <StoreProvider>
       <PermissionsProvider initialPermissionCodes={initialPermissionCodes}>
         <AiCopilotProvider>
+          <SupabaseSessionRefresher />
           <div className={appClass}>
             <Sidebar
               open={menuOpen}
@@ -101,8 +106,8 @@ export default function CRMShell({
               <Topbar
                 onMenuToggle={() => setMenuOpen((v) => !v)}
                 showMenuToggle={!sidebarPinned}
+                sessionEmailMasked={sessionEmailMasked}
               />
-              <QuickNav />
               <div id="content">{children}</div>
             </div>
             <AiCopilotLazy />

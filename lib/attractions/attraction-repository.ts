@@ -1,7 +1,6 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getServerSupabaseClient } from '@/lib/supabase/server';
 import {
   attractionToRow,
   assembleAttractions,
@@ -12,8 +11,10 @@ import type { Attraction } from '@/lib/types';
 /**
  * Lấy toàn bộ danh sách địa điểm tham quan kèm ảnh từ server.
  */
-export async function getAllAttractionsServer(region?: Attraction['region']): Promise<Attraction[]> {
-  const supabase = await getServerSupabaseClient();
+export async function getAllAttractionsServer(
+  supabase: SupabaseClient,
+  region?: Attraction['region'],
+): Promise<Attraction[]> {
 
   let query = supabase
     .from('attractions')

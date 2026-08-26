@@ -60,20 +60,20 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
 - [x] A2. Complete Tour Product end-to-end: product/pricing API/repository/cache, UI/hooks, tests, and direct-path removal.
 - [x] A3. Complete Daily Planner end-to-end: planner API/repository, authorization, UI/hooks, tests, and direct-path removal.
 - [x] A4. Complete Attraction Schedule end-to-end: province-attraction/schedule API/repository, UI/hooks, tests, and direct-path removal.
-- [x] A5. Complete Tour Design end-to-end: draft/outline API/repository, child-record write safety, UI/hooks, tests, and direct-path removal.
+- [x] A5. Complete Tour Design end-to-end: BFF reference data, draft/outline API/repository, atomic Outline → Lead/Comm workflow, UI/hooks, tests, and direct-path removal.
 - [ ] A6. Coordinate final removal of public Supabase runtime/build configuration with Owner-Ops after all nine scoped features pass acceptance.
 
 ### Developer B task list
 
-- [ ] B0. Produce and maintain the direct browser-Supabase inventory, mapping every caller to an API replacement. *(Clients callers mapped 2026-08-21; Agents callers mapped 2026-08-23; Sales/Gallery/Weather still open.)*
+- [x] B0. Produce and maintain the direct browser-Supabase inventory, mapping every caller to an API replacement. *(Dev B scoped complete 2026-08-24: Clients, Agents, Sales, Gallery, Weather + Dashboard — see `Personal/docs/bff-inventory-index.md`.)*
 - [x] B1. Define shared domain DTOs and test fixtures jointly with Developer A. *(Customers contract + fixtures shipped; expand as Agents/Sales land.)*
 - [x] B2. Complete Clients end-to-end: customer API/repository, server search/pagination, UI/hooks, tests, and direct-path removal.
 - [x] B3. Complete B2B Agents end-to-end: agent API/repository, UI/hooks, tests, and direct-path removal.
-- [ ] B4. Complete Sales Pipeline end-to-end: lead/pipeline API/repository, UI/hooks, tests, and direct-path removal.
-- [ ] B5. Complete Photo Gallery end-to-end: gallery metadata plus existing upload/delete CRM APIs, UI/hooks, tests, and direct-path removal.
-- [ ] B6. Complete Weather Guide end-to-end: weather API/repository, refresh authorization, UI/hooks, tests, and direct-path removal.
-- [ ] B7. Replace generic browser hydrate and auto-sync only for fully migrated scoped features.
-- [ ] B8. Build browser-network, parity, permission, and Redis-down regression coverage; lead final UI acceptance.
+- [x] B4. Complete Sales Pipeline end-to-end: lead/pipeline API/repository, UI/hooks, tests, and direct-path removal.
+- [x] B5. Complete Photo Gallery end-to-end: gallery metadata plus existing upload/delete CRM APIs, UI/hooks, tests, and direct-path removal.
+- [x] B6. Complete Weather Guide end-to-end: weather API/repository, refresh authorization, UI/hooks, tests, and direct-path removal.
+- [x] B7. Replace generic browser hydrate and auto-sync only for fully migrated scoped features. *(Profile inquiry/comms via `/api/customers/:id/inquiry|comms`; empty Dev B `PAGE_BOOT`; shell/route-cache denylist; cutover tests `tests/b7-dev-b-hydrate-cutover.test.ts`.)*
+- [x] B8. Build browser-network, parity, permission, and Redis-down regression coverage; lead final UI acceptance. *(2026-08-25: `e2e/dev-b-*.spec.ts`, `tests/dashboard-redis-down.test.ts`, `tests/weather-redis-down.test.ts`, `Personal/docs/bff-b8-final-acceptance.md`.)*
 
 ### Shared rules and handoffs
 

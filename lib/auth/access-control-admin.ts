@@ -122,6 +122,31 @@ export async function setAccessControlAuthUserActive(
     }
 }
 
+/** Cập nhật mật khẩu mới cho Auth user bằng Supabase Admin SDK. */
+export async function updateAccessControlUserPassword(
+    userId: string,
+    newPassword: string,
+): Promise<void> {
+    const admin = getAccessControlAdminClient();
+    if (!admin) {
+        throw new AccessControlAuthAdminError(
+            'Máy chủ chưa cấu hình SUPABASE_SERVICE_ROLE_KEY.',
+            503,
+        );
+    }
+
+    const { error } = await admin.auth.admin.updateUserById(userId, {
+        password: newPassword,
+    });
+
+    if (error) {
+        throw new AccessControlAuthAdminError(
+            'Không thể đổi mật khẩu người dùng.',
+            503,
+        );
+    }
+}
+
 /**
  * Xóa Auth user mới tạo khi gán profile/role thất bại.
  *

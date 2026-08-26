@@ -660,6 +660,18 @@ export async function updateUserActiveStatus(
     });
 }
 
+/** Đổi mật khẩu của user. */
+export async function updateUserPassword(
+    userId: string,
+    password: string,
+): Promise<void> {
+    await sendUserUpdate({
+        action: 'change_password',
+        userId,
+        password,
+    });
+}
+
 
 /**
  * Tạo một tài khoản Auth mới, sau đó API sẽ tự tạo profile và gán role.

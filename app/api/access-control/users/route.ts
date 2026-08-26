@@ -25,6 +25,7 @@ import {
     AccessControlAuthAdminError,
     createAccessControlAuthUser,
     rollbackNewAccessControlAuthUser,
+    updateAccessControlUserPassword,
 } from '@/lib/auth/access-control-admin';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import {
@@ -272,6 +273,13 @@ export async function PATCH(request: Request) {
         if (parsed.data.action === 'restore') {
             await restoreAccessControlUser(
                 parsed.data.userId,
+            );
+        }
+
+        if (parsed.data.action === 'change_password') {
+            await updateAccessControlUserPassword(
+                parsed.data.userId,
+                parsed.data.password,
             );
         }
 

@@ -153,6 +153,25 @@ export function createHttpRequestLogger(
   };
 }
 
+/**
+ * Wraps a Route Handler so every normal response emits exactly one completion
+ * event while the domain handler retains its existing response contract.
+ */
+export function withHttpRequestLogging<TContext>(
+  context: HttpLogContext,
+  handler: (
+    request: Request,
+    routeContext: TContext,
+    requestLog: HttpRequestLogger,
+  ) => Promise<Response>,
+): (request: Request, routeContext: TContext) => Promise<Response> {
+  return async (request, routeContext) => {
+    const requestLog = createHttpRequestLogger(request, context);
+    const response = await handler(request, routeContext, requestLog);
+    return requestLog.completeResponse(response);
+  };
+}
+
 export function requestLogger(request: Request, scope: string): { logger: Logger; requestId: string } {
   const requestId = getOrCreateRequestId(request);
   return { logger: serverLogger.child({ scope, requestId }), requestId };

@@ -187,22 +187,6 @@ test('BFF routes keep static logging metadata for every wrapper call', () => {
 test('server console logging is restricted to the explicit migration allowlist', () => {
   const root = process.cwd();
   const allowedConsoleCallCounts = new Map([
-    ['app/api/agents/[id]/route.ts', 6],
-    ['app/api/agents/route.ts', 4],
-    ['app/api/customers/[id]/comms/route.ts', 2],
-    ['app/api/customers/[id]/inquiry/route.ts', 2],
-    ['app/api/customers/[id]/profile/route.ts', 2],
-    ['app/api/customers/[id]/route.ts', 6],
-    ['app/api/customers/email-check/route.ts', 2],
-    ['app/api/customers/route.ts', 4],
-    ['app/api/leads/[id]/approve-outline/route.ts', 2],
-    ['app/api/leads/[id]/confirm/route.ts', 2],
-    ['app/api/leads/[id]/route.ts', 4],
-    ['app/api/leads/route.ts', 2],
-    ['app/api/photo-folders/route.ts', 1],
-    ['app/api/photos/route.ts', 2],
-    ['app/api/products/facets/route.ts', 2],
-    ['app/api/products/route.ts', 2],
     ['lib/dashboard/dashboard-repository.ts', 1],
     ['lib/db/supabase/table-api.ts', 6],
     ['lib/redis/cache-helper.ts', 5],

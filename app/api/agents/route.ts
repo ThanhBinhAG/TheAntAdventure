@@ -10,10 +10,13 @@ import {
   createAgent,
   listAgentsPage,
 } from '@/lib/agents/agent-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export const GET = withHttpRequestLogging<void>(
+  { scope: 'agents', route: '/api/agents' },
+  async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('agents.read');
 
   if (!permission.allowed) {
@@ -57,11 +60,7 @@ export async function GET(request: Request) {
       },
     );
   } catch (error) {
-    if (error instanceof AgentRepositoryError) {
-      console.error('Không thể lấy danh sách đại lý:', error.message);
-    } else {
-      console.error('Lỗi không xác định khi lấy danh sách đại lý:', error);
-    }
+    logger.error({ event: 'agents.list.failed', err: error }, 'Agent list failed');
 
     return NextResponse.json(
       {
@@ -71,9 +70,12 @@ export async function GET(request: Request) {
       { status: 500 },
     );
   }
-}
+  },
+);
 
-export async function POST(request: Request) {
+export const POST = withHttpRequestLogging<void>(
+  { scope: 'agents', route: '/api/agents' },
+  async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('agents.write');
 
   if (!permission.allowed) {
@@ -108,15 +110,12 @@ export async function POST(request: Request) {
     const agent = await createAgent(parsed.data);
     return NextResponse.json({ ok: true, agent }, { status: 201 });
   } catch (error) {
-    if (error instanceof AgentRepositoryError) {
-      console.error('Không thể tạo đại lý:', error.message);
-    } else {
-      console.error('Lỗi không xác định khi tạo đại lý:', error);
-    }
+    logger.error({ event: 'agents.create.failed', err: error }, 'Agent creation failed');
 
     return NextResponse.json(
       { ok: false, error: 'Không thể tạo đại lý.' },
       { status: 500 },
     );
   }
-}
+  },
+);

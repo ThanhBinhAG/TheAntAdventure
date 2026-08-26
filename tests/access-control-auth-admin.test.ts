@@ -51,3 +51,11 @@ test('Access Control bans or unbans the Supabase Auth user when account status c
   await setAccessControlAuthUserActive('user-1', true);
   assert.deepEqual(updateInput, { ban_duration: 'none' });
 });
+
+test('Access Control updates user password via Supabase Auth Admin', async () => {
+  const { updateAccessControlUserPassword } = await import('../lib/auth/access-control-admin');
+
+  updateInput = null;
+  await updateAccessControlUserPassword('user-123', 'new-password-123');
+  assert.deepEqual(updateInput, { password: 'new-password-123' });
+});

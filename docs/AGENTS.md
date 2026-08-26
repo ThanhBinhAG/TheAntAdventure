@@ -9,6 +9,7 @@ Tracked product documentation: database schema reference and Supabase setup. Sou
 - `BFF-REFACTOR-PLAN.md` — target private-Supabase BFF architecture and implementation plan
 - `BFF-TASKS.md` — ordered implementation backlog for the BFF migration
 - `BFF-TASKS-vi.md` — Vietnamese two-developer BFF implementation backlog
+- `BFF-TASK.md` — verified final-cutover checklist covering source, tests, browser leakage, sessions, and production networking
 - `GRAPHRAG-MEMORY.md` — verified codebase retrieval and flow map
 - `SUPABASE-SETUP.md` — install & connect steps
 - `SESSION-AVAILABILITY.md` — CRM session durability and Redis outage operating decision

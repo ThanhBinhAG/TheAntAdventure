@@ -3,7 +3,7 @@ import 'server-only';
 import { createServerClient } from '@supabase/ssr';
 import type { NextResponse } from 'next/server';
 import type { Session } from '@supabase/supabase-js';
-import { getServerSupabaseAnonKey, getServerSupabaseUrl } from '@/lib/env';
+import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/server/env/supabase';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 import { SUPABASE_ACCESS_COOKIE } from '@/lib/auth/supabase-cookie-names';
 
@@ -24,8 +24,8 @@ function accessCookieOptions(maxAge: number) {
 }
 
 function requireSupabaseAuthConfig() {
-  const url = getServerSupabaseUrl();
-  const key = getServerSupabaseAnonKey();
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
   if (!url || !key) {
     throw new Error('Supabase Auth chưa được cấu hình ở phía server.');
   }

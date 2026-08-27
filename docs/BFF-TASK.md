@@ -68,7 +68,7 @@ feature/bff-cutover-domains
 - [ ] Sửa `.env.example` theo server-only contract.
 - [ ] Sửa `scripts/validate-production-env.sh` theo server-only contract.
 - [ ] Tách server env helpers sang module có `import 'server-only'`.
-- [ ] Không fallback server env về `NEXT_PUBLIC_*`.
+- [ ] Không fallback server env về ` *`.
 - [ ] Chuyển middleware sang server env helpers.
 - [ ] Chuyển JWT/JWKS sang server env helpers.
 - [ ] Chuyển health/diagnostics sang server env helpers.

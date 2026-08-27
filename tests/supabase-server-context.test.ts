@@ -61,10 +61,10 @@ mock.module(require.resolve('../lib/auth/break-glass-supabase'), {
     isBreakGlassShadowEmail: () => false,
   },
 });
-mock.module(require.resolve('../lib/env'), {
+mock.module(require.resolve('../lib/server/env/supabase'), {
   namedExports: {
-    getServerSupabaseUrl: () => 'https://supabase.example.test',
-    getServerSupabaseAnonKey: () => 'anon-key',
+    getSupabaseUrl: () => 'https://supabase.example.test',
+    getSupabaseAnonKey: () => 'anon-key',
     getSupabaseServiceRoleKey: () => 'service-role-key',
   },
 });

@@ -2,10 +2,10 @@ import 'server-only';
 
 import { createClient } from '@supabase/supabase-js';
 import {
-  getServerSupabaseUrl,
-  getServerSupabaseAnonKey,
+  getSupabaseUrl,
+  getSupabaseAnonKey,
   getSupabaseServiceRoleKey,
-} from '@/lib/env';
+} from '@/lib/server/env/supabase';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 import { SUPABASE_ACCESS_COOKIE } from '@/lib/auth/supabase-cookie-names';
 import { getCurrentAuthzState } from '@/lib/auth/authz-state';
@@ -30,8 +30,8 @@ function createUserScopedSupabaseClient(url: string, key: string, accessToken: s
  * Browser chỉ gửi cookie HttpOnly; không có token trong JavaScript/browser storage.
  */
 export async function getServerSupabaseClient(verifiedContext?: AuthContext) {
-  const url = getServerSupabaseUrl();
-  const key = getServerSupabaseAnonKey();
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
 
   if (!url || !key) {
     throw new Error('Supabase URL hoặc Anon Key chưa được cấu hình ở phía server.');
@@ -67,7 +67,7 @@ export async function getServerSupabaseClient(verifiedContext?: AuthContext) {
  * Không chuyển tiếp cookies của người dùng.
  */
 export function getAdminSupabaseClient() {
-  const url = getServerSupabaseUrl();
+  const url = getSupabaseUrl();
   const serviceRoleKey = getSupabaseServiceRoleKey();
 
   if (!url || !serviceRoleKey) {

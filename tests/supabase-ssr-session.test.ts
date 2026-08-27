@@ -22,10 +22,10 @@ mock.module(require.resolve('@supabase/ssr'), {
     },
   },
 });
-mock.module(require.resolve('../lib/env'), {
+mock.module(require.resolve('../lib/server/env/supabase'), {
   namedExports: {
-    getServerSupabaseUrl: () => 'https://supabase.example.test',
-    getServerSupabaseAnonKey: () => 'anon-key',
+    getSupabaseUrl: () => 'https://supabase.example.test',
+    getSupabaseAnonKey: () => 'anon-key',
   },
 });
 mock.module(require.resolve('../lib/supabase/insecure-fetch'), {

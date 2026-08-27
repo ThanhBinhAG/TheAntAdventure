@@ -10,7 +10,7 @@ function hasTrustedApiMutationOrigin(request: NextRequest): boolean {
   try {
     const configured = (
       process.env.APP_URL
-      ?? process.env.NEXT_PUBLIC_APP_URL
+      ?? process.env.APP_URL
       ?? request.nextUrl.origin
     ).trim();
     return origin === request.nextUrl.origin || origin === new URL(configured).origin;

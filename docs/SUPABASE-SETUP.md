@@ -218,7 +218,7 @@ Trên Supabase Dashboard → **Authentication** → **Settings** (hoặc **Sessi
 
 Sau khi đổi JWT expiry, user đang đăng nhập có thể cần **logout rồi login lại**.
 
-Nếu CRM server gọi Supabase qua hostname nội bộ (`SUPABASE_URL=http://supabase-gateway:8000`), đặt thêm `SUPABASE_JWT_ISSUER` bằng issuer mà Auth ghi vào JWT `iss` (public hoặc LAN). JWKS luôn được fetch từ `NEXT_PUBLIC_SUPABASE_URL` (không từ host issuer riêng), vì host LAN/Docker thường unreachable từ máy dev. Không đưa biến này ra browser.
+Nếu CRM server gọi Supabase qua hostname nội bộ (`SUPABASE_URL=http://supabase-gateway:8000`), đặt thêm `SUPABASE_JWT_ISSUER` bằng issuer mà Auth ghi vào JWT `iss` (public hoặc LAN). Đặt `SUPABASE_JWKS_URL` nếu JWKS phải được fetch từ một hostname server-side khác. Không đưa biến nào ra browser.
 
 Login đi qua `POST /api/auth/login` (rate-limit theo IP: tối đa ~10 lần thất bại / 15 phút). Logout: `POST /api/auth/logout`.
 
@@ -268,7 +268,7 @@ Mỗi dòng log là JSON có `"tag":"system-debug"`.
 
 ```bash
 curl -vI https://your-domain.com 2>&1 | head -40
-curl -sI "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/health"
+curl -sI "$SUPABASE_URL/auth/v1/health"
 ```
 
 Nginx cần có (app listen `:3006`):

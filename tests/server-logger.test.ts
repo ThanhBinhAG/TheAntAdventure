@@ -115,7 +115,7 @@ test('HTTP logging contract adds request context and selects the completion leve
     time: entries[0].time,
     service: 'the-ant-adventures-crm',
     environment: process.env.NODE_ENV ?? 'development',
-    version: process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown',
+    version: process.env.APP_VERSION ?? 'unknown',
     scope: 'catalog/products',
     requestId: 'request-42',
     route: '/api/products',

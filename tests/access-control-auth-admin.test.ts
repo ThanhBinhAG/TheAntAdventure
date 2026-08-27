@@ -27,7 +27,7 @@ mock.module(require.resolve('@supabase/supabase-js'), {
     }),
   },
 });
-mock.module(require.resolve('../lib/env'), {
+mock.module(require.resolve('../lib/server/env/supabase'), {
   namedExports: {
     getSupabaseServiceRoleKey: () => 'service-role-key',
     getSupabaseUrl: () => 'https://supabase.example.test',

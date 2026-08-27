@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getAppUrl } from '@/lib/env';
+import { getAppUrl } from '@/lib/server/env/app';
 
 /** Reject cross-site state changes made with ambient HttpOnly cookies. */
 export function hasTrustedRequestOrigin(request: Request): boolean {

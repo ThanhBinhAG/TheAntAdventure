@@ -50,7 +50,7 @@ mock.module(require.resolve('@supabase/ssr'), {
     }),
   },
 });
-mock.module(require.resolve('../lib/env'), {
+mock.module(require.resolve('../lib/server/env/supabase'), {
   namedExports: {
     getSupabaseUrl: () => 'https://supabase.example.test',
     getSupabaseAnonKey: () => 'anon-key',

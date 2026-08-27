@@ -1,6 +1,6 @@
 import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/server/env/supabase';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
 import { pickGalleryProfile } from '@/lib/image-pipeline/profiles';

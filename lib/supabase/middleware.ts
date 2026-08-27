@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { SUPABASE_ACCESS_COOKIE } from '@/lib/auth/supabase-cookie-names';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/server/env/supabase';
 import {
   isDebugRoute,
   isSystemDebugEnabled,

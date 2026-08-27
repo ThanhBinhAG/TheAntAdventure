@@ -43,11 +43,6 @@ for key in $(required_template_keys); do
   fi
 done
 
-if [ "$(value_for NEXT_PUBLIC_USE_SUPABASE)" != "true" ]; then
-  echo "ERROR: NEXT_PUBLIC_USE_SUPABASE must be true in production." >&2
-  missing=1
-fi
-
 if [ "$missing" -ne 0 ]; then
   echo "Production environment validation failed; deployment was not started." >&2
   exit 1

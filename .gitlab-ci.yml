@@ -97,7 +97,6 @@ docker:
       BASE_ENV_FILE="$(sh scripts/docker-with-env.sh print)"
       # These values must survive redeploys. Generate only when absent so CRM
       # sessions and the emergency credentials are never unexpectedly rotated.
-      ensure_generated_env "$BASE_ENV_FILE" "NEXT_PUBLIC_USE_SUPABASE" "true"
       ensure_generated_env "$BASE_ENV_FILE" "CRM_SESSION_SECRET" "$(random_secret)"
       ensure_generated_env "$BASE_ENV_FILE" "WEATHER_CRON_SECRET" "$(random_secret)"
       ensure_generated_env "$BASE_ENV_FILE" "BREAK_GLASS_USERNAME" "breakglass-$(openssl rand -hex 8)"
@@ -128,8 +127,8 @@ docker:
           *) DB_URL="${DB_URL}?sslmode=disable" ;;
         esac
       fi
-      upsert_env "$BASE_ENV_FILE" "NEXT_PUBLIC_SUPABASE_URL" "http://supabase-ant-crm-gateway:8000"
-      upsert_env "$BASE_ENV_FILE" "NEXT_PUBLIC_SUPABASE_ANON_KEY" "$ANON_KEY"
+      upsert_env "$BASE_ENV_FILE" "SUPABASE_URL" "http://supabase-ant-crm-gateway:8000"
+      upsert_env "$BASE_ENV_FILE" "SUPABASE_ANON_KEY" "$ANON_KEY"
       upsert_env "$BASE_ENV_FILE" "SUPABASE_SERVICE_ROLE_KEY" "$SERVICE_ROLE_KEY"
       upsert_env "$BASE_ENV_FILE" "SUPABASE_JWT_ISSUER" "$JWT_ISSUER"
       if [ -n "$DB_URL" ]; then

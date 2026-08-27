@@ -43,7 +43,7 @@ npm run docker:down
 # override: ENV_FILE=/path/to/.env.local npm run docker:up
 ```
 
-`NEXT_PUBLIC_*` are baked in at **image build** time. Server secrets come from the same env file at **runtime**. App data URL must be company self-host (`https://sb.mitelai.com:9001`) — never `127.0.0.1` on the VM.
+Supabase configuration is injected only at **runtime**. App data URL must be company self-host (`https://sb.mitelai.com:9001`) — never `127.0.0.1` on the VM.
 
 ### Checklist when Docker CI / deploy rights are ready
 
@@ -58,11 +58,8 @@ Edit **`.env.local`** (gitignored). Template: [`.env.example`](.env.example)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | When using Supabase | Project URL (Settings → API) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | When using Supabase | Anon/public key |
-| `NEXT_PUBLIC_USE_SUPABASE` | No | `true` = use Supabase (company self-host) |
-| `NEXT_PUBLIC_SUPABASE_AUTO_SYNC` | No | `true` = auto-push edits to Supabase |
-| `NEXT_PUBLIC_SUPABASE_READ_ONLY` | No | `true` = hydrate only (safe on shared DB) |
+| `SUPABASE_URL` | When using Supabase | Server-only internal project URL |
+| `SUPABASE_ANON_KEY` | When using Supabase | Server-only anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional | Server/scripts only — never expose in client |
 | `REDIS_URL` | Optional | Server cache (`redis://127.0.0.1:6379` for `npm run dev`; `npm run redis:up`) |
 

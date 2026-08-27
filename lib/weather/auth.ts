@@ -4,7 +4,7 @@ import {
   checkPermissionForRequest,
   type RequestPermissionResult,
 } from '@/lib/auth/permissions-server';
-import { getWeatherCronSecret } from '@/lib/env';
+import { getWeatherCronSecret } from '@/lib/server/env/auth';
 
 export async function checkRefreshAuthorized(request: Request): Promise<RequestPermissionResult> {
   const secret = getWeatherCronSecret();

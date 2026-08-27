@@ -131,8 +131,8 @@ export function DebugPanel({ token }: DebugPanelProps) {
           <pre className="debug-cmd">pm2 logs --lines 200 | grep system-debug</pre>
           <p>Test SSL domain:</p>
           <pre className="debug-cmd">curl -vI https://your-domain.com 2&gt;&amp;1 | head -40</pre>
-          <p>Test Supabase từ server:</p>
-          <pre className="debug-cmd">curl -sI &quot;$NEXT_PUBLIC_SUPABASE_URL/auth/v1/health&quot;</pre>
+          <p>Test CRM health từ server:</p>
+          <pre className="debug-cmd">curl -sI https://your-domain.com/api/health</pre>
           <p className="login-hint">Sau khi fix xong: set SYSTEM_DEBUG=false và restart app.</p>
         </div>
       </div>

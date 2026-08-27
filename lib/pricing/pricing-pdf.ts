@@ -3,7 +3,7 @@ import { access } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
-import { getAppUrl } from '@/lib/env';
+import { getAppUrl } from '@/lib/server/env/app';
 import { buildPricingHTML, type PricingHtmlMeta } from '@/lib/pricing/pricing-html';
 import type { PricingTableRow } from '@/lib/products/product-pricing-helpers';
 import { pdfBrowserGate } from '@/lib/system/pdf-concurrency';

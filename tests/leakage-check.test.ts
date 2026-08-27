@@ -25,7 +25,7 @@ test('leakage check accepts a clean browser bundle and rejects Supabase paths or
     assert.throws(runLeakageCheck(buildDir));
 
     writeFileSync(join(buildDir, 'key.js'), 'public-anon-test-key');
-    assert.throws(runLeakageCheck(buildDir, { NEXT_PUBLIC_SUPABASE_ANON_KEY: 'public-anon-test-key' }));
+    assert.throws(runLeakageCheck(buildDir, { SUPABASE_ANON_KEY: 'public-anon-test-key' }));
   } finally {
     rmSync(buildDir, { recursive: true, force: true });
   }

@@ -313,7 +313,7 @@ Migration v4.3 JSONB → v5 relational **đã hoàn tất**. Quy trình chuẩn 
 2. Run supabase/schema.sql
 3. Run supabase/import-v5-data.sql
 4. Run supabase/verify-counts-v5.sql — cột rows phải khớp expected
-5. .env.local: NEXT_PUBLIC_USE_SUPABASE=true + URL + anon key
+5. .env.local: `NEXT_PUBLIC_USE_SUPABASE=true` + URL + anon key
 6. Auth login OK → Run supabase/rls-authenticated.sql
 ```
 

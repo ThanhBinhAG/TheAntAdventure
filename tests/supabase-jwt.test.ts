@@ -113,11 +113,13 @@ test('reports JWKS connectivity failures without classifying the token as invali
   assert.deepEqual(result, { status: 'unavailable' });
 });
 
-test('uses the configured public issuer when the server reaches Supabase privately', async () => {
+test('uses server-only issuer and JWKS endpoints when the server reaches Supabase privately', async () => {
   const previousIssuer = process.env.SUPABASE_JWT_ISSUER;
-  const previousPublic = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const previousUrl = process.env.SUPABASE_URL;
+  const previousJwksUrl = process.env.SUPABASE_JWKS_URL;
   process.env.SUPABASE_JWT_ISSUER = issuer;
-  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://sb.example.test:9001';
+  process.env.SUPABASE_URL = 'http://supabase-gateway:8000';
+  process.env.SUPABASE_JWKS_URL = 'https://sb.example.test:9001/auth/v1/.well-known/jwks.json';
   try {
     const {
       getSupabaseAuthIssuer,
@@ -125,10 +127,7 @@ test('uses the configured public issuer when the server reaches Supabase private
       getSupabaseJwksUrl,
     } = await import('../lib/auth/supabase-jwt');
     assert.equal(getSupabaseAuthIssuer('http://supabase-gateway:8000'), issuer);
-    assert.deepEqual(getSupabaseAuthIssuers('http://supabase-gateway:8000'), [
-      issuer,
-      'https://sb.example.test:9001/auth/v1',
-    ]);
+    assert.deepEqual(getSupabaseAuthIssuers('http://supabase-gateway:8000'), [issuer]);
     assert.equal(
       getSupabaseJwksUrl()?.href,
       'https://sb.example.test:9001/auth/v1/.well-known/jwks.json',
@@ -136,34 +135,38 @@ test('uses the configured public issuer when the server reaches Supabase private
   } finally {
     if (previousIssuer === undefined) delete process.env.SUPABASE_JWT_ISSUER;
     else process.env.SUPABASE_JWT_ISSUER = previousIssuer;
-    if (previousPublic === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    else process.env.NEXT_PUBLIC_SUPABASE_URL = previousPublic;
+    if (previousUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = previousUrl;
+    if (previousJwksUrl === undefined) delete process.env.SUPABASE_JWKS_URL;
+    else process.env.SUPABASE_JWKS_URL = previousJwksUrl;
   }
 });
 
-test('fetches JWKS from the public Supabase URL even when issuer is a private LAN host', async () => {
+test('uses only configured server endpoints when issuer is a private LAN host', async () => {
   const previousIssuer = process.env.SUPABASE_JWT_ISSUER;
-  const previousPublic = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const previousUrl = process.env.SUPABASE_URL;
+  const previousJwksUrl = process.env.SUPABASE_JWKS_URL;
   process.env.SUPABASE_JWT_ISSUER = 'http://192.168.1.75:9001/auth/v1';
-  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://sb.example.test:9001';
+  process.env.SUPABASE_URL = 'http://supabase-gateway:8000';
+  process.env.SUPABASE_JWKS_URL = 'http://supabase-gateway:8000/auth/v1/.well-known/jwks.json';
   try {
     const { getSupabaseJwksUrl, getSupabaseAuthIssuers } = await import(
       '../lib/auth/supabase-jwt'
     );
     assert.equal(
       getSupabaseJwksUrl()?.href,
-      'https://sb.example.test:9001/auth/v1/.well-known/jwks.json',
+      'http://supabase-gateway:8000/auth/v1/.well-known/jwks.json',
     );
     assert.ok(
       getSupabaseAuthIssuers().includes('http://192.168.1.75:9001/auth/v1'),
     );
-    assert.ok(
-      getSupabaseAuthIssuers().includes('https://sb.example.test:9001/auth/v1'),
-    );
+    assert.deepEqual(getSupabaseAuthIssuers(), ['http://192.168.1.75:9001/auth/v1']);
   } finally {
     if (previousIssuer === undefined) delete process.env.SUPABASE_JWT_ISSUER;
     else process.env.SUPABASE_JWT_ISSUER = previousIssuer;
-    if (previousPublic === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    else process.env.NEXT_PUBLIC_SUPABASE_URL = previousPublic;
+    if (previousUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = previousUrl;
+    if (previousJwksUrl === undefined) delete process.env.SUPABASE_JWKS_URL;
+    else process.env.SUPABASE_JWKS_URL = previousJwksUrl;
   }
 });

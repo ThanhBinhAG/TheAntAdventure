@@ -23,7 +23,7 @@ export function loadE2eEnvironment(): void {
   if (process.env.E2E_ALLOW_DATABASE_MUTATION !== '1') {
     throw new Error('E2E_ALLOW_DATABASE_MUTATION=1 is required before browser E2E may modify data.');
   }
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL ?? process.env.SUPABASE_URL;
   if (!url || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error('SUPABASE URL and SUPABASE_SERVICE_ROLE_KEY are required for browser E2E.');
   }
@@ -35,7 +35,7 @@ export function loadE2eEnvironment(): void {
 }
 
 export function getAdminClient(): SupabaseClient {
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL ?? process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('E2E Supabase environment is unavailable.');
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });

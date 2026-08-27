@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { FormEvent, useCallback, useState } from 'react';
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
-import { getAuthCaptchaSiteKey } from '@/lib/env';
 
 function authErrorMessage(message: string): string {
   const lower = message.toLowerCase();
@@ -35,11 +34,11 @@ function authErrorMessage(message: string): string {
 
 type LoginFormProps = {
   showDebugLink?: boolean;
+  captchaSiteKey?: string;
 };
 
-export function LoginForm({ showDebugLink = false }: LoginFormProps) {
+export function LoginForm({ showDebugLink = false, captchaSiteKey = '' }: LoginFormProps) {
   const searchParams = useSearchParams();
-  const captchaSiteKey = getAuthCaptchaSiteKey();
   const captchaRequired = Boolean(captchaSiteKey);
 
   const [identity, setIdentity] = useState('');

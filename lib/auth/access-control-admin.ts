@@ -23,7 +23,7 @@ import {
 import {
     getSupabaseServiceRoleKey,
     getSupabaseUrl,
-} from '@/lib/env';
+} from '@/lib/server/env/supabase';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 
 /** Lỗi riêng để API trả HTTP status phù hợp. */

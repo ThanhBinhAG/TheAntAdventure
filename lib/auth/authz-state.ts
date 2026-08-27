@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { createClient } from '@supabase/supabase-js';
-import { getServerSupabaseAnonKey, getServerSupabaseUrl } from '@/lib/env';
+import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/server/env/supabase';
 import {
   getCachedAuthzState,
   setCachedAuthzState,
@@ -31,8 +31,8 @@ export async function getCurrentAuthzStateResult(input: {
   const cached = await getCachedAuthzState(input.userId);
   if (cached) return resolveState(cached);
 
-  const url = getServerSupabaseUrl();
-  const key = getServerSupabaseAnonKey();
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
   if (!url || !key) return { status: 'unavailable' };
 
   try {

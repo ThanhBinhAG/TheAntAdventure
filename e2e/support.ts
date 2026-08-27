@@ -6,7 +6,7 @@ import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const statePath = join(process.cwd(), '.e2e-state.json');
-const SUPABASE_ACCESS_COOKIE = 'sb-crm-access-token';
+const CRM_SESSION_COOKIE = 'crm_session';
 
 export type E2eState = {
   prefix: string;
@@ -66,7 +66,7 @@ export async function login(page: Page, credentials: E2eState['admin']): Promise
   const response = await loginResponse;
   if (!response.ok()) throw new Error(`Login API rejected the E2E user: ${await response.text()}`);
   await expect
-    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === SUPABASE_ACCESS_COOKIE))
+    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === CRM_SESSION_COOKIE))
     .toBe(true);
 }
 
@@ -74,7 +74,7 @@ export async function logoutViaUi(page: Page): Promise<void> {
   await page.getByRole('button', { name: /Mở công cụ hệ thống/ }).click();
   await page.getByTitle('Đăng xuất').click();
   await expect
-    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === SUPABASE_ACCESS_COOKIE))
+    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === CRM_SESSION_COOKIE))
     .toBe(false);
 }
 

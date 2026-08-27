@@ -78,3 +78,14 @@ encrypted-payload rows, stores only a hash of a high-entropy cookie token, and
 stores Supabase credentials as AES-GCM ciphertext server-side. The remaining
 Phase 2 rollout work is applying the migration to each environment and
 validating the real Supabase/Auth deployment path.
+
+## Phase 3 update — 2026-08-27
+
+The local platform gate is now `npm run test:platform`; it discovers the Dev 1
+auth, durable-session, Proxy, request-context, JWKS, and Redis resilience tests
+using a Node-only runner. `npm test`, `npm run dev`, and Playwright's web server
+now use Node launchers rather than POSIX shell syntax, so their invocation is
+portable to Windows and Linux. The Docker verifier runs lint, typecheck, all
+unit tests, build, and a leakage report in that order. The leakage report remains
+non-blocking only while the known Dev 2 `/storage/v1` browser dependency exists;
+`npm run leakage:check` is the cross-platform hard-fail command for final cutover.

@@ -8,6 +8,7 @@ import {
   clearSupabaseAccessCookie,
   createSupabaseRouteClient,
 } from '@/lib/auth/supabase-ssr';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 function clearBrowserCredentials(response: NextResponse, cookieHeader: string | null): void {
   clearSupabaseAccessCookie(response);
@@ -21,8 +22,11 @@ function copyCookies(source: NextResponse, target: NextResponse): void {
   }
 }
 
-export async function POST(request: Request) {
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'auth/logout', route: '/api/auth/logout' },
+  async (request, _context, { logger }) => {
   if (!hasTrustedRequestOrigin(request)) {
+    logger.warn({ event: 'auth.logout.origin_rejected', statusCode: 403 }, 'Logout origin rejected');
     return NextResponse.json({ ok: false, error: 'Origin không hợp lệ.' }, { status: 403 });
   }
 
@@ -34,7 +38,8 @@ export async function POST(request: Request) {
     const supabase = createSupabaseRouteClient(request, response);
     const { error } = await supabase.auth.signOut({ scope: 'local' });
     if (error) throw error;
-  } catch {
+  } catch (error) {
+    logger.error({ event: 'auth.logout.failed', err: error }, 'Logout failed');
     clearBrowserCredentials(response, cookieHeader);
     const failure = NextResponse.json(
       { ok: false, error: 'Không thể thu hồi Supabase session. Vui lòng thử lại.' },
@@ -46,6 +51,8 @@ export async function POST(request: Request) {
   }
 
   clearBrowserCredentials(response, cookieHeader);
+  logger.info({ event: 'auth.logout.succeeded' }, 'Logout succeeded');
   void recordAuthSecurityEvent({ eventType: 'logout_succeeded', ip });
   return response;
-}
+  },
+);

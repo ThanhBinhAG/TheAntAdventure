@@ -108,11 +108,28 @@ mock.module(require.resolve('../lib/auth/security-audit'), {
 });
 mock.module(require.resolve('../lib/system/server-logger'), {
   namedExports: {
-    serverLogger: { warn: () => {} },
-    requestLogger: () => ({
-      logger: { warn: () => { refreshFailureLogged = true; } },
-      requestId: 'refresh-test-request-id',
-    }),
+    withHttpRequestLogging: (
+      _context: Record<string, unknown>,
+      handler: (
+        request: Request,
+        routeContext: { params: Promise<Record<string, never>> },
+        requestLog: {
+          logger: { warn: () => void };
+          requestId: string;
+        },
+      ) => Promise<Response>,
+    ) => async (request: Request, routeContext?: { params: Promise<Record<string, never>> }) => {
+      const response = await handler(
+        request,
+        routeContext ?? { params: Promise.resolve({}) },
+        {
+          logger: { warn: () => { refreshFailureLogged = true; } },
+          requestId: 'refresh-test-request-id',
+        },
+      );
+      response.headers.set('X-Request-Id', 'refresh-test-request-id');
+      return response;
+    },
   },
 });
 
@@ -132,7 +149,7 @@ test('Supabase refresh preserves the HttpOnly session without returning a token 
   });
 
   await t.test('updates the access mirror and returns no credential body', async () => {
-    const response = await POST(request());
+    const response = await POST(request(), { params: Promise.resolve({}) });
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true });
     assert.equal(accessCookieIssued, true);
@@ -141,22 +158,22 @@ test('Supabase refresh preserves the HttpOnly session without returning a token 
 
   await t.test('succeeds when tokens-only session.user throws on access', async () => {
     refreshState = 'tokensOnlyUserTrap';
-    const response = await POST(request());
+    const response = await POST(request(), { params: Promise.resolve({}) });
     assert.equal(response.status, 200);
     assert.equal(accessCookieIssued, true);
   });
 
   await t.test('returns 401 and clears credentials for missing or rejected sessions', async () => {
     refreshState = 'missing';
-    assert.equal((await POST(request())).status, 401);
+    assert.equal((await POST(request(), { params: Promise.resolve({}) })).status, 401);
     assert.equal(accessCookieCleared, true);
     refreshState = 'rejected';
-    assert.equal((await POST(request())).status, 401);
+    assert.equal((await POST(request(), { params: Promise.resolve({}) })).status, 401);
   });
 
   await t.test('returns 503 without clearing credentials for temporary failures', async () => {
     refreshState = 'unavailable';
-    const response = await POST(request());
+    const response = await POST(request(), { params: Promise.resolve({}) });
     assert.equal(response.status, 503);
     assert.equal(accessCookieCleared, false);
     assert.equal(response.headers.get('retry-after'), '60');
@@ -166,7 +183,7 @@ test('Supabase refresh preserves the HttpOnly session without returning a token 
 
   await t.test('returns 429 before contacting Supabase when refresh is rate limited', async () => {
     refreshRateLimited = true;
-    const response = await POST(request());
+    const response = await POST(request(), { params: Promise.resolve({}) });
     assert.equal(response.status, 429);
     assert.equal(response.headers.get('retry-after'), '42');
     assert.equal(accessCookieIssued, false);

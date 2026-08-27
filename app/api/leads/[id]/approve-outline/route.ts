@@ -4,6 +4,7 @@ import {
   LeadRepositoryError,
   approveLeadOutline,
 } from '@/lib/sales/lead-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,9 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function POST(_request: Request, context: RouteContext) {
+export const POST = withHttpRequestLogging<RouteContext>(
+  { scope: 'sales/leads/approve-outline', route: '/api/leads/[id]/approve-outline' },
+  async (_request, context, { logger }) => {
   const permission = await checkPermissionForRequest('sales.write');
 
   if (!permission.allowed) {
@@ -49,9 +52,9 @@ export async function POST(_request: Request, context: RouteContext) {
           { status: 400 },
         );
       }
-      console.error('Không thể duyệt outline:', error.message);
+      logger.error({ event: 'sales.leads.outline_approve.failed', err: error }, 'Lead outline approval failed');
     } else {
-      console.error('Lỗi không xác định khi duyệt outline:', error);
+      logger.error({ event: 'sales.leads.outline_approve.failed', err: error }, 'Lead outline approval failed');
     }
 
     return NextResponse.json(
@@ -59,4 +62,5 @@ export async function POST(_request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);

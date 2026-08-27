@@ -47,6 +47,12 @@ type CookieResponse = {
   };
 };
 
+type CapturedLogger = {
+  info: (entry: Record<string, unknown>, message: string) => void;
+  warn: (entry: Record<string, unknown>, message: string) => void;
+  error: (entry: Record<string, unknown>, message: string) => void;
+};
+
 mock.module(require.resolve('../lib/auth/supabase-ssr'), {
   namedExports: {
     SUPABASE_ACCESS_COOKIE: 'sb-crm-access-token',
@@ -146,14 +152,23 @@ mock.module(require.resolve('../lib/system/debug-logger'), {
 });
 mock.module(require.resolve('../lib/system/server-logger'), {
   namedExports: {
-    requestLogger: () => ({
-      requestId: 'login-request-42',
-      logger: {
+    withHttpRequestLogging: (
+      _context: Record<string, unknown>,
+      handler: (
+        request: Request,
+        routeContext: { params: Promise<Record<string, never>> },
+        requestLog: { logger: CapturedLogger },
+      ) => Promise<Response>,
+    ) => async (request: Request, routeContext?: { params: Promise<Record<string, never>> }) => {
+      const logger = {
         info: (entry: Record<string, unknown>, message: string) => loginLogs.push({ level: 'info', entry, message }),
         warn: (entry: Record<string, unknown>, message: string) => loginLogs.push({ level: 'warn', entry, message }),
         error: (entry: Record<string, unknown>, message: string) => loginLogs.push({ level: 'error', entry, message }),
-      },
-    }),
+      };
+      const response = await handler(request, routeContext ?? { params: Promise.resolve({}) }, { logger });
+      response.headers.set('X-Request-Id', 'logout-request-42');
+      return response;
+    },
   },
 });
 
@@ -186,7 +201,7 @@ test('Supabase auth session routes', async (t) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
       body: JSON.stringify({ identity: 'user@example.com', password: 'correct-password' }),
-    }));
+    }), { params: Promise.resolve({}) });
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, mode: 'crm' });
@@ -205,7 +220,7 @@ test('Supabase auth session routes', async (t) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
       body: JSON.stringify({ identity: 'recovery-admin', password: 'recovery-password' }),
-    }));
+    }), { params: Promise.resolve({}) });
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, mode: 'break_glass' });
@@ -223,7 +238,7 @@ test('Supabase auth session routes', async (t) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
       body: JSON.stringify({ identity: 'user@example.com', password: 'wrong-password' }),
-    }));
+    }), { params: Promise.resolve({}) });
 
     assert.equal(response.status, 401);
     const body = await response.json();
@@ -243,13 +258,16 @@ test('Supabase auth session routes', async (t) => {
   });
 
   await t.test('signs out at Supabase and clears every browser auth cookie', async () => {
-    const response = await logoutRoute.POST(new Request('http://localhost/api/auth/logout', {
-      method: 'POST',
-      headers: {
-        Cookie: 'sb-crm-access-token=supabase-access-token; sb-test-auth-token=legacy',
-        Origin: 'http://localhost',
-      },
-    }));
+    const response = await logoutRoute.POST(
+      new Request('http://localhost/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          Cookie: 'sb-crm-access-token=supabase-access-token; sb-test-auth-token=legacy',
+          Origin: 'http://localhost',
+        },
+      }),
+      { params: Promise.resolve({}) },
+    );
 
     assert.equal(response.status, 200);
     assert.equal(signOutCalls, 1);

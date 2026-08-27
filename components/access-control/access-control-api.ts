@@ -617,6 +617,11 @@ type UserUpdateRequest =
         isActive: boolean;
     }
     | {
+        action: 'change_password';
+        userId: string;
+        password: string;
+    }
+    | {
         action: 'restore';
         userId: string;
     };
@@ -657,6 +662,18 @@ export async function updateUserActiveStatus(
         action: 'set_active',
         userId,
         isActive,
+    });
+}
+
+/** Đổi mật khẩu của user. */
+export async function updateUserPassword(
+    userId: string,
+    password: string,
+): Promise<void> {
+    await sendUserUpdate({
+        action: 'change_password',
+        userId,
+        password,
     });
 }
 

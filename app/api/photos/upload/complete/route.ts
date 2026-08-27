@@ -18,12 +18,16 @@ import {
   galleryPhotoMetaSchema,
   processingErrorStatus,
 } from '@/lib/storage/gallery-upload-meta';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const maxDuration = 300;
 
-export async function POST(request: Request) {
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'gallery/upload/complete', route: '/api/photos/upload/complete' },
+  async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('gallery.write');
   if (!permission.allowed) {
+    logger.warn({ event: 'gallery.permission.denied', statusCode: permission.status }, 'Gallery permission denied');
     return NextResponse.json(
       { ok: false, error: permission.status === 401 ? 'Unauthorized' : 'Forbidden' },
       { status: permission.status },
@@ -99,8 +103,10 @@ export async function POST(request: Request) {
     );
     const photo = await persistGalleryPhotoRow(client, metaParsed.data, uploaded);
     await cleanupGalleryUploadSession(uploadId);
+    logger.info({ event: 'gallery.upload.completed' }, 'Gallery upload completed');
     return NextResponse.json({ ok: true, photo });
   } catch (e) {
+    logger.error({ event: 'gallery.upload.complete.failed', err: e }, 'Gallery upload completion failed');
     const message = e instanceof Error ? e.message : 'Upload failed';
     try {
       await cleanupGalleryUploadSession(uploadId);
@@ -112,4 +118,5 @@ export async function POST(request: Request) {
       : processingErrorStatus(message);
     return NextResponse.json({ ok: false, error: message }, { status });
   }
-}
+  },
+);

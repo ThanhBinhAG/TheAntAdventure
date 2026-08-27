@@ -4,14 +4,14 @@ import {
   customerEmailCheckQuerySchema,
   optionalCustomerQueryParam,
 } from '@/lib/customers/customer-list-input';
-import {
-  CustomerRepositoryError,
-  findDuplicateCustomerEmail,
-} from '@/lib/customers/customer-repository';
+import { findDuplicateCustomerEmail } from '@/lib/customers/customer-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'customers/email-check', route: '/api/customers/email-check' },
+  async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('customers.write');
 
   if (!permission.allowed) {
@@ -63,15 +63,12 @@ export async function GET(request: Request) {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
-    if (error instanceof CustomerRepositoryError) {
-      console.error('Không thể kiểm tra email khách hàng:', error.message);
-    } else {
-      console.error('Lỗi không xác định khi kiểm tra email khách hàng:', error);
-    }
+    logger.error({ event: 'customers.email_check.failed', err: error }, 'Customer email check failed');
 
     return NextResponse.json(
       { ok: false, error: 'Không thể kiểm tra email.' },
       { status: 500 },
     );
   }
-}
+  },
+);

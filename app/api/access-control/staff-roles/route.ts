@@ -32,6 +32,7 @@ import {
     accessControlError,
     accessControlPermissionError,
 } from '@/lib/access-control/api-error';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,12 +71,15 @@ function errorResponse(error: unknown) {
 }
 
 /** Lấy danh sách role nhân viên động. */
-export async function GET() {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+    { scope: 'access-control/staff-roles', route: '/api/access-control/staff-roles' },
+    async (_request, _context, { logger }) => {
     const permission = await checkPermissionForRequest(
         'users.manage',
     );
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -105,17 +109,22 @@ export async function GET() {
             },
         );
     } catch (error) {
+        logger.error({ event: 'access_control.staff_roles.load.failed', err: error }, 'Staff role load failed');
         return errorResponse(error);
     }
-}
+    },
+);
 
 /** Tạo role nhân viên mới. */
-export async function POST(request: Request) {
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+    { scope: 'access-control/staff-roles', route: '/api/access-control/staff-roles' },
+    async (request, _context, { logger }) => {
     const permission = await checkPermissionForRequest(
         'users.manage',
     );
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -138,19 +147,25 @@ export async function POST(request: Request) {
     try {
         await createAccessControlStaffRole(parsed.data);
 
+        logger.info({ event: 'access_control.staff_role.created' }, 'Staff role created');
         return NextResponse.json({ ok: true }, { status: 201 });
     } catch (error) {
+        logger.error({ event: 'access_control.staff_role.create.failed', err: error }, 'Staff role creation failed');
         return errorResponse(error);
     }
-}
+    },
+);
 
 /** Sửa thông tin role hoặc permission của role. */
-export async function PATCH(request: Request) {
+export const PATCH = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+    { scope: 'access-control/staff-roles', route: '/api/access-control/staff-roles' },
+    async (request, _context, { logger }) => {
     const permission = await checkPermissionForRequest(
         'users.manage',
     );
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -201,19 +216,25 @@ export async function PATCH(request: Request) {
             );
         }
 
+        logger.info({ event: 'access_control.staff_role.updated', action: parsed.data.action }, 'Staff role updated');
         return NextResponse.json({ ok: true });
     } catch (error) {
+        logger.error({ event: 'access_control.staff_role.update.failed', err: error }, 'Staff role update failed');
         return errorResponse(error);
     }
-}
+    },
+);
 
 /** Xóa role nhân viên động đã không còn được gán cho user nào. */
-export async function DELETE(request: Request) {
+export const DELETE = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+    { scope: 'access-control/staff-roles', route: '/api/access-control/staff-roles' },
+    async (request, _context, { logger }) => {
     const permission = await checkPermissionForRequest(
         'users.manage',
     );
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -236,8 +257,11 @@ export async function DELETE(request: Request) {
     try {
         await deleteAccessControlStaffRole(parsed.data.code);
 
+        logger.info({ event: 'access_control.staff_role.deleted' }, 'Staff role deleted');
         return NextResponse.json({ ok: true });
     } catch (error) {
+        logger.error({ event: 'access_control.staff_role.delete.failed', err: error }, 'Staff role deletion failed');
         return errorResponse(error);
     }
-}
+    },
+);

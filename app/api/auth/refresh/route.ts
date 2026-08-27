@@ -9,7 +9,7 @@ import {
   createSupabaseRouteClient,
   setSupabaseAccessCookie,
 } from '@/lib/auth/supabase-ssr';
-import { requestLogger } from '@/lib/system/server-logger';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 function clearRefreshCredentials(response: NextResponse, cookieHeader: string | null): void {
   clearSupabaseAccessCookie(response);
@@ -43,8 +43,9 @@ function getSafeErrorDetails(error: unknown) {
   };
 }
 
-export async function POST(request: Request) {
-  const { logger, requestId } = requestLogger(request, 'auth/refresh');
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'auth/refresh', route: '/api/auth/refresh' },
+  async (request, _context, { logger }) => {
   if (!hasTrustedRequestOrigin(request)) {
     return NextResponse.json({ ok: false, error: 'Origin không hợp lệ.' }, { status: 403 });
   }
@@ -89,9 +90,10 @@ export async function POST(request: Request) {
     );
     const failure = NextResponse.json(
       { ok: false, error: 'Dịch vụ xác thực tạm thời không khả dụng.' },
-      { status: 503, headers: { 'Retry-After': '60', 'X-Request-Id': requestId } },
+      { status: 503, headers: { 'Retry-After': '60' } },
     );
     void recordAuthSecurityEvent({ eventType: 'refresh_failed', ip });
     return failure;
   }
-}
+  },
+);

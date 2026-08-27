@@ -32,6 +32,13 @@ export const accessControlUserUpdateBodySchema =
             action: z.literal('restore'),
             userId: z.string().uuid('userId không hợp lệ.'),
         }),
+        z.object({
+            action: z.literal('change_password'),
+            userId: z.string().uuid('userId không hợp lệ.'),
+            password: z.string()
+                .min(8, 'Mật khẩu cần ít nhất 8 ký tự.')
+                .max(72, 'Mật khẩu tối đa 72 ký tự.'),
+        }),
     ]);
 
 /** Dữ liệu tối thiểu để tạo Auth user, profile và role ban đầu. */

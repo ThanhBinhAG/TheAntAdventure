@@ -4,14 +4,14 @@ import {
     optionalProductQueryParam,
     productListFilterQuerySchema,
 } from '@/lib/products/product-list-input';
-import {
-    listProductFacets,
-    ProductListError,
-} from '@/lib/products/product-list-server';
+import { listProductFacets } from '@/lib/products/product-list-server';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+    { scope: 'products/facets', route: '/api/products/facets' },
+    async (request, _context, { logger }) => {
     const permission = await checkPermissionForRequest(
         'products.read',
     );
@@ -61,17 +61,7 @@ export async function GET(request: Request) {
             },
         );
     } catch (error) {
-        if (error instanceof ProductListError) {
-            console.error(
-                'Không thể lấy facet product:',
-                error.message,
-            );
-        } else {
-            console.error(
-                'Lỗi không xác định khi lấy facet product:',
-                error,
-            );
-        }
+        logger.error({ event: 'products.facets.failed', err: error }, 'Product facets failed');
 
         return NextResponse.json(
             {
@@ -81,4 +71,5 @@ export async function GET(request: Request) {
             { status: 500 },
         );
     }
-}
+    },
+);

@@ -6,6 +6,7 @@ import {
   getLeadById,
   updateLeadRecord,
 } from '@/lib/sales/lead-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,9 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function GET(_request: Request, context: RouteContext) {
+export const GET = withHttpRequestLogging<RouteContext>(
+  { scope: 'sales/leads/detail', route: '/api/leads/[id]' },
+  async (_request, context, { logger }) => {
   const permission = await checkPermissionForRequest('sales.read');
 
   if (!permission.allowed) {
@@ -48,9 +51,9 @@ export async function GET(_request: Request, context: RouteContext) {
           { status: 404 },
         );
       }
-      console.error('Không thể lấy lead:', error.message);
+      logger.error({ event: 'sales.leads.get.failed', err: error }, 'Lead lookup failed');
     } else {
-      console.error('Lỗi không xác định khi lấy lead:', error);
+      logger.error({ event: 'sales.leads.get.failed', err: error }, 'Lead lookup failed');
     }
 
     return NextResponse.json(
@@ -58,9 +61,12 @@ export async function GET(_request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);
 
-export async function PATCH(request: Request, context: RouteContext) {
+export const PATCH = withHttpRequestLogging<RouteContext>(
+  { scope: 'sales/leads/detail', route: '/api/leads/[id]' },
+  async (request, context, { logger }) => {
   const permission = await checkPermissionForRequest('sales.write');
 
   if (!permission.allowed) {
@@ -116,9 +122,9 @@ export async function PATCH(request: Request, context: RouteContext) {
           { status: 400 },
         );
       }
-      console.error('Không thể cập nhật lead:', error.message);
+      logger.error({ event: 'sales.leads.update.failed', err: error }, 'Lead update failed');
     } else {
-      console.error('Lỗi không xác định khi cập nhật lead:', error);
+      logger.error({ event: 'sales.leads.update.failed', err: error }, 'Lead update failed');
     }
 
     return NextResponse.json(
@@ -126,4 +132,5 @@ export async function PATCH(request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);

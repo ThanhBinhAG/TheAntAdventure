@@ -5,6 +5,7 @@ import {
   CustomerRepositoryError,
   createCustomerInquiry,
 } from '@/lib/customers/customer-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,9 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function POST(request: Request, context: RouteContext) {
+export const POST = withHttpRequestLogging<RouteContext>(
+  { scope: 'customers/inquiry', route: '/api/customers/[id]/inquiry' },
+  async (request, context, { logger }) => {
   const permission = await checkPermissionForRequest('customers.write');
 
   if (!permission.allowed) {
@@ -63,9 +66,9 @@ export async function POST(request: Request, context: RouteContext) {
           { status: 404 },
         );
       }
-      console.error('Không thể tạo inquiry:', error.message);
+      logger.error({ event: 'customers.inquiry.create.failed', err: error }, 'Customer inquiry creation failed');
     } else {
-      console.error('Lỗi không xác định khi tạo inquiry:', error);
+      logger.error({ event: 'customers.inquiry.create.failed', err: error }, 'Customer inquiry creation failed');
     }
 
     return NextResponse.json(
@@ -73,4 +76,5 @@ export async function POST(request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);

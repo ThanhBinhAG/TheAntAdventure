@@ -10,14 +10,18 @@ import {
     accessControlError,
     accessControlPermissionError,
 } from '@/lib/access-control/api-error';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+    { scope: 'access-control/super-admin-status', route: '/api/access-control/super-admin-status' },
+    async (_request, _context, { logger }) => {
     // Chỉ người đã có quyền vào Access Control mới được hỏi trạng thái này.
     const permission = await checkPermissionForRequest('users.manage');
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -40,6 +44,7 @@ export async function GET() {
             },
         );
     } catch (error) {
+        logger.error({ event: 'access_control.super_admin_status.failed', err: error }, 'Super Admin status lookup failed');
         const status =
             error instanceof AccessControlRpcError &&
                 error.code === '42501'
@@ -54,4 +59,5 @@ export async function GET() {
             { status },
         );
     }
-}
+    },
+);

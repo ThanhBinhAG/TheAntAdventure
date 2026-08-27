@@ -4,6 +4,7 @@ import {
   CustomerRepositoryError,
   getCustomerProfileContext,
 } from '@/lib/customers/customer-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,9 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function GET(_request: Request, context: RouteContext) {
+export const GET = withHttpRequestLogging<RouteContext>(
+  { scope: 'customers/profile', route: '/api/customers/[id]/profile' },
+  async (_request, context, { logger }) => {
   const permission = await checkPermissionForRequest('customers.read');
 
   if (!permission.allowed) {
@@ -46,9 +49,9 @@ export async function GET(_request: Request, context: RouteContext) {
           { status: 404 },
         );
       }
-      console.error('Không thể tải profile khách hàng:', error.message);
+      logger.error({ event: 'customers.profile.failed', err: error }, 'Customer profile load failed');
     } else {
-      console.error('Lỗi không xác định khi tải profile khách hàng:', error);
+      logger.error({ event: 'customers.profile.failed', err: error }, 'Customer profile load failed');
     }
 
     return NextResponse.json(
@@ -56,4 +59,5 @@ export async function GET(_request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);

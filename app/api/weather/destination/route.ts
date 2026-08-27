@@ -3,11 +3,15 @@ import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import { isWeatherBackendConfigured } from '@/lib/weather/supabase-admin';
 import { getDestinationWeather } from '@/lib/weather/refresh';
 import { weatherDeniedJson } from '@/lib/weather/auth';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 const CACHE_CONTROL = 'private, max-age=60, stale-while-revalidate=300';
 
-export async function GET(request: Request) {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'weather/destination', route: '/api/weather/destination' },
+  async (request, _context, { logger }) => {
   if (!isWeatherBackendConfigured()) {
+    logger.error({ event: 'weather.backend.unavailable', statusCode: 503 }, 'Weather backend unavailable');
     return NextResponse.json(
       { error: 'Weather cache requires SUPABASE_SERVICE_ROLE_KEY on the server.' },
       { status: 503 }
@@ -16,6 +20,7 @@ export async function GET(request: Request) {
 
   const permission = await checkPermissionForRequest('weather.read');
   if (!permission.allowed) {
+    logger.warn({ event: 'weather.permission.denied', statusCode: permission.status }, 'Weather permission denied');
     return weatherDeniedJson(permission);
   }
 
@@ -43,8 +48,10 @@ export async function GET(request: Request) {
       { headers: { 'Cache-Control': fromCache ? CACHE_CONTROL : 'no-store' } }
     );
   } catch (err) {
+    logger.error({ event: 'weather.destination.load.failed', err }, 'Weather destination load failed');
     const message = err instanceof Error ? err.message : String(err);
     const status = /not found/i.test(message) ? 404 : 500;
     return NextResponse.json({ error: message }, { status });
   }
-}
+  },
+);

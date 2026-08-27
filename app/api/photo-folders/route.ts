@@ -8,10 +8,13 @@ import {
   GalleryRepositoryError,
   listPhotoFoldersServer,
 } from '@/lib/gallery/photo-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'gallery/photo-folders', route: '/api/photo-folders' },
+  async (_request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('gallery.read');
 
   if (!permission.allowed) {
@@ -31,15 +34,18 @@ export async function GET() {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
-    console.error('Không thể lấy danh sách thư mục ảnh:', error);
+    logger.error({ event: 'gallery.photo_folders.list.failed', err: error }, 'Photo folder list failed');
     return NextResponse.json(
       { ok: false, error: 'Không thể tải danh sách thư mục.' },
       { status: 500 },
     );
   }
-}
+  },
+);
 
-export async function POST(request: Request) {
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'gallery/photo-folders', route: '/api/photo-folders' },
+  async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('gallery.write');
 
   if (!permission.allowed) {
@@ -71,6 +77,7 @@ export async function POST(request: Request) {
     const folder = await createPhotoFolder(parsed.data);
     return NextResponse.json({ ok: true, folder });
   } catch (error) {
+    logger.error({ event: 'gallery.photo_folders.create.failed', err: error }, 'Photo folder creation failed');
     if (error instanceof GalleryRepositoryError) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
@@ -79,4 +86,5 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-}
+  },
+);

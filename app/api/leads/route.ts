@@ -4,14 +4,14 @@ import {
   leadListQuerySchema,
   optionalLeadQueryParam,
 } from '@/lib/sales/lead-list-input';
-import {
-  LeadRepositoryError,
-  listLeadsPage,
-} from '@/lib/sales/lead-repository';
+import { listLeadsPage } from '@/lib/sales/lead-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'sales/leads', route: '/api/leads' },
+  async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('sales.read');
 
   if (!permission.allowed) {
@@ -66,11 +66,7 @@ export async function GET(request: Request) {
       },
     );
   } catch (error) {
-    if (error instanceof LeadRepositoryError) {
-      console.error('Không thể lấy danh sách leads:', error.message);
-    } else {
-      console.error('Lỗi không xác định khi lấy danh sách leads:', error);
-    }
+    logger.error({ event: 'sales.leads.list.failed', err: error }, 'Lead list failed');
 
     return NextResponse.json(
       {
@@ -80,4 +76,5 @@ export async function GET(request: Request) {
       { status: 500 },
     );
   }
-}
+  },
+);

@@ -23,6 +23,7 @@ import {
     accessControlError,
     accessControlPermissionError,
 } from '@/lib/access-control/api-error';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,12 +51,15 @@ function errorResponse(error: unknown) {
     );
 }
 
-export async function GET(request: Request) {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+    { scope: 'access-control/audit-logs', route: '/api/access-control/audit-logs' },
+    async (request, _context, { logger }) => {
     const permission = await checkPermissionForRequest(
         'users.manage',
     );
 
     if (!permission.allowed) {
+        logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
         return NextResponse.json(
             accessControlPermissionError(permission.status),
             { status: permission.status },
@@ -94,6 +98,8 @@ export async function GET(request: Request) {
             },
         );
     } catch (error) {
+        logger.error({ event: 'access_control.audit_logs.load.failed', err: error }, 'Access Control audit-log load failed');
         return errorResponse(error);
     }
-}
+    },
+);

@@ -25,6 +25,7 @@ import {
     getSupabaseUrl,
 } from '@/lib/server/env/supabase';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { getCrmSessionRepository } from '@/lib/auth/crm-session-repository';
 
 /** Lỗi riêng để API trả HTTP status phù hợp. */
 export class AccessControlAuthAdminError extends Error {
@@ -119,6 +120,17 @@ export async function setAccessControlAuthUserActive(
                 : 'Không thể khóa tài khoản Supabase Auth.',
             503,
         );
+    }
+
+    if (!isActive) {
+        try {
+            await getCrmSessionRepository().revokeAllForUser(userId);
+        } catch {
+            throw new AccessControlAuthAdminError(
+                'Không thể thu hồi CRM session đang hoạt động.',
+                503,
+            );
+        }
     }
 }
 

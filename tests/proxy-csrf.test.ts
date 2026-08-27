@@ -29,7 +29,7 @@ test('proxy blocks cross-origin cookie-authenticated API mutations', async (t) =
   await t.test('rejects a mutation with an untrusted origin', async () => {
     const response = await proxy(new NextRequest('https://crm.example.test/api/products', {
       method: 'POST',
-      headers: { Cookie: 'sb-crm-access-token=token', Origin: 'https://attacker.example.test' },
+      headers: { Cookie: 'crm_session=opaque-token', Origin: 'https://attacker.example.test' },
     }));
     assert.equal(response.status, 403);
     assert.equal(delegated, 0);
@@ -38,7 +38,7 @@ test('proxy blocks cross-origin cookie-authenticated API mutations', async (t) =
   await t.test('allows a same-origin authenticated mutation and token-authenticated automation', async () => {
     const sameOrigin = await proxy(new NextRequest('https://crm.example.test/api/products', {
       method: 'POST',
-      headers: { Cookie: 'sb-crm-access-token=token', Origin: 'https://crm.example.test' },
+      headers: { Cookie: 'crm_session=opaque-token', Origin: 'https://crm.example.test' },
     }));
     assert.equal(sameOrigin.status, 200);
 

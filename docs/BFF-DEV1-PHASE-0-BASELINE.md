@@ -69,3 +69,12 @@ Verification after the change: lint, typecheck, production build, and 254 unit
 tests pass. The leakage gate now has one remaining `/storage/v1` client-bundle hit
 from `lib/gallery/storage-image-src.ts`; this is the Dev 2 gallery-asset URL
 normalization dependency and remains intentionally visible rather than allowlisted.
+
+## Phase 2 update — 2026-08-27
+
+The legacy Supabase SSR-cookie contract has been replaced in source with the
+CRM-owned opaque `crm_session` contract. The new migration revokes legacy
+encrypted-payload rows, stores only a hash of a high-entropy cookie token, and
+stores Supabase credentials as AES-GCM ciphertext server-side. The remaining
+Phase 2 rollout work is applying the migration to each environment and
+validating the real Supabase/Auth deployment path.

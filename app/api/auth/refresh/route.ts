@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
 import { clearSupabaseAuthCookies } from '@/lib/auth/cookie-hygiene';
+import {
+  clearCrmSessionCookie,
+  readCrmSessionToken,
+  setCrmSessionCookie,
+} from '@/lib/auth/crm-session-cookie';
+import { getCrmSessionRepository } from '@/lib/auth/crm-session-repository';
 import { hasTrustedRequestOrigin } from '@/lib/auth/request-origin';
 import { consumeRefreshRateLimit, getClientIp } from '@/lib/auth/rate-limit';
 import { recordAuthSecurityEvent } from '@/lib/auth/security-audit';
-import {
-  clearLegacyCrmAuthCookies,
-  clearSupabaseAccessCookie,
-  createSupabaseRouteClient,
-  setSupabaseAccessCookie,
-} from '@/lib/auth/supabase-ssr';
+import { createSupabaseAuthClient } from '@/lib/auth/supabase-auth-server';
 import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 function clearRefreshCredentials(response: NextResponse, cookieHeader: string | null): void {
-  clearSupabaseAccessCookie(response);
-  clearLegacyCrmAuthCookies(response);
+  clearCrmSessionCookie(response);
   clearSupabaseAuthCookies(response, cookieHeader);
 }
 
@@ -62,25 +62,38 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
   const ip = getClientIp(request);
   let stage = 'create_client';
   try {
-    const supabase = createSupabaseRouteClient(request, response);
-    // getSession refreshes only when the token is near expiry, avoiding an
-    // unnecessary refresh-token rotation for every active browser tab.
-    stage = 'get_session';
-    const { data, error } = await supabase.auth.getSession();
+    const sessionToken = readCrmSessionToken(request.headers.get('cookie'));
+    if (!sessionToken) return unauthenticatedResponse(request, ip);
+
+    stage = 'lookup_crm_session';
+    const repository = getCrmSessionRepository();
+    const stored = await repository.lookup(sessionToken);
+    if (!stored) return unauthenticatedResponse(request, ip);
+
+    stage = 'refresh_supabase_session';
+    const { data, error } = await createSupabaseAuthClient().auth.refreshSession({
+      refresh_token: stored.refreshToken,
+    });
     const session = data.session;
-    if (!session?.access_token) {
+    if (!session?.access_token || !session.refresh_token) {
       if (!error || isRejectedSupabaseSession(error)) {
+        await repository.revoke(sessionToken);
         return unauthenticatedResponse(request, ip);
       }
       throw error;
     }
 
-    stage = 'set_access_cookie';
-    // `tokens-only` storage has no safe session.user/session.id. This helper
-    // reads only access-token expiry fields, so proactive refresh cannot fail
-    // because of the absent user object.
-    setSupabaseAccessCookie(response, session);
-    clearLegacyCrmAuthCookies(response);
+    stage = 'rotate_crm_session';
+    await repository.rotateCredentials({
+      id: stored.id,
+      token: sessionToken,
+      accessToken: session.access_token,
+      refreshToken: session.refresh_token,
+      accessTokenExpiresAt: new Date((session.expires_at ?? Math.floor(Date.now() / 1000)) * 1000),
+      expiresAt: stored.expiresAt,
+    });
+    setCrmSessionCookie(response, sessionToken, stored.expiresAt);
+    clearSupabaseAuthCookies(response, request.headers.get('cookie'));
     void recordAuthSecurityEvent({ eventType: 'refresh_succeeded', ip });
     return response;
   } catch (error) {

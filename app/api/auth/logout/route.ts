@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server';
 import { clearSupabaseAuthCookies } from '@/lib/auth/cookie-hygiene';
+import { clearCrmSessionCookie, readCrmSessionToken } from '@/lib/auth/crm-session-cookie';
+import { getCrmSessionRepository } from '@/lib/auth/crm-session-repository';
 import { getClientIp } from '@/lib/auth/rate-limit';
 import { hasTrustedRequestOrigin } from '@/lib/auth/request-origin';
 import { recordAuthSecurityEvent } from '@/lib/auth/security-audit';
-import {
-  clearLegacyCrmAuthCookies,
-  clearSupabaseAccessCookie,
-  createSupabaseRouteClient,
-} from '@/lib/auth/supabase-ssr';
 import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 function clearBrowserCredentials(response: NextResponse, cookieHeader: string | null): void {
-  clearSupabaseAccessCookie(response);
-  clearLegacyCrmAuthCookies(response);
+  clearCrmSessionCookie(response);
   clearSupabaseAuthCookies(response, cookieHeader);
 }
 
@@ -34,20 +30,21 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
   const ip = getClientIp(request);
   const response = NextResponse.json({ ok: true });
 
-  try {
-    const supabase = createSupabaseRouteClient(request, response);
-    const { error } = await supabase.auth.signOut({ scope: 'local' });
-    if (error) throw error;
-  } catch (error) {
-    logger.error({ event: 'auth.logout.failed', err: error }, 'Logout failed');
-    clearBrowserCredentials(response, cookieHeader);
-    const failure = NextResponse.json(
-      { ok: false, error: 'Không thể thu hồi Supabase session. Vui lòng thử lại.' },
-      { status: 503 },
-    );
-    copyCookies(response, failure);
-    void recordAuthSecurityEvent({ eventType: 'logout_failed', ip });
-    return failure;
+  const sessionToken = readCrmSessionToken(cookieHeader);
+  if (sessionToken) {
+    try {
+      await getCrmSessionRepository().revoke(sessionToken);
+    } catch (error) {
+      logger.error({ event: 'auth.logout.failed', err: error }, 'Logout failed');
+      clearBrowserCredentials(response, cookieHeader);
+      const failure = NextResponse.json(
+        { ok: false, error: 'Dịch vụ session tạm thời không khả dụng. Vui lòng thử lại.' },
+        { status: 503 },
+      );
+      copyCookies(response, failure);
+      void recordAuthSecurityEvent({ eventType: 'logout_failed', ip });
+      return failure;
+    }
   }
 
   clearBrowserCredentials(response, cookieHeader);

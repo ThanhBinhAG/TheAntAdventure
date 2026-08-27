@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-test-module-mocks --import tsx --test $(find tests -name '*.test.ts' 2>/dev/null | sort)",
     "test:e2e": "playwright test",
+    "session:cleanup": "node scripts/cleanup-crm-sessions.mjs",
     "db:link": "supabase link",
     "db:login": "supabase login",
     "db:migration:new": "supabase migration new",

@@ -518,13 +518,10 @@ export async function setAccessControlUserActive(
     );
 
     if (result.error) {
-        if (!isActive) {
-            try {
-                await setAccessControlAuthUserActive(userId, true);
-            } catch {
-                // The original RPC error is more useful to the caller.
-            }
-        }
+        // A disabled user's durable sessions have already been revoked. Do not
+        // silently unban Supabase Auth here: revoked opaque sessions cannot be
+        // restored safely, and reporting an RPC failure must not re-enable an
+        // account whose CRM session boundary has already been closed.
         throwRpcError(result.error);
         return;
     }

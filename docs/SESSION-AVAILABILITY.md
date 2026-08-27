@@ -25,3 +25,4 @@ Each `bffRoute` verifies the JWT and active-profile state once, then shares one 
 3. Monitor JWKS verification errors, refresh rate-limit responses, refresh failures, and `auth_security_events`.
 4. Deployment adds `SESSION_ENCRYPTION_KEY` once. Rotating it invalidates active durable sessions, so perform that only as an intentional security response.
 5. The Phase 2 database migration revokes obsolete pre-cutover rows. Users sign in once again through Supabase Auth and receive a new opaque CRM cookie.
+6. Schedule `npm run session:cleanup` once daily on the application host (for example, `15 3 * * *`). It calls `cleanup_crm_sessions` independently of login traffic; optionally set `CRM_SESSION_RETENTION_DAYS` (default: 30).

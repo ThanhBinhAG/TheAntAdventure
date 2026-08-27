@@ -59,10 +59,18 @@ test('durable CRM session repository decrypts credentials only after an active h
     gt: () => query,
     maybeSingle: async () => ({ data: row, error: null }),
   };
+  let lastUsedUpdateDispatched = false;
   const client = {
     from: () => ({
       select: () => query,
-      update: () => ({ eq: () => undefined }),
+      update: () => ({
+        eq: () => ({
+          then: (resolve: () => void) => {
+            lastUsedUpdateDispatched = true;
+            resolve();
+          },
+        }),
+      }),
     }),
   };
   const repository = createCrmSessionRepository(client, key);
@@ -75,6 +83,7 @@ test('durable CRM session repository decrypts credentials only after an active h
     accessTokenExpiresAt: new Date(row.access_token_expires_at),
     expiresAt: new Date(row.expires_at),
   });
+  assert.equal(lastUsedUpdateDispatched, true);
 });
 
 test('refresh credential rotation calls the atomic database RPC with no plaintext token', async () => {

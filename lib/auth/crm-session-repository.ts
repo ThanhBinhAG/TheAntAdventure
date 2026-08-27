@@ -108,7 +108,12 @@ export function createCrmSessionRepository(client: SupabaseTableClient, encrypti
         if (!data) return null;
 
         const session = asActiveSession(data as CrmSessionRow, encryptionKey);
-        void sessions(client).update({ last_used_at: new Date().toISOString() }).eq('sid', session.id);
+        // Supabase query builders are lazy: attach handlers so this best-effort
+        // audit update is actually dispatched without delaying authentication.
+        void sessions(client).update({ last_used_at: new Date().toISOString() }).eq('sid', session.id).then(
+          () => undefined,
+          () => undefined,
+        );
         return session;
       } catch (error) {
         if (error instanceof CrmSessionStoreUnavailableError) throw error;

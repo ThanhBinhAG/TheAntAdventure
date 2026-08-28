@@ -154,6 +154,15 @@ feature/bff-cutover-domains
 
 > Test fail thuộc domain business cụ thể giao Dev 2.
 
+## D1.5 Handoff and final acceptance
+
+- [x] Stable handoff contract documents `getAuthContext()`, permission checks, user/admin server clients, `bffRoute`, request ID, and safe auth-outage behavior.
+- [x] `npm run final:acceptance` runs lint → typecheck → unit tests → build → hard browser-leakage check in one cross-platform command.
+- [x] Real session E2E is explicitly opt-in with `FINAL_ACCEPTANCE_E2E=1`, preventing an accidental mutation of a shared database.
+- [ ] Dev 2 confirms domain routes follow the handoff contract and no browser Supabase client/API path remains.
+- [ ] Staging applies durable-session migration and passes real login/refresh/logout/revoke/disable E2E.
+- [ ] Production private-network verifier confirms reverse proxy is the only public ingress; key rotation is completed after leakage is eliminated.
+
 ---
 
 # DEV 2 CHECKLIST — Domain BFF / Browser Cutover / Storage
@@ -726,10 +735,10 @@ Sau đó Dev 2:
 
 **Owner: Shared**
 
-- [ ] `npm run lint` pass.
-- [ ] `npm run typecheck` pass.
-- [ ] `npm test` pass.
-- [ ] `npm run build` pass.
+- [x] `npm run lint` pass (verified 2026-08-28).
+- [x] `npm run typecheck` pass (verified 2026-08-28).
+- [x] `npm test` pass (259 tests: 254 pass, 5 intentional skips; verified 2026-08-28).
+- [x] `npm run build` pass (verified 2026-08-28).
 - [ ] Supabase leakage check pass.
 - [ ] Playwright login pass.
 - [ ] Playwright Bookings pass.
@@ -742,8 +751,8 @@ Sau đó Dev 2:
 - [ ] Playwright Dev Notes pass.
 - [ ] Playwright Guide Calendar pass.
 - [ ] Playwright Team Chat pass.
-- [ ] Redis-down test pass.
-- [ ] Supabase-down test pass.
+- [x] Redis-down test pass (unit contract).
+- [x] Supabase-down test pass (unit contract returns safe `503`).
 
 ---
 

@@ -48,6 +48,9 @@ Supabase configuration is injected only at **runtime**. Production CRM must use
 `SUPABASE_URL=http://supabase-ant-crm-gateway:8000` and join the external
 `CRM_PROXY_NETWORK` used by the reverse proxy. See the [private-network runbook](docs/runbooks/PRIVATE-NETWORK-CUTOVER.md).
 
+For the reproducible final platform gate, run `npm run final:acceptance`. Set
+`FINAL_ACCEPTANCE_E2E=1` only on the isolated Supabase E2E target.
+
 ### Checklist when Docker CI / deploy rights are ready
 
 1. Confirm `$MNT_FDATA/sharing/.env.local` has company Supabase URL + keys (not localhost).

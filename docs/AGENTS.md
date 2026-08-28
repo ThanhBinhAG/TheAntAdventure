@@ -11,6 +11,7 @@ Tracked product documentation: database schema reference and Supabase setup. Sou
 - `BFF-TASKS-vi.md` — Vietnamese two-developer BFF implementation backlog
 - `BFF-TASK.md` — verified final-cutover checklist covering source, tests, browser leakage, sessions, and production networking
 - `BFF-DEV1-PHASE-0-BASELINE.md` — recorded Dev 1 verification, leakage, session, and ownership baseline before cutover work
+- `BFF-DEV1-HANDOFF.md` — stable platform-auth contract, final gate, and ownership boundary for Dev 2
 - `GRAPHRAG-MEMORY.md` — verified codebase retrieval and flow map
 - `SUPABASE-SETUP.md` — install & connect steps
 - `SESSION-AVAILABILITY.md` — CRM session durability and Redis outage operating decision

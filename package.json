@@ -18,6 +18,7 @@
     "test": "node scripts/test-runner.mjs all",
     "test:platform": "node scripts/test-runner.mjs platform",
     "test:e2e": "playwright test",
+    "final:acceptance": "node scripts/final-acceptance.mjs",
     "session:cleanup": "node scripts/cleanup-crm-sessions.mjs",
     "db:link": "supabase link",
     "db:login": "supabase login",

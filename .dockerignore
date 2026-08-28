@@ -22,8 +22,8 @@ backups
 .env.*
 !.env.example
 
-# Tests & docs not needed in image
-tests
+# Docs not needed in image
+# Tests are needed by the verifier build stage but are not copied into runner.
 docs
 coverage
 *.md

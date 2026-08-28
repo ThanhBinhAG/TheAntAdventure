@@ -4,14 +4,14 @@
 
 CRM là public application duy nhất. Browser chỉ gọi CRM origin; chỉ CRM server kết nối Supabase qua private Docker network. Redis là cache tùy chọn, không phải source of truth.
 
-Baseline kiểm tra ngày 2026-08-26:
+Baseline ban đầu ngày 2026-08-26; đối soát local gần nhất ngày 2026-08-28:
 
 - [x] `npm run lint` pass.
 - [x] `npm run typecheck` pass.
 - [x] `npm run build` pass.
-- [ ] Browser bundle không còn dấu vết Supabase — hiện leakage check vẫn phát hiện `NEXT_PUBLIC_SUPABASE`, `supabase.co`, `/auth/v1` và `/storage/v1`.
-- [ ] Unit test pass — hiện chạy cô lập 86 test files: 59 pass, 27 fail.
-- [ ] E2E pass — hiện `npm run dev` dùng cú pháp gán env kiểu Unix nên Playwright web server không start trên Windows.
+- [ ] Browser bundle không còn dấu vết Supabase — local hard leakage check chỉ còn phát hiện `/storage/v1`; đây là dependency Dev 2 tại `lib/gallery/storage-image-src.ts`.
+- [x] Unit test pass — `npm test` pass 254/259 tests, 5 skipped, 0 failed (2026-08-28).
+- [ ] E2E pass — E2E lifecycle với Supabase test database riêng chưa được chạy; launcher đa nền tảng đã thay thế cú pháp gán env kiểu Unix cũ.
 
 ---
 

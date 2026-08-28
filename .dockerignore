@@ -25,11 +25,9 @@ backups
 # Tests and documentation are verifier inputs but are not copied into runner.
 coverage
 
-# CI / misc
-.gitlab-ci.yml
+# CI verifier inputs are required by source-contract tests but are not copied
+# into the production runner stage.
 .npm
 npm-debug.log*
 yarn-error.log*
-Dockerfile*
-docker-compose*.yml
 .dockerignore

@@ -1,10 +1,19 @@
 import {
-  PHOTOS_BUCKET_PUBLIC_URL_PREFIX,
-  thumbPathFromDisplayPath,
-} from '@/lib/storage/photo-paths';
+  CRM_BRANDING_LOGO_FILE_ROUTE,
+  CRM_GALLERY_FILE_ROUTE,
+  crmGalleryAssetUrl,
+  crmGalleryThumbUrl,
+  isCrmGalleryAssetUrl,
+} from '@/lib/gallery/crm-gallery-asset-url';
+import { PHOTOS_BUCKET_PUBLIC_URL_PREFIX } from '@/lib/storage/photo-paths';
 
-export const CRM_GALLERY_FILE_ROUTE = '/api/photos/file';
-export const CRM_BRANDING_LOGO_FILE_ROUTE = '/api/branding/logo/file';
+export {
+  CRM_BRANDING_LOGO_FILE_ROUTE,
+  CRM_GALLERY_FILE_ROUTE,
+  crmGalleryAssetUrl,
+  crmGalleryThumbUrl,
+  isCrmGalleryAssetUrl,
+};
 
 const GALLERY_VARIANT_PATH = /^gallery\/[A-Za-z0-9_.-]+\/(?:display|thumb)\.webp$/;
 
@@ -26,27 +35,8 @@ export function legacyPublicUrlToStoragePath(url: string): string | null {
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
-export function isCrmGalleryAssetUrl(url: string): boolean {
-  return url.startsWith(`${CRM_GALLERY_FILE_ROUTE}?`) || url === CRM_GALLERY_FILE_ROUTE;
-}
-
 export function isCrmBrandingLogoFileUrl(url: string): boolean {
   return url.startsWith(`${CRM_BRANDING_LOGO_FILE_ROUTE}?`) || url === CRM_BRANDING_LOGO_FILE_ROUTE;
-}
-
-export function crmGalleryAssetUrl(storagePath: string, version?: number | string | null): string {
-  const query = new URLSearchParams({ path: storagePath });
-  if (version != null && version !== '') query.set('v', String(version));
-  return `${CRM_GALLERY_FILE_ROUTE}?${query.toString()}`;
-}
-
-export function crmGalleryThumbUrl(
-  storagePath: string,
-  version?: number | string | null,
-): string | undefined {
-  const thumbPath = thumbPathFromDisplayPath(storagePath);
-  if (!thumbPath) return undefined;
-  return crmGalleryAssetUrl(thumbPath, version);
 }
 
 export function crmBrandingLogoFileUrl(version?: string | null): string {

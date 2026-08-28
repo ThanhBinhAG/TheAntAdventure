@@ -4,15 +4,11 @@ import {
   crmGalleryAssetUrl,
   crmGalleryThumbUrl,
   isCrmGalleryAssetUrl,
-  isLegacyPhotosBucketPublicUrl,
-  legacyPublicUrlToCrmGalleryUrl,
-} from '@/lib/gallery/gallery-asset-url';
-import { thumbPathFromDisplayPath } from '@/lib/storage/photo-paths';
+} from '@/lib/gallery/crm-gallery-asset-url';
 
 export function isStoragePhoto(p: GalleryPhoto): boolean {
   if (p.storagePath) return true;
-  const url = p.url ?? '';
-  return isLegacyPhotosBucketPublicUrl(url) || isCrmGalleryAssetUrl(url);
+  return isCrmGalleryAssetUrl(p.url ?? '');
 }
 
 /**
@@ -45,10 +41,6 @@ export function photoDisplayUrl(p: GalleryPhoto): string | undefined {
   const raw = p.url || undefined;
   if (!raw) return undefined;
   if (isCrmGalleryAssetUrl(raw)) return cacheBustPhotoUrl(raw, p);
-  if (isLegacyPhotosBucketPublicUrl(raw)) {
-    const crm = legacyPublicUrlToCrmGalleryUrl(raw, p.displayBytes);
-    if (crm) return crm;
-  }
   if (isStoragePhoto(p)) return cacheBustPhotoUrl(raw, p);
   return raw;
 }
@@ -65,20 +57,11 @@ export function photoThumbUrl(p: GalleryPhoto): string | undefined {
     const base = p.url.split('?')[0] ?? p.url;
     if (base.endsWith('/display.webp')) {
       raw = `${base.slice(0, -'display.webp'.length)}thumb.webp`;
-    } else if (isLegacyPhotosBucketPublicUrl(p.url)) {
-      const displayPath = legacyPublicUrlToCrmGalleryUrl(p.url)?.match(/path=([^&]+)/)?.[1];
-      if (displayPath) {
-        const thumbPath = thumbPathFromDisplayPath(decodeURIComponent(displayPath));
-        if (thumbPath) raw = crmGalleryAssetUrl(thumbPath, p.displayBytes);
-      }
     }
   }
 
   if (!raw) return undefined;
   if (isCrmGalleryAssetUrl(raw)) return cacheBustPhotoUrl(raw, p);
-  if (isLegacyPhotosBucketPublicUrl(raw)) {
-    return legacyPublicUrlToCrmGalleryUrl(raw, p.displayBytes) ?? cacheBustPhotoUrl(raw, p);
-  }
   return cacheBustPhotoUrl(raw, p);
 }
 

@@ -4,9 +4,9 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { toCrmPhotoAssetUrl } from '@/lib/gallery/storage-image-src';
 
-test('Supabase gallery asset URLs are served through the CRM media route', () => {
+test('browser image helper preserves server-normalized media routes', () => {
   assert.equal(
-    toCrmPhotoAssetUrl('http://127.0.0.1:54321/storage/v1/object/public/photos/gallery/PH-001/thumb.webp?v=88'),
+    toCrmPhotoAssetUrl('/api/photos/file?path=gallery%2FPH-001%2Fthumb.webp&v=88'),
     '/api/photos/file?path=gallery%2FPH-001%2Fthumb.webp&v=88',
   );
   assert.equal(
@@ -22,6 +22,16 @@ test('Supabase gallery asset URLs are served through the CRM media route', () =>
 test('CRM gallery asset URLs pass through unchanged', () => {
   const crm = '/api/photos/file?path=gallery%2FPH-001%2Fthumb.webp&v=88';
   assert.equal(toCrmPhotoAssetUrl(crm), crm);
+});
+
+test('browser image helpers do not retain legacy Supabase Storage URL parsing', () => {
+  const browserHelpers = [
+    'lib/gallery/storage-image-src.ts',
+    'lib/gallery/gallery-helpers.ts',
+  ].map((path) => readFileSync(join(process.cwd(), path), 'utf8')).join('\n');
+
+  assert.doesNotMatch(browserHelpers, /storage\/v1/);
+  assert.doesNotMatch(browserHelpers, /isLegacyPhotosBucketPublicUrl/);
 });
 
 test('CRM gallery media route accepts only allow-listed gallery variants', () => {

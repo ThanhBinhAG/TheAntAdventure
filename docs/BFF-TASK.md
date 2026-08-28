@@ -9,8 +9,8 @@ Baseline ban đầu ngày 2026-08-26; đối soát local gần nhất ngày 2026
 - [x] `npm run lint` pass.
 - [x] `npm run typecheck` pass.
 - [x] `npm run build` pass.
-- [ ] Browser bundle không còn dấu vết Supabase — local hard leakage check chỉ còn phát hiện `/storage/v1`; đây là dependency Dev 2 tại `lib/gallery/storage-image-src.ts`.
-- [x] Unit test pass — `npm test` pass 254/259 tests, 5 skipped, 0 failed (2026-08-28).
+- [x] Browser bundle không còn dấu vết Supabase — `npm run leakage:check` pass sau private photo/BFF cutover (2026-08-28).
+- [x] Unit test pass — `npm test` pass 276/281 tests, 5 skipped, 0 failed (2026-08-28).
 - [ ] E2E pass — E2E lifecycle với Supabase test database riêng chưa được chạy; launcher đa nền tảng đã thay thế cú pháp gán env kiểu Unix cũ.
 
 ---
@@ -54,8 +54,8 @@ feature/bff-cutover-domains
 # DEV 1 CHECKLIST — Platform / Auth / Infra / CI
 
 > Last reconciled: 2026-08-28. `[x]` means the source/configuration and its
-> local regression coverage are complete. Items requiring a deployment target,
-> a Windows/GitLab runner, or Dev 2 browser cutover remain unchecked.
+> local regression coverage are complete. Items requiring a deployment target
+> or a Windows/GitLab runner remain unchecked.
 
 ## D1.1 Server-only Supabase configuration
 
@@ -68,14 +68,14 @@ feature/bff-cutover-domains
 - [x] `next.config.mjs` không còn Supabase hostname hay Storage remote pattern.
 - [x] README và session-operation document phản ánh server-only/durable-session boundary.
 - [x] Cập nhật `docs/SUPABASE-SETUP.md` và `docs/CURRENT-SYSTEM.md` theo server-only config, durable CRM session và private-network boundary.
-- [ ] Xóa hit `/storage/v1` còn lại trong browser bundle — dependency Dev 2 (`lib/gallery/storage-image-src.ts`).
+- [x] Legacy Storage URL parsing đã ở server DTO; browser bundle chỉ dùng CRM media routes và hard leakage check pass.
 
 ### Acceptance D1.1
 
 - [x] Production build không cần bất kỳ `NEXT_PUBLIC_SUPABASE_*` variable nào.
 - [x] Server configuration and CI deploy use `SUPABASE_URL` at runtime only.
 - [x] Browser bundle không nhận Supabase URL/key từ build env.
-- [ ] Final browser leakage check passes after Dev 2 storage cutover.
+- [x] Final browser leakage check passes after Dev 2 storage cutover.
 
 ---
 
@@ -142,10 +142,10 @@ feature/bff-cutover-domains
 - [x] `npm run test:platform` owns Dev 1 auth/session/proxy/request-context/JWKS/Redis suite.
 - [x] Request-context and `cookies()` tests run through valid mocked request context.
 - [x] `scripts/check-supabase-leakage.mjs` is the cross-platform hard-fail command.
-- [x] Docker verifier runs lint → typecheck → test → build → leakage report.
+- [x] Docker verifier runs lint → typecheck → test → build → hard leakage check.
 - [x] Redis-down and Supabase/JWKS-down tests assert resilient cache behavior or safe `503` responses with request ID/structured logging.
 - [ ] Run launcher/build matrix on Windows and the GitLab runner.
-- [ ] Change CI leakage report to hard-fail after Dev 2 removes `/storage/v1`.
+- [x] CI leakage check là hard-fail sau khi Dev 2 hoàn tất private photo/BFF cutover.
 
 ### Dev 1 chịu trách nhiệm sửa các test fail thuộc
 

@@ -27,7 +27,7 @@ COPY . .
 # as Docker build arguments: values used during `next build` can enter image
 # layers or browser bundles.
 
-RUN npm run lint && npm run typecheck && npm test && npm run build && npm run leakage:report
+RUN npm run lint && npm run typecheck && npm test && npm run build && npm run leakage:check
 
 # Explicit CI target: keeps verification on the same Node version and dependency
 # graph that produces the runtime image.

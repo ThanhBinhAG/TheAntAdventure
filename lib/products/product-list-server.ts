@@ -1,7 +1,8 @@
 import 'server-only';
 
-import { assembleProducts, rowToPhoto } from '@/lib/db/mappers';
+import { assembleProducts } from '@/lib/db/mappers';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
+import { mapGalleryPhotoForClient } from '@/lib/gallery/gallery-photo-dto';
 import { photoDisplayUrl, photoThumbUrl } from '@/lib/gallery/gallery-helpers';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import type { Product } from '@/lib/types';
@@ -37,21 +38,15 @@ export class ProductListError extends Error {
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 function galleryPhotoFromRow(row: ProductRow): GalleryPhoto {
-    const mapped = rowToPhoto(row);
-    return {
-        id: String(mapped.id),
-        caption: String(mapped.caption ?? ''),
-        region: String(mapped.region ?? ''),
-        url: mapped.url ? String(mapped.url) : undefined,
-        thumbUrl: mapped.thumbUrl ? String(mapped.thumbUrl) : undefined,
-        storagePath: mapped.storagePath
-            ? String(mapped.storagePath)
-            : undefined,
-        displayBytes:
-            typeof mapped.displayBytes === 'number'
-                ? mapped.displayBytes
-                : undefined,
-    };
+  return mapGalleryPhotoForClient({
+    id: String(row.id),
+    caption: row.caption as string | null,
+    region: row.region as string | null,
+    url: row.url as string | null,
+    thumb_url: row.thumb_url as string | null,
+    storage_path: row.storage_path as string | null,
+    display_bytes: row.display_bytes as number | null,
+  });
 }
 
 async function attachPageCoverThumbs(

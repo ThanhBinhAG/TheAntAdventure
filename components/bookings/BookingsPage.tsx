@@ -14,6 +14,7 @@ import { useCreateBooking } from '@/hooks/useCreateBooking';
 import { useUpdateBooking } from '@/hooks/useUpdateBooking';
 import { useEnsureCustomersCatalogLoaded } from '@/hooks/useEnsureCustomersCatalogLoaded';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
 import type { Booking } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
@@ -81,6 +82,14 @@ export default function BookingsPage() {
   const { pageSize, setPageSize } = usePageSize();
   const pagination = usePagination(filtered, pageSize, [search, statusF, monthF, pageSize]);
   const { paginatedItems } = pagination;
+
+  const hasActiveFilters = Boolean(search.trim() || statusF || monthF);
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatusF('');
+    setMonthF('');
+  };
 
   const handleCreateBooking = async (booking: Parameters<typeof createBooking>[0]) => {
     setSaving(true);
@@ -220,6 +229,42 @@ export default function BookingsPage() {
                 <tr>
                   <td colSpan={11} style={{ padding: 16, color: 'var(--m)' }}>
                     Loading bookings…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={11} style={{ padding: 0, border: 'none' }}>
+                    <EmptyState
+                      className="crm-empty-state--table"
+                      size="compact"
+                      variant="tasks"
+                      title={hasActiveFilters ? 'No bookings match your filters' : 'No bookings yet'}
+                      description={
+                        hasActiveFilters
+                          ? 'Try a different search term, status, or month — or clear filters to see all bookings.'
+                          : 'Create a booking from a confirmed lead, or add one manually to start tracking deposits and travel dates.'
+                      }
+                      action={
+                        <>
+                          {hasActiveFilters && (
+                            <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
+                              Clear filters
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-p btn-sm"
+                            onClick={openNewBooking}
+                            disabled={!canWrite || loading}
+                            title={
+                              !canWrite ? 'You need write permission for Bookings to create a booking' : undefined
+                            }
+                          >
+                            + New Booking
+                          </button>
+                        </>
+                      }
+                    />
                   </td>
                 </tr>
               ) : (

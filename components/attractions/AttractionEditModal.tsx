@@ -10,6 +10,7 @@ import {
   photosLinkedToAttraction,
 } from '@/lib/attractions/attractions-helpers';
 import { photoThumbUrl } from '@/lib/gallery/gallery-helpers';
+import { toCrmPhotoAssetUrl } from '@/lib/gallery/storage-image-src';
 import { saveNewLoosePhoto, saveNewLoosePhotosBatch } from '@/lib/gallery/gallery-loose-save';
 import { deletePhotoViaApi } from '@/lib/gallery/photo-api';
 import GalleryPhotoModal, { type GalleryPhotoSavePayload } from '@/components/gallery/GalleryPhotoModal';
@@ -512,7 +513,7 @@ export default function AttractionEditModal({
                           >
                             <span
                               className="att-edit-photo-preview"
-                              style={photoThumbUrl(p) ? { backgroundImage: `url(${photoThumbUrl(p)})` } : undefined}
+                              style={photoThumbUrl(p) ? { backgroundImage: `url(${toCrmPhotoAssetUrl(photoThumbUrl(p)!)})` } : undefined}
                             />
                             <span className="att-edit-photo-cap">{p.caption || p.id}</span>
                             <span className="att-edit-photo-status">

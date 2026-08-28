@@ -1,5 +1,6 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { crmBrandingLogoFileUrl, mapBrandingLogoUrlForClient } from '@/lib/gallery/gallery-asset-url';
 import {
   companyLogoObjectPathFromUrl,
   companyLogoPath,
@@ -40,8 +41,7 @@ export async function uploadCompanyLogo(
   });
   if (error) throw new Error(error.message);
 
-  const { data } = supabase.storage.from(PHOTOS_BUCKET).getPublicUrl(path);
-  const logoUrl = `${data.publicUrl}?v=${version}`;
+  const logoUrl = crmBrandingLogoFileUrl(version);
 
   const { error: dbError } = await supabase.from('company_branding').upsert(
     { id: BRANDING_ID, logo_url: logoUrl, updated_at: new Date().toISOString() },
@@ -79,5 +79,23 @@ export async function clearCompanyLogo(supabase: SupabaseClient): Promise<void> 
 }
 
 export async function fetchCompanyLogoUrl(supabase: SupabaseClient): Promise<string | null> {
-  return readCurrentLogoUrl(supabase);
+  const logoUrl = await readCurrentLogoUrl(supabase);
+  return mapBrandingLogoUrlForClient(logoUrl);
+}
+
+export async function resolveCompanyLogoStoragePath(supabase: SupabaseClient): Promise<string | null> {
+  const logoUrl = await readCurrentLogoUrl(supabase);
+  const fromUrl = companyLogoObjectPathFromUrl(logoUrl);
+  if (fromUrl) return fromUrl;
+
+  const client = supabase.storage.from(PHOTOS_BUCKET);
+  const { data, error } = await client.list('branding', {
+    limit: 100,
+    sortBy: { column: 'created_at', order: 'desc' },
+  });
+  if (error) return LEGACY_COMPANY_LOGO_PATH;
+
+  const latest = (data ?? []).find((entry) => entry.name?.startsWith('logo-') && entry.name.endsWith('.webp'));
+  if (!latest?.name) return null;
+  return `branding/${latest.name}`;
 }

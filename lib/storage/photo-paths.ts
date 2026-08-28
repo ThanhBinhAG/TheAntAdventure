@@ -1,5 +1,24 @@
 export const PHOTOS_BUCKET = 'photos';
 
+/** @deprecated Legacy public-object URL prefix — used only to rewrite old stored URLs. */
+export const PHOTOS_BUCKET_PUBLIC_URL_PREFIX = `/storage/v1/object/public/${PHOTOS_BUCKET}/`;
+
+/** Whether a URL targets the CRM photos bucket (local Supabase or hosted). */
+export function isPhotosBucketPublicUrl(url: string): boolean {
+  return (
+    url.includes(PHOTOS_BUCKET_PUBLIC_URL_PREFIX) ||
+    url.includes(`.supabase.co/storage/v1/object/public/${PHOTOS_BUCKET}/`)
+  );
+}
+
+/** Rewrite a base public display URL to another object path in the same bucket. */
+export function photosBucketPublicUrlFromBase(baseUrl: string, objectPath: string): string | undefined {
+  const base = baseUrl.split('?')[0] ?? baseUrl;
+  const idx = base.indexOf(PHOTOS_BUCKET_PUBLIC_URL_PREFIX);
+  if (idx < 0) return undefined;
+  return `${base.slice(0, idx)}${PHOTOS_BUCKET_PUBLIC_URL_PREFIX}${objectPath}`;
+}
+
 function sanitizePathSegment(value: string): string {
   return value.trim().replace(/[^\w.-]+/g, '-');
 }

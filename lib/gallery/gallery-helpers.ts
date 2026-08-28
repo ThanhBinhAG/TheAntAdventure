@@ -1,11 +1,18 @@
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import type { Product } from '@/lib/types';
+import {
+  crmGalleryAssetUrl,
+  crmGalleryThumbUrl,
+  isCrmGalleryAssetUrl,
+  isLegacyPhotosBucketPublicUrl,
+  legacyPublicUrlToCrmGalleryUrl,
+} from '@/lib/gallery/gallery-asset-url';
 import { thumbPathFromDisplayPath } from '@/lib/storage/photo-paths';
 
 export function isStoragePhoto(p: GalleryPhoto): boolean {
   if (p.storagePath) return true;
   const url = p.url ?? '';
-  return url.includes('.supabase.co/storage/v1/object/public/') || url.includes('/storage/v1/object/public/photos/');
+  return isLegacyPhotosBucketPublicUrl(url) || isCrmGalleryAssetUrl(url);
 }
 
 /**
@@ -16,9 +23,10 @@ export function withPhotoCacheBust(url: string, version?: number | string | null
   if (!url || version == null || version === '') return url;
   const v = String(version);
   try {
-    const u = new URL(url);
+    const u = new URL(url, 'http://crm.local');
     u.searchParams.set('v', v);
-    return u.href;
+    const out = `${u.pathname}${u.search}`;
+    return out.startsWith('http://crm.local') ? out.replace('http://crm.local', '') : u.href;
   } catch {
     const bare = url.split('#')[0]?.split('?')[0] ?? url;
     return `${bare}?v=${encodeURIComponent(v)}`;
@@ -31,30 +39,45 @@ function cacheBustPhotoUrl(url: string | undefined, p: GalleryPhoto): string | u
 }
 
 export function photoDisplayUrl(p: GalleryPhoto): string | undefined {
+  if (p.storagePath) {
+    return crmGalleryAssetUrl(p.storagePath, p.displayBytes ?? null);
+  }
   const raw = p.url || undefined;
   if (!raw) return undefined;
+  if (isCrmGalleryAssetUrl(raw)) return cacheBustPhotoUrl(raw, p);
+  if (isLegacyPhotosBucketPublicUrl(raw)) {
+    const crm = legacyPublicUrlToCrmGalleryUrl(raw, p.displayBytes);
+    if (crm) return crm;
+  }
   if (isStoragePhoto(p)) return cacheBustPhotoUrl(raw, p);
   return raw;
 }
 
 export function photoThumbUrl(p: GalleryPhoto): string | undefined {
+  if (p.storagePath) {
+    return crmGalleryThumbUrl(p.storagePath, p.displayBytes ?? null);
+  }
+
   let raw: string | undefined;
   if (p.thumbUrl) {
     raw = p.thumbUrl;
-  } else if (p.storagePath) {
-    const thumbPath = thumbPathFromDisplayPath(p.storagePath);
-    if (thumbPath && p.url) {
-      const base = p.url.split('?')[0] ?? p.url;
-      const idx = base.indexOf('/storage/v1/object/public/photos/');
-      if (idx >= 0) {
-        raw = `${base.slice(0, idx)}/storage/v1/object/public/photos/${thumbPath}`;
-      }
-    }
   } else if (isStoragePhoto(p) && p.url) {
     const base = p.url.split('?')[0] ?? p.url;
     if (base.endsWith('/display.webp')) {
       raw = `${base.slice(0, -'display.webp'.length)}thumb.webp`;
+    } else if (isLegacyPhotosBucketPublicUrl(p.url)) {
+      const displayPath = legacyPublicUrlToCrmGalleryUrl(p.url)?.match(/path=([^&]+)/)?.[1];
+      if (displayPath) {
+        const thumbPath = thumbPathFromDisplayPath(decodeURIComponent(displayPath));
+        if (thumbPath) raw = crmGalleryAssetUrl(thumbPath, p.displayBytes);
+      }
     }
+  }
+
+  if (!raw) return undefined;
+  if (isCrmGalleryAssetUrl(raw)) return cacheBustPhotoUrl(raw, p);
+  if (isLegacyPhotosBucketPublicUrl(raw)) {
+    return legacyPublicUrlToCrmGalleryUrl(raw, p.displayBytes) ?? cacheBustPhotoUrl(raw, p);
   }
   return cacheBustPhotoUrl(raw, p);
 }

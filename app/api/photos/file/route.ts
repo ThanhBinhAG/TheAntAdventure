@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { bffRoute } from '@/lib/bff/route';
-import { PHOTOS_BUCKET } from '@/lib/storage/photo-paths';
+import { downloadPhotosBucketObject } from '@/lib/storage/photos-bucket-download';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,17 +15,18 @@ const galleryAssetQuerySchema = z.object({
 export const GET = bffRoute(
   {
     logging: { scope: 'gallery/photo-file', route: '/api/photos/file' },
+    requiredPermission: 'gallery.read',
     querySchema: galleryAssetQuerySchema,
   },
-  async ({ supabase, query }) => {
-    const { data, error } = await supabase.storage.from(PHOTOS_BUCKET).download(query.path);
-    if (error || !data) {
+  async ({ query }) => {
+    const downloaded = await downloadPhotosBucketObject(query.path);
+    if (!downloaded) {
       return NextResponse.json({ ok: false, error: 'Không tìm thấy ảnh.' }, { status: 404 });
     }
 
-    return new NextResponse(data, {
+    return new NextResponse(downloaded.data, {
       headers: {
-        'Content-Type': data.type || 'image/webp',
+        'Content-Type': downloaded.contentType || 'image/webp',
         'Cache-Control': 'private, max-age=31536000, immutable',
       },
     });

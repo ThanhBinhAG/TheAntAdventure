@@ -1,8 +1,12 @@
-import { getSupabaseUrl } from '@/lib/env';
+import {
+  CRM_BRANDING_LOGO_FILE_ROUTE,
+  CRM_GALLERY_FILE_ROUTE,
+  isLegacyPhotosBucketPublicUrl,
+  legacyPublicUrlToCrmGalleryUrl,
+} from '@/lib/gallery/gallery-asset-url';
+import { PHOTOS_BUCKET_PUBLIC_URL_PREFIX } from '@/lib/storage/photo-paths';
 
 /** Hosts allowed for next/image — keep in sync with next.config.js remotePatterns */
-
-const GALLERY_PUBLIC_PATH = '/storage/v1/object/public/photos/';
 const GALLERY_VARIANT_PATH = /^gallery\/[A-Za-z0-9_.-]+\/(?:display|thumb)\.webp$/;
 
 /**
@@ -10,43 +14,50 @@ const GALLERY_VARIANT_PATH = /^gallery\/[A-Za-z0-9_.-]+\/(?:display|thumb)\.webp
  * allow-lists this path before downloading from the `photos` Storage bucket.
  */
 export function toCrmPhotoAssetUrl(src: string): string {
+  if (
+    src.startsWith(`${CRM_GALLERY_FILE_ROUTE}?`) ||
+    src === CRM_GALLERY_FILE_ROUTE ||
+    src.startsWith(`${CRM_BRANDING_LOGO_FILE_ROUTE}?`) ||
+    src === CRM_BRANDING_LOGO_FILE_ROUTE
+  ) {
+    return src;
+  }
+
+  if (isLegacyPhotosBucketPublicUrl(src)) {
+    try {
+      const source = new URL(src);
+      const crm = legacyPublicUrlToCrmGalleryUrl(src, source.searchParams.get('v'));
+      if (crm) return crm;
+    } catch {
+      const crm = legacyPublicUrlToCrmGalleryUrl(src);
+      if (crm) return crm;
+    }
+  }
+
   try {
     const source = new URL(src);
-    const markerIndex = source.pathname.indexOf(GALLERY_PUBLIC_PATH);
+    const markerIndex = source.pathname.indexOf(PHOTOS_BUCKET_PUBLIC_URL_PREFIX);
     if (markerIndex < 0) return src;
 
-    const path = decodeURIComponent(source.pathname.slice(markerIndex + GALLERY_PUBLIC_PATH.length));
+    const path = decodeURIComponent(source.pathname.slice(markerIndex + PHOTOS_BUCKET_PUBLIC_URL_PREFIX.length));
     if (!GALLERY_VARIANT_PATH.test(path)) return src;
 
     const query = new URLSearchParams({ path });
     const version = source.searchParams.get('v');
     if (version) query.set('v', version);
-    return `/api/photos/file?${query.toString()}`;
+    return `${CRM_GALLERY_FILE_ROUTE}?${query.toString()}`;
   } catch {
     return src;
   }
 }
 
-function supabaseUrlHost(): URL | null {
-  const raw = getSupabaseUrl();
-  if (!raw) return null;
-  try {
-    return new URL(raw);
-  } catch {
-    return null;
-  }
-}
-
 export function isNextImageOptimizable(src: string): boolean {
   if (!src || src.startsWith('blob:') || src.startsWith('data:')) return false;
+  if (src.startsWith('/api/')) return false;
+
   try {
     const u = new URL(src);
     if (u.hostname === 'picsum.photos') return true;
-    if (u.hostname.endsWith('.supabase.co')) return true;
-
-    const base = supabaseUrlHost();
-    if (base && u.hostname === base.hostname && u.port === base.port) return true;
-
     return false;
   } catch {
     return false;

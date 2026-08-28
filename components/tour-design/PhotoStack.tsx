@@ -1,6 +1,7 @@
 'use client';
 
 import type { ResolvedPhoto } from '@/lib/gallery/tour-photos';
+import { toCrmPhotoAssetUrl } from '@/lib/gallery/storage-image-src';
 
 interface Props {
   photos: ResolvedPhoto[];
@@ -21,7 +22,7 @@ export default function PhotoStack({ photos, height = 105, className = '', showC
           {/* Raw public-storage URLs cannot be safely passed to Next's optimizer. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={p.thumbUrl || p.url}
+            src={toCrmPhotoAssetUrl(p.thumbUrl || p.url)}
             alt={p.caption || 'Experience photo'}
             loading="lazy"
             style={{ width: '100%', height, objectFit: 'cover', display: 'block' }}

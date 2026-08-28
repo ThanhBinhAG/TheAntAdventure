@@ -3,6 +3,7 @@
 import WeatherIcon from '@/components/weather/icons/WeatherIcon';
 import { useResolvedCover } from '@/components/weather/hooks/useResolvedCover';
 import { weatherCardCoverUrl } from '@/lib/weather/resolve-cover';
+import { toCrmPhotoAssetUrl } from '@/lib/gallery/storage-image-src';
 import {
   formatDayLabel,
   formatUpdatedAt,
@@ -31,18 +32,19 @@ export default function MainWeatherCard({
 }: Props) {
   const resolved = useResolvedCover(meta);
   const cover = weatherCardCoverUrl(resolved);
+  const coverStyle = cover ? toCrmPhotoAssetUrl(cover) : null;
   const current = detail?.current;
   const days = detail?.days?.slice(0, 5) ?? [];
 
   return (
     <article
-      className={`wg-main-card wg-main-card--${meta.region}${loading ? ' is-loading' : ''}${!cover ? ' wg-main-card--no-cover' : ''}`}
+      className={`wg-main-card wg-main-card--${meta.region}${loading ? ' is-loading' : ''}${!coverStyle ? ' wg-main-card--no-cover' : ''}`}
       aria-busy={loading || undefined}
     >
-      {cover ? (
+      {coverStyle ? (
         <div
           className="wg-main-card-bg"
-          style={{ backgroundImage: `url(${cover})` }}
+          style={{ backgroundImage: `url(${coverStyle})` }}
           aria-hidden
         />
       ) : (

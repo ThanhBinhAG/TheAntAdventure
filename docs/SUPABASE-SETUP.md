@@ -321,8 +321,11 @@ If Tour Product photos vanish on refresh with `new row violates row-level securi
 | Library display | `gallery/{photoId}/display.webp` |
 | Library thumbnail | `gallery/{photoId}/thumb.webp` |
 | Guide avatar | `guides/{guideId}/avatar.webp` |
+| Company logo | `branding/logo-{version}.webp` |
 
-Bucket: **`photos`** (public). Users may pick JPEG/PNG/WebP of **any size** (including multi‑hundred MB / ~1 GB) — there is no hard per-file byte reject. The client always uploads the original via **chunked upload** (`init` → `chunk` × N → `complete`, 512 KB chunks streamed to temp disk). On `complete`, a **forked Sharp child** ([`lib/image-pipeline/sharp-worker.cjs`](../lib/image-pipeline/sharp-worker.cjs), disk→disk, `VIPS_DISC_THRESHOLD=8m`, concurrency **1**) builds display ≤1280px + thumb ≤400px WebP, isolated from the Next.js process. The assembled original is deleted from disk immediately after Sharp succeeds, before Storage upload. A per-user hourly quota (`lib/storage/gallery-upload-rate-limit.ts`) guards against abuse instead of a hard size cap. Stored objects are typically well under the bucket’s **5 MB** file-size limit (only display + thumb WebP — originals are never kept).
+Bucket: **`photos`** (**private**). Browser never receives `*.supabase.co/storage/v1/...` URLs — gallery images are served via `/api/photos/file`, company logo via `/api/branding/logo/file`, guide avatars via `/api/guides/avatar` (CRM BFF + service-role download). Migrations: `20260828210000_backfill_photos_storage_paths.sql`, `20260828210100_make_photos_bucket_private.sql`.
+
+Users may pick JPEG/PNG/WebP of **any size** (including multi‑hundred MB / ~1 GB) — there is no hard per-file byte reject. The client always uploads the original via **chunked upload** (`init` → `chunk` × N → `complete`, 512 KB chunks streamed to temp disk). On `complete`, a **forked Sharp child** ([`lib/image-pipeline/sharp-worker.cjs`](../lib/image-pipeline/sharp-worker.cjs), disk→disk, `VIPS_DISC_THRESHOLD=8m`, concurrency **1**) builds display ≤1280px + thumb ≤400px WebP, isolated from the Next.js process. The assembled original is deleted from disk immediately after Sharp succeeds, before Storage upload. A per-user hourly quota (`lib/storage/gallery-upload-rate-limit.ts`) guards against abuse instead of a hard size cap. Stored objects are typically well under the bucket’s **5 MB** file-size limit (only display + thumb WebP — originals are never kept).
 
 ### Upload via app
 
@@ -379,7 +382,7 @@ Two guards are in place: `npm run dev` pins `--max-old-space-size=2048` so V8 co
 ### Manual upload via Supabase Dashboard
 
 1. Storage → bucket `photos` → upload files at paths above.
-2. Table Editor → `photos`: set `url` (display public URL), `thumb_url`, `storage_path` to match.
+2. Table Editor → `photos`: set `storage_path` (e.g. `gallery/PH-001/display.webp`); `url` / `thumb_url` are CRM routes after upload via app.
 3. Reload app (hydrate pulls remote data).
 
 ### Free tier notes

@@ -105,6 +105,7 @@ interface CRMState {
   setProductPricing: (rows: ProductPricing[]) => void;
   upsertProductPricing: (row: ProductPricing, syncProductPrice?: boolean) => void;
   deleteProductPricing: (productCode: string) => void;
+  setContracts: (contracts: unknown[]) => void;
   addContract: (contract: Record<string, unknown>) => void;
   updateContract: (id: string, data: Record<string, unknown>) => void;
   addFeedback: (item: Record<string, unknown>) => void;
@@ -113,18 +114,23 @@ interface CRMState {
   addSpecialSupplier: (supplier: ExtendedSupplier) => void;
   updateSpecialSupplier: (id: string, data: Partial<ExtendedSupplier>) => void;
   removeSpecialSupplier: (id: string) => void;
+  setSpecialSuppliers: (suppliers: ExtendedSupplier[]) => void;
   addHotel: (hotel: Hotel) => void;
   updateHotel: (id: string, data: Partial<Hotel>) => void;
   removeHotel: (id: string) => void;
+  setHotels: (hotels: Hotel[]) => void;
   addTransport: (row: TransportSupplier) => void;
   updateTransport: (id: string, data: Partial<TransportSupplier>) => void;
   removeTransport: (id: string) => void;
+  setTransport: (rows: TransportSupplier[]) => void;
   addRestaurant: (row: RestaurantSupplier) => void;
   updateRestaurant: (id: string, data: Partial<RestaurantSupplier>) => void;
   removeRestaurant: (id: string) => void;
+  setRestaurants: (rows: RestaurantSupplier[]) => void;
   addCruise: (row: CruiseSupplier) => void;
   updateCruise: (id: string, data: Partial<CruiseSupplier>) => void;
   removeCruise: (id: string) => void;
+  setCruises: (rows: CruiseSupplier[]) => void;
   addCalEvent: (event: Record<string, unknown>) => void;
   removeCalEvent: (id: string) => void;
   setPhotos: (photos: Record<string, unknown>[]) => void;
@@ -294,6 +300,7 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
           productPricing: s.productPricing.filter((p) => p.productCode !== productCode),
         }));
       },
+      setContracts: (contracts) => set({ contracts }),
       addContract: (contract) => set((s) => ({ contracts: [contract, ...s.contracts] })),
       updateContract: (id, data) =>
         set((s) => ({
@@ -321,30 +328,35 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         set((s) => ({
           specialSuppliers: s.specialSuppliers.filter((x) => x.id !== id),
         })),
+      setSpecialSuppliers: (specialSuppliers) => set({ specialSuppliers }),
       addHotel: (hotel) => set((s) => ({ hotels: [...s.hotels, hotel] })),
       updateHotel: (id, data) =>
         set((s) => ({
           hotels: s.hotels.map((h) => (h.id === id ? { ...h, ...data } : h)),
         })),
       removeHotel: (id) => set((s) => ({ hotels: s.hotels.filter((h) => h.id !== id) })),
+      setHotels: (hotels) => set({ hotels }),
       addTransport: (row) => set((s) => ({ transport: [...s.transport, row] })),
       updateTransport: (id, data) =>
         set((s) => ({
           transport: s.transport.map((t) => (t.id === id ? { ...t, ...data } : t)),
         })),
       removeTransport: (id) => set((s) => ({ transport: s.transport.filter((t) => t.id !== id) })),
+      setTransport: (transport) => set({ transport }),
       addRestaurant: (row) => set((s) => ({ restaurants: [...s.restaurants, row] })),
       updateRestaurant: (id, data) =>
         set((s) => ({
           restaurants: s.restaurants.map((r) => (r.id === id ? { ...r, ...data } : r)),
         })),
       removeRestaurant: (id) => set((s) => ({ restaurants: s.restaurants.filter((r) => r.id !== id) })),
+      setRestaurants: (restaurants) => set({ restaurants }),
       addCruise: (row) => set((s) => ({ cruises: [...s.cruises, row] })),
       updateCruise: (id, data) =>
         set((s) => ({
           cruises: s.cruises.map((c) => (c.id === id ? { ...c, ...data } : c)),
         })),
       removeCruise: (id) => set((s) => ({ cruises: s.cruises.filter((c) => c.id !== id) })),
+      setCruises: (cruises) => set({ cruises }),
       addCalEvent: (event) => set((s) => ({ calEvents: [...s.calEvents, event] })),
       removeCalEvent: (id) =>
         set((s) => ({

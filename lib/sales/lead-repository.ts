@@ -3,7 +3,10 @@ import 'server-only';
 import { STAGE_PROB_V22 } from '@/lib/constants';
 import { invalidateDashboardCache } from '@/lib/dashboard/dashboard-repository';
 import {
-  bookingToRow,
+  insertBookingServer,
+  listBookingSummariesServer,
+} from '@/lib/bookings/booking-repository';
+import {
   commToRow,
   leadToRow,
   rowToLead,
@@ -323,27 +326,14 @@ export async function confirmLead(id: string): Promise<ConfirmLeadResult> {
   };
   const lead = await updateLeadRecord(id, leadPatch);
 
-  const { data: bookingRows, error: bookingErr } = await supabase
-    .from('bookings')
-    .select('id, lead_id, cust_id, tour, pax, start_date, end_date, total, deposit, status, guide_name, hotel, guide_alert_pending');
-  if (bookingErr) throw new LeadRepositoryError(bookingErr.message);
-
-  const existingBookings = ((bookingRows ?? []) as Row[]).map((r) => ({
-    id: String(r.id),
-    custId: String(r.cust_id ?? ''),
-    leadId: r.lead_id ? String(r.lead_id) : undefined,
-    tour: String(r.tour ?? ''),
-    pax: Number(r.pax ?? 1),
-    start: r.start_date ? String(r.start_date) : '',
-    end: r.end_date ? String(r.end_date) : '',
-    total: Number(r.total ?? 0),
-    deposit: Number(r.deposit ?? 0),
-    status: String(r.status ?? ''),
-    guide: String(r.guide_name ?? ''),
-    hotel: String(r.hotel ?? ''),
-    changes: [],
-    guideAlertPending: Boolean(r.guide_alert_pending),
-  })) as Booking[];
+  let existingBookings;
+  try {
+    existingBookings = await listBookingSummariesServer(supabase);
+  } catch (error) {
+    throw new LeadRepositoryError(
+      error instanceof Error ? error.message : 'Không thể tải bookings.',
+    );
+  }
 
   if (findBookingForLead(existingBookings, id)) {
     return { lead, booking: null };
@@ -354,16 +344,17 @@ export async function confirmLead(id: string): Promise<ConfirmLeadResult> {
     existingBookings,
   );
 
-  const { error: insertErr } = await supabase
-    .from('bookings')
-    .insert(bookingToRow(booking));
-  if (insertErr) throw new LeadRepositoryError(insertErr.message);
-
-  await invalidateDashboardCache();
-  return {
-    lead: { ...lead, hasBooking: true },
-    booking,
-  };
+  try {
+    const created = await insertBookingServer(supabase, booking);
+    return {
+      lead: { ...lead, hasBooking: true },
+      booking: created,
+    };
+  } catch (error) {
+    throw new LeadRepositoryError(
+      error instanceof Error ? error.message : 'Không thể tạo booking.',
+    );
+  }
 }
 
 export type ApproveOutlineResult = {

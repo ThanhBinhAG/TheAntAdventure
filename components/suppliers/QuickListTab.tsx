@@ -6,6 +6,7 @@ import EmptyState from '@/components/EmptyState';
 import QuickListFormModal, { type QuickListKind } from '@/components/suppliers/QuickListFormModal';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
+import { useQuickListMutations } from '@/hooks/useQuickListMutations';
 import { useStore } from '@/hooks/useStore';
 import { filterByRegion, supplierMatchesSearch, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/lib/types';
@@ -87,15 +88,7 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
   const transport = useStore((s) => s.transport);
   const restaurants = useStore((s) => s.restaurants);
   const cruises = useStore((s) => s.cruises);
-  const addTransport = useStore((s) => s.addTransport);
-  const updateTransport = useStore((s) => s.updateTransport);
-  const removeTransport = useStore((s) => s.removeTransport);
-  const addRestaurant = useStore((s) => s.addRestaurant);
-  const updateRestaurant = useStore((s) => s.updateRestaurant);
-  const removeRestaurant = useStore((s) => s.removeRestaurant);
-  const addCruise = useStore((s) => s.addCruise);
-  const updateCruise = useStore((s) => s.updateCruise);
-  const removeCruise = useStore((s) => s.removeCruise);
+  const { createRow, patchRow, deleteRow } = useQuickListMutations(kind);
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
@@ -139,22 +132,30 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
   const handleDelete = async (id: string) => {
     const ok = await confirmDialog('Remove this entry?', { title: 'Remove entry' });
     if (!ok) return;
-    if (kind === 'transport') removeTransport(id);
-    else if (kind === 'restaurant') removeRestaurant(id);
-    else removeCruise(id);
+    const result = await deleteRow(id);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
     toast.success('Entry removed.');
   };
 
-  const handleSave = (row: QuickRow) => {
+  const handleSave = async (row: QuickRow) => {
     if (formMode === 'edit' && editId) {
-      if (kind === 'transport') updateTransport(editId, row as TransportSupplier);
-      else if (kind === 'restaurant') updateRestaurant(editId, row as RestaurantSupplier);
-      else updateCruise(editId, row as CruiseSupplier);
-    } else {
-      if (kind === 'transport') addTransport(row as TransportSupplier);
-      else if (kind === 'restaurant') addRestaurant(row as RestaurantSupplier);
-      else addCruise(row as CruiseSupplier);
+      const result = await patchRow(editId, row);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success('Entry updated.');
+      return;
     }
+    const result = await createRow(row);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success('Entry created.');
   };
 
   return (
@@ -212,7 +213,7 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
                       className="btn btn-s btn-sm"
                       type="button"
                       style={{ marginLeft: 4 }}
-                      onClick={() => handleDelete(row.id)}
+                      onClick={() => void handleDelete(row.id)}
                       disabled={!canWrite}
                       title={!canWrite ? 'You need write permission to delete' : undefined}
                     >
@@ -258,7 +259,9 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
         row={editRow}
         existing={rows}
         onClose={() => setFormOpen(false)}
-        onSave={handleSave}
+        onSave={(row) => {
+          void handleSave(row);
+        }}
       />
     </>
   );

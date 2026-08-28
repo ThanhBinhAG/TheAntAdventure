@@ -45,6 +45,6 @@ test('all nine scoped BFF features bypass legacy browser hydrate and auto-sync',
   }
 
   // These deferred domains are intentionally untouched by this scoped cutover.
-  assert.equal(shell.includes('bookings'), true);
+  assert.equal(shell.includes('bookings'), false);
   assert.equal(shell.includes('feedback'), true);
 });

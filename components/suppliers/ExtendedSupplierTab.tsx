@@ -7,6 +7,7 @@ import ExtSupplierCard from '@/components/suppliers/ExtSupplierCard';
 import ExtendedSupplierFormModal from '@/components/suppliers/ExtendedSupplierFormModal';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
+import { useExtendedSupplierMutations } from '@/hooks/useExtendedSupplierMutations';
 import { useStore } from '@/hooks/useStore';
 import { filterExtendedSuppliers, preselectCategoryForTab, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { ExtendedSupplier } from '@/lib/types';
@@ -70,9 +71,7 @@ function ExtGrid({
 
 export default function ExtendedSupplierTab({ section, filters, canWrite }: Props) {
   const specialSuppliers = useStore((s) => s.specialSuppliers);
-  const addSpecialSupplier = useStore((s) => s.addSpecialSupplier);
-  const updateSpecialSupplier = useStore((s) => s.updateSpecialSupplier);
-  const removeSpecialSupplier = useStore((s) => s.removeSpecialSupplier);
+  const { createSupplier, patchSupplier, deleteSupplier } = useExtendedSupplierMutations();
 
   const [logSub, setLogSub] = useState<'visa' | 'fasttrack' | 'aviation'>('visa');
   const [advSub, setAdvSub] = useState<'cycling' | 'trekking' | 'wildlife'>('cycling');
@@ -112,18 +111,32 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
     setFormOpen(true);
   };
 
-  const handleSave = (supplier: ExtendedSupplier) => {
+  const handleSave = async (supplier: ExtendedSupplier) => {
     if (formMode === 'edit' && editId) {
-      updateSpecialSupplier(editId, supplier);
-    } else {
-      addSpecialSupplier(supplier);
+      const result = await patchSupplier(editId, supplier);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success('Supplier updated.');
+      return;
     }
+    const result = await createSupplier(supplier);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success('Supplier created.');
   };
 
   const deleteExt = async (id: string) => {
     const ok = await confirmDialog('Remove this supplier?', { title: 'Remove supplier' });
     if (!ok) return;
-    removeSpecialSupplier(id);
+    const result = await deleteSupplier(id);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
     toast.success('Supplier removed.');
   };
 
@@ -331,7 +344,9 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
         defaultCat={defaultCat}
         existing={specialSuppliers}
         onClose={() => setFormOpen(false)}
-        onSave={handleSave}
+        onSave={(supplier) => {
+          void handleSave(supplier);
+        }}
       />
     </>
   );

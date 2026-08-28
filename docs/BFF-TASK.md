@@ -236,6 +236,12 @@ Mỗi domain chỉ được đánh dấu DONE khi đủ toàn bộ:
 - [ ] API không trả sensitive/internal fields.
 - [ ] Domain không còn phụ thuộc generic auto-sync cho write.
 
+**Domains đã đạt D2.1 (theo checklist riêng bên dưới):**
+
+- [x] Bookings — đủ slice UI hiện tại; chi tiết D2.2 (2026-08-27). `DELETE` API deferred vì UI không có xóa booking.
+- [x] Contracts — đủ slice UI hiện tại; chi tiết D2.3 (2026-08-27). `DELETE`/archive deferred vì UI không có.
+- [x] Suppliers — đủ slice UI hiện tại (Hotels+rooms, Transport, Restaurants, Cruises, Extended); chi tiết D2.4 (2026-08-27).
+
 ---
 
 ## D2.2 Bookings — PRIORITY 1
@@ -260,44 +266,44 @@ UI
 
 Checklist:
 
-- [ ] Tạo Zod contract cho Bookings.
-- [ ] Tạo Booking DTO.
-- [ ] Tạo Booking mapper.
-- [ ] Tạo Bookings repository server-only.
-- [ ] Tạo `GET /api/bookings`.
-- [ ] Tạo `POST /api/bookings`.
-- [ ] Tạo `PATCH /api/bookings/[id]` hoặc equivalent.
-- [ ] Tạo `DELETE /api/bookings/[id]` hoặc equivalent.
-- [ ] Thêm auth check.
-- [ ] Thêm permission check.
-- [ ] Thêm object-level authorization.
-- [ ] Chuyển booking reads khỏi direct hydrate.
-- [ ] Chuyển booking mutations khỏi Zustand → auto-sync.
-- [ ] UI dùng BFF fetcher/hook.
-- [ ] Mutation có rollback.
-- [ ] Mutation có cache invalidation.
-- [ ] Test `401`.
-- [ ] Test `403`.
-- [ ] Test invalid input.
-- [ ] Test success.
-- [ ] Test object-level authorization.
-- [ ] Test optimistic rollback.
-- [ ] Xác nhận `bookings` không còn generic direct sync.
+- [x] Tạo Zod contract cho Bookings.
+- [x] Tạo Booking DTO.
+- [x] Tạo Booking mapper.
+- [x] Tạo Bookings repository server-only.
+- [x] Tạo `GET /api/bookings`.
+- [x] Tạo `POST /api/bookings`.
+- [x] Tạo `PATCH /api/bookings/[id]` hoặc equivalent.
+- [ ] Tạo `DELETE /api/bookings/[id]` hoặc equivalent. *(UI không có delete — deferred)*
+- [x] Thêm auth check.
+- [x] Thêm permission check.
+- [x] Thêm object-level authorization.
+- [x] Chuyển booking reads khỏi direct hydrate.
+- [x] Chuyển booking mutations khỏi Zustand → auto-sync.
+- [x] UI dùng BFF fetcher/hook.
+- [x] Mutation có rollback.
+- [x] Mutation có cache invalidation.
+- [x] Test `401`.
+- [x] Test `403`.
+- [x] Test invalid input.
+- [x] Test success.
+- [x] Test object-level authorization.
+- [x] Test optimistic rollback.
+- [x] Xác nhận `bookings` không còn generic direct sync.
 
 ---
 
 ## D2.3 Contracts
 
-- [ ] Hoàn thành full vertical slice cho Contracts.
-- [ ] Read qua BFF.
-- [ ] Create qua BFF.
-- [ ] Update qua BFF.
-- [ ] Delete/archive qua BFF nếu có.
-- [ ] Permission + object authorization.
-- [ ] DTO tối thiểu.
-- [ ] Rollback + cache invalidation.
-- [ ] Tests đầy đủ.
-- [ ] Không generic auto-sync.
+- [x] Hoàn thành full vertical slice cho Contracts.
+- [x] Read qua BFF.
+- [x] Create qua BFF.
+- [x] Update qua BFF.
+- [ ] Delete/archive qua BFF nếu có. *(UI không có delete/archive — deferred)*
+- [x] Permission + object authorization.
+- [x] DTO tối thiểu.
+- [x] Rollback + cache invalidation.
+- [x] Tests đầy đủ.
+- [x] Không generic auto-sync.
 
 ---
 
@@ -305,30 +311,30 @@ Checklist:
 
 ### Hotels
 
-- [ ] Hoàn thành full vertical slice Hotels.
+- [x] Hoàn thành full vertical slice Hotels.
 
 ### Hotel Rooms
 
-- [ ] Hoàn thành full vertical slice Hotel Rooms.
+- [x] Hoàn thành full vertical slice Hotel Rooms.
 
 ### Transport
 
-- [ ] Hoàn thành full vertical slice Transport.
+- [x] Hoàn thành full vertical slice Transport.
 
 ### Restaurants
 
-- [ ] Hoàn thành full vertical slice Restaurants.
+- [x] Hoàn thành full vertical slice Restaurants.
 
 ### Cruises
 
-- [ ] Hoàn thành full vertical slice Cruises.
+- [x] Hoàn thành full vertical slice Cruises.
 
 ### Extended suppliers
 
-- [ ] Audit toàn bộ extended supplier types.
-- [ ] Hoàn thành BFF cho từng supplier type còn thiếu.
-- [ ] Dùng shared supplier primitives nếu phù hợp.
-- [ ] Không tạo API generic trả raw supplier DB rows.
+- [x] Audit toàn bộ extended supplier types.
+- [x] Hoàn thành BFF cho từng supplier type còn thiếu.
+- [x] Dùng shared supplier primitives nếu phù hợp.
+- [x] Không tạo API generic trả raw supplier DB rows.
 
 ---
 
@@ -596,9 +602,9 @@ asset BFF endpoints
 
 ### Dev 2
 
-- [ ] Audit Bookings.
-- [ ] Chuẩn hóa pattern vertical slice.
-- [ ] Chuẩn bị DTO/repository/API structure.
+- [x] Audit Bookings.
+- [x] Chuẩn hóa pattern vertical slice.
+- [x] Chuẩn bị DTO/repository/API structure.
 
 **Gate:**
 
@@ -610,9 +616,9 @@ asset BFF endpoints
 
 Dev 2 thực hiện theo thứ tự:
 
-- [ ] Bookings.
-- [ ] Contracts.
-- [ ] Suppliers.
+- [x] Bookings.
+- [x] Contracts.
+- [x] Suppliers.
 - [ ] Guide Calendar.
 - [ ] Post-tour / Feedback.
 - [ ] Finance / AR / AP.
@@ -634,9 +640,9 @@ Song song Dev 1:
 
 Chỉ bắt đầu khi:
 
-- [ ] Bookings đạt parity.
-- [ ] Contracts đạt parity.
-- [ ] Suppliers đạt parity.
+- [x] Bookings đạt parity.
+- [x] Contracts đạt parity.
+- [x] Suppliers đạt parity.
 - [ ] Post-tour / Feedback đạt parity.
 - [ ] Finance / AR / AP đạt parity.
 - [ ] Tax Reports đạt parity.

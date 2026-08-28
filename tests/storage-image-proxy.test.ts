@@ -19,12 +19,17 @@ test('Supabase gallery asset URLs are served through the CRM media route', () =>
   );
 });
 
+test('CRM gallery asset URLs pass through unchanged', () => {
+  const crm = '/api/photos/file?path=gallery%2FPH-001%2Fthumb.webp&v=88';
+  assert.equal(toCrmPhotoAssetUrl(crm), crm);
+});
+
 test('CRM gallery media route accepts only allow-listed gallery variants', () => {
   const route = readFileSync(join(process.cwd(), 'app/api/photos/file/route.ts'), 'utf8');
   assert.match(route, /bffRoute/);
   assert.match(route, /gallery/);
   assert.match(route, /\(display\|thumb\)/);
-  assert.match(route, /storage\.from\(PHOTOS_BUCKET\)\.download/);
+  assert.match(route, /downloadPhotosBucketObject/);
   assert.doesNotMatch(route, /fetch\(/);
 });
 

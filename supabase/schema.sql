@@ -2090,15 +2090,17 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values (
   'photos',
   'photos',
-  true,
+  false,
   5242880,
   array['image/jpeg', 'image/png', 'image/webp']
 )
-on conflict (id) do nothing;
+on conflict (id) do update set public = excluded.public;
 
 drop policy if exists photos_public_read on storage.objects;
-create policy photos_public_read on storage.objects
-  for select to public
+
+drop policy if exists photos_auth_select on storage.objects;
+create policy photos_auth_select on storage.objects
+  for select to authenticated
   using (bucket_id = 'photos');
 
 drop policy if exists photos_auth_insert on storage.objects;
@@ -2106,10 +2108,7 @@ create policy photos_auth_insert on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'photos' and (
-      (storage.foldername(name))[1] = 'guides'
-      or (
-        (storage.foldername(name))[1] = 'gallery'
-      )
+      (storage.foldername(name))[1] in ('guides', 'gallery', 'branding')
     )
   );
 
@@ -2118,18 +2117,12 @@ create policy photos_auth_update on storage.objects
   for update to authenticated
   using (
     bucket_id = 'photos' and (
-      (storage.foldername(name))[1] = 'guides'
-      or (
-        (storage.foldername(name))[1] = 'gallery'
-      )
+      (storage.foldername(name))[1] in ('guides', 'gallery', 'branding')
     )
   )
   with check (
     bucket_id = 'photos' and (
-      (storage.foldername(name))[1] = 'guides'
-      or (
-        (storage.foldername(name))[1] = 'gallery'
-      )
+      (storage.foldername(name))[1] in ('guides', 'gallery', 'branding')
     )
   );
 
@@ -2138,10 +2131,7 @@ create policy photos_auth_delete on storage.objects
   for delete to authenticated
   using (
     bucket_id = 'photos' and (
-      (storage.foldername(name))[1] = 'guides'
-      or (
-        (storage.foldername(name))[1] = 'gallery'
-      )
+      (storage.foldername(name))[1] in ('guides', 'gallery', 'branding')
     )
   );
 

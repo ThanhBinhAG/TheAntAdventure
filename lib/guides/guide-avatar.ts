@@ -10,7 +10,7 @@ const MAX_AVATAR_BYTES = 20 * 1024 * 1024;
 export function guidePhotoForBrowser(guideId: string, photo: string): string {
   if (!photo) return '';
   if (photo === guideAvatarApiUrl(guideId)) return photo;
-  return /\/storage\/v1\/object\/(?:public|sign)\/photos\/guides\//.test(photo)
+  return new RegExp(`/storage/v1/object/(?:public|sign)/${PHOTOS_BUCKET}/guides/`).test(photo)
     ? guideAvatarApiUrl(guideId)
     : photo;
 }

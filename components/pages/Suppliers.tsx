@@ -5,7 +5,9 @@ import ExtendedSupplierTab from '@/components/suppliers/ExtendedSupplierTab';
 import HotelTab from '@/components/suppliers/HotelTab';
 import QuickListTab from '@/components/suppliers/QuickListTab';
 import SupplierFilterBar, { computeSupplierCounts, type SupTab } from '@/components/suppliers/SupplierFilterBar';
+import EmptyState from '@/components/EmptyState';
 import { useStore } from '@/hooks/useStore';
+import { useSuppliersPage } from '@/hooks/useSuppliersPage';
 import type { SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import { usePagePermission } from '@/hooks/usePagePermission';
 
@@ -25,6 +27,7 @@ const EXTENDED_TABS: SupTab[] = ['logistics', 'water', 'adventure', 'experience'
 
 export default function Suppliers() {
   const { canWrite } = usePagePermission('suppliers');
+  const { loading, error, reload } = useSuppliersPage();
   const hotels = useStore((s) => s.hotels);
   const transport = useStore((s) => s.transport);
   const restaurants = useStore((s) => s.restaurants);
@@ -38,6 +41,37 @@ export default function Suppliers() {
     () => computeSupplierCounts({ hotels, transport, restaurants, cruises, specialSuppliers }),
     [hotels, transport, restaurants, cruises, specialSuppliers]
   );
+
+  if (loading && !hotels.length && !transport.length && !restaurants.length && !cruises.length && !specialSuppliers.length) {
+    return (
+      <div className="sup-page">
+        <EmptyState
+          size="compact"
+          variant="suppliers"
+          title="Loading suppliers…"
+          description="Fetching partner catalogs from the CRM API."
+        />
+      </div>
+    );
+  }
+
+  if (error && !hotels.length && !transport.length) {
+    return (
+      <div className="sup-page">
+        <EmptyState
+          size="compact"
+          variant="suppliers"
+          title="Could not load suppliers"
+          description={error}
+          action={
+            <button type="button" className="btn btn-p btn-sm" onClick={() => void reload()}>
+              Retry
+            </button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="sup-page">

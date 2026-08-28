@@ -1,5 +1,9 @@
 import { z } from 'zod';
+import { nextBookingId } from '@/lib/bookings/booking-ids';
+import { normalizeBookingDateInput } from '@/lib/bookings/booking-dates';
 import type { Booking, Lead } from '../types';
+
+export { nextBookingId } from '@/lib/bookings/booking-ids';
 
 const leadForBookingSchema = z.object({
   id: z.string().min(1),
@@ -12,18 +16,6 @@ const leadForBookingSchema = z.object({
 
 export function findBookingForLead(bookings: Booking[], leadId: string): Booking | undefined {
   return bookings.find((b) => b.leadId === leadId);
-}
-
-export function nextBookingId(existing: Booking[], year = new Date().getFullYear()): string {
-  const yy = String(year).slice(-2);
-  const prefix = `BK-20${yy}-`;
-  const nums = existing
-    .map((b) => b.id)
-    .filter((id) => id.startsWith(prefix))
-    .map((id) => parseInt(id.slice(prefix.length), 10))
-    .filter((n) => !Number.isNaN(n));
-  const next = (nums.length ? Math.max(...nums) : 0) + 1;
-  return `${prefix}${String(next).padStart(3, '0')}`;
 }
 
 /** Build a Confirmed booking from a pipeline lead (does not check idempotency). */
@@ -44,8 +36,8 @@ export function buildBookingFromLead(lead: Lead, existingBookings: Booking[]): B
     leadId: parsed.id,
     tour: parsed.tour,
     pax: parsed.pax,
-    start: parsed.month?.trim() || 'TBD',
-    end: 'TBD',
+    start: normalizeBookingDateInput(parsed.month),
+    end: '',
     total,
     deposit,
     status: 'Confirmed',

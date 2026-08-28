@@ -70,9 +70,12 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   gallery: [],
   /** Pricing loads its catalogue through Product/Pricing BFF routes. */
   pricing: [],
-  bookings: ['bookings', 'customers'],
-  contracts: ['contracts', 'bookings'],
-  suppliers: ['hotels', 'transport', 'restaurants', 'cruises', 'suppliers'],
+  /** Bookings list/CRUD via `/api/bookings`; customer picker via Customers BFF catalog. */
+  bookings: [],
+  /** Contracts list/CRUD via `/api/contracts`; booking picker via Bookings BFF catalog. */
+  contracts: [],
+  /** Suppliers catalogs via `/api/hotels|transport|restaurants|cruises|suppliers`. */
+  suppliers: [],
   /** Guides use `/api/guides`; do not hydrate them through browser Supabase. */
   guides: [],
   /** Pickers load gallery catalog via BFF when opened. */
@@ -90,7 +93,6 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
 
 /** @deprecated Use PAGE_BOOT_TABLES — kept for wave-1 full hydrate / shell-cache shim. Scoped BFF tables excluded. */
 export const SHELL_HYDRATE_TABLES: readonly SyncArrayTable[] = [
-  'bookings',
   'feedback',
 ] as const;
 

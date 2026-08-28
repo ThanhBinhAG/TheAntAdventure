@@ -26,14 +26,12 @@ test('PAGE_BOOT_TABLES empty for migrated Dev B routes', () => {
     'gallery',
     'weather',
     'dashboard',
+    'bookings',
+    'contracts',
   ] as const) {
     const boot = PAGE_BOOT_TABLES[slug] ?? [];
     assert.equal(boot.length, 0, `${slug} boot must be empty`);
   }
-  // Non-migrated domains still boot (B7 does not empty these).
-  assert.ok((PAGE_BOOT_TABLES.bookings ?? []).includes('bookings'));
-  assert.ok((PAGE_BOOT_TABLES.bookings ?? []).includes('customers'));
-  assert.ok((PAGE_BOOT_TABLES.contracts ?? []).includes('bookings'));
 });
 
 test('BFF_MANAGED_TABLES denylist covers Dev B CRM tables', () => {
@@ -43,6 +41,7 @@ test('BFF_MANAGED_TABLES denylist covers Dev B CRM tables', () => {
     'leads',
     'comms',
     'bookings',
+    'contracts',
     'photos',
     'photo_folders',
   ] as const) {
@@ -52,10 +51,10 @@ test('BFF_MANAGED_TABLES denylist covers Dev B CRM tables', () => {
 
 test('SHELL_HYDRATE_TABLES keeps only deferred legacy tables', () => {
   const shell = SHELL_HYDRATE_TABLES as readonly string[];
-  for (const table of ['customers', 'leads', 'agents', 'tasks', 'tour_drafts']) {
+  for (const table of ['customers', 'leads', 'agents', 'tasks', 'tour_drafts', 'bookings']) {
     assert.equal(shell.includes(table), false, `shell must not include ${table}`);
   }
-  for (const table of ['bookings', 'feedback']) {
+  for (const table of ['feedback']) {
     assert.equal(shell.includes(table), true, `shell must keep ${table}`);
   }
 });

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { fmt } from '@/lib/constants';
 import { parseMoneyInput } from '@/lib/core/money';
+import { formatBookingTravelLabel } from '@/lib/bookings/booking-dates';
 import type { Booking } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
@@ -66,7 +67,7 @@ export function BookingDetailModal({
             <div className="bkd-header-lbl">Booking Detail</div>
             <div className="bkd-title">{b.tour}</div>
             <div className="bkd-sub">
-              {b.id} · {customerName} · {b.pax} pax · {b.start}–{b.end} 2026
+              {b.id} · {customerName} · {b.pax} pax · {formatBookingTravelLabel(b.start, b.end)}
             </div>
           </div>
           <span className="bkd-status-pill" style={{ background: sc }}>

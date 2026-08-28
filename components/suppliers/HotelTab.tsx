@@ -7,6 +7,7 @@ import EmptyState from '@/components/EmptyState';
 import HotelFormModal from '@/components/suppliers/HotelFormModal';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
+import { useHotelMutations } from '@/hooks/useHotelMutations';
 import { useStore } from '@/hooks/useStore';
 import { filterByRegion, REG_BADGE, supplierMatchesSearch, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { Hotel } from '@/lib/types';
@@ -21,9 +22,7 @@ type Props = {
 
 export default function HotelTab({ filters, canWrite }: Props) {
   const hotels = useStore((s) => s.hotels);
-  const addHotel = useStore((s) => s.addHotel);
-  const updateHotel = useStore((s) => s.updateHotel);
-  const removeHotel = useStore((s) => s.removeHotel);
+  const { createHotel, patchHotel, deleteHotel } = useHotelMutations();
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
@@ -56,13 +55,30 @@ export default function HotelTab({ filters, canWrite }: Props) {
   const handleDelete = async (id: string) => {
     const ok = await confirmDialog('Remove this hotel?', { title: 'Remove hotel' });
     if (!ok) return;
-    removeHotel(id);
+    const result = await deleteHotel(id);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
     toast.success('Hotel removed.');
   };
 
-  const handleSave = (hotel: Hotel) => {
-    if (formMode === 'edit' && editId) updateHotel(editId, hotel);
-    else addHotel(hotel);
+  const handleSave = async (hotel: Hotel) => {
+    if (formMode === 'edit' && editId) {
+      const result = await patchHotel(editId, hotel);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success('Hotel updated.');
+      return;
+    }
+    const result = await createHotel(hotel);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success('Hotel created.');
   };
 
   return (
@@ -167,7 +183,7 @@ export default function HotelTab({ filters, canWrite }: Props) {
                           className="btn btn-s btn-sm"
                           type="button"
                           style={{ marginLeft: 4 }}
-                          onClick={() => handleDelete(h.id)}
+                          onClick={() => void handleDelete(h.id)}
                           disabled={!canWrite}
                           title={!canWrite ? 'You need write permission to delete a hotel' : undefined}
                         >
@@ -214,7 +230,9 @@ export default function HotelTab({ filters, canWrite }: Props) {
         hotel={editHotel}
         existing={hotels}
         onClose={() => setFormOpen(false)}
-        onSave={handleSave}
+        onSave={(hotel) => {
+          void handleSave(hotel);
+        }}
       />
     </>
   );

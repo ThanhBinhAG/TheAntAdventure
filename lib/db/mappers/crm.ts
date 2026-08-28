@@ -1,3 +1,4 @@
+import { bookingDateForDb } from '@/lib/bookings/booking-dates';
 import type {
   Agent,
   Booking,
@@ -207,8 +208,8 @@ export function bookingToRow(b: Booking): Row {
     lead_id: fkOrNull(b.leadId),
     tour: b.tour,
     pax: b.pax,
-    start_date: b.start || null,
-    end_date: b.end || null,
+    start_date: bookingDateForDb(b.start),
+    end_date: bookingDateForDb(b.end),
     total: moneyAbs(b.total),
     deposit: moneyAbs(b.deposit),
     status: b.status,

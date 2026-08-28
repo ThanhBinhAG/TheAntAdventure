@@ -7,10 +7,10 @@ import {
   type JWTVerifyGetKey,
 } from 'jose';
 import {
-  getServerSupabaseUrl,
-  getSupabaseJwtIssuer,
+  getSupabaseJwksUrl as getConfiguredSupabaseJwksUrl,
   getSupabaseUrl,
-} from '@/lib/env';
+  getSupabaseJwtIssuer,
+} from '@/lib/server/env/supabase';
 import { getSupabaseFetch } from '@/lib/supabase/insecure-fetch';
 
 const SUPABASE_AUDIENCE = 'authenticated';
@@ -37,7 +37,7 @@ type VerifyOptions = {
 const remoteJwksByUrl = new Map<string, JWTVerifyGetKey>();
 
 /** Expected JWT `iss` — may be a private LAN URL when GoTrue stamps API_EXTERNAL_URL. */
-export function getSupabaseAuthIssuer(supabaseUrl = getServerSupabaseUrl()): string | null {
+export function getSupabaseAuthIssuer(supabaseUrl = getSupabaseUrl()): string | null {
   const configuredIssuer = getSupabaseJwtIssuer().replace(/\/$/, '');
   if (configuredIssuer) return configuredIssuer;
 
@@ -46,16 +46,13 @@ export function getSupabaseAuthIssuer(supabaseUrl = getServerSupabaseUrl()): str
 }
 
 /**
- * Issuers accepted during verify. Includes the configured issuer (possibly private)
- * and the browser-facing public Auth issuer so either GoTrue stamp can succeed.
+ * Issuers accepted during verification. The issuer is server configuration only,
+ * and may use a private LAN hostname when GoTrue stamps that origin in JWTs.
  */
-export function getSupabaseAuthIssuers(supabaseUrl = getServerSupabaseUrl()): string[] {
+export function getSupabaseAuthIssuers(supabaseUrl = getSupabaseUrl()): string[] {
   const issuers = new Set<string>();
   const primary = getSupabaseAuthIssuer(supabaseUrl);
   if (primary) issuers.add(primary);
-
-  const publicOrigin = getSupabaseUrl().replace(/\/$/, '');
-  if (publicOrigin) issuers.add(`${publicOrigin}/auth/v1`);
 
   return [...issuers];
 }
@@ -65,11 +62,10 @@ export function getSupabaseAuthIssuers(supabaseUrl = getServerSupabaseUrl()): st
  * Private issuer hosts (Docker/LAN) often return EHOSTUNREACH from WSL/dev.
  */
 export function getSupabaseJwksUrl(): URL | null {
-  const publicOrigin = getSupabaseUrl().replace(/\/$/, '');
-  const serverOrigin = getServerSupabaseUrl().replace(/\/$/, '');
-  const origin = publicOrigin || serverOrigin;
-  if (!origin) return null;
-  return new URL(`${origin}/auth/v1/.well-known/jwks.json`);
+  const configured = getConfiguredSupabaseJwksUrl();
+  const origin = getSupabaseUrl().replace(/\/$/, '');
+  if (!configured && !origin) return null;
+  return new URL(configured || `${origin}/auth/v1/.well-known/jwks.json`);
 }
 
 function getRemoteJwks(): JWTVerifyGetKey | null {

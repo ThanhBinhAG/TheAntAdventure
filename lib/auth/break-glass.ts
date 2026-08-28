@@ -2,7 +2,7 @@ import {
   getBreakGlassPassword,
   getBreakGlassUsername,
   isBreakGlassConfigured,
-} from '@/lib/env';
+} from '@/lib/server/env/auth';
 
 const textEncoder = new TextEncoder();
 

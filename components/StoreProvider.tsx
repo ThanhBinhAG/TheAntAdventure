@@ -70,7 +70,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     clearLocalPersistedData();
     if (!remoteEnabled) {
       markHydrationFailed(
-        'Supabase bắt buộc — bật NEXT_PUBLIC_USE_SUPABASE=true và cấu hình URL + anon key trong .env.local'
+        'Dữ liệu CRM chưa sẵn sàng. Dùng các API BFF đã được chuyển đổi hoặc hoàn tất cutover của domain này.'
       );
     } else if (!hydrationPendingMarked) {
       hydrationPendingMarked = true;
@@ -259,7 +259,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             {!remoteEnabled && (
               <div className="crm-remote-status">
                 <span className="crm-status-fail">
-                  ✗ CRM chỉ dùng Supabase — không còn lưu localStorage. Kiểm tra .env.local: USE_SUPABASE=true, URL, anon key — rồi restart npm run dev
+                  ✗ Domain này chưa có dữ liệu BFF sẵn sàng. Hoàn tất cutover trước khi dùng browser data stack cũ.
                 </span>
               </div>
             )}
@@ -282,7 +282,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                   )}
                   {!autoSyncOn && !readOnly && (
                     <div style={{ marginTop: 4, opacity: 0.95 }} className="crm-status-fail">
-                      Auto-sync tắt — chỉnh sửa chỉ ở RAM; bật NEXT_PUBLIC_SUPABASE_AUTO_SYNC=true
+                      Auto-sync browser đã bị tắt trong quá trình BFF cutover.
                       hoặc dùng Push snapshot
                     </div>
                   )}

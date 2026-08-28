@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isBreakGlassShadowEmail } from '@/lib/auth/break-glass-supabase';
 import { requireBreakGlass } from '@/lib/auth/session';
-import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/server/env/supabase';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 import { withHttpRequestLogging } from '@/lib/system/server-logger';

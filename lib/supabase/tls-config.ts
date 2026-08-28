@@ -2,7 +2,7 @@
  * TLS policy for self-hosted company Supabase (no Node-only deps — safe for Edge middleware).
  */
 
-import { getSupabaseUrl } from '@/lib/env';
+import { getSupabaseUrl } from '@/lib/server/env/supabase';
 
 function truthyEnv(v: string | undefined): boolean | null {
   const t = (v ?? '').trim().toLowerCase();

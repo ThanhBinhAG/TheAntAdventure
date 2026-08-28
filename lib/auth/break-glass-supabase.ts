@@ -1,7 +1,7 @@
 import 'server-only';
 import { randomBytes } from 'crypto';
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseAnonKey, getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseAnonKey, getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/server/env/supabase';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 import { debugLog } from '@/lib/system/debug-logger';
 

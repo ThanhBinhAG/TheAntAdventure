@@ -19,21 +19,86 @@
 
 create extension if not exists "pgcrypto";
 
--- Retired server-owned CRM sessions. Kept only for legacy data retention; new
--- authentication uses Supabase SSR cookies and public JWKS verification.
+-- Server-owned durable CRM sessions. Browser receives only an opaque token;
+-- Supabase credentials remain encrypted and readable only by the CRM server.
 create table if not exists crm_sessions (
   sid text primary key,
-  payload_ciphertext text not null,
+  token_hash text unique not null,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  access_token_ciphertext text not null,
+  refresh_token_ciphertext text not null,
+  access_token_expires_at timestamptz not null,
+  refresh_token_key_version integer not null default 1,
   expires_at timestamptz not null,
   revoked_at timestamptz,
+  last_used_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_crm_sessions_active_expiry
   on crm_sessions (expires_at) where revoked_at is null;
+create index if not exists idx_crm_sessions_user_active
+  on crm_sessions (user_id, expires_at) where revoked_at is null;
 alter table crm_sessions enable row level security;
 comment on table crm_sessions is
-  'Retired CRM HMAC session persistence. Retain temporarily for migration cleanup only.';
+  'Server-owned durable CRM sessions. Browser receives only opaque tokens; Supabase credentials are AES-GCM ciphertext.';
+
+create or replace function rotate_crm_session_credentials(
+  p_sid text,
+  p_token_hash text,
+  p_access_token_ciphertext text,
+  p_refresh_token_ciphertext text,
+  p_access_token_expires_at timestamptz,
+  p_expires_at timestamptz
+) returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  updated_count integer;
+begin
+  update crm_sessions
+  set access_token_ciphertext = p_access_token_ciphertext,
+      refresh_token_ciphertext = p_refresh_token_ciphertext,
+      access_token_expires_at = p_access_token_expires_at,
+      expires_at = p_expires_at,
+      last_used_at = now(),
+      updated_at = now()
+  where sid = p_sid
+    and token_hash = p_token_hash
+    and revoked_at is null
+    and expires_at > now();
+
+  get diagnostics updated_count = row_count;
+  return updated_count = 1;
+end;
+$$;
+
+revoke all on function rotate_crm_session_credentials(text, text, text, text, timestamptz, timestamptz)
+  from public, anon, authenticated;
+grant execute on function rotate_crm_session_credentials(text, text, text, text, timestamptz, timestamptz)
+  to service_role;
+
+create or replace function cleanup_crm_sessions(p_retention_days integer default 30)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  deleted_count integer;
+begin
+  delete from crm_sessions
+  where expires_at < now() - make_interval(days => p_retention_days)
+     or (revoked_at is not null and revoked_at < now() - make_interval(days => p_retention_days));
+  get diagnostics deleted_count = row_count;
+  return deleted_count;
+end;
+$$;
+
+revoke all on function cleanup_crm_sessions(integer) from public, anon, authenticated;
+grant execute on function cleanup_crm_sessions(integer) to service_role;
 
 -- ============================================================
 --  MODULE 1 · AGENTS & CUSTOMERS (B2B / B2C)

@@ -23,26 +23,11 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# NEXT_PUBLIC_* are inlined at build time — pass via --build-arg / compose args.
-ARG NEXT_PUBLIC_SUPABASE_URL=
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=
-ARG NEXT_PUBLIC_USE_SUPABASE=true
-ARG NEXT_PUBLIC_SUPABASE_AUTO_SYNC=true
-ARG NEXT_PUBLIC_SUPABASE_READ_ONLY=false
-ARG NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY=
-ARG NEXT_PUBLIC_APP_NAME="The Ant Adventures CRM"
-ARG NEXT_PUBLIC_APP_VERSION=4.3
+# Supabase configuration is runtime-only. Do not add credentials or endpoints
+# as Docker build arguments: values used during `next build` can enter image
+# layers or browser bundles.
 
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY \
-    NEXT_PUBLIC_USE_SUPABASE=$NEXT_PUBLIC_USE_SUPABASE \
-    NEXT_PUBLIC_SUPABASE_AUTO_SYNC=$NEXT_PUBLIC_SUPABASE_AUTO_SYNC \
-    NEXT_PUBLIC_SUPABASE_READ_ONLY=$NEXT_PUBLIC_SUPABASE_READ_ONLY \
-    NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY=$NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY \
-    NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME \
-    NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION
-
-RUN npm run lint && npm run typecheck && npm run build
+RUN npm run lint && npm run typecheck && npm test && npm run build && npm run leakage:report
 
 # Explicit CI target: keeps verification on the same Node version and dependency
 # graph that produces the runtime image.

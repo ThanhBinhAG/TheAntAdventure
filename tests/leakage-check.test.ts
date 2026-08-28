@@ -25,7 +25,7 @@ test('leakage check accepts a clean browser bundle and rejects Supabase paths or
     assert.throws(runLeakageCheck(buildDir));
 
     writeFileSync(join(buildDir, 'key.js'), 'public-anon-test-key');
-    assert.throws(runLeakageCheck(buildDir, { NEXT_PUBLIC_SUPABASE_ANON_KEY: 'public-anon-test-key' }));
+    assert.throws(runLeakageCheck(buildDir, { SUPABASE_ANON_KEY: 'public-anon-test-key' }));
   } finally {
     rmSync(buildDir, { recursive: true, force: true });
   }
@@ -36,7 +36,8 @@ test('leakage check remains available through the explicit verified build comman
     readFile(join(process.cwd(), 'package.json'), 'utf8')
   );
   const scripts = JSON.parse(packageJson).scripts as Record<string, string>;
-  assert.equal(scripts['leakage:check'], 'bash scripts/scan-leakage.sh');
+  assert.equal(scripts['leakage:check'], 'node scripts/check-supabase-leakage.mjs');
+  assert.equal(scripts['leakage:report'], 'node scripts/report-supabase-leakage.mjs');
   assert.equal(scripts.build, 'next build --webpack');
   assert.equal(scripts['build:with-leakage'], 'npm run build && npm run leakage:check');
 });

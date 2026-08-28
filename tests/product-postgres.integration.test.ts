@@ -85,7 +85,7 @@ function pricingRow(productCode: string, stdCost: unknown = 10) {
 test('Product PostgreSQL transactions roll back failed imports and aggregate writes', {
   skip: enabled ? undefined : 'Set PRODUCT_POSTGRES_INTEGRATION=1 to run',
 }, async () => {
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) throw new Error('Local Supabase admin configuration is required.');
 

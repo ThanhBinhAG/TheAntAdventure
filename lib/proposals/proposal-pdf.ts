@@ -3,7 +3,7 @@ import { access } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
-import { getAppUrl } from '@/lib/env';
+import { getAppUrl } from '@/lib/server/env/app';
 import { buildProposalHTML } from '@/lib/proposals/proposal-html';
 import type { ProposalDoc } from '@/lib/proposals/proposal-types';
 import { pdfBrowserGate } from '@/lib/system/pdf-concurrency';

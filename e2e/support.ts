@@ -6,7 +6,7 @@ import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const statePath = join(process.cwd(), '.e2e-state.json');
-const SUPABASE_ACCESS_COOKIE = 'sb-crm-access-token';
+const CRM_SESSION_COOKIE = 'crm_session';
 
 export type E2eState = {
   prefix: string;
@@ -23,7 +23,7 @@ export function loadE2eEnvironment(): void {
   if (process.env.E2E_ALLOW_DATABASE_MUTATION !== '1') {
     throw new Error('E2E_ALLOW_DATABASE_MUTATION=1 is required before browser E2E may modify data.');
   }
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL ?? process.env.SUPABASE_URL;
   if (!url || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error('SUPABASE URL and SUPABASE_SERVICE_ROLE_KEY are required for browser E2E.');
   }
@@ -35,7 +35,7 @@ export function loadE2eEnvironment(): void {
 }
 
 export function getAdminClient(): SupabaseClient {
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL ?? process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('E2E Supabase environment is unavailable.');
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -66,7 +66,7 @@ export async function login(page: Page, credentials: E2eState['admin']): Promise
   const response = await loginResponse;
   if (!response.ok()) throw new Error(`Login API rejected the E2E user: ${await response.text()}`);
   await expect
-    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === SUPABASE_ACCESS_COOKIE))
+    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === CRM_SESSION_COOKIE))
     .toBe(true);
 }
 
@@ -74,7 +74,7 @@ export async function logoutViaUi(page: Page): Promise<void> {
   await page.getByRole('button', { name: /Mở công cụ hệ thống/ }).click();
   await page.getByTitle('Đăng xuất').click();
   await expect
-    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === SUPABASE_ACCESS_COOKIE))
+    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === CRM_SESSION_COOKIE))
     .toBe(false);
 }
 

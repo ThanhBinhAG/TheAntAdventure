@@ -1,13 +1,11 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies, headers } from 'next/headers';
 import {
-  getAuthCaptchaSiteKey,
   getSupabaseAnonKey,
   getSupabaseUrl,
-  isRemoteDataEnabled,
-  isSupabaseReadOnly,
-  isUseSupabaseEnabled,
-} from '@/lib/env';
+  isSupabaseConfigured,
+} from '@/lib/server/env/supabase';
+import { getAppVersion, getAuthCaptchaSiteKey } from '@/lib/server/env/app';
 import { getSupabaseFetch, getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 import { isSupabaseTlsInsecureEnabled } from '@/lib/supabase/tls-config';
 import { maskSecret } from './debug-config';
@@ -125,7 +123,7 @@ function checkEnv(): DiagnosticCheck {
   const hints: string[] = [];
 
   if (!url) {
-    issues.push('NEXT_PUBLIC_SUPABASE_URL chưa set');
+    issues.push('SUPABASE_URL chưa set');
     hints.push('Thêm URL từ Supabase Dashboard → Settings → API');
   } else if (!url.startsWith('https://')) {
     issues.push('SUPABASE_URL không dùng https');
@@ -133,7 +131,7 @@ function checkEnv(): DiagnosticCheck {
   }
 
   if (!key) {
-    issues.push('NEXT_PUBLIC_SUPABASE_ANON_KEY chưa set');
+    issues.push('SUPABASE_ANON_KEY chưa set');
     hints.push('Thêm anon key từ Supabase Dashboard');
   }
 
@@ -145,13 +143,11 @@ function checkEnv(): DiagnosticCheck {
     details: {
       supabaseUrl: url ? `${url.slice(0, 30)}...` : '(empty)',
       anonKey: maskSecret(key),
-      useSupabase: isUseSupabaseEnabled(),
-      remoteData: isRemoteDataEnabled(),
-      readOnly: isSupabaseReadOnly(),
+      supabaseConfigured: isSupabaseConfigured(),
       tlsInsecure: isSupabaseTlsInsecureEnabled(),
       captchaConfigured: Boolean(getAuthCaptchaSiteKey()),
       nodeEnv: process.env.NODE_ENV ?? 'unknown',
-      appVersion: process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown',
+      appVersion: getAppVersion(),
     },
   };
 }
@@ -304,9 +300,9 @@ async function checkCookieHeaderSize(): Promise<DiagnosticCheck> {
     hint:
       issues.length || authChunkCount > 2
         ? [
-            ...issues,
-            'Logout/login lại để dọn sb-*-auth-token chunks; trên nginx tăng large_client_header_buffers (vd. 4 16k). localStorage/sessionStorage không gửi lên proxy.',
-          ].join(' ')
+          ...issues,
+          'Logout/login lại để dọn sb-*-auth-token chunks; trên nginx tăng large_client_header_buffers (vd. 4 16k). localStorage/sessionStorage không gửi lên proxy.',
+        ].join(' ')
         : undefined,
     details: {
       bytes,

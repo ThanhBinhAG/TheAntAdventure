@@ -22,12 +22,8 @@ backups
 .env.*
 !.env.example
 
-# Docs not needed in image
-# Tests are needed by the verifier build stage but are not copied into runner.
-docs
+# Tests and documentation are verifier inputs but are not copied into runner.
 coverage
-*.md
-!README.md
 
 # CI / misc
 .gitlab-ci.yml

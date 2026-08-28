@@ -67,7 +67,7 @@ feature/bff-cutover-domains
 - [x] JWT/JWKS, middleware/proxy, health/diagnostics, weather, storage, break-glass và Access Control đã chuyển sang server env helpers.
 - [x] `next.config.mjs` không còn Supabase hostname hay Storage remote pattern.
 - [x] README và session-operation document phản ánh server-only/durable-session boundary.
-- [ ] Cập nhật các ví dụ `NEXT_PUBLIC_SUPABASE_*` cũ trong `docs/SUPABASE-SETUP.md`.
+- [x] Cập nhật `docs/SUPABASE-SETUP.md` và `docs/CURRENT-SYSTEM.md` theo server-only config, durable CRM session và private-network boundary.
 - [ ] Xóa hit `/storage/v1` còn lại trong browser bundle — dependency Dev 2 (`lib/gallery/storage-image-src.ts`).
 
 ### Acceptance D1.1
@@ -762,9 +762,9 @@ Sau đó Dev 2:
 
 - [ ] Cập nhật `BFF-TASKS.md`.
 - [ ] Cập nhật `BFF-TASKS-vi.md`.
-- [ ] Cập nhật current-system documentation.
-- [ ] Cập nhật deployment documentation.
-- [ ] Cập nhật rollback runbook.
+- [x] Cập nhật current-system documentation.
+- [x] Cập nhật deployment documentation.
+- [x] Cập nhật rollback runbook.
 - [ ] Owner/Ops xác nhận network isolation.
 - [ ] Owner/Ops xác nhận key rotation.
 - [ ] Owner/Ops xác nhận deployment.

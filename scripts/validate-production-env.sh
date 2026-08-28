@@ -48,4 +48,21 @@ if [ "$missing" -ne 0 ]; then
   exit 1
 fi
 
+# The production Compose topology is private-only. Enable this check from the
+# deploy job; local development deliberately uses different endpoints.
+if [ "${REQUIRE_PRIVATE_NETWORK:-0}" = "1" ]; then
+  supabase_url="$(value_for SUPABASE_URL)"
+  redis_url="$(value_for REDIS_URL)"
+  if [ "$supabase_url" != "http://supabase-ant-crm-gateway:8000" ]; then
+    echo "ERROR: Private deployment must use SUPABASE_URL=http://supabase-ant-crm-gateway:8000." >&2
+    exit 1
+  fi
+  case "$redis_url" in
+    *localhost*|*127.0.0.1*|*0.0.0.0*)
+      echo "ERROR: Private deployment must not use a host-local REDIS_URL." >&2
+      exit 1
+      ;;
+  esac
+fi
+
 echo "Production environment validation passed."

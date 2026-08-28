@@ -1,17 +1,17 @@
-# Local / VM packaging for The Ant Adventures CRM.
+# Production / VM packaging for The Ant Adventures CRM.
 # Env resolution (see scripts/docker-with-env.sh):
 #   1) ENV_FILE if set
 #   2) $MNT_FDATA/sharing/.env.local  (or env.local)
 #   3) ./.env.local
 #
-#   npm run docker:up       # build + run
+#   npm run docker:up       # build + run behind an external reverse proxy
 #   npm run docker:deploy   # recreate from existing image (CI)
 #   npm run docker:status
-#   npm run redis:up        # local Redis only (127.0.0.1:6379) for npm run dev
+# Local ports and a local Redis cache are defined in docker-compose.local.yml.
 #
 # COMPOSE_PROJECT_NAME defaults to the-ant-adventures-crm (set in script / CI).
 # VM deploy uses shared_redis on network shared-services (REDIS_URL from env / CI).
-# Local npm run dev uses Compose service `redis` via REDIS_URL=redis://127.0.0.1:6379.
+# The reverse proxy must join CRM_PROXY_NETWORK (default: reverse-proxy).
 
 services:
   app:
@@ -19,8 +19,8 @@ services:
       context: .
       dockerfile: Dockerfile
     image: the-ant-adventures-crm:local
-    ports:
-      - "${APP_PORT:-3006}:3006"
+    expose:
+      - "3006"
     env_file:
       - ${ENV_FILE:-/mnt/fdata/sharing/.env.local}
     environment:
@@ -31,6 +31,7 @@ services:
       NODE_OPTIONS: --max-old-space-size=1536
 
     networks:
+      - crm_proxy
       - ss_ant_crm_app
       - shared-services
 
@@ -52,9 +53,10 @@ services:
       start_period: 40s
     restart: unless-stopped
 
-  # Local / WSL cache for `npm run redis:up` + `npm run dev` (Ngôn feat/redis).
-  # Not required by `app` on VM06 — that uses shared_redis via REDIS_URL.
+  # Optional local cache only. Production uses shared_redis via REDIS_URL and
+  # never starts this profile during deployment.
   redis:
+    profiles: ["local-cache"]
     image: redis:7.4-alpine
     command:
       - redis-server
@@ -64,8 +66,8 @@ services:
       - 256mb
       - --maxmemory-policy
       - noeviction
-    ports:
-      - "127.0.0.1:6379:6379"
+    expose:
+      - "6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -78,6 +80,10 @@ volumes:
   redis-data:
 
 networks:
+  # Reverse proxy joins this external network; it is the only ingress path.
+  crm_proxy:
+    name: ${CRM_PROXY_NETWORK:-reverse-proxy}
+    external: true
   # Supabase ant-crm stack network; resolves supabase-ant-crm-gateway.
   ss_ant_crm_app:
     external: true

@@ -188,7 +188,7 @@ docker:
 
       # Fail before build/migration/deploy when the runtime cannot create a
       # durable CRM session or recovery login. Values are never printed.
-      sh scripts/validate-production-env.sh "$DEPLOY_ENV_FILE" .env.example
+      REQUIRE_PRIVATE_NETWORK=1 sh scripts/validate-production-env.sh "$DEPLOY_ENV_FILE" .env.example
 
       export ENV_FILE="$DEPLOY_ENV_FILE"
       echo "Building with generated deployment environment"
@@ -257,6 +257,7 @@ docker:
         STATUS="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}starting{{end}}' "$APP_ID")"
         if [ "$STATUS" = "healthy" ]; then
           echo "CRM is healthy."
+          sh scripts/verify-private-network.sh "$DEPLOY_ENV_FILE"
           docker image prune -f || true
           exit 0
         fi

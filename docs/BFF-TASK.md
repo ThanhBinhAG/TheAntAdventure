@@ -53,86 +53,60 @@ feature/bff-cutover-domains
 
 # DEV 1 CHECKLIST — Platform / Auth / Infra / CI
 
+> Last reconciled: 2026-08-28. `[x]` means the source/configuration and its
+> local regression coverage are complete. Items requiring a deployment target,
+> a Windows/GitLab runner, or Dev 2 browser cutover remain unchecked.
+
 ## D1.1 Server-only Supabase configuration
 
-- [ ] Thay `NEXT_PUBLIC_SUPABASE_URL` bằng `SUPABASE_URL=http://supabase-ant-crm-gateway:8000`.
-- [ ] Thay `NEXT_PUBLIC_SUPABASE_ANON_KEY` bằng `SUPABASE_ANON_KEY` ở runtime server.
-- [ ] Xóa `NEXT_PUBLIC_USE_SUPABASE`.
-- [ ] Xóa `NEXT_PUBLIC_SUPABASE_AUTO_SYNC`.
-- [ ] Xóa `NEXT_PUBLIC_SUPABASE_READ_ONLY`.
-- [ ] Xóa toàn bộ Supabase build args/ENV khỏi `Dockerfile`.
-- [ ] Xóa toàn bộ Supabase build args khỏi `docker-compose.yml`.
-- [ ] Xóa toàn bộ Supabase build args khỏi `docker-compose.local.yml`.
-- [ ] Sửa `.gitlab-ci.yml` để chỉ ghi server-only variables.
-- [ ] Xác nhận không đưa Supabase URL/key vào browser build.
-- [ ] Sửa `.env.example` theo server-only contract.
-- [ ] Sửa `scripts/validate-production-env.sh` theo server-only contract.
-- [ ] Tách server env helpers sang module có `import 'server-only'`.
-- [ ] Không fallback server env về ` *`.
-- [ ] Chuyển middleware sang server env helpers.
-- [ ] Chuyển JWT/JWKS sang server env helpers.
-- [ ] Chuyển health/diagnostics sang server env helpers.
-- [ ] Chuyển Weather server configuration sang server env helpers.
-- [ ] Chuyển Storage server configuration sang server env helpers.
-- [ ] Chuyển break-glass sang server env helpers.
-- [ ] Chuyển access-control sang server env helpers.
-- [ ] Xóa Supabase hostname khỏi `next.config.mjs`.
-- [ ] Xóa Supabase Storage remote pattern khỏi `next.config.mjs`.
-- [ ] Cập nhật README theo cấu hình server-only.
-- [ ] Cập nhật tài liệu setup.
-- [ ] Cập nhật tài liệu database.
-- [ ] Cập nhật tài liệu deployment.
+- [x] Server runtime dùng `SUPABASE_URL` / `SUPABASE_ANON_KEY`; deploy CI đặt gateway nội bộ `http://supabase-ant-crm-gateway:8000`.
+- [x] `lib/server/env/supabase.ts` là server-only boundary; server callers không fallback về `NEXT_PUBLIC_*`.
+- [x] Browser compatibility boundary tắt generic Supabase hydrate/sync/read-only flags.
+- [x] Không còn Supabase build args/ENV trong Dockerfile hoặc hai Compose files.
+- [x] `.env.example`, deployment CI và production-env validator dùng server-only contract.
+- [x] JWT/JWKS, middleware/proxy, health/diagnostics, weather, storage, break-glass và Access Control đã chuyển sang server env helpers.
+- [x] `next.config.mjs` không còn Supabase hostname hay Storage remote pattern.
+- [x] README và session-operation document phản ánh server-only/durable-session boundary.
+- [ ] Cập nhật các ví dụ `NEXT_PUBLIC_SUPABASE_*` cũ trong `docs/SUPABASE-SETUP.md`.
+- [ ] Xóa hit `/storage/v1` còn lại trong browser bundle — dependency Dev 2 (`lib/gallery/storage-image-src.ts`).
 
 ### Acceptance D1.1
 
-- [ ] Production build không cần bất kỳ `NEXT_PUBLIC_SUPABASE_*` variable nào.
-- [ ] Server có thể kết nối Supabase bằng `SUPABASE_URL`.
-- [ ] Browser bundle không nhận Supabase URL/key từ build env.
+- [x] Production build không cần bất kỳ `NEXT_PUBLIC_SUPABASE_*` variable nào.
+- [x] Server configuration and CI deploy use `SUPABASE_URL` at runtime only.
+- [x] Browser bundle không nhận Supabase URL/key từ build env.
+- [ ] Final browser leakage check passes after Dev 2 storage cutover.
 
 ---
 
 ## D1.2 CRM-owned session
 
-- [ ] Browser chỉ giữ opaque CRM session ID hoặc signed minimal CRM claims.
-- [ ] Không gửi Supabase access token xuống browser.
-- [ ] Không gửi Supabase refresh token xuống browser.
-- [ ] Không lưu Supabase access/refresh token trong HttpOnly cookie.
-- [ ] Xóa `sb-crm-access-token`.
-- [ ] Dọn mọi `sb-*-auth-token` legacy cookie.
-- [ ] Lưu session/token server-side trong durable source of truth.
-- [ ] Redis chỉ dùng làm optional cache.
-- [ ] Sửa login theo CRM session boundary.
-- [ ] Sửa logout theo CRM session boundary.
-- [ ] Sửa refresh theo CRM session boundary.
-- [ ] Sửa revoke theo CRM session boundary.
-- [ ] Sửa proxy middleware theo CRM session boundary.
-- [ ] Sửa `getAuthContext` theo CRM session boundary.
-- [ ] BFF server client lấy user context từ CRM session.
-- [ ] Service-role path luôn kiểm tra permission trước query.
-- [ ] Service-role path luôn kiểm tra permission trước mutation.
+- [x] Browser chỉ nhận opaque HttpOnly `crm_session`; Supabase access/refresh tokens không được trả, lưu cookie, storage hoặc log.
+- [x] Durable `crm_sessions` stores hash opaque token and AES-GCM encrypted server credentials; Redis không là source of truth.
+- [x] Login, refresh (atomic rotation), logout/revoke, Proxy và `getAuthContext` dùng CRM session boundary.
+- [x] Legacy `sb-crm-access-token` và `sb-*-auth-token` được dọn khi gặp.
+- [x] BFF user-scoped client chỉ nhận verified CRM auth context; disable account ban Auth và revoke all durable sessions.
+- [x] Có host job `npm run session:cleanup` để cleanup không phụ thuộc login traffic.
+- [ ] Apply migration `20260827104813_durable_crm_sessions_v2.sql` ở staging/production.
+- [ ] Kiểm tra login/refresh/logout/revoke/disable trên Supabase Auth và Postgres thật.
 
 ### Auth/session tests
 
-- [ ] Login success.
-- [ ] Login failure.
-- [ ] Session expiry.
-- [ ] Refresh success.
-- [ ] Refresh failure.
-- [ ] Revoke.
-- [ ] Disabled account.
-- [ ] Auth outage.
-- [ ] JWKS outage.
-- [ ] Logout cleanup.
-- [ ] Legacy Supabase cookie cleanup.
-- [ ] Redis-down không làm mất durable session source of truth.
+- [x] Unit tests: login success/failure, refresh success/failure, logout, revoke, disabled account, legacy-cookie cleanup, JWT/JWKS outage và Redis graceful degradation.
+- [x] E2E contract now asserts opaque `crm_session`, never a retired Supabase cookie.
+- [ ] E2E login/session lifecycle against a dedicated test Supabase instance (`E2E_ALLOW_DATABASE_MUTATION=1`).
 
 ---
 
 ## D1.3 Production network and secrets
 
-- [ ] Production Compose dùng `expose` cho CRM.
-- [ ] Không publish CRM port trực tiếp ra host.
-- [ ] Redis production không có host `ports:` mapping.
+> Phase 4 source controls are implemented. `docker-compose.yml` is the
+> private production topology; `docker-compose.local.yml` intentionally keeps
+> CRM `3006` and Redis `127.0.0.1:6379` for local development.
+
+- [x] Production Compose dùng `expose` cho CRM.
+- [x] Không publish CRM port trực tiếp ra host.
+- [x] Redis production không có host `ports:` mapping.
 - [ ] Supabase gateway không có host port mapping.
 - [ ] Supabase Auth không có host port mapping.
 - [ ] Supabase REST không có host port mapping.
@@ -141,18 +115,15 @@ feature/bff-cutover-domains
 - [ ] Supabase Studio không có host port mapping.
 - [ ] Supabase Postgres không có host port mapping.
 - [ ] Chỉ reverse proxy publish `80/443`.
-- [ ] Reverse proxy kết nối CRM qua private Docker network.
-- [ ] CRM container resolve được `supabase-ant-crm-gateway`.
-- [ ] CRM container gọi được `supabase-ant-crm-gateway:8000`.
+- [x] Production Compose yêu cầu reverse proxy qua external `CRM_PROXY_NETWORK` (default: `reverse-proxy`).
+- [x] Deploy verifier kiểm tra DNS/reachability gateway, Redis và `/api/health` từ CRM container.
 - [ ] Browser/máy người dùng không resolve được Supabase internal hostname.
 - [ ] Browser/máy người dùng không kết nối được Supabase internal service.
 - [ ] Rotate anon key sau khi browser leakage đã được loại bỏ.
 - [ ] Rotate service-role key nếu từng xuất hiện trong deploy/build history.
 - [ ] Kiểm tra firewall.
-- [ ] Kiểm tra production healthcheck.
-- [ ] Kiểm tra backup.
-- [ ] Kiểm tra restore.
-- [ ] Viết/kiểm tra rollback runbook.
+- [x] Docker healthcheck and CI post-deploy verifier cover CRM readiness and private dependencies.
+- [x] Runbook covers deploy, rollback, backup/restore, Redis flush recovery and key rotation.
 
 ### Acceptance D1.3
 
@@ -166,37 +137,20 @@ feature/bff-cutover-domains
 
 ## D1.4 Test infrastructure and CI gates
 
-- [ ] Sửa `npm test` để chạy cross-platform.
-- [ ] `npm test` không phụ thuộc `find`.
-- [ ] `npm test` không phụ thuộc `/dev/null`.
-- [ ] Sửa `npm run dev` để `NODE_OPTIONS` chạy trên Windows.
-- [ ] Sửa `npm run dev` để `NODE_OPTIONS` chạy trên Linux.
-- [ ] Sửa Playwright web server để start được trên Windows.
-- [ ] Sửa test infrastructure cho BFF/auth request context.
-- [ ] Sửa các test gọi `cookies()` ngoài request scope.
-- [ ] Dùng `scripts/check-supabase-leakage.mjs` làm leakage command cross-platform.
-- [ ] Thêm leakage check vào Docker verifier.
-- [ ] Thêm leakage check vào GitLab CI sau production build.
-- [ ] CI bắt buộc `npm run lint`.
-- [ ] CI bắt buộc `npm run typecheck`.
-- [ ] CI bắt buộc `npm test`.
-- [ ] CI bắt buộc `npm run build`.
-- [ ] CI bắt buộc Supabase leakage check.
-- [ ] Test Redis-down.
-- [ ] Test Supabase-down.
-- [ ] Supabase-down trả lỗi phù hợp.
-- [ ] Supabase-down có structured log.
-- [ ] Supabase-down có request ID.
+- [x] `npm test` uses Node recursive discovery; no `find` or `/dev/null` dependency.
+- [x] `npm run dev` and Playwright use Node launcher with portable `NODE_OPTIONS` handling.
+- [x] `npm run test:platform` owns Dev 1 auth/session/proxy/request-context/JWKS/Redis suite.
+- [x] Request-context and `cookies()` tests run through valid mocked request context.
+- [x] `scripts/check-supabase-leakage.mjs` is the cross-platform hard-fail command.
+- [x] Docker verifier runs lint → typecheck → test → build → leakage report.
+- [x] Redis-down and Supabase/JWKS-down tests assert resilient cache behavior or safe `503` responses with request ID/structured logging.
+- [ ] Run launcher/build matrix on Windows and the GitLab runner.
+- [ ] Change CI leakage report to hard-fail after Dev 2 removes `/storage/v1`.
 
 ### Dev 1 chịu trách nhiệm sửa các test fail thuộc
 
-- [ ] Auth.
-- [ ] Middleware.
-- [ ] Session.
-- [ ] Request context.
-- [ ] `cookies()`.
-- [ ] Env.
-- [ ] CI/test infrastructure.
+- [x] Auth, middleware/proxy, session, request context, `cookies()`, env and test infrastructure regressions have an assigned platform suite.
+- [ ] Triage any failure found by Windows/GitLab matrix or real E2E separately from Dev 2 domain suites.
 
 > Test fail thuộc domain business cụ thể giao Dev 2.
 

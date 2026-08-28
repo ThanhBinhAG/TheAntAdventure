@@ -15,6 +15,7 @@ Tracked product documentation: database schema reference and Supabase setup. Sou
 - `SUPABASE-SETUP.md` — install & connect steps
 - `SESSION-AVAILABILITY.md` — CRM session durability and Redis outage operating decision
 - `LOGGING.md` — Pino logging contract and operational boundary
+- `runbooks/PRIVATE-NETWORK-CUTOVER.md` — production private-network, rollback, recovery, and key-rotation operator procedure
 - `DEV-A-MIGRATION-REVIEW-2026-08-21.md` — consolidated Dev A implementation, acceptance, build, and remaining-cutover report
 
 ## Boundaries

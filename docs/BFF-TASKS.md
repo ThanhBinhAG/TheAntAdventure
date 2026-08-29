@@ -1,4 +1,9 @@
-# BFF Migration Tasks
+# BFF Migration Tasks — historical implementation plan
+
+> **Status (2026-08-29):** This document records the original phased plan and
+> retains its historical checkboxes. It is not the current delivery tracker.
+> Use [`BFF-TASK.md`](BFF-TASK.md) for reconciled Dev 1, Dev 2, CI, and
+> production-acceptance status.
 
 ## Definition of done
 

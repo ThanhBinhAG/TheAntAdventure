@@ -54,8 +54,8 @@ feature/bff-cutover-domains
 # DEV 1 CHECKLIST — Platform / Auth / Infra / CI
 
 > Last reconciled: 2026-08-29. `[x]` means the source/configuration and its
-> local regression coverage are complete. Items requiring a production deployment
-> target remain unchecked.
+> local regression coverage are complete. Deployment evidence is recorded only
+> when the corresponding GitLab job or operator check has succeeded.
 
 ## D1.1 Server-only Supabase configuration
 
@@ -86,8 +86,9 @@ feature/bff-cutover-domains
 - [x] Login, refresh (atomic rotation), logout/revoke, Proxy và `getAuthContext` dùng CRM session boundary.
 - [x] Legacy `sb-crm-access-token` và `sb-*-auth-token` được dọn khi gặp.
 - [x] BFF user-scoped client chỉ nhận verified CRM auth context; disable account ban Auth và revoke all durable sessions.
-- [x] Có host job `npm run session:cleanup` để cleanup không phụ thuộc login traffic.
-- [ ] Apply migration `20260827104813_durable_crm_sessions_v2.sql` ở staging/production.
+- [ ] Ops schedule host job `npm run session:cleanup`; code/script is ready but the repository cannot prove a real crontab exists. Run daily; it retains expired/revoked rows for 30 days by default, or 7 days only when `CRM_SESSION_RETENTION_DAYS=7` is explicitly set.
+- [x] Production main deploy applies `20260827104813_durable_crm_sessions_v2.sql` through `supabase db push` before replacing CRM; deployment and durable-session login succeeded on 2026-08-29.
+- [ ] Apply the migration and run the same lifecycle E2E on staging.
 - [x] Đã kiểm tra login/refresh/logout/revoke/disable trên Supabase Auth và Postgres test thật.
 
 ### Auth/session tests
@@ -114,7 +115,7 @@ feature/bff-cutover-domains
 - [ ] Supabase Realtime không có host port mapping.
 - [ ] Supabase Studio không có host port mapping.
 - [ ] Supabase Postgres không có host port mapping.
-- [ ] Ops xác nhận ingress/proxy hiện có vẫn route được vào `APP_PORT` sau deploy.
+- [x] Existing Ops-managed ingress continues to route to `APP_PORT` after the 2026-08-29 main deployment; repository does not own its configuration.
 - [x] Deploy verifier kiểm tra DNS/reachability gateway, Redis và `/api/health` từ CRM container.
 - [ ] Browser/máy người dùng không resolve được Supabase internal hostname.
 - [ ] Browser/máy người dùng không kết nối được Supabase internal service.
@@ -127,7 +128,7 @@ feature/bff-cutover-domains
 ### Acceptance D1.3
 
 - [ ] `docker compose ps` xác nhận CRM bind đúng `${APP_PORT:-3006}:3006` và ingress hiện có hoạt động.
-- [ ] CRM → Supabase private gateway: PASS.
+- [x] CRM → Supabase private gateway: PASS through the successful deploy-time verifier.
 - [ ] Browser/host external → Supabase internal services: BLOCKED.
 - [ ] Redis không public port.
 - [ ] Postgres không public port.
@@ -160,7 +161,8 @@ feature/bff-cutover-domains
 - [x] Real session E2E is explicitly opt-in with `FINAL_ACCEPTANCE_E2E=1`, preventing an accidental mutation of a shared database.
 - [ ] Dev 2 confirms domain routes follow the handoff contract and no browser Supabase client/API path remains.
 - [ ] Staging applies durable-session migration and passes real login/refresh/logout/revoke/disable E2E.
-- [ ] Production verifier confirms private Supabase/Redis dependencies; ingress/proxy remains unchanged; key rotation is completed after leakage is eliminated.
+- [x] Production verifier confirms private Supabase/Redis dependencies and the existing ingress remains unchanged.
+- [ ] Ops completes planned anon-key rotation; service-role rotation remains conditional on an exposure-history audit.
 
 ---
 
@@ -678,6 +680,11 @@ Sau đó Dev 2:
 
 # FINAL ACCEPTANCE
 
+> This is the cross-owner production sign-off matrix, not a second source-code
+> backlog. Use D1.1–D1.5 above for the reconciled Dev 1 implementation status;
+> leave the items below unchecked until their manual browser, host, or Owner/Ops
+> evidence is recorded.
+
 ## A. Browser boundary
 
 **Owner: Dev 1 + Dev 2**
@@ -795,8 +802,8 @@ Sau đó Dev 2:
 
 **Owner: Shared + Owner/Ops**
 
-- [ ] Cập nhật `BFF-TASKS.md`.
-- [ ] Cập nhật `BFF-TASKS-vi.md`.
+- [x] `BFF-TASKS.md` identifies itself as a historical implementation plan; current delivery status is in this checklist.
+- [x] `BFF-TASKS-vi.md` identifies itself as a historical implementation plan; current delivery status is in this checklist.
 - [x] Cập nhật current-system documentation.
 - [x] Cập nhật deployment documentation.
 - [x] Cập nhật rollback runbook.

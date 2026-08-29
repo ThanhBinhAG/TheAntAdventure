@@ -25,6 +25,10 @@ test('deployment scripts invoke Docker Compose directly and validation requires 
   assert.match(localCompose, /\$\{APP_PORT:-3006\}:3006/);
   assert.match(localCompose, /127\.0\.0\.1:6379:6379/);
   assert.doesNotMatch(dockerScript, /exec compose\b/);
+  assert.match(
+    dockerScript,
+    /exec docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" build/,
+  );
   assert.match(validator, /REQUIRE_PRIVATE_NETWORK/);
   assert.match(validator, /supabase-ant-crm-gateway:8000/);
   assert.match(verifier, /SUPABASE_URL/);

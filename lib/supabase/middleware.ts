@@ -16,7 +16,14 @@ function redirectToLogin(request: NextRequest) {
 }
 
 async function validateCrmSession(request: NextRequest): Promise<{ status: number; requestId: string | null }> {
-  const validationUrl = new URL('/api/auth/session', request.url);
+  // Proxy runs inside the CRM Node.js process. Do not derive this URL from the
+  // public request: doing so routes this internal check through the external
+  // gateway/challenge again and can turn a valid newly-created session into a
+  // 503 before the dashboard is rendered. API routes are exempt from Proxy, so
+  // the loopback request reaches the Route Handler without recursion.
+  const configuredPort = process.env.PORT;
+  const port = configuredPort && /^\d{1,5}$/.test(configuredPort) ? configuredPort : '3006';
+  const validationUrl = new URL('/api/auth/session', `http://127.0.0.1:${port}`);
   try {
     const response = await fetch(validationUrl, {
       headers: { cookie: request.headers.get('cookie') ?? '' },

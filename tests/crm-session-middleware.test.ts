@@ -26,7 +26,10 @@ test('Proxy validates only CRM opaque sessions and clears retired Supabase cooki
   });
 
   await t.test('passes an opaque CRM session only after the server validation endpoint succeeds', async () => {
-    globalThis.fetch = async () => new Response(JSON.stringify({ ok: true }), { status: 200 });
+    globalThis.fetch = async (input) => {
+      assert.equal(String(input), 'http://127.0.0.1:3006/api/auth/session');
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    };
     const response = await updateSession(new NextRequest('https://crm.example.test/dashboard', {
       headers: { Cookie: 'crm_session=opaque-session' },
     }));
@@ -34,10 +37,13 @@ test('Proxy validates only CRM opaque sessions and clears retired Supabase cooki
   });
 
   await t.test('propagates a validation outage with its request ID instead of redirecting', async () => {
-    globalThis.fetch = async () => new Response(null, {
-      status: 503,
-      headers: { 'X-Request-Id': 'request-123' },
-    });
+    globalThis.fetch = async (input) => {
+      assert.equal(String(input), 'http://127.0.0.1:3006/api/auth/session');
+      return new Response(null, {
+        status: 503,
+        headers: { 'X-Request-Id': 'request-123' },
+      });
+    };
     const response = await updateSession(new NextRequest('https://crm.example.test/dashboard', {
       headers: { Cookie: 'crm_session=opaque-session' },
     }));

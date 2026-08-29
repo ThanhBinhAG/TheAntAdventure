@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import {
     EditOutlined,
+    KeyOutlined,
     LockOutlined,
     MoreOutlined,
     UnlockOutlined,
@@ -42,11 +43,13 @@ type UserActionsMenuProps = {
     user: AccessControlUser;
     onChanged: () => Promise<void>;
     onEditInfo: () => void;
+    onChangePassword: () => void;
 };
 
 export default function UserActionsMenu({
     user,
     onEditInfo,
+    onChangePassword,
     onChanged,
 }: UserActionsMenuProps) {
     const { language } = useLanguage();
@@ -110,6 +113,12 @@ export default function UserActionsMenu({
             icon: <EditOutlined />,
             label: tac('editInformation', language),
             onClick: onEditInfo,
+        },
+        {
+            key: 'change-password',
+            icon: <KeyOutlined />,
+            label: tac('changePassword', language),
+            onClick: onChangePassword,
         },
         {
             key: 'active-status',

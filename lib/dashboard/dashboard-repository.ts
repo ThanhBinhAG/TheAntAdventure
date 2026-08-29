@@ -21,6 +21,7 @@ import {
   cacheSet,
 } from '@/lib/redis/cache-helper';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
+import { serverLogger } from '@/lib/system/server-logger';
 import type { Agent, Booking, Customer, Lead } from '@/lib/types';
 
 const DASHBOARD_CACHE_TTL_SECONDS = 45;
@@ -47,7 +48,11 @@ export async function invalidateDashboardCache(): Promise<void> {
     await cacheInvalidatePattern(`${DASHBOARD_CACHE_PREFIX}*`);
   } catch (error) {
     // Cache is optional: a completed mutation must still succeed.
-    console.warn('[Redis Cache Error] Dashboard cache invalidation failed:', error);
+    serverLogger.warn({
+      scope: 'dashboard/cache',
+      event: 'dashboard.cache.invalidate_failed',
+      err: error,
+    }, 'Dashboard cache invalidation failed');
   }
 }
 

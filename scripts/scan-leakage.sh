@@ -11,7 +11,7 @@ if [ ! -d "$BUILD_DIR" ]; then
   exit 1
 fi
 
-read_public_env() {
+read_runtime_env() {
   key="$1"
   value="$(printenv "$key" 2>/dev/null || true)"
   if [ -n "$value" ]; then
@@ -29,8 +29,8 @@ read_public_env() {
   done
 }
 
-SUPABASE_URL="$(read_public_env NEXT_PUBLIC_SUPABASE_URL)"
-SUPABASE_ANON_KEY="$(read_public_env NEXT_PUBLIC_SUPABASE_ANON_KEY)"
+SUPABASE_URL="$(read_runtime_env SUPABASE_URL)"
+SUPABASE_ANON_KEY="$(read_runtime_env SUPABASE_ANON_KEY)"
 
 # Trích xuất Hostname
 SUPABASE_HOST=""

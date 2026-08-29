@@ -115,7 +115,7 @@ test('HTTP logging contract adds request context and selects the completion leve
     time: entries[0].time,
     service: 'the-ant-adventures-crm',
     environment: process.env.NODE_ENV ?? 'development',
-    version: process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown',
+    version: process.env.APP_VERSION ?? 'unknown',
     scope: 'catalog/products',
     requestId: 'request-42',
     route: '/api/products',
@@ -173,4 +173,29 @@ test('HTTP response helper returns the request ID and emits one completion event
   assert.equal(entry.actorId, 'user-42');
   assert.equal(entry.resourceId, 'product-42');
   assert.equal(typeof entry.durationMs, 'number');
+});
+
+test('direct API wrapper completes every returned response once', async () => {
+  const { createServerLogger, withHttpRequestLogging } = await import('../lib/system/server-logger');
+  const destination = new CapturingStream();
+  const logger = createServerLogger({ level: 'trace', destination });
+  const handler = withHttpRequestLogging(
+    { scope: 'catalog/products', route: '/api/products' },
+    async () => new Response(null, { status: 401 }),
+    logger,
+  );
+
+  const response = await handler(
+    new Request('https://crm.test/api/products', {
+      headers: { 'x-request-id': 'wrapper-42' },
+    }),
+    { params: Promise.resolve({}) },
+  );
+
+  assert.equal(response.headers.get('x-request-id'), 'wrapper-42');
+  const entries = destination.lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].event, 'http.request.completed');
+  assert.equal(entries[0].statusCode, 401);
+  assert.equal(entries[0].requestId, 'wrapper-42');
 });

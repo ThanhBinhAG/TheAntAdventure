@@ -5,7 +5,8 @@ import {
   isBreakGlassShadowEmail,
 } from '@/lib/auth/break-glass-supabase';
 import { getCurrentAuthzStateResult } from '@/lib/auth/authz-state';
-import { SUPABASE_ACCESS_COOKIE } from '@/lib/auth/supabase-cookie-names';
+import { CRM_SESSION_COOKIE } from '@/lib/auth/crm-session-cookie';
+import { getCrmSessionRepository } from '@/lib/auth/crm-session-repository';
 import { verifySupabaseAccessTokenResult } from '@/lib/auth/supabase-jwt';
 
 export type AuthContext = {
@@ -28,9 +29,29 @@ const verifiedAccessTokens = new WeakMap<AuthContext, string>();
 /** Cookie-store based context (Route Handlers / Server Components). */
 export async function getAuthContext(): Promise<AuthContext> {
   const cookieStore = await cookies();
-  const verification = await verifySupabaseAccessTokenResult(
-    cookieStore.get(SUPABASE_ACCESS_COOKIE)?.value,
-  );
+  const sessionToken = cookieStore.get(CRM_SESSION_COOKIE)?.value;
+  if (!sessionToken) {
+    return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
+  }
+
+  let session;
+  try {
+    session = await getCrmSessionRepository().lookup(sessionToken);
+  } catch {
+    return {
+      authenticated: false,
+      isSuperAdmin: false,
+      isBreakGlass: false,
+      userId: null,
+      email: null,
+      authenticationUnavailable: true,
+    };
+  }
+  if (!session) {
+    return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
+  }
+
+  const verification = await verifySupabaseAccessTokenResult(session.accessToken);
   if (verification.status !== 'verified') {
     if (verification.status === 'unavailable') {
       return {
@@ -45,10 +66,13 @@ export async function getAuthContext(): Promise<AuthContext> {
     return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
   }
   const access = verification.access;
+  if (access.userId !== session.userId) {
+    return { authenticated: false, isSuperAdmin: false, isBreakGlass: false, userId: null, email: null };
+  }
 
   const authz = await getCurrentAuthzStateResult({
     userId: access.userId,
-    accessToken: cookieStore.get(SUPABASE_ACCESS_COOKIE)?.value ?? '',
+    accessToken: session.accessToken,
   });
   if (authz.status === 'unavailable') {
     return {
@@ -80,7 +104,7 @@ export async function getAuthContext(): Promise<AuthContext> {
     userId: access.userId,
     email: access.email,
   };
-  verifiedAccessTokens.set(context, cookieStore.get(SUPABASE_ACCESS_COOKIE)?.value ?? '');
+  verifiedAccessTokens.set(context, session.accessToken);
   return context;
 }
 

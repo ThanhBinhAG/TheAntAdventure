@@ -25,6 +25,11 @@ export const ROUTE_CACHE_DENYLIST: readonly SyncArrayTable[] = [
   'leads',
   'comms',
   'bookings',
+  'hotels',
+  'transport',
+  'restaurants',
+  'cruises',
+  'suppliers',
 ] as const;
 
 /** Drop order when payload exceeds ROUTE_CACHE_MAX_BYTES (heaviest first). */

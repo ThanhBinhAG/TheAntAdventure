@@ -44,10 +44,12 @@ import {
     type UserListRoleFilter,
     type UserListStatusFilter,
     updateUserDisplayName,
+    updateUserPassword,
 } from './access-control-api';
 import styles from './AccessControlPage.module.css';
 import UserActionsMenu from './UserActionsMenu';
 import UserEditDrawer from './UserEditDrawer';
+import UserPasswordDrawer from './UserPasswordDrawer';
 import UserCreateDrawer from './UserCreateDrawer';
 import useRefreshAccessControlAuditLogs from './useRefreshAccessControlAuditLogs';
 
@@ -259,6 +261,10 @@ export default function UserDirectory() {
         useState<AccessControlUser | null>(null);
     const [savingEdit, setSavingEdit] = useState(false);
 
+    const [passwordUser, setPasswordUser] =
+        useState<AccessControlUser | null>(null);
+    const [savingPassword, setSavingPassword] = useState(false);
+
     const [isCreateDrawerOpen, setIsCreateDrawerOpen] =
         useState(false);
     const [savingCreate, setSavingCreate] = useState(false);
@@ -311,6 +317,31 @@ export default function UserDirectory() {
             ));
         } finally {
             setSavingEdit(false);
+        }
+    }
+
+    /** Lưu mật khẩu mới từ UserPasswordDrawer. */
+    async function handleSavePassword(
+        userId: string,
+        newPassword: string,
+    ) {
+        setSavingPassword(true);
+
+        try {
+            await updateUserPassword(userId, newPassword);
+
+            toast.success(tac('userPasswordUpdated', language));
+            setPasswordUser(null);
+
+            refreshAuditLogs();
+        } catch (error) {
+            toast.error(getAccessControlErrorMessage(
+                error,
+                language,
+                'updateUserPasswordFailed',
+            ));
+        } finally {
+            setSavingPassword(false);
         }
     }
 
@@ -437,6 +468,7 @@ export default function UserDirectory() {
                     <UserActionsMenu
                         user={user}
                         onEditInfo={() => setEditingUser(user)}
+                        onChangePassword={() => setPasswordUser(user)}
                         onChanged={refreshUsersAndAuditLogs}
                     />
                 </div>
@@ -563,6 +595,17 @@ export default function UserDirectory() {
                 saving={savingEdit}
                 onClose={() => setEditingUser(null)}
                 onSave={handleSaveDisplayName}
+            />
+            <UserPasswordDrawer
+                key={
+                    passwordUser
+                        ? `password-${passwordUser.user_id}`
+                        : 'password-drawer-closed'
+                }
+                user={passwordUser}
+                saving={savingPassword}
+                onClose={() => setPasswordUser(null)}
+                onSave={handleSavePassword}
             />
             <UserCreateDrawer
                 open={isCreateDrawerOpen}

@@ -6,6 +6,7 @@ import type {
     ProductListFilters,
 } from '@/lib/products/product-list-input';
 import { cacheGet, cacheSet, cacheInvalidatePattern } from './cache-helper';
+import { serverLogger } from '@/lib/system/server-logger';
 
 const PRODUCT_FACETS_TTL_SECONDS = 5 * 60;
 
@@ -54,8 +55,12 @@ export async function setCachedProductFacets(
 export async function invalidateProductFacetsCache(): Promise<void> {
     try {
         await cacheInvalidatePattern('cache:products:*:v1:*');
-    } catch (error) {
-        // Cache is optional: a completed Product mutation must still succeed.
-        console.warn('[Redis Cache Error] Product cache invalidation failed:', error);
-    }
+  } catch (error) {
+    // Cache is optional: a completed Product mutation must still succeed.
+    serverLogger.warn({
+        scope: 'redis/product-facets',
+        event: 'redis.product_facets.invalidate_failed',
+        err: error,
+    }, 'Product-facets cache invalidation failed');
+  }
 }

@@ -3,8 +3,9 @@ import { access } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
-import { getAppUrl } from '@/lib/env';
+import { getAppUrl } from '@/lib/server/env/app';
 import { buildProposalHTML } from '@/lib/proposals/proposal-html';
+import { inlineProposalDocImages } from '@/lib/proposals/proposal-image-inliner';
 import type { ProposalDoc } from '@/lib/proposals/proposal-types';
 import { pdfBrowserGate } from '@/lib/system/pdf-concurrency';
 
@@ -59,7 +60,8 @@ export async function renderProposalPdf(doc: ProposalDoc): Promise<Buffer> {
 
 async function renderProposalPdfUngated(doc: ProposalDoc): Promise<Buffer> {
   const origin = getAppUrl();
-  const html = buildProposalHTML(doc, origin);
+  const inlined = await inlineProposalDocImages(doc);
+  const html = buildProposalHTML(inlined, origin);
 
   let browser;
   try {

@@ -5,7 +5,7 @@ Opt-in Playwright acceptance tests for Developer A and Developer B BFF flows aga
 
 ## Contents
 - `*.spec.ts` — browser-driven acceptance scenarios
-- `support.ts` — test identity, database assertion, and cleanup helpers
+- `support.ts` — test identity, database assertion, cleanup helpers, and opaque `crm_session` cookie assertions
 - Dev A: `network-origin.spec.ts`, `catalogue-planner.spec.ts`, `tour-design.spec.ts`, `auth-session.spec.ts`
 - Dev B: `dev-b-network-origin.spec.ts` (Fetch/XHR CRM-origin), `dev-b-domains.spec.ts` (401/403 + smoke CRUD)
 

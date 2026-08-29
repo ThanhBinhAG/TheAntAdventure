@@ -58,19 +58,20 @@ Expected highlights: `customers: 27`, `products: 196`, `booking_itinerary: 33`, 
 `.env.local`:
 
 ```env
-NEXT_PUBLIC_USE_SUPABASE=true
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-NEXT_PUBLIC_SUPABASE_AUTO_SYNC=true
+# Server-only: use the private gateway in production.
+SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+SESSION_ENCRYPTION_KEY=<base64-32-byte-key>
 ```
 
 ```bash
 npm run dev
 ```
 
-- Supabase panel appears in the app (☁ banner)
-- With Supabase enabled, the app hydrates from remote — not localStorage as source of truth
-- Edits auto-sync to PostgreSQL (e.g. bookings + itinerary + activities)
+- Supabase credentials are read by server-only modules; never add `NEXT_PUBLIC_SUPABASE_*` values.
+- Browser login receives only the opaque HttpOnly `crm_session` cookie.
+- CRM API routes perform user-scoped reads/writes; do not restore generic browser hydrate or auto-sync.
 
 ## 3. Common errors
 
@@ -96,18 +97,9 @@ Expected: **0 rows** for your CRM schemas.
 
 ## 5. Ongoing data updates
 
-- **Recommended:** edit in the app with `NEXT_PUBLIC_SUPABASE_AUTO_SYNC=true`
-- **Bulk:** re-run `import-v5-data.sql` (UPSERT) or use the in-app backup → push flow
-
-### Sync safety (v5.1+)
-
-The app protects against accidental bulk data loss:
-
-1. **Hydrate gate** — auto-sync waits until Supabase data is loaded (no sync on empty startup state).
-2. **Catalogue upsert-only** — `products` and `product_pricing` are never bulk-deleted via orphan sync; explicit UI delete removes one row at a time.
-3. **Regression guard** — other tables skip orphan-delete when local row count drops more than 10% below the hydrate baseline.
-
-Panel ☁ shows hydrate status, blocked sync warnings, and **Push có xác nhận** for manual override.
+- **Recommended:** edit through the CRM UI/API; the BFF performs the server-side Supabase access.
+- **Bulk:** re-run `import-v5-data.sql` (UPSERT) only with a backup and the expected environment selected.
+- **Boundary:** do not introduce a browser Supabase client, browser Storage URL, generic hydrate, or auto-sync path.
 
 ## 5b. Môi trường DEV (local) vs PROD (khách / remote)
 
@@ -120,7 +112,7 @@ Panel ☁ shows hydrate status, blocked sync warnings, and **Push có xác nhậ
 | API URL | `http://127.0.0.1:54321` | e.g. `https://sb.example.com` |
 | Migration | `npm run db:push:local` | `npm run db:push` + `SUPABASE_DB_URL` |
 | Status | `npm run db:status:local` | `npm run db:status` |
-| `NEXT_PUBLIC_SUPABASE_AUTO_SYNC` | `false` recommended at first | `true` when ready |
+| `SUPABASE_URL` | Server-only local API URL | Server-only private gateway URL |
 | `reset-v5.sql` / wipe | Dev only | Never on customer DB |
 
 ### Setup local (recommended daily workflow)
@@ -165,16 +157,16 @@ Panel ☁ shows hydrate status, blocked sync warnings, and **Push có xác nhậ
 ### Bước 2 — Cấu hình `.env.local`
 
 ```env
-NEXT_PUBLIC_USE_SUPABASE=true
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-NEXT_PUBLIC_SUPABASE_AUTO_SYNC=true
+SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+SESSION_ENCRYPTION_KEY=<base64-32-byte-key>
 
-# CAPTCHA — để trống khi dev local (bỏ qua Turnstile)
+# CAPTCHA site key may be public; leave empty for local development.
 NEXT_PUBLIC_AUTH_CAPTCHA_SITE_KEY=
 ```
 
-Lấy URL và anon key tại: **Project Settings** → **API**.
+Lấy URL, anon key và service-role key tại: **Project Settings** → **API**. Chỉ đặt chúng trong server/deployment env; không đưa bất kỳ key nào vào browser bundle.
 
 ### Bước 3 — Chạy app và đăng nhập
 
@@ -184,7 +176,7 @@ npm run dev
 
 1. Mở `http://localhost:3006` → tự redirect sang `/login`.
 2. Nhập email + password vừa tạo ở Bước 1.
-3. Sau khi đăng nhập → vào `/dashboard`, dữ liệu hydrate từ Supabase như bình thường.
+3. Sau khi đăng nhập → vào `/dashboard`; browser chỉ giữ cookie `crm_session`, còn CRM server truy cập Supabase.
 4. **Logout** ở góc Topbar khi cần.
 
 ### Bước 4 — Siết RLS (sau khi login chạy ổn)
@@ -207,18 +199,18 @@ npm run dev
 
 ### JWT access / refresh (khuyến nghị)
 
-App dùng **Supabase Auth JWT** trong cookie HttpOnly (`@supabase/ssr`). Proxy gọi `getSession()` để refresh khi token sắp hết hạn, rồi `getClaims()` để xác minh identity — không tự mint access/refresh riêng cho user thường.
+Supabase vẫn phát access/refresh credential, nhưng CRM mã hóa và lưu chúng trong durable server-side session. Browser không nhận Supabase JWT/cookie; Proxy xác thực opaque `crm_session`, còn server xác minh JWT khi cần.
 
 Trên Supabase Dashboard → **Authentication** → **Settings** (hoặc **Sessions**):
 
 | Setting | Khuyến nghị | Ghi chú |
 |---------|-------------|---------|
-| JWT expiry (access token) | **900** giây (15 phút) | Token ngắn hạn; cookie được middleware làm mới |
-| Refresh token | Giữ mặc định Supabase | Dùng để cấp access mới khi hết hạn |
+| JWT expiry (access token) | **900** giây (15 phút) | Token ngắn hạn; CRM refresh ở server |
+| Refresh token | Giữ mặc định Supabase | CRM xoay và lưu encrypted server-side |
 
 Sau khi đổi JWT expiry, user đang đăng nhập có thể cần **logout rồi login lại**.
 
-Nếu CRM server gọi Supabase qua hostname nội bộ (`SUPABASE_URL=http://supabase-gateway:8000`), đặt thêm `SUPABASE_JWT_ISSUER` bằng issuer mà Auth ghi vào JWT `iss` (public hoặc LAN). JWKS luôn được fetch từ `NEXT_PUBLIC_SUPABASE_URL` (không từ host issuer riêng), vì host LAN/Docker thường unreachable từ máy dev. Không đưa biến này ra browser.
+Nếu CRM server gọi Supabase qua hostname nội bộ (`SUPABASE_URL=http://supabase-gateway:8000`), đặt thêm `SUPABASE_JWT_ISSUER` bằng issuer mà Auth ghi vào JWT `iss` (public hoặc LAN). Đặt `SUPABASE_JWKS_URL` nếu JWKS phải được fetch từ một hostname server-side khác. Không đưa biến nào ra browser.
 
 Login đi qua `POST /api/auth/login` (rate-limit theo IP: tối đa ~10 lần thất bại / 15 phút). Logout: `POST /api/auth/logout`.
 
@@ -268,7 +260,7 @@ Mỗi dòng log là JSON có `"tag":"system-debug"`.
 
 ```bash
 curl -vI https://your-domain.com 2>&1 | head -40
-curl -sI "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/health"
+curl -sI "$SUPABASE_URL/auth/v1/health"
 ```
 
 Nginx cần có (app listen `:3006`):
@@ -329,8 +321,11 @@ If Tour Product photos vanish on refresh with `new row violates row-level securi
 | Library display | `gallery/{photoId}/display.webp` |
 | Library thumbnail | `gallery/{photoId}/thumb.webp` |
 | Guide avatar | `guides/{guideId}/avatar.webp` |
+| Company logo | `branding/logo-{version}.webp` |
 
-Bucket: **`photos`** (public). Users may pick JPEG/PNG/WebP of **any size** (including multi‑hundred MB / ~1 GB) — there is no hard per-file byte reject. The client always uploads the original via **chunked upload** (`init` → `chunk` × N → `complete`, 512 KB chunks streamed to temp disk). On `complete`, a **forked Sharp child** ([`lib/image-pipeline/sharp-worker.cjs`](../lib/image-pipeline/sharp-worker.cjs), disk→disk, `VIPS_DISC_THRESHOLD=8m`, concurrency **1**) builds display ≤1280px + thumb ≤400px WebP, isolated from the Next.js process. The assembled original is deleted from disk immediately after Sharp succeeds, before Storage upload. A per-user hourly quota (`lib/storage/gallery-upload-rate-limit.ts`) guards against abuse instead of a hard size cap. Stored objects are typically well under the bucket’s **5 MB** file-size limit (only display + thumb WebP — originals are never kept).
+Bucket: **`photos`** (**private**). Browser never receives `*.supabase.co/storage/v1/...` URLs — gallery images are served via `/api/photos/file`, company logo via `/api/branding/logo/file`, guide avatars via `/api/guides/avatar` (CRM BFF + service-role download). Migrations: `20260828210000_backfill_photos_storage_paths.sql`, `20260828210100_make_photos_bucket_private.sql`.
+
+Users may pick JPEG/PNG/WebP of **any size** (including multi‑hundred MB / ~1 GB) — there is no hard per-file byte reject. The client always uploads the original via **chunked upload** (`init` → `chunk` × N → `complete`, 512 KB chunks streamed to temp disk). On `complete`, a **forked Sharp child** ([`lib/image-pipeline/sharp-worker.cjs`](../lib/image-pipeline/sharp-worker.cjs), disk→disk, `VIPS_DISC_THRESHOLD=8m`, concurrency **1**) builds display ≤1280px + thumb ≤400px WebP, isolated from the Next.js process. The assembled original is deleted from disk immediately after Sharp succeeds, before Storage upload. A per-user hourly quota (`lib/storage/gallery-upload-rate-limit.ts`) guards against abuse instead of a hard size cap. Stored objects are typically well under the bucket’s **5 MB** file-size limit (only display + thumb WebP — originals are never kept).
 
 ### Upload via app
 
@@ -387,7 +382,7 @@ Two guards are in place: `npm run dev` pins `--max-old-space-size=2048` so V8 co
 ### Manual upload via Supabase Dashboard
 
 1. Storage → bucket `photos` → upload files at paths above.
-2. Table Editor → `photos`: set `url` (display public URL), `thumb_url`, `storage_path` to match.
+2. Table Editor → `photos`: set `storage_path` (e.g. `gallery/PH-001/display.webp`); `url` / `thumb_url` are CRM routes after upload via app.
 3. Reload app (hydrate pulls remote data).
 
 ### Free tier notes

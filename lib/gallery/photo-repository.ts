@@ -13,11 +13,8 @@ import {
   UNSORTED_FOLDER_ID,
   type PhotoFolder,
 } from '@/lib/gallery/photo-folders';
-import {
-  photoFolderToRow,
-  rowToPhoto,
-  rowToPhotoFolder,
-} from '@/lib/db/mappers';
+import { mapGalleryPhotoForClient } from '@/lib/gallery/gallery-photo-dto';
+import { photoFolderToRow, rowToPhotoFolder } from '@/lib/db/mappers';
 import type { Row } from '@/lib/db/mappers/shared';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
@@ -52,7 +49,17 @@ function escapeIlike(value: string): string {
 }
 
 function mapPhotoRow(raw: Row, tags: string[]): GalleryPhoto {
-  return rowToPhoto(raw, tags) as GalleryPhoto;
+  return mapGalleryPhotoForClient({
+    id: String(raw.id),
+    caption: raw.caption as string | null,
+    region: raw.region as string | null,
+    url: raw.url as string | null,
+    thumb_url: raw.thumb_url as string | null,
+    storage_path: raw.storage_path as string | null,
+    display_bytes: raw.display_bytes as number | null,
+    folder_id: raw.folder_id as string | null,
+    tags,
+  });
 }
 
 async function fetchPhotoTagsByIds(

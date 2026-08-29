@@ -45,7 +45,7 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 | Task | Owner chính | Hoàn thành khi |
 |---|---|---|
 | Ghi nhận baseline Network | A | Có capture login, dashboard và 9 feature hiện tại |
-| Inventory direct Supabase imports | B | **Done (Dev B scoped 2026-08-24):** Clients/Agents/Sales/Gallery/Weather + Dashboard — `Personal/docs/bff-inventory-index.md` |
+| Inventory direct Supabase imports | B | **Done (Dev B scoped 2026-08-24):** Clients/Agents/Sales/Gallery/Weather + Dashboard — `Personal/docs/stage-1/checklist.md` |
 | Server-only Supabase client + BFF helper | A | `lib/supabase/server.ts`, auth/permission/error primitives sẵn sàng |
 | CRM-owned HttpOnly session | A | Browser không giữ Supabase token |
 | Shared DTO/test fixtures | B | Feature owner có contract và test fixture dùng chung — **Customers Zod + fixtures: done** (`customer-list-input.ts`, `Personal/tests/customer-*.test.ts`) |
@@ -99,14 +99,14 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 - [x] Search/pagination ở server; chuyển UI/hook và optimistic update.
 - [x] Test quyền, filter, UI parity; gỡ direct browser-Supabase path.
 
-> **Done 2026-08-21 (DEV B):** `/api/customers` + repo Zod, `useCustomerPage` / register / delete, contract tests, Network filter B2B → CRM API. Notes qua `PATCH`. Hydrate/shared sync `customers` vẫn còn cho route khác (quy tắc #6 — chưa xóa sync chung). Profile inquiry/comms: **B7** `POST .../inquiry` + `.../comms`. Inventory callers: `Personal/docs/bff-customers-inventory.md`. CI script: `npm run check:supabase-leakage` (chưa hard-fail build tới cutover).
+> **Done 2026-08-21 (DEV B):** `/api/customers` + repo Zod, `useCustomerPage` / register / delete, contract tests, Network filter B2B → CRM API. Notes qua `PATCH`. Hydrate/shared sync `customers` vẫn còn cho route khác (quy tắc #6 — chưa xóa sync chung). Profile inquiry/comms: **B7** `POST .../inquiry` + `.../comms`. Chi tiết: `Personal/docs/stage-1/checklist.md` (Clients). CI script: `npm run check:supabase-leakage` (chưa hard-fail build tới cutover).
 
 ### B2 — B2B Agents
 
 - [x] Agent API/repository, UI/hook và permission test.
 - [x] Gỡ direct browser-Supabase path.
 
-> **Done 2026-08-23 (DEV B):** `/api/agents` + Zod/repo, `useAgentPage` / register / delete, contract tests. Notes via form PATCH. Hydrate/shared sync `agents` retained for dashboard/customers (rule #6). Inventory: `Personal/docs/bff-agents-inventory.md`. Network checklist: `Personal/docs/bff-agents-network-checklist.md`.
+> **Done 2026-08-23 (DEV B):** `/api/agents` + Zod/repo, `useAgentPage` / register / delete, contract tests. Notes via form PATCH. Hydrate/shared sync `agents` retained for dashboard/customers (rule #6). Chi tiết: `Personal/docs/stage-1/checklist.md` (B2B Agents).
 
 ### B3 — Sales Pipeline
 
@@ -114,7 +114,7 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 - [x] Test luồng chuyển stage, lỗi validation và UI parity.
 - [x] Gỡ direct browser-Supabase path.
 
-> **Done 2026-08-24 (DEV B):** `/api/leads` + Zod/repo, `useSalesPage` / `useUpdateLead` / `useConfirmLead` / `useApproveLeadOutline`, contract tests. Register Lead stays `/api/customers`. `PAGE_BOOT_TABLES.sales: []`; `leads`/`comms`/`bookings` in BFF denylist. Inventory: `Personal/docs/bff-sales-inventory.md`. Network checklist: `Personal/docs/bff-sales-network-checklist.md`.
+> **Done 2026-08-24 (DEV B):** `/api/leads` + Zod/repo, `useSalesPage` / `useUpdateLead` / `useConfirmLead` / `useApproveLeadOutline`, contract tests. Register Lead stays `/api/customers`. `PAGE_BOOT_TABLES.sales: []`; `leads`/`comms`/`bookings` in BFF denylist. Chi tiết: `Personal/docs/stage-1/checklist.md` (Sales Pipeline).
 
 ### B4 — Photo Gallery
 
@@ -122,7 +122,7 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 - [x] Hoàn thiện repository/API, UI/hook, permission test.
 - [x] Browser chỉ upload/call CRM origin; gỡ direct Storage/Supabase path.
 
-> **Done 2026-08-24 (DEV B):** `GET /api/photos`, `PATCH /api/photos/[id]`, `/api/photo-folders` CRUD; upload routes + `gallery.write`; hooks `useGalleryPage`, `useUpdatePhoto`, `useDeletePhoto`, `usePhotoFolderMutations`, `useEnsureGalleryCatalogLoaded`; `PAGE_BOOT_TABLES.gallery: []`; inventory/checklist `Personal/docs/bff-gallery-*`; contract tests `tests/gallery-bff.test.ts`.
+> **Done 2026-08-24 (DEV B):** `GET /api/photos`, `PATCH /api/photos/[id]`, `/api/photo-folders` CRUD; upload routes + `gallery.write`; hooks `useGalleryPage`, `useUpdatePhoto`, `useDeletePhoto`, `usePhotoFolderMutations`, `useEnsureGalleryCatalogLoaded`; `PAGE_BOOT_TABLES.gallery: []`; chi tiết `Personal/docs/stage-1/checklist.md` (Photo Gallery); contract tests `tests/gallery-bff.test.ts`.
 
 ### B5 — Weather Guide
 
@@ -135,7 +135,7 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 - [x] Aggregate `GET /api/dashboard` + `dashboard.read`; metrics server-side; Redis cache-aside.
 - [x] UI/hook; `PAGE_BOOT_TABLES.dashboard: []`; gỡ PostgREST hydrate trên `/dashboard`.
 
-> **Done 2026-08-24 (DEV B):** [`/api/dashboard`](app/api/dashboard/route.ts), [`useDashboardPage`](hooks/useDashboardPage.ts), [`dashboard-repository.ts`](lib/dashboard/dashboard-repository.ts); inventory/checklist `Personal/docs/bff-dashboard-*`; contract tests [`tests/dashboard-bff.test.ts`](tests/dashboard-bff.test.ts). Lead writes invalidate dashboard cache. Shared hydrate retained for other routes (rule #6).
+> **Done 2026-08-24 (DEV B):** [`/api/dashboard`](app/api/dashboard/route.ts), [`useDashboardPage`](hooks/useDashboardPage.ts), [`dashboard-repository.ts`](lib/dashboard/dashboard-repository.ts); chi tiết `Personal/docs/stage-1/checklist.md` (Dashboard); contract tests [`tests/dashboard-bff.test.ts`](tests/dashboard-bff.test.ts). Lead writes invalidate dashboard cache. Shared hydrate retained for other routes (rule #6).
 
 ### B7 — Hydrate / auto-sync cutover (feature đã migrate)
 
@@ -144,12 +144,14 @@ Chỉ thực hiện 9 feature dưới đây. Các feature CRM khác được ho�
 - [x] Giữ boot Bookings/Contracts (chưa migrate). Không xóa stack hydrate chung (T6.2 / cutover cuối).
 - [x] Test: `tests/b7-dev-b-hydrate-cutover.test.ts`, `tests/customer-profile-write-bff.test.ts`.
 
+> **Dev 2 D2.2 (2026-08-27):** Bookings đã cutover — `PAGE_BOOT_TABLES.bookings: []`, `/api/bookings*`, hooks BFF. Chi tiết: `docs/BFF-TASK.md` D2.2; checklist tay `Personal/docs/stage-2/checklist.md` (Bookings).
+
 ### B8 — Acceptance cuối (Dev B)
 
 - [x] Playwright browser-network (Fetch/XHR CRM-only) cho Dashboard/Clients/Agents/Sales/Gallery/Weather.
 - [x] Playwright permission 401/403 + smoke CRUD/parity cho API Dev B.
 - [x] Unit Redis-down cho Dashboard + Weather cache; invalidate soft-fail.
-- [x] Checklist tổng: `Personal/docs/bff-b8-final-acceptance.md`.
+- [x] Checklist tổng: `Personal/docs/stage-1/acceptance.md`.
 
 > **Done 2026-08-25 (DEV B):** `e2e/dev-b-network-origin.spec.ts`, `e2e/dev-b-domains.spec.ts`, `tests/dashboard-redis-down.test.ts`, `tests/weather-redis-down.test.ts`. Out of scope: T6.2 / A6 / Owner-Ops private Docker.
 

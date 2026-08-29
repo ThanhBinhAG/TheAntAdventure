@@ -4,7 +4,7 @@
 Lead pipeline utils, booking-from-lead, agent commission math, and Sales BFF contracts/repository.
 
 ## Contents
-- `sales-lead-utils.ts`, `booking-from-lead.ts`, `agents-commission.ts`
+- `sales-lead-utils.ts`, `booking-from-lead.ts` (re-exports `nextBookingId` from `lib/bookings`), `agents-commission.ts`
 - `lead-list-input.ts` — Zod list/patch contracts for BFF
 - `lead-repository.ts` — `server-only` list/patch/confirm/approve-outline
 

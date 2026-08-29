@@ -1,41 +1,20 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { buildContractHTML, downloadContractWord, printContract } from '@/lib/contracts/contract-html';
+import type { ContractListItem } from '@/lib/contracts/contract-input';
 import { localTodayIso } from '@/lib/core/date-utils';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
+import { useContractsPage } from '@/hooks/useContractsPage';
+import { useCreateContract } from '@/hooks/useCreateContract';
+import { useUpdateContract } from '@/hooks/useUpdateContract';
+import { useEnsureBookingsCatalogLoaded } from '@/hooks/useEnsureBookingsCatalogLoaded';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
-
-type Contract = {
-  id: string;
-  bookingId?: string;
-  clientName?: string;
-  nationality?: string;
-  pax?: number;
-  rooms?: string;
-  tourName?: string;
-  duration?: string;
-  departureDate?: string;
-  returnDate?: string;
-  route?: string;
-  inclusions?: string;
-  exclusions?: string;
-  flights?: string;
-  currency?: string;
-  total?: number;
-  depositPct?: number;
-  depositAmt?: number;
-  balanceDueDate?: string;
-  status?: string;
-  createdAt?: string;
-  signedAt?: string | null;
-  notes?: string;
-};
 
 const DEFAULT_INCLUSIONS = `Private English-speaking guide throughout
 All accommodation as per itinerary
@@ -72,15 +51,17 @@ function fmtDate(d?: string) {
 
 export default function Contracts() {
   const { canWrite } = usePagePermission('contracts');
-  const contracts = useStore((s) => s.contracts) as Contract[];
+  const { items: contracts, loading, error, reload } = useContractsPage();
+  const { createContract } = useCreateContract();
+  const { patchContract } = useUpdateContract();
+  const { ensureCatalog } = useEnsureBookingsCatalogLoaded();
   const bookings = useStore((s) => s.bookings);
-  const addContract = useStore((s) => s.addContract);
-  const updateContract = useStore((s) => s.updateContract);
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [showNew, setShowNew] = useState(false);
-  const [preview, setPreview] = useState<Contract | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState<ContractListItem | null>(null);
   const [form, setForm] = useState({
     bookingId: '',
     clientName: '',
@@ -101,6 +82,10 @@ export default function Contracts() {
     balanceDueDate: '',
     notes: '',
   });
+
+  useEffect(() => {
+    void ensureCatalog();
+  }, [ensureCatalog]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -138,14 +123,13 @@ export default function Contracts() {
 
   const depositAmt = form.total * (form.depositPct / 100);
 
-  const saveContract = () => {
+  const saveContract = async () => {
     if (!form.clientName || !form.tourName) {
       toast.warning('Please fill in Client Name and Tour Name.');
       return;
     }
-    const id = `CTR-${new Date().getFullYear()}-${String(contracts.length + 1).padStart(3, '0')}`;
-    const c: Contract = {
-      id,
+    setSaving(true);
+    const outcome = await createContract({
       bookingId: form.bookingId,
       clientName: form.clientName,
       nationality: form.nationality,
@@ -153,8 +137,8 @@ export default function Contracts() {
       rooms: form.rooms,
       tourName: form.tourName,
       duration: form.duration,
-      departureDate: form.departureDate,
-      returnDate: form.returnDate,
+      departureDate: form.departureDate || undefined,
+      returnDate: form.returnDate || undefined,
       route: form.route,
       inclusions: form.inclusions,
       exclusions: form.exclusions,
@@ -163,15 +147,33 @@ export default function Contracts() {
       total: form.total,
       depositPct: form.depositPct,
       depositAmt,
-      balanceDueDate: form.balanceDueDate,
+      balanceDueDate: form.balanceDueDate || undefined,
       status: 'Draft',
       createdAt: localTodayIso(),
       signedAt: null,
       notes: form.notes,
-    };
-    addContract(c as Record<string, unknown>);
+    });
+    setSaving(false);
+
+    if (!outcome.ok) {
+      toast.error(outcome.message);
+      return;
+    }
+
     setShowNew(false);
-    setPreview(c);
+    setPreview(outcome.contract);
+    await reload();
+  };
+
+  const changeStatus = async (status: string) => {
+    if (!preview || !canWrite) return;
+    const signedAt = status === 'Signed' ? localTodayIso() : null;
+    const outcome = await patchContract(preview.id, { status, signedAt });
+    if (!outcome.ok) {
+      toast.error(outcome.message);
+      return;
+    }
+    setPreview(outcome.contract);
   };
 
   return (
@@ -196,6 +198,15 @@ export default function Contracts() {
           ＋ New Contract
         </button>
       </div>
+
+      {error ? (
+        <div className="card" style={{ marginBottom: 12, color: 'var(--r)' }}>
+          {error}{' '}
+          <button type="button" className="btn btn-s btn-sm" onClick={() => void reload()}>
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       <div className="ctr-kpi-row">
         {[
@@ -230,7 +241,13 @@ export default function Contracts() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {loading && contracts.length === 0 ? (
+              <tr>
+                <td colSpan={9} style={{ padding: 24, textAlign: 'center', color: 'var(--mu)' }}>
+                  Loading contracts…
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={9} style={{ padding: 0, border: 'none' }}>
                   <EmptyState
@@ -398,8 +415,8 @@ export default function Contracts() {
                 <button className="btn btn-s" type="button" onClick={() => setShowNew(false)}>
                   Cancel
                 </button>
-                <button className="btn btn-p" type="button" onClick={saveContract}>
-                  💾 Save as Draft
+                <button className="btn btn-p" type="button" onClick={() => void saveContract()} disabled={saving}>
+                  {saving ? 'Saving…' : '💾 Save as Draft'}
                 </button>
               </div>
             </div>
@@ -417,10 +434,9 @@ export default function Contracts() {
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <select
                   value={preview.status}
-                  onChange={(e) => {
-                    updateContract(preview.id, { status: e.target.value, signedAt: e.target.value === 'Signed' ? localTodayIso() : null });
-                    setPreview({ ...preview, status: e.target.value });
-                  }}
+                  disabled={!canWrite}
+                  title={!canWrite ? 'You need write permission for Contracts to change status' : undefined}
+                  onChange={(e) => void changeStatus(e.target.value)}
                   className="ctr-status-select"
                 >
                   <option>Draft</option>

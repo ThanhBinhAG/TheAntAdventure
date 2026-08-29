@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 import { checkBreakGlassCredentials } from '@/lib/auth/break-glass';
 import { getBreakGlassSupabaseSession } from '@/lib/auth/break-glass-supabase';
 import {
-  clearLegacyCrmAuthCookies,
-  createSupabaseRouteClient,
-  setSupabaseAccessCookie,
-} from '@/lib/auth/supabase-ssr';
+  createCrmSessionExpiry,
+  setCrmSessionCookie,
+} from '@/lib/auth/crm-session-cookie';
+import { getCrmSessionRepository } from '@/lib/auth/crm-session-repository';
+import { createSupabaseAuthClient } from '@/lib/auth/supabase-auth-server';
+import { clearSupabaseAuthCookies } from '@/lib/auth/cookie-hygiene';
 import {
   checkLoginRateLimit,
   clearLoginFailures,
@@ -17,7 +19,7 @@ import { recordSuccessfulLogin } from '@/lib/auth/login-history-store';
 import { recordAuthSecurityEvent } from '@/lib/auth/security-audit';
 import { hasTrustedRequestOrigin } from '@/lib/auth/request-origin';
 import { debugLog } from '@/lib/system/debug-logger';
-import { requestLogger } from '@/lib/system/server-logger';
+import { type HttpRequestLogger, withHttpRequestLogging } from '@/lib/system/server-logger';
 
 type LoginBody = {
   identity?: string;
@@ -52,7 +54,7 @@ function authConnectivityMessage(raw: string): string {
 }
 
 function logLoginRejected(
-  logger: ReturnType<typeof requestLogger>['logger'],
+  logger: HttpRequestLogger['logger'],
   statusCode: number,
   reason: string,
   authMethod?: 'password' | 'break_glass',
@@ -68,6 +70,26 @@ function logLoginRejected(
   );
 }
 
+async function createDurableSession(response: NextResponse, input: {
+  userId: string;
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresAt: number | undefined;
+}): Promise<void> {
+  const expiresAt = createCrmSessionExpiry();
+  const accessTokenExpiresAt = new Date((input.accessTokenExpiresAt ?? Math.floor(Date.now() / 1000)) * 1000);
+  const repository = getCrmSessionRepository();
+  const session = await repository.create({
+    userId: input.userId,
+    accessToken: input.accessToken,
+    refreshToken: input.refreshToken,
+    accessTokenExpiresAt,
+    expiresAt,
+  });
+  setCrmSessionCookie(response, session.token, expiresAt);
+  void repository.cleanupExpired().catch(() => {});
+}
+
 /**
  * Audit không được làm thất bại đăng nhập.
  *
@@ -78,7 +100,7 @@ async function recordSuccessfulLoginSafely(input: {
   userId: string | null;
   authMethod: 'password' | 'break_glass';
   request: Request;
-  logger: ReturnType<typeof requestLogger>['logger'];
+  logger: HttpRequestLogger['logger'];
 }): Promise<void> {
   try {
     await recordSuccessfulLogin({
@@ -94,8 +116,9 @@ async function recordSuccessfulLoginSafely(input: {
   }
 }
 
-export async function POST(request: Request) {
-  const { logger } = requestLogger(request, 'auth/login');
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'auth/login', route: '/api/auth/login' },
+  async (request, _context, { logger }) => {
   if (!hasTrustedRequestOrigin(request)) {
     logLoginRejected(logger, 403, 'origin_invalid');
     return fail(403, 'Origin không hợp lệ.');
@@ -144,33 +167,30 @@ export async function POST(request: Request) {
         logger.error({ event: 'auth.break_glass_login_unavailable' }, 'Break-glass login unavailable');
         return fail(500, 'Break-glass session is not available.');
       }
-      const response = NextResponse.json({ ok: true, mode: 'break_glass' });
-      const supabase = createSupabaseRouteClient(request, response);
-      const { data, error } = await supabase.auth.setSession({
-        access_token: supabaseSession.access_token,
-        refresh_token: supabaseSession.refresh_token,
-      });
-      if (error || !data.session) {
+      if (!supabaseSession.user?.id) {
         logger.error(
-          { event: 'auth.break_glass_login_unavailable', err: error },
+          { event: 'auth.break_glass_login_unavailable' },
           'Break-glass login unavailable',
         );
         return fail(503, 'Không thể tạo Supabase session. Vui lòng thử lại.');
       }
-      setSupabaseAccessCookie(response, data.session);
-      clearLegacyCrmAuthCookies(response);
+      const response = NextResponse.json({ ok: true, mode: 'break_glass' });
+      await createDurableSession(response, {
+        userId: supabaseSession.user.id,
+        accessToken: supabaseSession.access_token,
+        refreshToken: supabaseSession.refresh_token,
+        accessTokenExpiresAt: supabaseSession.expires_at,
+      });
+      clearSupabaseAuthCookies(response, request.headers.get('cookie'));
       await recordSuccessfulLoginSafely({
-        userId: null,
+        userId: supabaseSession.user.id,
         authMethod: 'break_glass',
         request,
         logger,
       });
       void recordAuthSecurityEvent({
         eventType: 'login_succeeded',
-        // Route SSR uses tokens-only storage, where session.user can be an
-        // intentionally unavailable proxy. The break-glass audit remains
-        // useful without a user ID and must never break recovery login.
-        userId: null,
+        userId: supabaseSession.user.id,
         ip,
       });
       logger.info({ event: 'auth.login.succeeded', authMethod: 'break_glass' }, 'Login succeeded');
@@ -195,7 +215,7 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true, mode: 'crm' });
   let supabase;
   try {
-    supabase = createSupabaseRouteClient(request, response);
+    supabase = createSupabaseAuthClient();
   } catch (error) {
     logger.error({ event: 'auth.supabase_client_create_failed', err: error }, 'Supabase Auth client creation failed');
     await recordLoginFailure(ip);
@@ -241,8 +261,18 @@ export async function POST(request: Request) {
     return fail(401, 'Không thể tạo phiên đăng nhập.');
   }
 
-  setSupabaseAccessCookie(response, data.session);
-  clearLegacyCrmAuthCookies(response);
+  try {
+    await createDurableSession(response, {
+      userId: data.user.id,
+      accessToken: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+      accessTokenExpiresAt: data.session.expires_at,
+    });
+  } catch (error) {
+    logger.error({ event: 'auth.crm_session_create_failed', err: error }, 'CRM session creation failed');
+    return fail(503, 'Dịch vụ session tạm thời không khả dụng.');
+  }
+  clearSupabaseAuthCookies(response, request.headers.get('cookie'));
 
   // Chạy ngầm ghi lịch sử để không chặn luồng trả về kết quả cho người dùng
   void recordSuccessfulLoginSafely({
@@ -262,4 +292,5 @@ export async function POST(request: Request) {
   );
 
   return response;
-}
+  },
+);

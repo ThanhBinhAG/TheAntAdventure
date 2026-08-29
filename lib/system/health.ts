@@ -1,7 +1,8 @@
 import 'server-only';
 
 import { checkRedisHealth, type RedisHealth } from '@/lib/redis/client';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/server/env/supabase';
+import { getAppVersion } from '@/lib/server/env/app';
 import {
   getProcessMemoryMetrics,
   type ProcessMemoryMetrics,
@@ -31,7 +32,7 @@ export type HealthReport = {
 export async function runHealthCheck(): Promise<HealthReport> {
   const redisPromise = checkRedisHealth();
   const ts = new Date().toISOString();
-  const version = process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown';
+  const version = getAppVersion();
   const memory = getProcessMemoryMetrics();
 
   const url = getSupabaseUrl();

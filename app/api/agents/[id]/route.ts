@@ -7,6 +7,7 @@ import {
   getAgentById,
   updateAgent,
 } from '@/lib/agents/agent-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,9 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function GET(_request: Request, context: RouteContext) {
+export const GET = withHttpRequestLogging<RouteContext>(
+  { scope: 'agents/detail', route: '/api/agents/[id]' },
+  async (_request, context, { logger }) => {
   const permission = await checkPermissionForRequest('agents.read');
 
   if (!permission.allowed) {
@@ -49,9 +52,9 @@ export async function GET(_request: Request, context: RouteContext) {
           { status: 404 },
         );
       }
-      console.error('Không thể lấy đại lý:', error.message);
+      logger.error({ event: 'agents.get.failed', err: error }, 'Agent lookup failed');
     } else {
-      console.error('Lỗi không xác định khi lấy đại lý:', error);
+      logger.error({ event: 'agents.get.failed', err: error }, 'Agent lookup failed');
     }
 
     return NextResponse.json(
@@ -59,9 +62,12 @@ export async function GET(_request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);
 
-export async function PATCH(request: Request, context: RouteContext) {
+export const PATCH = withHttpRequestLogging<RouteContext>(
+  { scope: 'agents/detail', route: '/api/agents/[id]' },
+  async (request, context, { logger }) => {
   const permission = await checkPermissionForRequest('agents.write');
 
   if (!permission.allowed) {
@@ -111,9 +117,9 @@ export async function PATCH(request: Request, context: RouteContext) {
           { status: 404 },
         );
       }
-      console.error('Không thể cập nhật đại lý:', error.message);
+      logger.error({ event: 'agents.update.failed', err: error }, 'Agent update failed');
     } else {
-      console.error('Lỗi không xác định khi cập nhật đại lý:', error);
+      logger.error({ event: 'agents.update.failed', err: error }, 'Agent update failed');
     }
 
     return NextResponse.json(
@@ -121,9 +127,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export const DELETE = withHttpRequestLogging<RouteContext>(
+  { scope: 'agents/detail', route: '/api/agents/[id]' },
+  async (_request, context, { logger }) => {
   const permission = await checkPermissionForRequest('agents.write');
 
   if (!permission.allowed) {
@@ -161,9 +170,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
           { status: 409 },
         );
       }
-      console.error('Không thể xóa đại lý:', error.message);
+      logger.error({ event: 'agents.delete.failed', err: error }, 'Agent deletion failed');
     } else {
-      console.error('Lỗi không xác định khi xóa đại lý:', error);
+      logger.error({ event: 'agents.delete.failed', err: error }, 'Agent deletion failed');
     }
 
     return NextResponse.json(
@@ -171,4 +180,5 @@ export async function DELETE(_request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);

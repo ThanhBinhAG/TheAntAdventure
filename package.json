@@ -6,16 +6,20 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "dev": "NODE_OPTIONS=--max-old-space-size=3072 next dev -p 3006",
+    "dev": "node scripts/run-next-dev.mjs",
     "build": "next build --webpack",
     "build:with-leakage": "npm run build && npm run leakage:check",
-    "leakage:check": "bash scripts/scan-leakage.sh",
+    "leakage:check": "node scripts/check-supabase-leakage.mjs",
+    "leakage:report": "node scripts/report-supabase-leakage.mjs",
     "analyze": "ANALYZE=true next build --webpack",
     "start": "next start -p 3006",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-test-module-mocks --import tsx --test $(find tests -name '*.test.ts' 2>/dev/null | sort)",
+    "test": "node scripts/test-runner.mjs all",
+    "test:platform": "node scripts/test-runner.mjs platform",
     "test:e2e": "playwright test",
+    "final:acceptance": "node scripts/final-acceptance.mjs",
+    "session:cleanup": "node scripts/cleanup-crm-sessions.mjs",
     "db:link": "supabase link",
     "db:login": "supabase login",
     "db:migration:new": "supabase migration new",
@@ -30,10 +34,12 @@
     "docker:build": "sh scripts/docker-with-env.sh build",
     "docker:up": "sh scripts/docker-with-env.sh up",
     "docker:deploy": "sh scripts/docker-with-env.sh deploy",
+    "docker:local:up": "sh scripts/docker-with-env.sh local-up",
+    "docker:local:deploy": "sh scripts/docker-with-env.sh local-deploy",
     "docker:down": "sh scripts/docker-with-env.sh down",
     "docker:status": "sh scripts/docker-with-env.sh status",
-    "redis:up": "COMPOSE_PROJECT_NAME=the-ant-adventures-crm docker compose up -d redis",
-    "redis:down": "COMPOSE_PROJECT_NAME=the-ant-adventures-crm docker compose stop redis"
+    "redis:up": "COMPOSE_PROJECT_NAME=the-ant-adventures-crm docker compose -f docker-compose.local.yml up -d redis",
+    "redis:down": "COMPOSE_PROJECT_NAME=the-ant-adventures-crm docker compose -f docker-compose.local.yml stop redis"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

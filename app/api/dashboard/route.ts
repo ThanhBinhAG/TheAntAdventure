@@ -8,12 +8,16 @@ import {
   DashboardRepositoryError,
   getDashboardPage,
 } from '@/lib/dashboard/dashboard-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'dashboard', route: '/api/dashboard' },
+  async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('dashboard.read');
   if (!permission.allowed) {
+    logger.warn({ event: 'dashboard.permission.denied', statusCode: permission.status }, 'Dashboard permission denied');
     return NextResponse.json(
       { error: 'Bạn không có quyền xem Dashboard.' },
       { status: permission.status },
@@ -42,6 +46,7 @@ export async function GET(request: Request) {
       headers: { 'Cache-Control': 'private, max-age=15' },
     });
   } catch (err) {
+    logger.error({ event: 'dashboard.load.failed', err }, 'Dashboard load failed');
     if (err instanceof DashboardRepositoryError) {
       const status = err.code === 'config' ? 503 : 500;
       return NextResponse.json({ error: err.message }, { status });
@@ -49,4 +54,5 @@ export async function GET(request: Request) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+  },
+);

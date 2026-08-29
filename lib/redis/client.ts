@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createClient } from 'redis';
+import { serverLogger } from '@/lib/system/server-logger';
 
 type RedisClient = ReturnType<
     // node-redis uses {} for no modules, functions, scripts, or type mapping extensions.
@@ -34,7 +35,7 @@ function createRedisClient(): RedisClient {
     });
 
     client.on('error', (err) => {
-        console.warn('Redis client connection failed:', err);
+        serverLogger.warn({ scope: 'redis/client', event: 'redis.connection.failed', err }, 'Redis connection failed');
     });
 
     return client;

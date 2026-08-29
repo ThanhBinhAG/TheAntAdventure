@@ -2,68 +2,34 @@
 
 ## Purpose
 
-This document records the deployed CRM architecture before the BFF refactor. It is an evidence-based map of the codebase, not a target design.
+This is the evidence-based post-BFF platform map, last reconciled on 2026-08-29. It records implemented source controls and separately names deployment work that still needs proof.
 
 ## Components
 
 | Component | Runtime responsibility | Network role |
-|---|---|---|
-| Browser | Renders Next.js UI, holds Zustand state, hydrates and syncs business data | Calls CRM and Supabase directly |
-| CRM app | Next.js 16 application, authentication middleware, API routes, PDF/image work | Listens on port 3006 |
-| Supabase | Auth, PostgREST, Storage, and PostgreSQL business data | URL is configured as `NEXT_PUBLIC_SUPABASE_URL` |
-| Redis | Best-effort cache for selected server-side reads | Local Compose `redis` on `127.0.0.1:6379`; VM06 uses `shared_redis` |
-| Reverse proxy | Deployment concern documented for nginx; terminates TLS before CRM | Not included as a CRM Compose service |
+| --- | --- | --- |
+| Browser | Renders the CRM UI and holds UI state | Auth and business calls use the CRM origin; no Supabase credential or session token is exposed. |
+| CRM app | Next.js 16 BFF, auth/session boundary, API routes, PDF and image work | Production container retains `${APP_PORT:-3006}:3006` for the existing Ops-managed ingress. |
+| Supabase | Auth, PostgREST, Storage, and PostgreSQL business data | CRM server uses server-only `SUPABASE_URL`; production target is the private gateway `http://supabase-ant-crm-gateway:8000`. |
+| Redis | Optional cache for selected server reads and authorization data | Production has no host port; a Redis failure must fall back to the durable source of truth. |
+| Existing ingress/proxy | Public routing to CRM | Operated outside this repository; it must keep targeting the configured CRM host port. |
 
-## Current request paths
+## Request paths
 
 ```text
-Browser ──HTTPS──> CRM Next.js :3006
-Browser ──HTTPS──> Supabase API / Auth / Storage :9001
-CRM     ──TCP────> Redis :6379
-CRM     ──HTTPS──> Supabase API / Auth / Storage :9001
+Browser ──HTTPS──> Existing ingress/proxy ──host upstream──> CRM Next.js :3006
+CRM     ──private──> Supabase gateway / Auth / Storage
+CRM     ──private──> Redis (optional cache)
 ```
 
-The application Compose file includes CRM and Redis only. It does not start a Supabase stack. The CRM image receives `NEXT_PUBLIC_SUPABASE_URL` and the anon key as build arguments, which means they are embedded into the browser bundle.
-
-## Browser-to-Supabase dependencies
-
-`lib/supabase/client.ts` creates an `@supabase/ssr` browser client from `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-
-`lib/db/supabase/shared.ts` uses that browser client for the CRM's generic hydrate and sync layer. It reads and writes business tables including customers, leads, bookings, guides, products, finance, staff, tasks, photos, and suppliers. Auto-sync therefore creates direct browser-to-Supabase database traffic.
-
-The Guides page uploads avatars directly from the browser to the `photos` Storage bucket. Gallery uploads are different: their chunking and Sharp processing already use CRM API routes before the server writes to Storage.
+`docker-compose.yml` preserves the existing CRM host-port upstream and joins the private Supabase/Redis service networks. Proxy configuration is not owned or validated by this repository. The real Supabase stack is operated separately, so its public-port removal, firewall rules, DNS isolation, and running-container topology require an Ops deployment check.
 
 ## Authentication and authorization
 
-- Login and logout already use CRM API routes under `app/api/auth/`.
-- The Supabase SSR middleware uses Supabase Auth cookies and contacts Supabase to resolve or refresh the user.
-- Access-control route handlers and server helpers enforce CRM roles and permissions for several server API paths.
-- Row Level Security remains a second authorization boundary in Supabase.
+Login, refresh, logout, Proxy, and `getAuthContext()` use a durable CRM session. The browser receives only the opaque HttpOnly `crm_session` cookie; Supabase access and refresh credentials are encrypted in the server-side session store. A verified context keeps the access token request-local and can create a user-scoped server client. `bffRoute` returns safe `503` responses for temporary auth/JWKS unavailability and standardizes request IDs and structured server logging.
 
-This is a mixed architecture: some operations are mediated by CRM, while generic data sync and one Storage upload path are not.
+Redis is not a session source of truth. Cache reads and writes degrade safely when Redis is unavailable; durable sessions and authorization behavior continue through server storage/Supabase according to their permission boundary.
 
-## Redis already in source
+## Remaining cutover work
 
-`lib/redis/client.ts` is server-only and returns `null` on a connection failure, so callers must continue without cache. It uses `REDIS_URL`, defaults its connection timeout to one second, and fails a connection attempt without reconnect retries on the request path.
-
-The current implemented cache is Product facets:
-
-- Key namespace: `cache:products:facets:v1:<filter-hash>`
-- TTL: five minutes
-- Invalidation: scans and deletes that namespace after relevant writes
-- Fallback: a Redis error must not fail the Product API request
-
-`docker-compose.yml` includes a local `redis` service bound to `127.0.0.1:6379` for `npm run redis:up` / `npm run dev`. On VM06 the CRM container uses `REDIS_URL` pointing at `shared_redis` on the `shared-services` network (no Compose `depends_on` redis).
-
-## Security implications
-
-The browser currently knows the Supabase base URL and publishable/anon key, and it can send Auth, REST, and Storage requests to that URL. The service-role key is server-only, but keeping it private is insufficient for the requirement that a browser must never touch Supabase.
-
-Hiding port `9001` behind a reverse-proxy path does not meet that requirement: the browser would still reach Supabase through that path.
-
-## Constraints for the refactor
-
-- Preserve existing domain mappers and sync safety rules where possible.
-- Preserve RLS, but do not rely on it as the only authorization check once a server service role is used.
-- Preserve server-side gallery upload processing and existing Redis graceful-degradation behavior.
-- Do not expose `SUPABASE_URL`, Supabase API keys, Postgres, Studio, Storage, or Realtime to browser code or public Docker ports.
+The hard browser-leakage gate passes after the private asset/BFF cutover. Production acceptance additionally requires the durable-session migration, private dependency verifier, Supabase DNS/port isolation proof, firewall review, and planned key rotation.

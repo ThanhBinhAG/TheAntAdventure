@@ -5,7 +5,7 @@ export function createClient() {
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();
   if (!url || !key) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+    throw new Error('Browser Supabase configuration is unavailable. Use the CRM BFF instead.');
   }
   return createBrowserClient(url, key);
 }

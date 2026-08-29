@@ -4,6 +4,7 @@ import WeatherIcon from '@/components/weather/icons/WeatherIcon';
 import { useDestinationWeather } from '@/components/weather/hooks/useDestinationWeather';
 import { useResolvedCover } from '@/components/weather/hooks/useResolvedCover';
 import { weatherHeroCoverUrl } from '@/lib/weather/resolve-cover';
+import { toCrmPhotoAssetUrl } from '@/lib/gallery/storage-image-src';
 import {
   formatDayLabel,
   formatUpdatedAt,
@@ -30,6 +31,7 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
   if (!open || !destinationId) return null;
 
   const cover = weatherHeroCoverUrl(resolved);
+  const coverStyle = cover ? toCrmPhotoAssetUrl(cover) : null;
   const current = data?.current;
   const days = data?.days ?? [];
 
@@ -52,8 +54,8 @@ export default function WeatherDetailModal({ open, destinationId, meta, onClose 
           </button>
         </div>
 
-        {cover ? (
-          <div className="wg-detail-hero" style={{ backgroundImage: `url(${cover})` }} aria-hidden />
+        {coverStyle ? (
+          <div className="wg-detail-hero" style={{ backgroundImage: `url(${coverStyle})` }} aria-hidden />
         ) : (
           <div className="wg-detail-hero wg-detail-hero--ph" aria-hidden>
             <span className="wg-cover-ph-name">{meta?.name || data?.name || ''}</span>

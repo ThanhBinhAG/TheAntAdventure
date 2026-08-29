@@ -10,10 +10,13 @@ import {
   CustomerRepositoryError,
   listCustomersPage,
 } from '@/lib/customers/customer-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'customers', route: '/api/customers' },
+  async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('customers.read');
 
   if (!permission.allowed) {
@@ -64,11 +67,7 @@ export async function GET(request: Request) {
       },
     );
   } catch (error) {
-    if (error instanceof CustomerRepositoryError) {
-      console.error('Không thể lấy danh sách khách hàng:', error.message);
-    } else {
-      console.error('Lỗi không xác định khi lấy danh sách khách hàng:', error);
-    }
+    logger.error({ event: 'customers.list.failed', err: error }, 'Customer list failed');
 
     return NextResponse.json(
       {
@@ -78,9 +77,12 @@ export async function GET(request: Request) {
       { status: 500 },
     );
   }
-}
+  },
+);
 
-export async function POST(request: Request) {
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'customers', route: '/api/customers' },
+  async (request, _context, { logger }) => {
   const permission = await checkPermissionForRequest('customers.write');
 
   if (!permission.allowed) {
@@ -134,9 +136,9 @@ export async function POST(request: Request) {
           { status: 409 },
         );
       }
-      console.error('Không thể tạo khách hàng:', error.message);
+      logger.error({ event: 'customers.create.failed', err: error }, 'Customer creation failed');
     } else {
-      console.error('Lỗi không xác định khi tạo khách hàng:', error);
+      logger.error({ event: 'customers.create.failed', err: error }, 'Customer creation failed');
     }
 
     return NextResponse.json(
@@ -144,4 +146,5 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-}
+  },
+);

@@ -23,8 +23,9 @@ import {
 import {
     getSupabaseServiceRoleKey,
     getSupabaseUrl,
-} from '@/lib/env';
+} from '@/lib/server/env/supabase';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
+import { getCrmSessionRepository } from '@/lib/auth/crm-session-repository';
 
 /** Lỗi riêng để API trả HTTP status phù hợp. */
 export class AccessControlAuthAdminError extends Error {
@@ -117,6 +118,42 @@ export async function setAccessControlAuthUserActive(
             isActive
                 ? 'Không thể kích hoạt tài khoản Supabase Auth.'
                 : 'Không thể khóa tài khoản Supabase Auth.',
+            503,
+        );
+    }
+
+    if (!isActive) {
+        try {
+            await getCrmSessionRepository().revokeAllForUser(userId);
+        } catch {
+            throw new AccessControlAuthAdminError(
+                'Không thể thu hồi CRM session đang hoạt động.',
+                503,
+            );
+        }
+    }
+}
+
+/** Cập nhật mật khẩu mới cho Auth user bằng Supabase Admin SDK. */
+export async function updateAccessControlUserPassword(
+    userId: string,
+    newPassword: string,
+): Promise<void> {
+    const admin = getAccessControlAdminClient();
+    if (!admin) {
+        throw new AccessControlAuthAdminError(
+            'Máy chủ chưa cấu hình SUPABASE_SERVICE_ROLE_KEY.',
+            503,
+        );
+    }
+
+    const { error } = await admin.auth.admin.updateUserById(userId, {
+        password: newPassword,
+    });
+
+    if (error) {
+        throw new AccessControlAuthAdminError(
+            'Không thể đổi mật khẩu người dùng.',
             503,
         );
     }

@@ -5,6 +5,7 @@ import {
   GalleryRepositoryError,
   updatePhoto,
 } from '@/lib/gallery/photo-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,10 +13,13 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function PATCH(request: Request, context: RouteContext) {
+export const PATCH = withHttpRequestLogging<RouteContext>(
+  { scope: 'gallery/photos/detail', route: '/api/photos/[id]' },
+  async (request, context, { logger }) => {
   const permission = await checkPermissionForRequest('gallery.write');
 
   if (!permission.allowed) {
+    logger.warn({ event: 'gallery.permission.denied', statusCode: permission.status }, 'Gallery permission denied');
     return NextResponse.json(
       {
         ok: false,
@@ -64,6 +68,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const photo = await updatePhoto(id, parsed.data);
     return NextResponse.json({ ok: true, photo });
   } catch (error) {
+    logger.error({ event: 'gallery.photo.update.failed', err: error }, 'Gallery photo update failed');
     if (error instanceof GalleryRepositoryError) {
       const status = error.code === 'not_found' ? 404 : error.code === 'blocked' ? 409 : 500;
       return NextResponse.json({ ok: false, error: error.message }, { status });
@@ -73,4 +78,5 @@ export async function PATCH(request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);

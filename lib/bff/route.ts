@@ -6,13 +6,18 @@ import { getAuthContext, type AuthContext } from '@/lib/auth/session';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
 import type { PermissionCode } from '@/lib/auth/permissions';
-import { createHttpRequestLogger, type HttpLogContext } from '@/lib/system/server-logger';
+import {
+  createHttpRequestLogger,
+  type HttpLogContext,
+  type HttpRequestLogger,
+} from '@/lib/system/server-logger';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type BffRequestContext<TQuery = unknown, TBody = unknown> = {
   request: NextRequest;
   auth: AuthContext;
   supabase: SupabaseClient;
+  logger: HttpRequestLogger['logger'];
   query: TQuery;
   body: TBody;
 };
@@ -146,6 +151,7 @@ export function bffRoute<
         request: nextRequest,
         auth,
         supabase: handlerSupabase,
+        logger: requestLog.logger,
         query: queryData as z.infer<TQuery>,
         body: bodyData as z.infer<TBody>,
       });

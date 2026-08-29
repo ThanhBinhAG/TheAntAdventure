@@ -5,6 +5,7 @@ import {
   CustomerRepositoryError,
   createCustomerComm,
 } from '@/lib/customers/customer-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,9 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function POST(request: Request, context: RouteContext) {
+export const POST = withHttpRequestLogging<RouteContext>(
+  { scope: 'customers/comms', route: '/api/customers/[id]/comms' },
+  async (request, context, { logger }) => {
   const permission = await checkPermissionForRequest('customers.write');
 
   if (!permission.allowed) {
@@ -62,9 +65,9 @@ export async function POST(request: Request, context: RouteContext) {
           { status: 404 },
         );
       }
-      console.error('Không thể ghi communication:', error.message);
+      logger.error({ event: 'customers.comm.create.failed', err: error }, 'Customer communication creation failed');
     } else {
-      console.error('Lỗi không xác định khi ghi communication:', error);
+      logger.error({ event: 'customers.comm.create.failed', err: error }, 'Customer communication creation failed');
     }
 
     return NextResponse.json(
@@ -72,4 +75,5 @@ export async function POST(request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);

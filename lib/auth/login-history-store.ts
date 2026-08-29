@@ -12,7 +12,7 @@ import {
 import {
     getSupabaseServiceRoleKey,
     getSupabaseUrl,
-} from '@/lib/env';
+} from '@/lib/server/env/supabase';
 import type {
     LoginClientMetadata,
 } from '@/lib/auth/login-history';

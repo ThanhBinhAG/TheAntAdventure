@@ -32,7 +32,6 @@ function collectFiles(dir, out = []) {
 
 function hostnameFromEnv() {
   const raw =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
     '';
   try {

@@ -1,6 +1,6 @@
 # The Ant Adventures CRM
 
-Next.js 16 CRM for The Ant Adventures (React 19, Node 22+). **Supabase (PostgreSQL v5)** is the production data store with auto-sync.
+Next.js 16 CRM for The Ant Adventures (React 19, Node 22+). Supabase (PostgreSQL v5) is a server-only production data store.
 
 ## Quick start
 
@@ -22,7 +22,7 @@ Access Control staff-role lists, Product facets, and similar server reads cache 
 
 ```bash
 npm run redis:up
-docker compose exec redis redis-cli ping   # PONG
+docker compose -f docker-compose.local.yml exec redis redis-cli ping   # PONG
 npm run dev                                # restart if Next was already running
 ```
 
@@ -38,19 +38,26 @@ Env file (auto via `docker-with-env.sh`):
 3. `./.env.local` for local WSL/dev
 
 ```bash
-npm run docker:up            # build + run on :3006
+npm run docker:up            # deploy CRM on the existing APP_PORT upstream (default :3006)
 npm run docker:down
 # override: ENV_FILE=/path/to/.env.local npm run docker:up
 ```
 
-`NEXT_PUBLIC_*` are baked in at **image build** time. Server secrets come from the same env file at **runtime**. App data URL must be company self-host (`https://sb.mitelai.com:9001`) — never `127.0.0.1` on the VM.
+Supabase configuration is injected only at **runtime**. Production CRM must use
+`SUPABASE_URL=http://supabase-ant-crm-gateway:8000`. The CRM keeps its existing
+`${APP_PORT:-3006}:3006` host-port upstream; reverse-proxy configuration is
+operated separately and is not changed by this repository. See the
+[deployment runbook](docs/runbooks/PRIVATE-NETWORK-CUTOVER.md).
+
+For the reproducible final platform gate, run `npm run final:acceptance`. Set
+`FINAL_ACCEPTANCE_E2E=1` only on the isolated Supabase E2E target.
 
 ### Checklist when Docker CI / deploy rights are ready
 
 1. Confirm `$MNT_FDATA/sharing/.env.local` has company Supabase URL + keys (not localhost).
-2. Push `main` → GitLab job `docker` builds and deploys; or run `npm run docker:up` on the VM.
-3. Stop any leftover `npm run dev` on the host so it does not fight port **3006**.
-4. Run `npm run docker:status` (or the CI `status` step) and open the demo URL / login.
+2. Confirm the existing ingress/proxy still targets the configured `APP_PORT` (default `3006`); no proxy configuration is changed by this deploy.
+3. Push `main` → GitLab job `docker` builds, deploys, and verifies private dependencies.
+4. Run `npm run docker:status` and open the normal CRM URL / login.
 
 ## Environment variables
 
@@ -58,11 +65,8 @@ Edit **`.env.local`** (gitignored). Template: [`.env.example`](.env.example)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | When using Supabase | Project URL (Settings → API) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | When using Supabase | Anon/public key |
-| `NEXT_PUBLIC_USE_SUPABASE` | No | `true` = use Supabase (company self-host) |
-| `NEXT_PUBLIC_SUPABASE_AUTO_SYNC` | No | `true` = auto-push edits to Supabase |
-| `NEXT_PUBLIC_SUPABASE_READ_ONLY` | No | `true` = hydrate only (safe on shared DB) |
+| `SUPABASE_URL` | When using Supabase | Server-only internal project URL |
+| `SUPABASE_ANON_KEY` | When using Supabase | Server-only anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional | Server/scripts only — never expose in client |
 | `REDIS_URL` | Optional | Server cache (`redis://127.0.0.1:6379` for `npm run dev`; `npm run redis:up`) |
 

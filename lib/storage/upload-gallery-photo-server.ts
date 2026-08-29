@@ -1,6 +1,6 @@
 import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/env';
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/server/env/supabase';
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 import { getServerSupabaseClient } from '@/lib/supabase/server';
 import { pickGalleryProfile } from '@/lib/image-pipeline/profiles';
@@ -8,6 +8,11 @@ import {
   processGalleryAssetFromPath,
   type GalleryProcessedAsset,
 } from '@/lib/image-pipeline/process';
+import {
+  crmGalleryAssetUrl,
+  crmGalleryThumbUrl,
+} from '@/lib/gallery/gallery-asset-url';
+import { mapGalleryPhotoForClient } from '@/lib/gallery/gallery-photo-dto';
 import {
   galleryDeleteCandidatePaths,
   galleryDisplayPath,
@@ -41,9 +46,11 @@ export async function getPhotoStorageClient(): Promise<SupabaseClient | null> {
   return getServerSupabaseClient();
 }
 
-function publicUrl(client: SupabaseClient, path: string): string {
-  const { data } = client.storage.from(PHOTOS_BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+function crmUrlsForVariants(displayPath: string, thumbPath: string, displayBytes: number): Pick<GalleryUploadResult, 'url' | 'thumbUrl'> {
+  return {
+    url: crmGalleryAssetUrl(displayPath, displayBytes),
+    thumbUrl: crmGalleryThumbUrl(displayPath, displayBytes) ?? crmGalleryAssetUrl(thumbPath, displayBytes),
+  };
 }
 
 /** Safe to cache for a year: URLs carry `?v=displayBytes` (see `withPhotoCacheBust`). */
@@ -80,9 +87,9 @@ async function uploadVariants(
     throw err;
   }
 
+  const crmUrls = crmUrlsForVariants(displayPath, thumbPath, variants.displayBytes);
   return {
-    url: publicUrl(client, displayPath),
-    thumbUrl: publicUrl(client, thumbPath),
+    ...crmUrls,
     storagePath: displayPath,
     displayBytes: variants.displayBytes,
   };
@@ -173,17 +180,17 @@ export async function persistGalleryPhotoRow(
     if (tagErr) throw new Error(tagErr.message);
   }
 
-  return {
+  return mapGalleryPhotoForClient({
     id: meta.photoId,
     caption: meta.caption,
     region: meta.region,
-    tags: meta.tags,
     url: uploaded.url,
-    thumbUrl: uploaded.thumbUrl,
-    storagePath: uploaded.storagePath,
-    displayBytes: uploaded.displayBytes,
-    folderId: meta.folderId,
-  };
+    thumb_url: uploaded.thumbUrl,
+    storage_path: uploaded.storagePath,
+    display_bytes: uploaded.displayBytes,
+    folder_id: meta.folderId,
+    tags: meta.tags,
+  }) as GalleryPhotoApiRecord;
 }
 
 export async function deleteGalleryPhotoFilesServer(

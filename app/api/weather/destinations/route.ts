@@ -8,9 +8,13 @@ import {
   listDestinations,
 } from '@/lib/weather/destinations';
 import { destinationCreateBodySchema } from '@/lib/weather/destination-input';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
-export async function GET() {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'weather/destinations', route: '/api/weather/destinations' },
+  async (_request, _context, { logger }) => {
   if (!isWeatherBackendConfigured()) {
+    logger.error({ event: 'weather.backend.unavailable', statusCode: 503 }, 'Weather backend unavailable');
     return NextResponse.json(
       { error: 'Weather requires SUPABASE_SERVICE_ROLE_KEY on the server.' },
       { status: 503 }
@@ -19,6 +23,7 @@ export async function GET() {
 
   const permission = await checkPermissionForRequest('weather.read');
   if (!permission.allowed) {
+    logger.warn({ event: 'weather.permission.denied', statusCode: permission.status }, 'Weather permission denied');
     return weatherDeniedJson(permission);
   }
 
@@ -30,13 +35,18 @@ export async function GET() {
       { headers: { 'Cache-Control': 'private, max-age=30' } }
     );
   } catch (err) {
+    logger.error({ event: 'weather.destinations.load.failed', err }, 'Weather destinations load failed');
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+  },
+);
 
-export async function POST(request: Request) {
+export const POST = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+  { scope: 'weather/destinations', route: '/api/weather/destinations' },
+  async (request, _context, { logger }) => {
   if (!isWeatherBackendConfigured()) {
+    logger.error({ event: 'weather.backend.unavailable', statusCode: 503 }, 'Weather backend unavailable');
     return NextResponse.json(
       { error: 'Weather requires SUPABASE_SERVICE_ROLE_KEY on the server.' },
       { status: 503 }
@@ -45,6 +55,7 @@ export async function POST(request: Request) {
 
   const permission = await checkRefreshAuthorized(request);
   if (!permission.allowed) {
+    logger.warn({ event: 'weather.permission.denied', statusCode: permission.status }, 'Weather permission denied');
     return weatherDeniedJson(permission);
   }
 
@@ -65,10 +76,13 @@ export async function POST(request: Request) {
 
   try {
     const destination = await createDestination(parsed.data);
+    logger.info({ event: 'weather.destination.created' }, 'Weather destination created');
     return NextResponse.json({ destination }, { status: 201 });
   } catch (err) {
+    logger.error({ event: 'weather.destination.create.failed', err }, 'Weather destination creation failed');
     const message = err instanceof Error ? err.message : String(err);
     const status = /already exists|required|must be/i.test(message) ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
-}
+  },
+);

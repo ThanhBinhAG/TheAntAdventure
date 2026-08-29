@@ -77,7 +77,7 @@ export function createServerLogger(options?: {
       base: {
         service: 'the-ant-adventures-crm',
         environment: process.env.NODE_ENV ?? 'development',
-        version: process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown',
+        version: process.env.APP_VERSION ?? 'unknown',
       },
       redact: { paths: [...REDACT_PATHS], censor: REDACTED },
       serializers: { err: serializeError },
@@ -153,7 +153,22 @@ export function createHttpRequestLogger(
   };
 }
 
-export function requestLogger(request: Request, scope: string): { logger: Logger; requestId: string } {
-  const requestId = getOrCreateRequestId(request);
-  return { logger: serverLogger.child({ scope, requestId }), requestId };
+/**
+ * Wraps a Route Handler so every normal response emits exactly one completion
+ * event while the domain handler retains its existing response contract.
+ */
+export function withHttpRequestLogging<TContext>(
+  context: HttpLogContext,
+  handler: (
+    request: Request,
+    routeContext: TContext,
+    requestLog: HttpRequestLogger,
+  ) => Promise<Response>,
+  parentLogger: Logger = serverLogger,
+): (request: Request, routeContext: TContext) => Promise<Response> {
+  return async (request, routeContext) => {
+    const requestLog = createHttpRequestLogger(request, context, parentLogger);
+    const response = await handler(request, routeContext, requestLog);
+    return requestLog.completeResponse(response);
+  };
 }

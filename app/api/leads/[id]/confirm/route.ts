@@ -4,6 +4,7 @@ import {
   LeadRepositoryError,
   confirmLead,
 } from '@/lib/sales/lead-repository';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,9 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function POST(_request: Request, context: RouteContext) {
+export const POST = withHttpRequestLogging<RouteContext>(
+  { scope: 'sales/leads/confirm', route: '/api/leads/[id]/confirm' },
+  async (_request, context, { logger }) => {
   const permission = await checkPermissionForRequest('sales.write');
 
   if (!permission.allowed) {
@@ -43,9 +46,9 @@ export async function POST(_request: Request, context: RouteContext) {
           { status: 404 },
         );
       }
-      console.error('Không thể xác nhận lead:', error.message);
+      logger.error({ event: 'sales.leads.confirm.failed', err: error }, 'Lead confirmation failed');
     } else {
-      console.error('Lỗi không xác định khi xác nhận lead:', error);
+      logger.error({ event: 'sales.leads.confirm.failed', err: error }, 'Lead confirmation failed');
     }
 
     return NextResponse.json(
@@ -53,4 +56,5 @@ export async function POST(_request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-}
+  },
+);

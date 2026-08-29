@@ -921,11 +921,14 @@ export default function GalleryWorkspace() {
                 </button>
               )}
               {photoDisplayUrl(activeLightbox) || activeLightbox.url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <StorageImage
                   src={photoDisplayUrl(activeLightbox) || activeLightbox.url}
                   alt={activeLightbox.caption}
                   className="phlib-viewer-img"
+                  width={1200}
+                  height={800}
+                  holdUntilLoaded={false}
+                  unoptimized
                 />
               ) : (
                 <div className="phlib-viewer-missing">No image URL</div>

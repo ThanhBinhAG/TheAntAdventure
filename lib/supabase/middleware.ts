@@ -1,7 +1,4 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { SUPABASE_ACCESS_COOKIE } from '@/lib/auth/supabase-cookie-names';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/env';
 import {
   isDebugRoute,
   isSystemDebugEnabled,
@@ -9,26 +6,7 @@ import {
 } from '@/lib/system/debug-config';
 import { debugLog } from '@/lib/system/debug-logger';
 
-function accessCookieOptions(maxAge: number) {
-  return {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    path: '/',
-    maxAge,
-  };
-}
-
-function setSupabaseAccessCookie(
-  response: NextResponse,
-  accessToken: string,
-  expiresAt: number | undefined,
-  expiresIn: number | undefined,
-) {
-  const now = Math.floor(Date.now() / 1000);
-  const maxAge = Math.max(1, (expiresAt ?? now + (expiresIn ?? 0)) - now);
-  response.cookies.set(SUPABASE_ACCESS_COOKIE, accessToken, accessCookieOptions(maxAge));
-}
+const CRM_SESSION_COOKIE = 'crm_session';
 
 function redirectToLogin(request: NextRequest) {
   const redirectUrl = request.nextUrl.clone();
@@ -37,44 +15,52 @@ function redirectToLogin(request: NextRequest) {
   return NextResponse.redirect(redirectUrl);
 }
 
-function isInvalidJwtVerificationError(error: unknown): boolean {
-  return (
-    typeof error === 'object'
-    && error !== null
-    && 'name' in error
-    && (error as { name?: unknown }).name === 'AuthInvalidJwtError'
-  );
+async function validateCrmSession(request: NextRequest): Promise<{ status: number; requestId: string | null }> {
+  const validationUrl = new URL('/api/auth/session', request.url);
+  try {
+    const response = await fetch(validationUrl, {
+      headers: { cookie: request.headers.get('cookie') ?? '' },
+      cache: 'no-store',
+    });
+    return { status: response.status, requestId: response.headers.get('X-Request-Id') };
+  } catch {
+    return { status: 503, requestId: null };
+  }
 }
 
-/**
- * A JWKS/Auth outage must not be treated as a logout. Preserve any cookie
- * changes Supabase made before verification and let the browser retry later.
- */
-function claimsVerificationUnavailableResponse(
-  response: NextResponse,
-  pathname: string,
-  error: unknown,
-) {
-  debugLog('middleware', 'Supabase claims verification temporarily unavailable', {
-    level: 'warn',
-    meta: {
-      pathname,
-      errorName: error instanceof Error ? error.name : 'unknown',
-    },
-  });
-
-  const unavailable = new NextResponse(null, {
-    status: 503,
-    headers: { 'Retry-After': '30' },
-  });
-  for (const cookie of response.cookies.getAll()) unavailable.cookies.set(cookie);
-  return unavailable;
+function clearLegacySupabaseCookies(response: NextResponse, request: NextRequest): NextResponse {
+  for (const cookie of request.cookies.getAll()) {
+    if (
+      cookie.name === 'sb-crm-access-token'
+      || (cookie.name.startsWith('sb-') && cookie.name.includes('-auth-token'))
+      || cookie.name === 'crm_access'
+      || cookie.name === 'crm_supabase_access'
+      || cookie.name === 'bg_session'
+    ) {
+      response.cookies.set(cookie.name, '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 0,
+      });
+    }
+  }
+  return response;
 }
 
-/**
- * Proxy refreshes Supabase SSR cookies only for page navigation. BFF routes
- * verify the mirrored Supabase JWT themselves so API requests stay stateless.
- */
+function clearInvalidCrmSession(response: NextResponse): NextResponse {
+  response.cookies.set(CRM_SESSION_COOKIE, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  });
+  return response;
+}
+
+/** Proxy validates the CRM-owned opaque session without creating Supabase cookies. */
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isLoginPage = pathname === '/login';
@@ -92,83 +78,36 @@ export async function updateSession(request: NextRequest) {
     return new NextResponse(null, { status: 404 });
   }
 
-  const url = getSupabaseUrl();
-  const key = getSupabaseAnonKey();
-  if (!url || !key) {
-    return isLoginPage ? NextResponse.next({ request }) : redirectToLogin(request);
+  if (!request.cookies.get(CRM_SESSION_COOKIE)?.value) {
+    const response = isLoginPage ? NextResponse.next({ request }) : redirectToLogin(request);
+    return clearLegacySupabaseCookies(response, request);
   }
 
-  let response = NextResponse.next({ request });
-  const supabase = createServerClient(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-      persistSession: true,
-    },
-    cookies: {
-      encode: 'tokens-only',
-      getAll: () => request.cookies.getAll(),
-      setAll: (cookiesToSet, headers) => {
-        for (const cookie of cookiesToSet) {
-          request.cookies.set(cookie.name, cookie.value);
-        }
-        response = NextResponse.next({ request });
-        for (const cookie of cookiesToSet) {
-          response.cookies.set(cookie.name, cookie.value, {
-            ...cookie.options,
-            path: '/',
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-          });
-        }
-        for (const [name, value] of Object.entries(headers)) {
-          response.headers.set(name, value);
-        }
+  const validation = await validateCrmSession(request);
+  if (validation.status === 503) {
+    debugLog('middleware', 'CRM session validation temporarily unavailable', {
+      level: 'warn',
+      meta: { pathname },
+    });
+    return new NextResponse(null, {
+      status: 503,
+      headers: {
+        'Retry-After': '30',
+        ...(validation.requestId ? { 'X-Request-Id': validation.requestId } : {}),
       },
-    },
-  });
-
-  const { data: sessionData } = await supabase.auth.getSession();
-  const session = sessionData.session;
-  let claimsSubject: string | null = null;
-  if (session) {
-    try {
-      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(session.access_token);
-      if (claimsError && !isInvalidJwtVerificationError(claimsError)) {
-        return claimsVerificationUnavailableResponse(response, pathname, claimsError);
-      }
-      claimsSubject = typeof claimsData?.claims?.sub === 'string' ? claimsData.claims.sub : null;
-    } catch (error) {
-      return claimsVerificationUnavailableResponse(response, pathname, error);
-    }
+    });
   }
-
-  if (!session || !claimsSubject) {
-    if (isLoginPage) return response;
-    debugLog('middleware', 'Unauthenticated Supabase session', { meta: { pathname } });
-    const redirect = redirectToLogin(request);
-    redirect.cookies.set(SUPABASE_ACCESS_COOKIE, '', accessCookieOptions(0));
-    return redirect;
-  }
-
-  if (request.cookies.get(SUPABASE_ACCESS_COOKIE)?.value !== session.access_token) {
-    setSupabaseAccessCookie(
-      response,
-      session.access_token,
-      session.expires_at,
-      session.expires_in,
-    );
+  if (validation.status !== 200) {
+    const response = isLoginPage ? NextResponse.next({ request }) : redirectToLogin(request);
+    return clearLegacySupabaseCookies(clearInvalidCrmSession(response), request);
   }
 
   if (isLoginPage) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/dashboard';
     redirectUrl.search = '';
-    const redirect = NextResponse.redirect(redirectUrl);
-    for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
-    return redirect;
+    return clearLegacySupabaseCookies(NextResponse.redirect(redirectUrl), request);
   }
 
-  return response;
+  return clearLegacySupabaseCookies(NextResponse.next({ request }), request);
 }

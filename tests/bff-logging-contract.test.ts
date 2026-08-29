@@ -184,32 +184,48 @@ test('BFF routes keep static logging metadata for every wrapper call', () => {
   assert.deepEqual(missingMetadata, []);
 });
 
+test('Phase 3 sensitive direct routes use the HTTP completion wrapper', () => {
+  const root = process.cwd();
+  const routes = [
+    'app/api/auth/logout/route.ts',
+    'app/api/auth/permissions/route.ts',
+    'app/api/auth/users/route.ts',
+    'app/api/access-control/route.ts',
+    'app/api/access-control/audit-logs/route.ts',
+    'app/api/access-control/login-history/route.ts',
+    'app/api/access-control/staff-roles/route.ts',
+    'app/api/access-control/super-admin-status/route.ts',
+    'app/api/access-control/users/route.ts',
+    'app/api/photos/[id]/route.ts',
+    'app/api/photos/delete/route.ts',
+    'app/api/photos/upload/init/route.ts',
+    'app/api/photos/upload/chunk/route.ts',
+    'app/api/photos/upload/complete/route.ts',
+    'app/api/branding/logo/route.ts',
+    'app/api/dashboard/route.ts',
+    'app/api/sidebar/badges/route.ts',
+    'app/api/weather/boot/route.ts',
+    'app/api/weather/destination/route.ts',
+    'app/api/weather/destination/refresh/route.ts',
+    'app/api/weather/destinations/route.ts',
+    'app/api/weather/destinations/[id]/route.ts',
+    'app/api/weather/destinations/featured/route.ts',
+    'app/api/weather/refresh/route.ts',
+    'app/api/weather/weekly/route.ts',
+  ];
+
+  const missingLogging = routes.filter(
+    (route) => !readFileSync(join(root, route), 'utf8').includes('withHttpRequestLogging'),
+  );
+
+  assert.deepEqual(missingLogging, []);
+});
+
 test('server console logging is restricted to the explicit migration allowlist', () => {
   const root = process.cwd();
   const allowedConsoleCallCounts = new Map([
-    ['app/api/agents/[id]/route.ts', 6],
-    ['app/api/agents/route.ts', 4],
-    ['app/api/customers/[id]/comms/route.ts', 2],
-    ['app/api/customers/[id]/inquiry/route.ts', 2],
-    ['app/api/customers/[id]/profile/route.ts', 2],
-    ['app/api/customers/[id]/route.ts', 6],
-    ['app/api/customers/email-check/route.ts', 2],
-    ['app/api/customers/route.ts', 4],
-    ['app/api/leads/[id]/approve-outline/route.ts', 2],
-    ['app/api/leads/[id]/confirm/route.ts', 2],
-    ['app/api/leads/[id]/route.ts', 4],
-    ['app/api/leads/route.ts', 2],
-    ['app/api/photo-folders/route.ts', 1],
-    ['app/api/photos/route.ts', 2],
-    ['app/api/products/facets/route.ts', 2],
-    ['app/api/products/route.ts', 2],
-    ['lib/dashboard/dashboard-repository.ts', 1],
     ['lib/db/supabase/table-api.ts', 6],
-    ['lib/redis/cache-helper.ts', 5],
-    ['lib/redis/client.ts', 1],
-    ['lib/redis/product-facets.ts', 1],
     ['lib/system/client-logger.ts', 3],
-    ['lib/system/debug-logger.ts', 1],
   ]);
   const files: string[] = [];
   const collect = (directory: string) => {

@@ -1,17 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
 import { getCustomerName } from '@/lib/core/crm-utils';
 import { parseMoneyInput } from '@/lib/core/money';
+import { formatBookingTravelLabel } from '@/lib/bookings/booking-dates';
 import { useStore } from '@/hooks/useStore';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
+import { useBookingsPage } from '@/hooks/useBookingsPage';
+import { useCreateBooking } from '@/hooks/useCreateBooking';
+import { useUpdateBooking } from '@/hooks/useUpdateBooking';
+import { useEnsureCustomersCatalogLoaded } from '@/hooks/useEnsureCustomersCatalogLoaded';
 import PaginationBar from '@/components/PaginationBar';
+import EmptyState from '@/components/EmptyState';
 import type { Booking } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import BookingFormModal from '@/components/bookings/BookingFormModal';
 import {
   BookingDetailModal,
   type BookingChange,
@@ -27,26 +34,13 @@ const STATUS_COLORS: Record<string, string> = {
   Cancelled: 'bdg-r',
 };
 
-
-const emptyNewBooking = {
-  custId: '',
-  tour: '',
-  pax: 2,
-  start: '',
-  end: '',
-  total: 0,
-  deposit: 0,
-  status: 'Confirmed',
-  guide: '',
-  hotel: '',
-};
-
 export default function BookingsPage() {
   const { canWrite } = usePagePermission('bookings');
-  const bookings = useStore((s) => s.bookings);
+  const { items, loading, error, reload } = useBookingsPage();
+  const { createBooking } = useCreateBooking();
+  const { patchBooking } = useUpdateBooking();
+  const { ensureCatalog } = useEnsureCustomersCatalogLoaded();
   const customers = useStore((s) => s.customers);
-  const addBooking = useStore((s) => s.addBooking);
-  const updateBooking = useStore((s) => s.updateBooking);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [otTab, setOtTab] = useState<OtTab>('add');
@@ -54,74 +48,61 @@ export default function BookingsPage() {
   const [statusF, setStatusF] = useState('');
   const [monthF, setMonthF] = useState('');
   const [showNew, setShowNew] = useState(false);
-  const [newBk, setNewBk] = useState(emptyNewBooking);
-  const [totalInput, setTotalInput] = useState('');
-  const [depositInput, setDepositInput] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    void ensureCatalog();
+  }, [ensureCatalog]);
 
   const openNewBooking = () => {
-    setNewBk(emptyNewBooking);
-    setTotalInput('');
-    setDepositInput('');
+    void ensureCatalog();
     setShowNew(true);
   };
 
-  const formatMoneyBlur = (raw: string, setter: (v: string) => void) => {
-    const n = parseMoneyInput(raw, { absolute: true });
-    setter(n ? fmt(n) : '');
-    return n;
-  };
+  const customerNameFor = (custId: string, fallback?: string) =>
+    fallback || getCustomerName(customers, custId);
 
-  const selected = bookings.find((b) => b.id === selectedId) || null;
+  const selected = items.find((b) => b.id === selectedId) || null;
 
   const filtered = useMemo(
     () =>
-      bookings.filter((b) => {
+      items.filter((b) => {
         if (statusF && b.status !== statusF) return false;
-        if (monthF && !`${b.start} ${b.end}`.toLowerCase().includes(monthF.toLowerCase().slice(0, 3))) return false;
-        const client = getCustomerName(customers, b.custId).toLowerCase();
+        if (monthF && !`${b.start} ${b.end}`.toLowerCase().includes(monthF.toLowerCase().slice(0, 3)))
+          return false;
+        const client = (b.customerName || getCustomerName(customers, b.custId)).toLowerCase();
         const q = search.toLowerCase();
-        if (q && !b.id.toLowerCase().includes(q) && !b.tour.toLowerCase().includes(q) && !client.includes(q)) return false;
+        if (q && !b.id.toLowerCase().includes(q) && !b.tour.toLowerCase().includes(q) && !client.includes(q))
+          return false;
         return true;
       }),
-    [bookings, customers, search, statusF, monthF]
+    [items, customers, search, statusF, monthF],
   );
 
   const { pageSize, setPageSize } = usePageSize();
   const pagination = usePagination(filtered, pageSize, [search, statusF, monthF, pageSize]);
   const { paginatedItems } = pagination;
 
-  const saveNewBooking = () => {
-    if (!newBk.custId || !newBk.tour) {
-      toast.warning('Please select a customer and enter tour name.');
-      return;
-    }
-    const total = parseMoneyInput(totalInput, { absolute: true });
-    let deposit = parseMoneyInput(depositInput, { absolute: true });
-    if (deposit > total) deposit = total;
-    const n = bookings.length + 1;
-    const id = `BK-2026-${String(n).padStart(3, '0')}`;
-    addBooking({
-      id,
-      custId: newBk.custId,
-      tour: newBk.tour,
-      pax: newBk.pax,
-      start: newBk.start || 'TBD',
-      end: newBk.end || 'TBD',
-      total,
-      deposit,
-      status: newBk.status,
-      guide: newBk.guide,
-      hotel: newBk.hotel,
-      changes: [],
-      guideAlertPending: false,
-    });
-    setShowNew(false);
-    setNewBk(emptyNewBooking);
-    setTotalInput('');
-    setDepositInput('');
+  const hasActiveFilters = Boolean(search.trim() || statusF || monthF);
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatusF('');
+    setMonthF('');
   };
 
-  const saveOnTourChange = (type: OtTab, payload: Record<string, unknown>) => {
+  const handleCreateBooking = async (booking: Parameters<typeof createBooking>[0]) => {
+    setSaving(true);
+    const result = await createBooking(booking);
+    setSaving(false);
+    if (result.ok) {
+      await reload();
+      toast.success('Booking created.');
+    }
+    return result;
+  };
+
+  const saveOnTourChange = async (type: OtTab, payload: Record<string, unknown>) => {
     if (!selected) return;
     const now = new Date();
     const entry: BookingChange = {
@@ -149,11 +130,22 @@ export default function BookingsPage() {
       if (payload.end) updates.end = String(payload.end);
       if (payload.hotel) updates.hotel = String(payload.hotel);
     }
-    updateBooking(selected.id, updates);
+    const result = await patchBooking(selected.id, updates);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    await reload();
   };
 
-  const markGuideNotified = () => {
-    if (selected) updateBooking(selected.id, { guideAlertPending: false });
+  const markGuideNotified = async () => {
+    if (!selected) return;
+    const result = await patchBooking(selected.id, { guideAlertPending: false });
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    await reload();
   };
 
   return (
@@ -172,6 +164,15 @@ export default function BookingsPage() {
           📋 View Feedback Log
         </Link>
       </div>
+
+      {error && (
+        <div className="card" style={{ marginBottom: 12, padding: 12, color: 'var(--red)' }}>
+          {error}{' '}
+          <button className="btn btn-s btn-sm" type="button" onClick={() => void reload()}>
+            Retry
+          </button>
+        </div>
+      )}
 
       <div className="search-row">
         <input placeholder="Search bookings..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -198,7 +199,7 @@ export default function BookingsPage() {
           className="btn btn-p btn-sm"
           type="button"
           onClick={openNewBooking}
-          disabled={!canWrite}
+          disabled={!canWrite || loading}
           title={!canWrite ? 'You need write permission for Bookings to create a booking' : undefined}
         >
           + New Booking
@@ -224,159 +225,126 @@ export default function BookingsPage() {
               </tr>
             </thead>
             <tbody>
-              {paginatedItems.map((b) => {
-                const bal = b.total - b.deposit;
-                const isOnTour = b.status === 'On Tour';
-                const changes = (b.changes as BookingChange[]) || [];
-                return (
-                  <tr
-                    key={b.id}
-                    style={{ cursor: 'pointer' }}
-                    className={isOnTour ? 'bk-on-tour-row' : undefined}
-                    onClick={() => setSelectedId(b.id)}
-                  >
-                    <td>
-                      <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{b.id}</code>
-                      {b.guideAlertPending && (
-                        <span className="bk-guide-alert" title="Guide not yet notified">
-                          ⚠ Guide
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <b>{getCustomerName(customers, b.custId)}</b>
-                    </td>
-                    <td>
-                      {b.tour}
-                      {changes.length > 0 && <span className="bk-changes-badge">{changes.length} change{changes.length > 1 ? 's' : ''}</span>}
-                    </td>
-                    <td>{b.pax}</td>
-                    <td>
-                      {b.start}–{b.end} 2026
-                    </td>
-                    <td style={{ fontWeight: 600 }}>${fmt(b.total)}</td>
-                    <td style={{ color: 'var(--blue)' }}>${fmt(b.deposit)}</td>
-                    <td style={{ color: bal > 0 ? 'var(--amb)' : 'var(--g)', fontWeight: 600 }}>${fmt(bal)}</td>
-                    <td>
-                      <span className={`bdg ${STATUS_COLORS[b.status] || 'bdg-w'}`}>{b.status}</span>
-                    </td>
-                    <td>{b.guide || '—'}</td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <button className="bk-forms-btn" type="button">
-                        📋 Generate
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {loading && items.length === 0 ? (
+                <tr>
+                  <td colSpan={11} style={{ padding: 16, color: 'var(--m)' }}>
+                    Loading bookings…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={11} style={{ padding: 0, border: 'none' }}>
+                    <EmptyState
+                      className="crm-empty-state--table"
+                      size="compact"
+                      variant="tasks"
+                      title={hasActiveFilters ? 'No bookings match your filters' : 'No bookings yet'}
+                      description={
+                        hasActiveFilters
+                          ? 'Try a different search term, status, or month — or clear filters to see all bookings.'
+                          : 'Create a booking from a confirmed lead, or add one manually to start tracking deposits and travel dates.'
+                      }
+                      action={
+                        <>
+                          {hasActiveFilters && (
+                            <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
+                              Clear filters
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-p btn-sm"
+                            onClick={openNewBooking}
+                            disabled={!canWrite || loading}
+                            title={
+                              !canWrite ? 'You need write permission for Bookings to create a booking' : undefined
+                            }
+                          >
+                            + New Booking
+                          </button>
+                        </>
+                      }
+                    />
+                  </td>
+                </tr>
+              ) : (
+                paginatedItems.map((b) => {
+                  const bal = b.total - b.deposit;
+                  const isOnTour = b.status === 'On Tour';
+                  const changes = (b.changes as BookingChange[]) || [];
+                  return (
+                    <tr
+                      key={b.id}
+                      style={{ cursor: 'pointer' }}
+                      className={isOnTour ? 'bk-on-tour-row' : undefined}
+                      onClick={() => setSelectedId(b.id)}
+                    >
+                      <td>
+                        <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{b.id}</code>
+                        {b.guideAlertPending && (
+                          <span className="bk-guide-alert" title="Guide not yet notified">
+                            ⚠ Guide
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <b>{customerNameFor(b.custId, b.customerName)}</b>
+                      </td>
+                      <td>
+                        {b.tour}
+                        {changes.length > 0 && (
+                          <span className="bk-changes-badge">
+                            {changes.length} change{changes.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </td>
+                      <td>{b.pax}</td>
+                      <td>{formatBookingTravelLabel(b.start, b.end)}</td>
+                      <td style={{ fontWeight: 600 }}>${fmt(b.total)}</td>
+                      <td style={{ color: 'var(--blue)' }}>${fmt(b.deposit)}</td>
+                      <td style={{ color: bal > 0 ? 'var(--amb)' : 'var(--g)', fontWeight: 600 }}>
+                        ${fmt(bal)}
+                      </td>
+                      <td>
+                        <span className={`bdg ${STATUS_COLORS[b.status] || 'bdg-w'}`}>{b.status}</span>
+                      </td>
+                      <td>{b.guide || '—'}</td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <button className="bk-forms-btn" type="button">
+                          📋 Generate
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
           <PaginationBar {...pagination} onPageSizeChange={setPageSize} />
         </div>
       </div>
 
-      {showNew && (
-        <div className="overlay open" onClick={() => setShowNew(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 640 }}>
-            <div className="modal-hd modal-hd-green">
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>+ New Booking</span>
-              <button className="modal-close-btn" type="button" onClick={() => setShowNew(false)}>
-                ✕
-              </button>
-            </div>
-            <div className="modal-body" style={{ padding: 20 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="fg">
-                  <label className="lbl">
-                    Customer <span className="req">*</span>
-                  </label>
-                  <select value={newBk.custId} onChange={(e) => setNewBk({ ...newBk, custId: e.target.value })}>
-                    <option value="">— Select customer —</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="fg">
-                  <label className="lbl">
-                    Tour Name <span className="req">*</span>
-                  </label>
-                  <input value={newBk.tour} onChange={(e) => setNewBk({ ...newBk, tour: e.target.value })} placeholder="North Vietnam Classic 12D" />
-                </div>
-                <div className="fg">
-                  <label className="lbl">Pax</label>
-                  <input type="number" min={1} value={newBk.pax} onChange={(e) => setNewBk({ ...newBk, pax: +e.target.value })} />
-                </div>
-                <div className="fg">
-                  <label className="lbl">Status</label>
-                  <select value={newBk.status} onChange={(e) => setNewBk({ ...newBk, status: e.target.value })}>
-                    <option>Confirmed</option>
-                    <option>Deposit Paid</option>
-                    <option>Fully Paid</option>
-                    <option>On Tour</option>
-                  </select>
-                </div>
-                <div className="fg">
-                  <label className="lbl">Start Date</label>
-                  <input placeholder="Oct 12" value={newBk.start} onChange={(e) => setNewBk({ ...newBk, start: e.target.value })} />
-                </div>
-                <div className="fg">
-                  <label className="lbl">End Date</label>
-                  <input placeholder="Oct 23" value={newBk.end} onChange={(e) => setNewBk({ ...newBk, end: e.target.value })} />
-                </div>
-                <div className="fg">
-                  <label className="lbl">Total (USD)</label>
-                  <input
-                    type="text"
-                    value={totalInput}
-                    placeholder="e.g. 22,000 or $22000"
-                    onChange={(e) => setTotalInput(e.target.value)}
-                    onBlur={() => formatMoneyBlur(totalInput, setTotalInput)}
-                  />
-                </div>
-                <div className="fg">
-                  <label className="lbl">Deposit (USD)</label>
-                  <input
-                    type="text"
-                    value={depositInput}
-                    placeholder="e.g. 6,600"
-                    onChange={(e) => setDepositInput(e.target.value)}
-                    onBlur={() => formatMoneyBlur(depositInput, setDepositInput)}
-                  />
-                </div>
-                <div className="fg">
-                  <label className="lbl">Guide</label>
-                  <input value={newBk.guide} onChange={(e) => setNewBk({ ...newBk, guide: e.target.value })} placeholder="Minh N." />
-                </div>
-                <div className="fg">
-                  <label className="lbl">Hotel</label>
-                  <input value={newBk.hotel} onChange={(e) => setNewBk({ ...newBk, hotel: e.target.value })} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-                <button className="btn btn-s" type="button" onClick={() => setShowNew(false)}>
-                  Cancel
-                </button>
-                <button className="btn btn-p" type="button" onClick={saveNewBooking}>
-                  ✓ Create Booking
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <BookingFormModal
+        open={showNew}
+        customers={customers}
+        saving={saving}
+        onClose={() => setShowNew(false)}
+        onCreate={handleCreateBooking}
+      />
 
       {selected && (
         <BookingDetailModal
           booking={selected}
-          customerName={getCustomerName(customers, selected.custId)}
+          customerName={customerNameFor(selected.custId, selected.customerName)}
           otTab={otTab}
           setOtTab={setOtTab}
           onClose={() => setSelectedId(null)}
-          onSaveChange={saveOnTourChange}
-          onMarkNotified={markGuideNotified}
+          onSaveChange={(type, payload) => {
+            void saveOnTourChange(type, payload);
+          }}
+          onMarkNotified={() => {
+            void markGuideNotified();
+          }}
         />
       )}
     </div>

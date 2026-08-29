@@ -12,18 +12,20 @@ Tasks are ordered by dependency. Do not remove a direct browser-Supabase path un
 
 This first BFF delivery is intentionally limited to the following features. All other CRM domains in later generic phases are deferred and must not expand the current sprint scope.
 
-| Feature | Owner | End-to-end responsibility |
-|---|---|---|
-| Auth & Session | Developer A | Login/logout, HttpOnly CRM session, refresh/revoke, middleware, permission enforcement, tests |
-| Daily Planner | Developer A | Repository/API, authorization, UI/hook migration, tests |
-| Attraction Schedule | Developer A | Province attraction data, schedule API, UI/hook migration, tests |
-| Tour Design | Developer A | Draft/outline API, child-record writes, UI/hook migration, tests |
-| Tour Product | Developer A | Product/pricing API, Redis cache, UI/hook migration, tests |
-| Clients | Developer B | Customer API, search/pagination, UI/hook migration, tests |
-| B2B Agents | Developer B | Agent API, UI/hook migration, tests |
-| Sales Pipeline | Developer B | Lead/pipeline API, UI/hook migration, tests |
-| Photo Gallery | Developer B | Gallery metadata, upload/delete CRM APIs, UI/hook migration, tests |
-| Weather Guide | Developer B | Weather read/refresh APIs, UI/hook migration, tests |
+
+| Feature             | Owner       | End-to-end responsibility                                                                     |
+| ------------------- | ----------- | --------------------------------------------------------------------------------------------- |
+| Auth & Session      | Developer A | Login/logout, HttpOnly CRM session, refresh/revoke, middleware, permission enforcement, tests |
+| Daily Planner       | Developer A | Repository/API, authorization, UI/hook migration, tests                                       |
+| Attraction Schedule | Developer A | Province attraction data, schedule API, UI/hook migration, tests                              |
+| Tour Design         | Developer A | Draft/outline API, child-record writes, UI/hook migration, tests                              |
+| Tour Product        | Developer A | Product/pricing API, Redis cache, UI/hook migration, tests                                    |
+| Clients             | Developer B | Customer API, search/pagination, UI/hook migration, tests                                     |
+| B2B Agents          | Developer B | Agent API, UI/hook migration, tests                                                           |
+| Sales Pipeline      | Developer B | Lead/pipeline API, UI/hook migration, tests                                                   |
+| Photo Gallery       | Developer B | Gallery metadata, upload/delete CRM APIs, UI/hook migration, tests                            |
+| Weather Guide       | Developer B | Weather read/refresh APIs, UI/hook migration, tests                                           |
+
 
 For every feature, its owner delivers the repository/API, authorization, cache invalidation where applicable, UI caller, tests, and removal of its direct browser-Supabase path. The second developer reviews the completed feature.
 
@@ -31,16 +33,20 @@ For every feature, its owner delivers the repository/API, authorization, cache i
 
 Each developer owns an entire feature vertically: repository, BFF API, authorization, Redis invalidation where applicable, UI/hooks, tests, and removal of that feature's direct browser-Supabase path. Do not divide one feature into a Developer A backend half and a Developer B frontend half. Infrastructure is owned by the user/Owner-Ops, not either developer. Neither developer removes shared legacy sync code until the final integration phase.
 
-| Phase | Developer A — end-to-end feature owner | Developer B — end-to-end feature owner | Integration checkpoint |
-|---|---|---|---|
-| 0 | T0.1 current traffic baseline; T0.3 CI leakage check | T0.2 direct-import inventory and UI/domain map | Agree the inventory and API contract list |
-| 1 | **Owner-Ops:** private Docker topology and internal Supabase handoff | **Owner-Ops:** Redis, reverse proxy, secrets, and deployment verification | Private development environment handed to both developers |
-| 2 | T2.1 server Supabase client; T2.2 BFF primitives; T2.3 CRM sessions | DTO contracts and shared test fixtures | Merge shared contract types before domain APIs |
-| 3 | Shared cache helper and cache policy | Redis-down test harness and cache regression tests | Cache policy review |
-| 4 | **Tour Product end-to-end:** API, Redis cache, UI, test | **Photo Gallery end-to-end:** upload/delete APIs, UI, test | Browser traffic audit for these features |
-| 5 | **Daily Planner and Attraction Schedule end-to-end** | **Clients and B2B Agents end-to-end** | Merge one completed vertical feature at a time |
-| 6 | **Tour Design end-to-end** | **Sales Pipeline and Weather Guide end-to-end** | No new direct Supabase import allowed |
-| 7 | Coordinate removal of public configuration with Owner-Ops | Parity, permissions, and browser acceptance | Final cutover together |
+
+| Phase | Developer A — end-to-end feature owner                               | Developer B — end-to-end feature owner                                    | Integration checkpoint                                    |
+| ----- | -------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 0     | T0.1 current traffic baseline; T0.3 CI leakage check                 | T0.2 direct-import inventory and UI/domain map                            | Agree the inventory and API contract list                 |
+| 1     | **Owner-Ops:** private Docker topology and internal Supabase handoff | **Owner-Ops:** Redis, reverse proxy, secrets, and deployment verification | Private development environment handed to both developers |
+| 2     | T2.1 server Supabase client; T2.2 BFF primitives; T2.3 CRM sessions  | DTO contracts and shared test fixtures                                    | Merge shared contract types before domain APIs            |
+| 3     | Shared cache helper and cache policy                                 | Redis-down test harness and cache regression tests                        | Cache policy review                                       |
+| 4     | **Tour Product end-to-end:** API, Redis cache, UI, test              | **Photo Gallery end-to-end:** upload/delete APIs, UI, test                | Browser traffic audit for these features                  |
+| 5     | **Daily Planner and Attraction Schedule end-to-end**                 | **Clients and B2B Agents end-to-end**                                     | Merge one completed vertical feature at a time            |
+| 6     | **Tour Design end-to-end**                                           | **Sales Pipeline and Weather Guide end-to-end**                           | No new direct Supabase import allowed                     |
+| 7     | Coordinate removal of public configuration with Owner-Ops            | Parity, permissions, and browser acceptance                               | Final cutover together                                    |
+
+
+
 
 ### Owner-Ops prerequisite: private infrastructure
 
@@ -51,6 +57,8 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
 - [ ] Server-only `SUPABASE_URL` service hostname, runtime-secret injection method, and CRM development endpoint.
 - [ ] Redis `REDIS_URL`, health verification, reverse-proxy configuration, firewall configuration, and deployment validation.
 - [ ] Evidence that CRM can reach Supabase internally while a browser cannot resolve or reach Supabase.
+
+
 
 ### Developer A task list
 
@@ -63,27 +71,37 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
 - [x] A5. Complete Tour Design end-to-end: BFF reference data, draft/outline API/repository, atomic Outline → Lead/Comm workflow, UI/hooks, tests, and direct-path removal.
 - [ ] A6. Coordinate final removal of public Supabase runtime/build configuration with Owner-Ops after all nine scoped features pass acceptance.
 
+
+
 ### Developer B task list
 
-- [x] B0. Produce and maintain the direct browser-Supabase inventory, mapping every caller to an API replacement. *(Dev B scoped complete 2026-08-24: Clients, Agents, Sales, Gallery, Weather + Dashboard — see `Personal/docs/bff-inventory-index.md`.)*
+
+- [x] B0. Produce and maintain the direct browser-Supabase inventory, mapping every caller to an API replacement. *(Dev B scoped complete 2026-08-24: Clients, Agents, Sales, Gallery, Weather + Dashboard — see* `Personal/docs/bff-inventory-index.md`*.)*
+
 - [x] B1. Define shared domain DTOs and test fixtures jointly with Developer A. *(Customers contract + fixtures shipped; expand as Agents/Sales land.)*
 - [x] B2. Complete Clients end-to-end: customer API/repository, server search/pagination, UI/hooks, tests, and direct-path removal.
 - [x] B3. Complete B2B Agents end-to-end: agent API/repository, UI/hooks, tests, and direct-path removal.
 - [x] B4. Complete Sales Pipeline end-to-end: lead/pipeline API/repository, UI/hooks, tests, and direct-path removal.
 - [x] B5. Complete Photo Gallery end-to-end: gallery metadata plus existing upload/delete CRM APIs, UI/hooks, tests, and direct-path removal.
 - [x] B6. Complete Weather Guide end-to-end: weather API/repository, refresh authorization, UI/hooks, tests, and direct-path removal.
-- [x] B7. Replace generic browser hydrate and auto-sync only for fully migrated scoped features. *(Profile inquiry/comms via `/api/customers/:id/inquiry|comms`; empty Dev B `PAGE_BOOT`; shell/route-cache denylist; cutover tests `tests/b7-dev-b-hydrate-cutover.test.ts`.)*
-- [x] B8. Build browser-network, parity, permission, and Redis-down regression coverage; lead final UI acceptance. *(2026-08-25: `e2e/dev-b-*.spec.ts`, `tests/dashboard-redis-down.test.ts`, `tests/weather-redis-down.test.ts`, `Personal/docs/bff-b8-final-acceptance.md`.)*
+
+- [x] B7. Replace generic browser hydrate and auto-sync only for fully migrated scoped features. *(Profile inquiry/comms via* `/api/customers/:id/inquiry|comms`*; empty Dev B* `PAGE_BOOT`*; shell/route-cache denylist; cutover tests* `tests/b7-dev-b-hydrate-cutover.test.ts`*.)*
+- [x] B8. Build browser-network, parity, permission, and Redis-down regression coverage; lead final UI acceptance. *(2026-08-25:* `e2e/dev-b-*.spec.ts`*,* `tests/dashboard-redis-down.test.ts`*,* `tests/weather-redis-down.test.ts`*,* `Personal/docs/bff-b8-final-acceptance.md`*.)*
+
+
+
 
 ### Shared rules and handoffs
 
 1. **One feature, one owner.** The owner delivers the repository/API, UI caller, permission tests, cache invalidation, and safe removal of that feature's direct path. The other developer reviews; they do not own a half-feature.
 2. **API contract first.** The feature owner proposes the route schema and DTO; the other developer reviews it. Mocked UI is allowed, but the feature owner owns real integration.
 3. **One feature per pull request.** A feature PR includes repository/API, caller migration, permission tests, cache invalidation, and removal of that feature's direct client path where safe.
-4. **Shared-file ownership.** Developer A owns BFF primitives, `lib/supabase/server.ts`, and Redis helpers. Developer B owns shared test fixtures and acceptance coverage. Owner-Ops owns Docker, reverse proxy, secrets, and firewall. Coordinate before editing `lib/db/*`, auth middleware, or shared types.
+4. **Shared-file ownership.** Developer A owns BFF primitives, `lib/supabase/server.ts`, and Redis helpers. Developer B owns shared test fixtures and acceptance coverage. Owner-Ops owns Docker, reverse proxy, secrets, and firewall. Coordinate before editing `lib/db/`*, auth middleware, or shared types.
 5. **Feature flag during handoff.** Keep a short-lived domain-level flag only while validating a new BFF endpoint against the old path. Remove the old path and flag as soon as parity passes.
 6. **Twice-weekly integration checkpoint.** Review new direct imports, browser network capture, API latency, cache invalidation, and outstanding feature inventory.
 7. **Final merge order.** Merge the Owner-Ops handoff and server foundation first; migrate independent features in parallel; remove generic browser sync only after every inventory item is closed.
+
+
 
 ### Phase 0 — Baseline and guardrails
 
@@ -102,6 +120,8 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
   - Exclude server-only build artifacts deliberately and document the exclusion.
   - Done when: CI fails if a client bundle exposes a Supabase URL or API path.
 
+
+
 ### Phase 1 — Private infrastructure (Owner-Ops)
 
 - [ ] **T1.1 — Owner-Ops: Create the private Docker topology**
@@ -118,6 +138,8 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
   - Remove Redis host port publishing unless an explicitly approved admin-only use needs it.
   - Keep `REDIS_URL=redis://redis:6379`, health checking, bounded connect timeout, and graceful fallback.
   - Done when: CRM health/diagnostics show Redis state without exposing Redis publicly.
+
+
 
 ### Phase 2 — Server foundation
 
@@ -142,6 +164,8 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
   - Reuse current row mappers on the server and return purpose-built DTOs.
   - Done when: new API route handlers do not query Supabase inline except for trivial one-off operations.
 
+
+
 ### Phase 3 — Cache foundation
 
 - [ ] **T3.1 — Standardize cache helpers**
@@ -157,6 +181,8 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
 - [ ] **T3.3 — Test Redis-degraded operation**
   - Run BFF API tests with Redis unavailable.
   - Done when: reads fall back to Supabase, writes succeed, and no stale success is returned after a write.
+
+
 
 ### Phase 4 — Migrate existing server-friendly domains
 
@@ -175,6 +201,8 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
   - Add guide list/detail/create/update APIs and `POST /api/guides/:id/avatar`.
   - Move image conversion/upload from `GuidesPage` into the route or a server worker.
   - Done when: `GuidesPage` has no `createClient()` import and no direct Storage call.
+
+
 
 ### Phase 5 — Migrate CRM business domains
 
@@ -198,6 +226,8 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
   - Migrate attractions, cruises, transport, restaurants, hotels, suppliers, calendar events, weather reads, and dev notes.
   - Done when: the direct-sync inventory from T0.2 is fully closed.
 
+
+
 ### Phase 6 — Replace the frontend data model
 
 - [ ] **T6.1 — Build API fetchers and mutation hooks**
@@ -214,6 +244,8 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
   - Prefer cache revalidation or short polling first.
   - If live updates are necessary, add an authenticated CRM SSE/WebSocket endpoint; only CRM connects to Supabase Realtime internally.
   - Done when: browser has no direct Realtime connection.
+
+
 
 ### Phase 7 — Cutover and hardening
 
@@ -232,6 +264,8 @@ The user/Owner-Ops completes Phase 1. Before Developer A or B starts feature wor
   - Add alerts for CRM error rate, Supabase reachability, Redis availability, and cache hit rate.
   - Done when: an operator can deploy, diagnose, and recover the private topology without exposing Supabase.
 
+
+
 ## Required test gates
 
 Run these gates at the end of every phase that changes code:
@@ -249,6 +283,8 @@ Before final cutover, additionally verify:
 - `docker compose ps` has no Supabase, Postgres, Redis, or CRM host port mapping.
 - CRM works with Redis stopped.
 - CRM fails safely and observably if Supabase is unreachable.
+
+
 
 ## Sequencing rules
 

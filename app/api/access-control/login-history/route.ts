@@ -12,6 +12,7 @@ import {
     accessControlPermissionError,
 } from '@/lib/access-control/api-error';
 import { checkPermissionForRequest } from '@/lib/auth/permissions-server';
+import { withHttpRequestLogging } from '@/lib/system/server-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,10 +52,13 @@ function errorResponse(error: unknown) {
     );
 }
 
-export async function GET(request: Request) {
+export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never>> }>(
+    { scope: 'access-control/login-history', route: '/api/access-control/login-history' },
+    async (request, _context, { logger }) => {
     const auth = await getAuthContext();
 
     if (!auth.authenticated) {
+        logger.warn({ event: 'access_control.login_history.denied', statusCode: 401 }, 'Access Control login-history access denied');
         return NextResponse.json(
             accessControlError('AUTH_UNAUTHORIZED', 'Unauthorized'),
             { status: 401 },
@@ -66,12 +70,14 @@ export async function GET(request: Request) {
         const permission = await checkPermissionForRequest('users.manage');
 
         if (!permission.allowed) {
+            logger.warn({ event: 'access_control.permission.denied', statusCode: permission.status }, 'Access Control permission denied');
             return NextResponse.json(
                 accessControlPermissionError(permission.status),
                 { status: permission.status },
             );
         }
     } catch (error) {
+        logger.error({ event: 'access_control.login_history.authorization.failed', err: error }, 'Access Control login-history authorization failed');
         return errorResponse(error);
     }
 
@@ -110,6 +116,8 @@ export async function GET(request: Request) {
             },
         );
     } catch (error) {
+        logger.error({ event: 'access_control.login_history.load.failed', err: error }, 'Access Control login-history load failed');
         return errorResponse(error);
     }
-}
+    },
+);

@@ -1,27 +1,25 @@
-# Private-network cutover runbook
+# CRM deployment and private-dependency runbook
 
 ## Scope and prerequisites
 
-This runbook deploys the CRM without a host port. The external reverse proxy is
-the sole public ingress and must already be attached to the Docker network named
-by `CRM_PROXY_NETWORK` (default: `reverse-proxy`). Supabase gateway and
-`shared_redis` must be reachable from the CRM private networks.
+This runbook preserves the CRM host-port upstream (`${APP_PORT:-3006}:3006`) used
+by the existing ingress/proxy. Proxy configuration is operated outside this
+repository and is not created, changed, or verified by these commands. Supabase
+gateway and `shared_redis` must be reachable from the CRM private networks.
 
 Do not run these steps against a production database until
 `20260827104813_durable_crm_sessions_v2.sql` has been reviewed and backed up.
 
 ## Preflight
 
-1. Create or identify the external reverse-proxy network and attach the proxy
-   container to it. Do not expose CRM port `3006` from the proxy's network.
-2. Set `CRM_PROXY_NETWORK` in the deployment environment if its network name is
-   not `reverse-proxy`.
-3. Confirm the deployment environment has `SUPABASE_URL` set to
+1. Confirm the existing ingress/proxy continues to route to the configured
+   `APP_PORT` (default `3006`). This deployment does not modify that proxy.
+2. Confirm the deployment environment has `SUPABASE_URL` set to
    `http://supabase-ant-crm-gateway:8000` and `REDIS_URL` points to an internal
    Redis hostname, never `localhost` or `127.0.0.1`.
-4. Back up the Supabase Postgres database using the operator-approved procedure
+3. Back up the Supabase Postgres database using the operator-approved procedure
    and record the backup location and restore command outside this repository.
-5. Run the local quality gates: `npm run lint`, `npm run typecheck`, `npm test`,
+4. Run the local quality gates: `npm run lint`, `npm run typecheck`, `npm test`,
    and `npm run build`.
 
 ## Deploy and verify
@@ -36,16 +34,17 @@ Do not run these steps against a production database until
    docker ps --format 'table {{.Names}}\t{{.Ports}}'
    ```
 
-   Only the reverse proxy may show `80` or `443`; the CRM app, Redis, Supabase
-   services, and Postgres must show no host mapping.
+   The CRM app is expected to show `${APP_PORT:-3006}:3006`. Confirm separately
+   that Redis, Supabase services, and Postgres have only the host mappings
+   approved by Ops.
 3. From the CRM container, re-run the deploy verifier if necessary:
 
    ```bash
    sh scripts/verify-private-network.sh /path/to/deploy.env
    ```
 
-4. From an external workstation, confirm the public CRM URL works over HTTPS and
-   that `supabase-ant-crm-gateway` does not resolve or accept a connection.
+4. Confirm the normal CRM URL works and that `supabase-ant-crm-gateway` does not
+   resolve or accept a connection from an external workstation.
 
 ## Rollback
 
@@ -61,7 +60,7 @@ Supabase schema migrations are not automatically reversible.
 
 ### Restore database
 
-1. Stop CRM writes or place the reverse proxy in maintenance mode.
+1. Stop CRM writes using the team-approved maintenance procedure.
 2. Restore only from the approved, timestamped Supabase Postgres backup.
 3. Run health and auth smoke tests before re-enabling public traffic.
 

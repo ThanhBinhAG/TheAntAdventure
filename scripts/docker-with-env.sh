@@ -8,7 +8,7 @@
 #   print   — print resolved ENV_FILE path (for CI)
 #   build   — docker compose build
 #   up      — build + run detached
-#   deploy  — production private-network deploy from already-built image
+#   deploy  — deploy from already-built image using the existing host-port upstream
 #   local-up/local-deploy — use docker-compose.local.yml with loopback ports
 #   down    — stop and remove compose services
 #   status  — show compose ps + matching images
@@ -76,10 +76,6 @@ fi
 
 compose() {
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
-}
-
-is_local_compose() {
-  [ "$(basename "$COMPOSE_FILE")" = "docker-compose.local.yml" ]
 }
 
 # Host port from ENV_FILE (APP_PORT=…) or default 3006 — matches docker-compose.yml
@@ -203,21 +199,17 @@ case "$cmd" in
   up)
     echo "Using ENV_FILE=$ENV_FILE COMPOSE_FILE=$COMPOSE_FILE"
     compose down --remove-orphans >/dev/null 2>&1 || true
-    if is_local_compose; then
-      APP_PORT_HOST=$(resolve_app_port)
-      free_host_port "$APP_PORT_HOST"
-    fi
+    APP_PORT_HOST=$(resolve_app_port)
+    free_host_port "$APP_PORT_HOST"
     exec compose up --build -d "$@"
     ;;
   deploy)
-    # Production uses an external reverse-proxy network and does not bind an
-    # app port. Local deployment keeps the historic loopback port behavior.
+    # Preserve the existing host-port upstream used by the externally managed
+    # proxy. Production still uses shared_redis rather than the local profile.
     echo "Deploying with ENV_FILE=$ENV_FILE COMPOSE_FILE=$COMPOSE_FILE (COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME)"
     compose down --remove-orphans || true
-    if is_local_compose; then
-      APP_PORT_HOST=$(resolve_app_port)
-      free_host_port "$APP_PORT_HOST"
-    fi
+    APP_PORT_HOST=$(resolve_app_port)
+    free_host_port "$APP_PORT_HOST"
     exec compose up -d --no-build --remove-orphans app "$@"
     ;;
   down)
@@ -228,11 +220,9 @@ case "$cmd" in
     compose ps "$@"
     docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}' \
       | awk 'NR==1 || /the-ant-adventures-crm/'
-    if is_local_compose; then
-      APP_PORT_HOST=$(resolve_app_port)
-      echo "Host port ${APP_PORT_HOST}:"
-      diagnose_port "$APP_PORT_HOST" 2>&1 || true
-    fi
+    APP_PORT_HOST=$(resolve_app_port)
+    echo "Host port ${APP_PORT_HOST}:"
+    diagnose_port "$APP_PORT_HOST" 2>&1 || true
     ;;
   print)
     # For CI: path only on stdout

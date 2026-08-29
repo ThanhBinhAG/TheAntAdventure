@@ -13,7 +13,7 @@ Ops shell helpers (not npm package scripts). Separate from `Personal/scripts` on
 - `test-runner.mjs`, `run-next-dev.mjs` — cross-platform Node launchers for unit tests and Next development/Playwright
 - `report-supabase-leakage.mjs` — legacy non-blocking diagnostic; CI uses `leakage:check` as its hard gate
 - `final-acceptance.mjs` — sequential cross-platform local quality gate; real E2E runs only with explicit isolated-target opt-in
-- `verify-private-network.sh` — deploy-time proof that CRM has no host port and can reach the private gateway, Redis, and health endpoint
+- `verify-private-network.sh` — deploy-time proof that CRM can reach the private gateway, Redis, and health endpoint; proxy/host-port topology remains Ops-owned
 - `npm run redis:up` / `redis:down` — start/stop Compose `redis` only (`127.0.0.1:6379`) for `npm run dev`; do not start the CRM container
 
 ## Boundaries

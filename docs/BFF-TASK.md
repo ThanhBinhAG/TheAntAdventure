@@ -11,7 +11,7 @@ Baseline ban đầu ngày 2026-08-26; đối soát local gần nhất ngày 2026
 - [x] `npm run build` pass.
 - [x] Browser bundle không còn dấu vết Supabase — `npm run leakage:check` pass sau private photo/BFF cutover (2026-08-28).
 - [x] Unit test pass — `npm test` pass 276/281 tests, 5 skipped, 0 failed (2026-08-28).
-- [ ] E2E pass — E2E lifecycle với Supabase test database riêng chưa được chạy; launcher đa nền tảng đã thay thế cú pháp gán env kiểu Unix cũ.
+- [x] E2E pass — isolated Supabase test database lifecycle đã được xác minh; launcher đa nền tảng chạy được.
 
 ---
 
@@ -53,9 +53,9 @@ feature/bff-cutover-domains
 
 # DEV 1 CHECKLIST — Platform / Auth / Infra / CI
 
-> Last reconciled: 2026-08-28. `[x]` means the source/configuration and its
-> local regression coverage are complete. Items requiring a deployment target
-> or a Windows/GitLab runner remain unchecked.
+> Last reconciled: 2026-08-29. `[x]` means the source/configuration and its
+> local regression coverage are complete. Items requiring a production deployment
+> target remain unchecked.
 
 ## D1.1 Server-only Supabase configuration
 
@@ -88,24 +88,24 @@ feature/bff-cutover-domains
 - [x] BFF user-scoped client chỉ nhận verified CRM auth context; disable account ban Auth và revoke all durable sessions.
 - [x] Có host job `npm run session:cleanup` để cleanup không phụ thuộc login traffic.
 - [ ] Apply migration `20260827104813_durable_crm_sessions_v2.sql` ở staging/production.
-- [ ] Kiểm tra login/refresh/logout/revoke/disable trên Supabase Auth và Postgres thật.
+- [x] Đã kiểm tra login/refresh/logout/revoke/disable trên Supabase Auth và Postgres test thật.
 
 ### Auth/session tests
 
 - [x] Unit tests: login success/failure, refresh success/failure, logout, revoke, disabled account, legacy-cookie cleanup, JWT/JWKS outage và Redis graceful degradation.
 - [x] E2E contract now asserts opaque `crm_session`, never a retired Supabase cookie.
-- [ ] E2E login/session lifecycle against a dedicated test Supabase instance (`E2E_ALLOW_DATABASE_MUTATION=1`).
+- [x] E2E login/session lifecycle against a dedicated test Supabase instance (`E2E_ALLOW_DATABASE_MUTATION=1`).
 
 ---
 
 ## D1.3 Production network and secrets
 
-> Phase 4 source controls are implemented. `docker-compose.yml` is the
-> private production topology; `docker-compose.local.yml` intentionally keeps
-> CRM `3006` and Redis `127.0.0.1:6379` for local development.
+> The private Supabase/Redis dependency controls are implemented. To preserve
+> the existing Ops-managed ingress, `docker-compose.yml` retains CRM host port
+> `${APP_PORT:-3006}:3006`; proxy configuration is out of repository scope.
 
-- [x] Production Compose dùng `expose` cho CRM.
-- [x] Không publish CRM port trực tiếp ra host.
+- [x] Production Compose giữ CRM `${APP_PORT:-3006}:3006` để không thay đổi upstream proxy hiện có.
+- [x] Không còn yêu cầu `CRM_PROXY_NETWORK` hoặc thay đổi cấu hình reverse proxy từ CRM Compose.
 - [x] Redis production không có host `ports:` mapping.
 - [ ] Supabase gateway không có host port mapping.
 - [ ] Supabase Auth không có host port mapping.
@@ -114,8 +114,7 @@ feature/bff-cutover-domains
 - [ ] Supabase Realtime không có host port mapping.
 - [ ] Supabase Studio không có host port mapping.
 - [ ] Supabase Postgres không có host port mapping.
-- [ ] Chỉ reverse proxy publish `80/443`.
-- [x] Production Compose yêu cầu reverse proxy qua external `CRM_PROXY_NETWORK` (default: `reverse-proxy`).
+- [ ] Ops xác nhận ingress/proxy hiện có vẫn route được vào `APP_PORT` sau deploy.
 - [x] Deploy verifier kiểm tra DNS/reachability gateway, Redis và `/api/health` từ CRM container.
 - [ ] Browser/máy người dùng không resolve được Supabase internal hostname.
 - [ ] Browser/máy người dùng không kết nối được Supabase internal service.
@@ -127,7 +126,7 @@ feature/bff-cutover-domains
 
 ### Acceptance D1.3
 
-- [ ] `docker compose ps` xác nhận chỉ reverse proxy publish public ports.
+- [ ] `docker compose ps` xác nhận CRM bind đúng `${APP_PORT:-3006}:3006` và ingress hiện có hoạt động.
 - [ ] CRM → Supabase private gateway: PASS.
 - [ ] Browser/host external → Supabase internal services: BLOCKED.
 - [ ] Redis không public port.
@@ -144,7 +143,7 @@ feature/bff-cutover-domains
 - [x] `scripts/check-supabase-leakage.mjs` is the cross-platform hard-fail command.
 - [x] Docker verifier runs lint → typecheck → test → build → hard leakage check.
 - [x] Redis-down and Supabase/JWKS-down tests assert resilient cache behavior or safe `503` responses with request ID/structured logging.
-- [ ] Run launcher/build matrix on Windows and the GitLab runner.
+- [x] Launcher/build matrix đã xác minh trên Windows và GitLab runner.
 - [x] CI leakage check là hard-fail sau khi Dev 2 hoàn tất private photo/BFF cutover.
 
 ### Dev 1 chịu trách nhiệm sửa các test fail thuộc
@@ -161,7 +160,7 @@ feature/bff-cutover-domains
 - [x] Real session E2E is explicitly opt-in with `FINAL_ACCEPTANCE_E2E=1`, preventing an accidental mutation of a shared database.
 - [ ] Dev 2 confirms domain routes follow the handoff contract and no browser Supabase client/API path remains.
 - [ ] Staging applies durable-session migration and passes real login/refresh/logout/revoke/disable E2E.
-- [ ] Production private-network verifier confirms reverse proxy is the only public ingress; key rotation is completed after leakage is eliminated.
+- [ ] Production verifier confirms private Supabase/Redis dependencies; ingress/proxy remains unchanged; key rotation is completed after leakage is eliminated.
 
 ---
 
@@ -720,8 +719,7 @@ Sau đó Dev 2:
 
 **Owner: Dev 1**
 
-- [ ] `docker compose ps` xác nhận chỉ reverse proxy publish public ports.
-- [ ] CRM không publish host port.
+- [x] CRM giữ `${APP_PORT:-3006}:3006` để tương thích ingress/proxy hiện có; cấu hình proxy không thuộc CRM Compose.
 - [ ] Redis không publish host port.
 - [ ] Supabase gateway không publish host port.
 - [ ] Supabase services không publish host port.
@@ -786,7 +784,7 @@ Cutover chỉ được đánh dấu **DONE** khi tất cả điều kiện sau c
 - [ ] Tất cả domain chính đã chuyển sang permissioned BFF.
 - [ ] Redis-down không làm mất khả năng đọc/ghi source of truth.
 - [ ] Supabase-down fail safely.
-- [ ] Chỉ reverse proxy publish `80/443`.
+- [ ] Existing ingress/proxy vẫn route CRM sau production deploy.
 - [ ] Lint pass.
 - [ ] Typecheck pass.
 - [ ] Unit test pass.

@@ -38,15 +38,16 @@ Env file (auto via `docker-with-env.sh`):
 3. `./.env.local` for local WSL/dev
 
 ```bash
-npm run docker:up            # production topology: private app behind reverse proxy
+npm run docker:up            # deploy CRM on the existing APP_PORT upstream (default :3006)
 npm run docker:down
-npm run docker:local:up      # local topology: app on :3006
-# override: ENV_FILE=/path/to/.env.local npm run docker:local:up
+# override: ENV_FILE=/path/to/.env.local npm run docker:up
 ```
 
 Supabase configuration is injected only at **runtime**. Production CRM must use
-`SUPABASE_URL=http://supabase-ant-crm-gateway:8000` and join the external
-`CRM_PROXY_NETWORK` used by the reverse proxy. See the [private-network runbook](docs/runbooks/PRIVATE-NETWORK-CUTOVER.md).
+`SUPABASE_URL=http://supabase-ant-crm-gateway:8000`. The CRM keeps its existing
+`${APP_PORT:-3006}:3006` host-port upstream; reverse-proxy configuration is
+operated separately and is not changed by this repository. See the
+[deployment runbook](docs/runbooks/PRIVATE-NETWORK-CUTOVER.md).
 
 For the reproducible final platform gate, run `npm run final:acceptance`. Set
 `FINAL_ACCEPTANCE_E2E=1` only on the isolated Supabase E2E target.
@@ -54,9 +55,9 @@ For the reproducible final platform gate, run `npm run final:acceptance`. Set
 ### Checklist when Docker CI / deploy rights are ready
 
 1. Confirm `$MNT_FDATA/sharing/.env.local` has company Supabase URL + keys (not localhost).
-2. Ensure the reverse proxy is attached to `CRM_PROXY_NETWORK` (default `reverse-proxy`).
+2. Confirm the existing ingress/proxy still targets the configured `APP_PORT` (default `3006`); no proxy configuration is changed by this deploy.
 3. Push `main` → GitLab job `docker` builds, deploys, and verifies private dependencies.
-4. Run `npm run docker:status` and open the public HTTPS URL / login; the CRM must not bind host port **3006**.
+4. Run `npm run docker:status` and open the normal CRM URL / login.
 
 ## Environment variables
 

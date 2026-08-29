@@ -1,5 +1,6 @@
 #!/bin/sh
-# Verify the deployed CRM has no host port and can reach only its private dependencies.
+# Verify the deployed CRM can reach its private Supabase and Redis dependencies.
+# The host-port/proxy topology is managed outside this repository.
 set -eu
 
 ENV_FILE="${1:-}"
@@ -13,22 +14,6 @@ if [ -z "$APP_ID" ]; then
   echo "ERROR: CRM app container was not found." >&2
   exit 1
 fi
-
-PORT_BINDINGS="$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$APP_ID")"
-if [ "$PORT_BINDINGS" != "null" ] && [ "$PORT_BINDINGS" != "{}" ]; then
-  echo "ERROR: CRM container has a host port binding." >&2
-  exit 1
-fi
-
-CRM_PROXY_NETWORK="${CRM_PROXY_NETWORK:-reverse-proxy}"
-NETWORKS="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$APP_ID")"
-case " $NETWORKS " in
-  *" $CRM_PROXY_NETWORK "*) ;;
-  *)
-    echo "ERROR: CRM container is not connected to the reverse-proxy network." >&2
-    exit 1
-    ;;
-esac
 
 docker exec "$APP_ID" node - <<'NODE'
 const dns = require('node:dns').promises;

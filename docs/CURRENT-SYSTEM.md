@@ -2,28 +2,27 @@
 
 ## Purpose
 
-This is the evidence-based post-BFF platform map, last reconciled on 2026-08-28. It records implemented source controls and separately names deployment and browser-cutover work that still needs proof.
+This is the evidence-based post-BFF platform map, last reconciled on 2026-08-29. It records implemented source controls and separately names deployment work that still needs proof.
 
 ## Components
 
 | Component | Runtime responsibility | Network role |
 | --- | --- | --- |
-| Browser | Renders the CRM UI and holds UI state | Auth and business calls use the CRM origin; no Supabase credential or session token is exposed. One Dev 2 Storage asset path still needs removal. |
-| CRM app | Next.js 16 BFF, auth/session boundary, API routes, PDF and image work | Production container exposes port 3006 only to the reverse-proxy network. |
+| Browser | Renders the CRM UI and holds UI state | Auth and business calls use the CRM origin; no Supabase credential or session token is exposed. |
+| CRM app | Next.js 16 BFF, auth/session boundary, API routes, PDF and image work | Production container retains `${APP_PORT:-3006}:3006` for the existing Ops-managed ingress. |
 | Supabase | Auth, PostgREST, Storage, and PostgreSQL business data | CRM server uses server-only `SUPABASE_URL`; production target is the private gateway `http://supabase-ant-crm-gateway:8000`. |
 | Redis | Optional cache for selected server reads and authorization data | Production has no host port; a Redis failure must fall back to the durable source of truth. |
-| Reverse proxy | Public TLS ingress to CRM | The intended only public service on ports 80/443; production proof remains an Ops gate. |
+| Existing ingress/proxy | Public routing to CRM | Operated outside this repository; it must keep targeting the configured CRM host port. |
 
 ## Request paths
 
 ```text
-Browser ──HTTPS──> Reverse proxy ──private──> CRM Next.js :3006
+Browser ──HTTPS──> Existing ingress/proxy ──host upstream──> CRM Next.js :3006
 CRM     ──private──> Supabase gateway / Auth / Storage
 CRM     ──private──> Redis (optional cache)
-Browser ──temporary Dev 2 asset path──> Supabase Storage `/storage/v1`
 ```
 
-`docker-compose.yml` is the private production topology: the CRM joins an external reverse-proxy network and private service networks, while `docker-compose.local.yml` deliberately retains loopback ports for development. The real Supabase stack is operated separately, so its public-port removal, firewall rules, DNS isolation, and running-container topology require an Ops deployment check.
+`docker-compose.yml` preserves the existing CRM host-port upstream and joins the private Supabase/Redis service networks. Proxy configuration is not owned or validated by this repository. The real Supabase stack is operated separately, so its public-port removal, firewall rules, DNS isolation, and running-container topology require an Ops deployment check.
 
 ## Authentication and authorization
 
@@ -33,4 +32,4 @@ Redis is not a session source of truth. Cache reads and writes degrade safely wh
 
 ## Remaining cutover work
 
-One known Dev 2 browser asset dependency still emits `/storage/v1` in `.next/static`; therefore the hard browser-leakage gate currently fails. Real durable-session E2E requires the session migration on an isolated mutable Supabase target. Production acceptance additionally requires the deploy verifier, public-port/DNS isolation proof, firewall review, and key rotation after browser leakage is eliminated.
+The hard browser-leakage gate passes after the private asset/BFF cutover. Production acceptance additionally requires the durable-session migration, private dependency verifier, Supabase DNS/port isolation proof, firewall review, and planned key rotation.

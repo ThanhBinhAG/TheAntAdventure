@@ -74,10 +74,6 @@ if [ ! -f "$COMPOSE_FILE" ]; then
   exit 1
 fi
 
-compose() {
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
-}
-
 # Host port from ENV_FILE (APP_PORT=…) or default 3006 — matches docker-compose.yml
 resolve_app_port() {
   port="${APP_PORT:-}"
@@ -194,30 +190,30 @@ free_host_port() {
 case "$cmd" in
   build)
     echo "Using ENV_FILE=$ENV_FILE COMPOSE_FILE=$COMPOSE_FILE"
-    compose build "$@"
+    exec docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build "$@"
     ;;
   up)
     echo "Using ENV_FILE=$ENV_FILE COMPOSE_FILE=$COMPOSE_FILE"
-    compose down --remove-orphans >/dev/null 2>&1 || true
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down --remove-orphans >/dev/null 2>&1 || true
     APP_PORT_HOST=$(resolve_app_port)
     free_host_port "$APP_PORT_HOST"
-    compose up --build -d "$@"
+    exec docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up --build -d "$@"
     ;;
   deploy)
     # Preserve the existing host-port upstream used by the externally managed
     # proxy. Production still uses shared_redis rather than the local profile.
     echo "Deploying with ENV_FILE=$ENV_FILE COMPOSE_FILE=$COMPOSE_FILE (COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME)"
-    compose down --remove-orphans || true
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down --remove-orphans || true
     APP_PORT_HOST=$(resolve_app_port)
     free_host_port "$APP_PORT_HOST"
-    compose up -d --no-build --remove-orphans app "$@"
+    exec docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --remove-orphans app "$@"
     ;;
   down)
-    compose down "$@"
+    exec docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down "$@"
     ;;
   status)
     echo "ENV_FILE=$ENV_FILE COMPOSE_FILE=$COMPOSE_FILE COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME"
-    compose ps "$@"
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps "$@"
     docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}' \
       | awk 'NR==1 || /the-ant-adventures-crm/'
     APP_PORT_HOST=$(resolve_app_port)

@@ -194,14 +194,14 @@ free_host_port() {
 case "$cmd" in
   build)
     echo "Using ENV_FILE=$ENV_FILE COMPOSE_FILE=$COMPOSE_FILE"
-    exec compose build "$@"
+    compose build "$@"
     ;;
   up)
     echo "Using ENV_FILE=$ENV_FILE COMPOSE_FILE=$COMPOSE_FILE"
     compose down --remove-orphans >/dev/null 2>&1 || true
     APP_PORT_HOST=$(resolve_app_port)
     free_host_port "$APP_PORT_HOST"
-    exec compose up --build -d "$@"
+    compose up --build -d "$@"
     ;;
   deploy)
     # Preserve the existing host-port upstream used by the externally managed
@@ -210,10 +210,10 @@ case "$cmd" in
     compose down --remove-orphans || true
     APP_PORT_HOST=$(resolve_app_port)
     free_host_port "$APP_PORT_HOST"
-    exec compose up -d --no-build --remove-orphans app "$@"
+    compose up -d --no-build --remove-orphans app "$@"
     ;;
   down)
-    exec compose down "$@"
+    compose down "$@"
     ;;
   status)
     echo "ENV_FILE=$ENV_FILE COMPOSE_FILE=$COMPOSE_FILE COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME"

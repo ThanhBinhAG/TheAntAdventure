@@ -13,9 +13,10 @@ test('production Compose retains the existing host-port CRM upstream without own
   assert.doesNotMatch(compose, /CRM_PROXY_NETWORK/);
 });
 
-test('local Compose retains only loopback ports and production validation requires private dependencies', async () => {
-  const [localCompose, validator, verifier, pipeline] = await Promise.all([
+test('deployment scripts invoke Docker Compose directly and validation requires private dependencies', async () => {
+  const [localCompose, dockerScript, validator, verifier, pipeline] = await Promise.all([
     readFile(join(process.cwd(), 'docker-compose.local.yml'), 'utf8'),
+    readFile(join(process.cwd(), 'scripts/docker-with-env.sh'), 'utf8'),
     readFile(join(process.cwd(), 'scripts/validate-production-env.sh'), 'utf8'),
     readFile(join(process.cwd(), 'scripts/verify-private-network.sh'), 'utf8'),
     readFile(join(process.cwd(), '.gitlab-ci.yml'), 'utf8'),
@@ -23,6 +24,7 @@ test('local Compose retains only loopback ports and production validation requir
 
   assert.match(localCompose, /\$\{APP_PORT:-3006\}:3006/);
   assert.match(localCompose, /127\.0\.0\.1:6379:6379/);
+  assert.doesNotMatch(dockerScript, /exec compose\b/);
   assert.match(validator, /REQUIRE_PRIVATE_NETWORK/);
   assert.match(validator, /supabase-ant-crm-gateway:8000/);
   assert.match(verifier, /SUPABASE_URL/);

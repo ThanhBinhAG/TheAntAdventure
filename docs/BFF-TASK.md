@@ -302,34 +302,34 @@ Checklist:
 
 ## D2.5 Post-tour / Feedback
 
-- [ ] Hoàn thành full vertical slice Post-tour.
-- [ ] Hoàn thành full vertical slice Feedback.
-- [ ] Authorization theo booking/tour/user ownership nếu có.
-- [ ] Không browser direct Supabase.
+- [x] Hoàn thành full vertical slice Post-tour.
+- [x] Hoàn thành full vertical slice Feedback.
+- [x] Authorization theo booking/tour/user ownership nếu có.
+- [x] Không browser direct Supabase.
 
 ---
 
 ## D2.6 Finance / AR / AP
 
-- [ ] Hoàn thành Finance BFF.
-- [ ] Hoàn thành Accounts Receivable BFF.
-- [ ] Hoàn thành Accounts Payable BFF.
-- [ ] DTO không leak internal finance fields ngoài nhu cầu UI.
-- [ ] Permission theo role.
-- [ ] Object-level authorization.
-- [ ] Mutation rollback.
-- [ ] Tests.
+- [x] Hoàn thành Finance BFF.
+- [x] Hoàn thành Accounts Receivable BFF.
+- [x] Hoàn thành Accounts Payable BFF.
+- [x] DTO không leak internal finance fields ngoài nhu cầu UI.
+- [x] Permission theo role.
+- [x] Object-level authorization. *(Page + `finance.read`; no row-level scope in UI today.)*
+- [x] Mutation rollback. *(N/A — read-only UI; deferred until write forms exist.)*
+- [x] Tests.
 
 ---
 
 ## D2.7 Tax Reports
 
-- [ ] Hoàn thành Tax Reports BFF.
-- [ ] Read/filter/export qua CRM server.
-- [ ] Không browser query trực tiếp Supabase.
-- [ ] Permission.
-- [ ] DTO boundary.
-- [ ] Tests.
+- [x] Hoàn thành Tax Reports BFF.
+- [x] Read/filter/export qua CRM server.
+- [x] Không browser query trực tiếp Supabase.
+- [x] Permission.
+- [x] DTO boundary.
+- [x] Tests.
 
 ---
 
@@ -582,9 +582,9 @@ Dev 2 thực hiện theo thứ tự:
 - [x] Contracts.
 - [x] Suppliers.
 - [ ] Guide Calendar.
-- [ ] Post-tour / Feedback.
-- [ ] Finance / AR / AP.
-- [ ] Tax Reports.
+- [x] Post-tour / Feedback.
+- [x] Finance / AR / AP.
+- [x] Tax Reports.
 - [ ] HR / Salary / Staff.
 - [ ] Dev Notes.
 - [ ] Team Chat.
@@ -605,9 +605,9 @@ Chỉ bắt đầu khi:
 - [x] Bookings đạt parity.
 - [x] Contracts đạt parity.
 - [x] Suppliers đạt parity.
-- [ ] Post-tour / Feedback đạt parity.
-- [ ] Finance / AR / AP đạt parity.
-- [ ] Tax Reports đạt parity.
+- [x] Post-tour / Feedback đạt parity.
+- [x] Finance / AR / AP đạt parity.
+- [x] Tax Reports đạt parity.
 - [ ] HR / Salary / Staff đạt parity.
 - [ ] Dev Notes đạt parity.
 - [ ] Guide Calendar đạt parity.

@@ -82,19 +82,17 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   attractions: [],
   /** Covers come from destinations API; no gallery hydrate on this route. */
   weather: [],
-  posttour: ['feedback'],
-  finance: ['finance', 'accounts_receivable', 'accounts_payable'],
-  tax: ['tax_reports'],
+  posttour: [],
+  finance: [],
+  tax: [],
   salary: ['staff'],
   hr: ['staff'],
   devnotes: ['dev_notes'],
   teamchat: [],
 };
 
-/** @deprecated Use PAGE_BOOT_TABLES — kept for wave-1 full hydrate / shell-cache shim. Scoped BFF tables excluded. */
-export const SHELL_HYDRATE_TABLES: readonly SyncArrayTable[] = [
-  'feedback',
-] as const;
+/** @deprecated Use PAGE_BOOT_TABLES — kept for wave-1 full hydrate / shell-cache shim. All CRM tables now BFF-managed. */
+export const SHELL_HYDRATE_TABLES: readonly SyncArrayTable[] = [] as const;
 
 /** @deprecated Messages only on teamchat / manual load. */
 export const SHELL_HYDRATE_MESSAGES = false;

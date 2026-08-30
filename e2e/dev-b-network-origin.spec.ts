@@ -11,6 +11,9 @@ const devBPages = [
   '/sales',
   '/bookings',
   '/contracts',
+  '/posttour',
+  '/finance',
+  '/tax',
   '/gallery',
   '/weather',
 ];

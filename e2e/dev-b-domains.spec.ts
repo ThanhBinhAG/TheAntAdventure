@@ -8,6 +8,9 @@ const AUTHZ_PATHS = [
   '/api/photos?page=1&pageSize=12',
   '/api/bookings',
   '/api/contracts',
+  '/api/feedback',
+  '/api/finance',
+  '/api/tax-reports?period=all',
   '/api/dashboard',
   '/api/weather/boot',
 ] as const;

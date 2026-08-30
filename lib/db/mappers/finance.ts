@@ -22,6 +22,7 @@ export function arToRow(r: Row): Row {
   return {
     id: r.id,
     finance_id: fkOrNull(r.finId ?? r.finance_id),
+    booking_id: fkOrNull(r.bkid ?? r.booking_id),
     cust_name: r.custName ?? r.cust_name,
     tour: r.tour,
     invoice_amount: moneyAbs(r.invoiceAmt ?? r.invoice_amount),
@@ -34,6 +35,7 @@ export function arToRow(r: Row): Row {
 export function apToRow(r: Row): Row {
   return {
     id: r.id,
+    booking_id: fkOrNull(r.bkid ?? r.booking_id),
     supplier: r.supplier,
     description: r.description,
     amount: moneyAbs(r.amount),
@@ -77,11 +79,12 @@ export function rowToAr(r: Row): Row {
   return {
     id: r.id,
     finId: r.finance_id,
+    bkid: r.booking_id ?? '',
     custName: r.cust_name,
     tour: r.tour,
     invoiceAmt: money(r.invoice_amount),
     depositPaid: money(r.deposit_paid),
-    balance: r.balance,
+    balance: money(r.balance),
     dueDate: r.due_date,
     status: r.status,
   };
@@ -90,6 +93,7 @@ export function rowToAr(r: Row): Row {
 export function rowToAp(r: Row): Row {
   return {
     id: r.id,
+    bkid: r.booking_id ?? '',
     supplier: r.supplier,
     description: r.description,
     amount: money(r.amount),
@@ -107,6 +111,8 @@ export function rowToTax(r: Row): Row {
     expenses: money(r.expenses),
     vat_out: money(r.vat_output),
     vat_in: money(r.vat_input),
+    vat_pay: money(r.vat_payable),
+    profit_bt: money(r.profit_before_tax),
     corp_tax: money(r.corp_tax),
   };
 }

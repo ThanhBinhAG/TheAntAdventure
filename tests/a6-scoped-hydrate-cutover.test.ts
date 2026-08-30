@@ -44,7 +44,7 @@ test('all nine scoped BFF features bypass legacy browser hydrate and auto-sync',
     assert.equal(shell.includes(table), false, `${table} must not be in legacy shell hydrate`);
   }
 
-  // These deferred domains are intentionally untouched by this scoped cutover.
+  // Bookings and feedback are BFF-managed (Dev 2 cutover).
   assert.equal(shell.includes('bookings'), false);
-  assert.equal(shell.includes('feedback'), true);
+  assert.equal(shell.includes('feedback'), false);
 });

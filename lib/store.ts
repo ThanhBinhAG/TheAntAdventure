@@ -109,6 +109,11 @@ interface CRMState {
   addContract: (contract: Record<string, unknown>) => void;
   updateContract: (id: string, data: Record<string, unknown>) => void;
   deleteContract: (id: string) => void;
+  setFinance: (finance: unknown[]) => void;
+  setAr: (ar: unknown[]) => void;
+  setAp: (ap: unknown[]) => void;
+  setTax: (tax: unknown[]) => void;
+  setFeedback: (feedback: unknown[]) => void;
   addFeedback: (item: Record<string, unknown>) => void;
   addDevNote: (note: Record<string, unknown>) => void;
   updateDevNote: (id: string, data: Record<string, unknown>) => void;
@@ -302,6 +307,10 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         }));
       },
       setContracts: (contracts) => set({ contracts }),
+      setFinance: (finance) => set({ finance }),
+      setAr: (ar) => set({ ar }),
+      setAp: (ap) => set({ ap }),
+      setTax: (tax) => set({ tax }),
       addContract: (contract) => set((s) => ({ contracts: [contract, ...s.contracts] })),
       updateContract: (id, data) =>
         set((s) => ({
@@ -314,6 +323,7 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         set((s) => ({
           contracts: s.contracts.filter((c) => (c as { id?: string }).id !== id),
         })),
+      setFeedback: (feedback) => set({ feedback }),
       addFeedback: (item) => set((s) => ({ feedback: [...s.feedback, item] })),
       addDevNote: (note) => set((s) => ({ devNotes: [note, ...s.devNotes] })),
       updateDevNote: (id, data) =>

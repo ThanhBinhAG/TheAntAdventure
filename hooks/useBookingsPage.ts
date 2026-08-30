@@ -1,30 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { getBffArray } from '@/lib/bff/client';
 import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { fetchBookingsCatalogOnce } from '@/lib/bookings/booking-catalog-fetch';
 import type { BookingListItem } from '@/lib/bookings/booking-input';
 import type { Booking } from '@/lib/types';
 import { useStore } from '@/hooks/useStore';
-
-const inflight = new Map<string, Promise<BookingListItem[]>>();
-
-async function fetchBookingsOnce(bust = false): Promise<BookingListItem[]> {
-  const key = '/api/bookings';
-  if (bust) inflight.delete(key);
-  const existing = inflight.get(key);
-  if (existing) return existing;
-
-  const promise = getBffArray<BookingListItem>(
-    key,
-    'Không thể tải danh sách booking.',
-  ).finally(() => {
-    inflight.delete(key);
-  });
-
-  inflight.set(key, promise);
-  return promise;
-}
 
 export function useBookingsPage() {
   const setBookings = useStore((s) => s.setBookings);
@@ -46,7 +27,7 @@ export function useBookingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const rows = await fetchBookingsOnce(true);
+      const rows = await fetchBookingsCatalogOnce(true);
       await applyRows(rows);
       setLoading(false);
       setError(null);
@@ -65,7 +46,7 @@ export function useBookingsPage() {
       setLoading(true);
       setError(null);
       try {
-        const rows = await fetchBookingsOnce();
+        const rows = await fetchBookingsCatalogOnce();
         if (!active) return;
         await applyRows(rows);
         if (active) {

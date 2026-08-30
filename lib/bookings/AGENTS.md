@@ -7,6 +7,7 @@ Server contracts and repository for Bookings BFF (list/create/update + change lo
 - `booking-ids.ts` — `nextBookingId` (shared with Sales confirm)
 - `booking-dates.ts` — ISO date normalize/display helpers (client + server safe)
 - `booking-form.ts` — create-form state + client validation
+- `booking-catalog-fetch.ts` — deduped browser GET `/api/bookings` (Bookings list + Contracts picker)
 - `booking-input.ts` — Zod request contracts for create/update
 - `booking-repository.ts` — server-only read/write + `booking_changes` sync
 

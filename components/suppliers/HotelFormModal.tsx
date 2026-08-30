@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
 import type { Hotel, HotelRoom } from '@/lib/types';
-import { toast } from '@/lib/toast';
 
 const EMPTY_ROOM = (): HotelRoom => ({
   type: '',
@@ -18,6 +17,17 @@ const EMPTY_ROOM = (): HotelRoom => ({
   fn: 0,
   pn: 0,
 });
+
+const RATE_COLUMNS = [
+  { key: 'lm', label: 'Low MUP', thClass: 'sup-th-low', tdClass: 'sup-td-low' },
+  { key: 'hm', label: 'High MUP', thClass: 'sup-th-high', tdClass: 'sup-td-high' },
+  { key: 'fm', label: 'Fest MUP', thClass: 'sup-th-fest', tdClass: 'sup-td-fest' },
+  { key: 'pm', label: 'Peak MUP', thClass: 'sup-th-peak', tdClass: 'sup-td-peak' },
+  { key: 'ln', label: 'Low NET', thClass: 'sup-th-low sup-th-net', tdClass: 'sup-td-low sup-td-net' },
+  { key: 'hn', label: 'High NET', thClass: 'sup-th-high sup-th-net', tdClass: 'sup-td-high sup-td-net' },
+  { key: 'fn', label: 'Fest NET', thClass: 'sup-th-fest sup-th-net', tdClass: 'sup-td-fest sup-td-net' },
+  { key: 'pn', label: 'Peak NET', thClass: 'sup-th-peak sup-th-net', tdClass: 'sup-td-peak sup-td-net' },
+] as const;
 
 interface Props {
   open: boolean;
@@ -51,15 +61,18 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
   const formKey = `${open}-${mode}-${hotel ? JSON.stringify(hotel) : existing.map((item) => item.id).join(',')}`;
   const [previousFormKey, setPreviousFormKey] = useState(formKey);
   const [form, setForm] = useState<Hotel>(() => initialForm(mode, hotel, existing));
+  const [formError, setFormError] = useState<string | null>(null);
 
   if (formKey !== previousFormKey) {
     setPreviousFormKey(formKey);
     setForm(initialForm(mode, hotel, existing));
+    setFormError(null);
   }
 
   if (!open) return null;
 
   function updateRoom(index: number, patch: Partial<HotelRoom>) {
+    setFormError(null);
     setForm((f) => ({
       ...f,
       rooms: f.rooms.map((room, i) => (i === index ? { ...room, ...patch } : room)),
@@ -76,7 +89,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
 
   function handleSave() {
     if (!form.name.trim() || !form.dest.trim()) {
-      toast.warning('Hotel name and destination are required.');
+      setFormError('Hotel name and destination are required.');
       return;
     }
     const rooms = form.rooms
@@ -87,7 +100,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
         type: room.type.trim(),
       }));
     if (!rooms.length) {
-      toast.warning('Add at least one room type.');
+      setFormError('Add at least one room type with a name.');
       return;
     }
     onSave({ ...form, name: form.name.trim(), dest: form.dest.trim(), rooms });
@@ -96,15 +109,24 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
 
   return (
     <div className="overlay open" onClick={onClose}>
-      <div className="modal" style={{ width: 900, maxHeight: '92vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-hd modal-hd-green">
-          <span style={{ color: '#fff', fontWeight: 700 }}>{mode === 'edit' ? '✏ Edit Hotel' : '＋ Add Hotel'}</span>
+      <div className="modal nc-modal" style={{ width: 900, maxWidth: '96vw' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-hd modal-hd-green nc-modal-hd">
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>
+              {mode === 'edit' ? 'Edit Hotel' : 'Add Hotel'}
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 1 }}>
+              Property details and room rates (USD / room / night)
+            </div>
+          </div>
           <button className="modal-close-btn" type="button" onClick={onClose}>
             ✕
           </button>
         </div>
-        <div style={{ padding: 20 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+
+        <div className="nc-modal-body">
+          <div className="nc-section-title">Property</div>
+          <div className="nc-grid-2" style={{ marginBottom: 16 }}>
             <div className="fg">
               <label className="lbl">Hotel Name *</label>
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -115,7 +137,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
             </div>
             <div className="fg">
               <label className="lbl">Category</label>
-              <input value={form.cat} onChange={(e) => setForm({ ...form, cat: e.target.value })} />
+              <input value={form.cat} onChange={(e) => setForm({ ...form, cat: e.target.value })} placeholder="e.g. Boutique" />
             </div>
             <div className="fg">
               <label className="lbl">Stars</label>
@@ -145,54 +167,57 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <b>Room types & rates (USD/rm/nt)</b>
+            <div className="sup-form-section" style={{ margin: 0 }}>
+              Room Types & Rates
+            </div>
             <button className="btn btn-s btn-sm" type="button" onClick={addRoom}>
-              ＋ Add room
+              + Add Room
             </button>
           </div>
+          <p className="nc-form-hint">MUP = client rate · NET = cost · All values USD per room per night</p>
 
           {form.rooms.map((room, ri) => (
-            <div key={ri} className="card" style={{ marginBottom: 10 }}>
-              <div className="card-body" style={{ padding: 12 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 80px', gap: 8, marginBottom: 8 }}>
-                  <input placeholder="Room type *" value={room.type} onChange={(e) => updateRoom(ri, { type: e.target.value })} />
-                  <input placeholder="View" value={room.view || ''} onChange={(e) => updateRoom(ri, { view: e.target.value })} />
-                  <input placeholder="sqm" type="number" value={room.sqm ?? ''} onChange={(e) => updateRoom(ri, { sqm: e.target.value ? +e.target.value : undefined })} />
-                  <button className="btn btn-s btn-sm" type="button" onClick={() => removeRoom(ri)} disabled={form.rooms.length <= 1}>
-                    ✕
-                  </button>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, fontSize: 11 }}>
-                  {(
-                    [
-                      ['lm', 'Low MUP'],
-                      ['hm', 'High MUP'],
-                      ['fm', 'Fest MUP'],
-                      ['pm', 'Peak MUP'],
-                      ['ln', 'Low NET'],
-                      ['hn', 'High NET'],
-                      ['fn', 'Fest NET'],
-                      ['pn', 'Peak NET'],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <div key={key} className="fg" style={{ margin: 0 }}>
-                      <label className="lbl" style={{ fontSize: 10 }}>
-                        {label}
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={room[key]}
-                        onChange={(e) => updateRoom(ri, { [key]: +e.target.value || 0 })}
-                      />
-                    </div>
-                  ))}
-                </div>
+            <div key={ri} className="nc-form-card" style={{ padding: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px 40px', gap: 8, marginBottom: 10 }}>
+                <input placeholder="Room type *" value={room.type} onChange={(e) => updateRoom(ri, { type: e.target.value })} />
+                <input placeholder="View" value={room.view || ''} onChange={(e) => updateRoom(ri, { view: e.target.value })} />
+                <input
+                  placeholder="sqm"
+                  type="number"
+                  value={room.sqm ?? ''}
+                  onChange={(e) => updateRoom(ri, { sqm: e.target.value ? +e.target.value : undefined })}
+                />
+                <button className="btn btn-s btn-sm" type="button" onClick={() => removeRoom(ri)} disabled={form.rooms.length <= 1}>
+                  ✕
+                </button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                {RATE_COLUMNS.map((col) => (
+                  <div key={col.key} className="fg" style={{ margin: 0 }}>
+                    <label className={`lbl sup-th ${col.thClass}`} style={{ fontSize: 10, display: 'block', padding: '4px 6px', borderRadius: 4 }}>
+                      {col.label}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className={col.tdClass}
+                      value={room[col.key as keyof HotelRoom] as number}
+                      onChange={(e) => updateRoom(ri, { [col.key]: +e.target.value || 0 })}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           ))}
+        </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+        <div className="nc-modal-ft">
+          {formError ? (
+            <div className="nc-form-error" role="alert">
+              {formError}
+            </div>
+          ) : null}
+          <div className="nc-modal-ft-actions">
             <button className="btn btn-s" type="button" onClick={onClose}>
               Cancel
             </button>

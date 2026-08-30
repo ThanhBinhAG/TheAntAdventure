@@ -25,6 +25,7 @@ export const ROUTE_CACHE_DENYLIST: readonly SyncArrayTable[] = [
   'leads',
   'comms',
   'bookings',
+  'contracts',
   'hotels',
   'transport',
   'restaurants',

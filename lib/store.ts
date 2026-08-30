@@ -108,6 +108,7 @@ interface CRMState {
   setContracts: (contracts: unknown[]) => void;
   addContract: (contract: Record<string, unknown>) => void;
   updateContract: (id: string, data: Record<string, unknown>) => void;
+  deleteContract: (id: string) => void;
   addFeedback: (item: Record<string, unknown>) => void;
   addDevNote: (note: Record<string, unknown>) => void;
   updateDevNote: (id: string, data: Record<string, unknown>) => void;
@@ -308,6 +309,10 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
             const row = c as { id?: string };
             return row.id === id ? { ...row, ...data } : c;
           }),
+        })),
+      deleteContract: (id) =>
+        set((s) => ({
+          contracts: s.contracts.filter((c) => (c as { id?: string }).id !== id),
         })),
       addFeedback: (item) => set((s) => ({ feedback: [...s.feedback, item] })),
       addDevNote: (note) => set((s) => ({ devNotes: [note, ...s.devNotes] })),

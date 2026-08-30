@@ -178,3 +178,19 @@ export async function updateContractServer(
 
   return getContractByIdServer(supabase, input.id);
 }
+
+export async function deleteContractServer(
+  supabase: SupabaseClient,
+  id: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('contracts')
+    .delete()
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+  if (error) throw new ContractRepositoryError(error.message);
+  if (!data) {
+    throw new ContractRepositoryError('Không tìm thấy hợp đồng.', 'not_found');
+  }
+}

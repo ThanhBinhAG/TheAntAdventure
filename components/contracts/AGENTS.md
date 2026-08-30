@@ -4,7 +4,9 @@
 Contracts CRM UI: list, create modal, preview/status, print helpers.
 
 ## Contents
-- `ContractsPage.tsx` — main Contracts screen; page shell is `pages/Contracts.tsx`
+- `ContractsPage.tsx` — list, KPI, preview/status, delete
+- `ContractFormModal.tsx` — create-only modal with booking autofill + client combobox
+- `ContractClientNameCombobox.tsx` — client name typeahead (customers + bookings)
 
 ## Boundaries
 - Reads/writes go through Contracts BFF hooks (`useContractsPage` / create / update).

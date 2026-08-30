@@ -51,7 +51,7 @@ test('BFF_MANAGED_TABLES denylist covers Dev B CRM tables', () => {
 
 test('SHELL_HYDRATE_TABLES keeps only deferred legacy tables', () => {
   const shell = SHELL_HYDRATE_TABLES as readonly string[];
-  for (const table of ['customers', 'leads', 'agents', 'tasks', 'tour_drafts', 'bookings']) {
+  for (const table of ['customers', 'leads', 'agents', 'tasks', 'tour_drafts', 'bookings', 'contracts']) {
     assert.equal(shell.includes(table), false, `shell must not include ${table}`);
   }
   for (const table of ['feedback']) {
@@ -69,6 +69,7 @@ test('ROUTE_CACHE_DENYLIST includes Dev B CRM tables', () => {
     'leads',
     'comms',
     'bookings',
+    'contracts',
   ]) {
     assert.equal(deny.includes(table), true, `denylist must include ${table}`);
   }

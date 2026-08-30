@@ -1826,7 +1826,16 @@ kbd{font-family:inherit}
 .nc-section-type{background:#F0F7F3;border:1px solid #C8E6D4;border-radius:9px;padding:13px 16px;margin-bottom:16px}
 .nc-section-children{background:var(--amb-l);border:1px solid #FDE68A;border-radius:9px;padding:14px 16px;margin-bottom:16px}
 .nc-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--g);margin-bottom:10px}
+.nc-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
 .nc-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px}
+.nc-form-hint{font-size:12px;color:var(--m);margin:-4px 0 10px;line-height:1.45}
+.nc-form-card{background:var(--gl);border:1px solid var(--b);border-radius:9px;padding:12px 14px;margin-bottom:16px}
+.nc-form-card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--gd);margin-bottom:8px}
+.nc-form-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.nc-form-summary-item{background:var(--bg);border:1px solid var(--b);border-radius:8px;padding:10px 12px;text-align:center}
+.nc-form-summary-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--m);margin-bottom:3px}
+.nc-form-summary-val{font-size:15px;font-weight:700;color:var(--td)}
+.sup-form-section{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--g);margin-bottom:10px}
 .child-tag{display:inline-block;background:#fff;border:1px solid #FDE68A;border-radius:12px;padding:2px 8px;font-size:10.5px;color:var(--amb);cursor:pointer;margin:2px 3px 2px 0}
 .child-quick-tags{margin-top:9px}
 .prof-modal{width:720px;max-width:95vw;padding:0;overflow:hidden}

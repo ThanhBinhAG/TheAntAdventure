@@ -24,6 +24,7 @@ import { useApproveLeadOutline } from '@/hooks/useApproveLeadOutline';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import { useRegisterCustomer } from '@/hooks/useRegisterCustomer';
 import type { SalesKey } from '@/lib/i18n/pages/sales';
@@ -58,7 +59,7 @@ function timeFilterLabel(mode: SalesTimeFilterMode, tsf: (key: SalesKey) => stri
 }
 
 export default function SalesPage() {
-  const { tc, tStage, tsf, tLostReason } = useLanguage();
+  const { tc, tStage, tsf, tLostReason, language } = useLanguage();
   const searchParams = useSearchParams();
   const urlCustId = searchParams.get('custId');
   const urlLeadId = searchParams.get('leadId');
@@ -73,6 +74,15 @@ export default function SalesPage() {
     urlLeadId ? 'list' : urlTab === 'list' || urlTab === 'pipeline' ? urlTab : 'pipeline'
   );
   const [lostModal, setLostModal] = useState<{ leadId: string; reason: string; note: string } | null>(null);
+  const lostBaseline = { reason: '', note: '' };
+  const lostCurrent = lostModal ? { reason: lostModal.reason, note: lostModal.note } : lostBaseline;
+  const lostDirty = useFormDirty(!!lostModal, lostBaseline, lostCurrent, undefined, lostModal?.leadId);
+  const { requestClose: requestLostClose } = useConfirmClose({
+    open: !!lostModal,
+    dirty: lostDirty,
+    onClose: () => setLostModal(null),
+    language,
+  });
   const [formOpen, setFormOpen] = useState(false);
   const [createdClient, setCreatedClient] = useState<{
     leadId: string;
@@ -619,11 +629,11 @@ export default function SalesPage() {
       {tab === 'policy' && <SalesPolicyView />}
 
       {lostModal && (
-        <div className="overlay open" onClick={() => setLostModal(null)}>
+        <div className="overlay open" onClick={() => void requestLostClose()}>
           <div className="modal lost-reason-modal" style={{ width: 440 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-hd modal-hd-green">
               <div style={{ color: '#fff', fontWeight: 700 }}>{tc('markLost')}</div>
-              <button type="button" className="modal-close-btn" onClick={() => setLostModal(null)}>
+              <button type="button" className="modal-close-btn" onClick={() => void requestLostClose()}>
                 ✕
               </button>
             </div>
@@ -644,7 +654,7 @@ export default function SalesPage() {
                 <textarea value={lostModal.note} onChange={(e) => setLostModal({ ...lostModal, note: e.target.value })} placeholder={tsf('optionalContext')} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button className="btn btn-s" type="button" onClick={() => setLostModal(null)}>
+                <button className="btn btn-s" type="button" onClick={() => void requestLostClose()}>
                   {tc('cancel')}
                 </button>
                 <button className="btn btn-p" type="button" onClick={() => void saveLostReason()} disabled={!lostModal.reason}>

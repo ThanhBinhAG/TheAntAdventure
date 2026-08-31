@@ -9,6 +9,11 @@ const devBPages = [
   '/customers',
   '/agents',
   '/sales',
+  '/bookings',
+  '/contracts',
+  '/posttour',
+  '/finance',
+  '/tax',
   '/gallery',
   '/weather',
 ];

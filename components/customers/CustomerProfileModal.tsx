@@ -7,6 +7,8 @@ import { getClientLeads, getClientPipeline, getCustomerBookings } from '@/lib/co
 import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useCustomerProfileMutations } from '@/hooks/useCustomerProfileMutations';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import type { Customer, Lead } from '@/lib/types';
@@ -107,6 +109,23 @@ export default function CustomerProfileModal({
   });
   const [aiDraft, setAiDraft] = useState<string | null>(null);
 
+  const { language } = useLanguage();
+  const emptyCommForm = {
+    type: 'Email',
+    dir: 'outbound' as const,
+    date: new Date().toISOString().split('T')[0],
+    subj: '',
+    body: '',
+  };
+  const profileDirty = useFormDirty(
+    true,
+    { notes: customer.notes || '', comm: emptyCommForm },
+    { notes: notesDraft, comm: commForm },
+    (v) => JSON.stringify(v),
+    customer.id,
+  );
+  const { requestClose } = useConfirmClose({ open: true, dirty: profileDirty, onClose, language });
+
   const custComms = useMemo(
     () => comms.filter((m) => m.cid === customer.id).sort((a, b) => b.date.localeCompare(a.date)),
     [comms, customer.id]
@@ -197,7 +216,7 @@ The Ant Adventures`;
   }
 
   return (
-    <div className="overlay open prof-overlay" onClick={onClose}>
+    <div className="overlay open prof-overlay" onClick={() => void requestClose()}>
       <div className="modal prof-modal" onClick={(e) => e.stopPropagation()}>
         <div className="prof-modal-hd">
           <div>
@@ -221,7 +240,7 @@ The Ant Adventures`;
           <button type="button" className="prof-toolbar-btn prof-toolbar-danger" onClick={onDelete} disabled={!canWrite}>
             ✕ Delete
           </button>
-          <button type="button" className="prof-toolbar-btn" onClick={onClose}>
+          <button type="button" className="prof-toolbar-btn" onClick={() => void requestClose()}>
             ✕ Close
           </button>
         </div>

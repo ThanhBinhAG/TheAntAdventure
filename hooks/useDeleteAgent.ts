@@ -3,8 +3,7 @@
 import { useCallback } from 'react';
 import { useStore } from '@/hooks/useStore';
 import { PROTECTED_AGENT_ID } from '@/lib/agents/agent-ids';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
-import { persistRouteCacheFromStore } from '@/lib/db/hydrate';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 
 export type AgentDeleteResult =
   | { ok: true }
@@ -87,7 +86,6 @@ export function useDeleteAgent() {
           });
         }
 
-        persistRouteCacheFromStore('agents');
         return { ok: true };
       } catch {
         if (existing) {

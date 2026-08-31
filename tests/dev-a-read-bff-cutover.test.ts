@@ -7,28 +7,15 @@ function source(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf8');
 }
 
-test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
-  const config = source('lib/db/sync-config.ts');
+test('Dev A read screens use BFF APIs (no browser hydrate helpers)', () => {
   const products = source('components/products/ProductsPage.tsx');
   const planner = source('components/pages/Planner.tsx');
   const attractions = source('components/pages/Attractions.tsx');
   const gallery = source('components/gallery/GalleryWorkspace.tsx');
   const pricing = source('components/pricing/PricingPage.tsx');
   const tourDesign = source('components/tour-design/TourDesignPage.tsx');
-  const tourDesignBoot = config.match(/tourdesign:\s*\[([\s\S]*?)\],\n\s*\/\/ Catalogue/)?.[1] ?? '';
 
-  assert.match(config, /planner:\s*\[\]/);
-  assert.match(config, /attractions:\s*\[\]/);
-  assert.match(config, /pricing:\s*\[\]/);
-  assert.doesNotMatch(tourDesignBoot, /'products'/);
-  assert.doesNotMatch(tourDesignBoot, /'tour_drafts'/);
-  assert.doesNotMatch(tourDesignBoot, /'tour_outline_days'/);
-  assert.doesNotMatch(tourDesignBoot, /'customers'/);
-  assert.doesNotMatch(tourDesignBoot, /'leads'/);
-  assert.doesNotMatch(tourDesignBoot, /'hotels'/);
-  assert.doesNotMatch(tourDesignBoot, /'comms'/);
-
-  assert.doesNotMatch(products, /ensureTablesLoaded/);
+  assert.doesNotMatch(products, /ensureTablesLoaded|ensurePageBootLoaded|lib\/db\/hydrate/);
   assert.match(products, /getBffData<Product>\(/);
   assert.match(products, /api\/products\?code=/);
   assert.doesNotMatch(products, /\/api\/products\/all/);
@@ -41,17 +28,17 @@ test('Dev A read screens use BFF APIs instead of hydrate helpers', () => {
   assert.match(attractions, /setAttractions/);
 
   assert.match(gallery, /useGalleryPage/);
-  assert.doesNotMatch(gallery, /ensureTablesLoaded\(\['attractions'\]\)/);
+  assert.doesNotMatch(gallery, /ensureTablesLoaded|lib\/db\/hydrate/);
   assert.match(gallery, /getBffArray<Attraction>\('\/api\/attractions\/all'/);
   assert.match(gallery, /setAttractions/);
 
-  assert.doesNotMatch(pricing, /ensureTablesLoaded/);
+  assert.doesNotMatch(pricing, /ensureTablesLoaded|lib\/db\/hydrate/);
   assert.match(pricing, /useProductPage/);
   assert.match(pricing, /\/api\/products\/pricing\?productCode=/);
   assert.doesNotMatch(pricing, /\/api\/products\/all/);
   assert.doesNotMatch(pricing, /\/api\/products\/pricing\/all/);
 
-  assert.doesNotMatch(tourDesign, /ensureTablesLoaded/);
+  assert.doesNotMatch(tourDesign, /ensureTablesLoaded|lib\/db\/hydrate/);
   assert.match(tourDesign, /\/api\/tour-design\/drafts\?leadIds=/);
   assert.match(tourDesign, /\/api\/tour-design\/drafts\?id=/);
   assert.match(tourDesign, /\/api\/tour-design\/outlines\?draftId=/);

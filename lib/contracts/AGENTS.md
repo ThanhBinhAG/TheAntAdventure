@@ -5,6 +5,8 @@ Guest contract HTML builders plus Contracts BFF Zod/DTO/ids and server-only repo
 
 ## Contents
 - `contract-html.ts` — print / Word HTML helpers (client-safe)
+- `contract-form.ts` — client create form state + validation
+- `contract-booking-fill.ts` — map booking/customer rows into contract form fields + client suggestions
 - `contract-input.ts` — Zod create/update + `ContractListItem` DTO
 - `contract-ids.ts` — `nextContractId` (`CTR-YYYY-NNN`)
 - `contract-repository.ts` — server-only list/get/create/update

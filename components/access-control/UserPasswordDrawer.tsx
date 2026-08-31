@@ -14,6 +14,7 @@ import { useState, type FormEvent } from 'react';
 import { Button, Drawer, Input } from 'antd';
 import type { AccessControlUser } from './access-control-api';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
 import { tac } from '@/lib/i18n/pages/access-control';
 import styles from './AccessControlPage.module.css';
 
@@ -35,11 +36,23 @@ export default function UserPasswordDrawer({
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
 
-    function handleClose() {
+    const dirty = Boolean(password || confirmPassword);
+    const finishClose = () => {
         setPassword('');
         setConfirmPassword('');
         setError(null);
         onClose();
+    };
+    const { requestClose } = useConfirmClose({
+        open: Boolean(user),
+        dirty,
+        onClose: finishClose,
+        disabled: saving,
+        language,
+    });
+
+    function handleClose() {
+        void requestClose();
     }
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {

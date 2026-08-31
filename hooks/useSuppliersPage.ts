@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getBffArray } from '@/lib/bff/client';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 import { mergeSupplierSeeds } from '@/lib/suppliers/ensure-supplier-seeds';
 import type { ExtendedSupplierListItem } from '@/lib/suppliers/extended-supplier-input';
 import type { HotelListItem } from '@/lib/suppliers/hotel-input';

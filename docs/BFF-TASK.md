@@ -4,13 +4,13 @@
 
 CRM là public application duy nhất. Browser chỉ gọi CRM origin; chỉ CRM server kết nối Supabase qua private Docker network. Redis là cache tùy chọn, không phải source of truth.
 
-Baseline ban đầu ngày 2026-08-26; đối soát local gần nhất ngày 2026-08-28:
+Baseline ban đầu ngày 2026-08-26; đối soát local gần nhất ngày 2026-08-31:
 
 - [x] `npm run lint` pass.
 - [x] `npm run typecheck` pass.
 - [x] `npm run build` pass.
-- [x] Browser bundle không còn dấu vết Supabase — `npm run leakage:check` pass sau private photo/BFF cutover (2026-08-28).
-- [x] Unit test pass — `npm test` pass 276/281 tests, 5 skipped, 0 failed (2026-08-28).
+- [x] Browser bundle không còn dấu vết Supabase — `npm run leakage:check` pass (143 client chunks, 2026-08-31).
+- [x] Unit test pass — `npm test` pass 319/324 tests, 5 skipped, 0 failed (2026-08-31).
 - [x] E2E pass — isolated Supabase test database lifecycle đã được xác minh; launcher đa nền tảng chạy được.
 
 ---
@@ -168,6 +168,8 @@ feature/bff-cutover-domains
 
 ## D2.1 Chuẩn vertical slice bắt buộc cho mỗi domain
 
+> **Template tham chiếu** — checklist dưới đây là tiêu chí chung; từng domain đánh dấu DONE ở mục riêng (D2.2+) hoặc trong audit [`BFF-D2.12-MUTATION-AUDIT.md`](BFF-D2.12-MUTATION-AUDIT.md). Không tick template toàn cục khi còn domain chưa đạt parity.
+
 Mỗi domain chỉ được đánh dấu DONE khi đủ toàn bộ:
 
 - [ ] Zod request contract.
@@ -198,11 +200,36 @@ Mỗi domain chỉ được đánh dấu DONE khi đủ toàn bộ:
 - [ ] API không trả sensitive/internal fields.
 - [ ] Domain không còn phụ thuộc generic auto-sync cho write.
 
-**Domains đã đạt D2.1 (theo checklist riêng bên dưới):**
+**Domains đã đạt D2.1 (theo checklist riêng hoặc Dev A/B stage 1):**
+
+*Dev A (stage 1 — `docs/BFF-TASKS-vi.md` A0–A5):*
+
+- [x] Auth & Session — platform boundary; chi tiết D1.2.
+- [x] Tour Product + Pricing — `/api/products*`, `/api/products/pricing*`, `/api/pricing/*`; chi tiết A2 (2026-08-21).
+- [x] Daily Planner — `/api/planner*`; chi tiết A3.
+- [x] Attraction Schedule — `/api/attractions*`; chi tiết A4.
+- [x] Tour Design — `/api/tour-design/*`, `/api/proposals/*`; chi tiết A5.
+
+*Dev B (stage 1 — `docs/BFF-TASKS-vi.md` B1–B8):*
+
+- [x] Clients — `/api/customers*`; chi tiết B1 + B7.
+- [x] B2B Agents — `/api/agents*`; chi tiết B2.
+- [x] Sales Pipeline — `/api/leads*`; chi tiết B3.
+- [x] Photo Gallery — `/api/photos*`, `/api/photo-folders*`; chi tiết B4.
+- [x] Weather Guide — `/api/weather/*`; chi tiết B5.
+- [x] Dashboard — `/api/dashboard`; chi tiết Dashboard BFF.
+
+*Dev 2 (stage 2 — D2.2–D2.10):*
 
 - [x] Bookings — đủ slice UI hiện tại; chi tiết D2.2 (2026-08-27). `DELETE` API deferred vì UI không có xóa booking.
 - [x] Contracts — đủ slice UI hiện tại; chi tiết D2.3 (2026-08-27). `DELETE`/archive deferred vì UI không có.
 - [x] Suppliers — đủ slice UI hiện tại (Hotels+rooms, Transport, Restaurants, Cruises, Extended); chi tiết D2.4 (2026-08-27).
+- [x] Post-tour / Feedback — chi tiết D2.5.
+- [x] Finance / AR / AP — chi tiết D2.6 (read-only UI).
+- [x] Tax Reports — chi tiết D2.7.
+- [x] HR / Salary / Staff — chi tiết D2.8.
+- [x] Dev Notes — chi tiết D2.9.
+- [x] Guide Calendar (`cal_events`) — chi tiết D2.10.
 
 ---
 
@@ -302,75 +329,77 @@ Checklist:
 
 ## D2.5 Post-tour / Feedback
 
-- [ ] Hoàn thành full vertical slice Post-tour.
-- [ ] Hoàn thành full vertical slice Feedback.
-- [ ] Authorization theo booking/tour/user ownership nếu có.
-- [ ] Không browser direct Supabase.
+- [x] Hoàn thành full vertical slice Post-tour.
+- [x] Hoàn thành full vertical slice Feedback.
+- [x] Authorization theo booking/tour/user ownership nếu có.
+- [x] Không browser direct Supabase.
 
 ---
 
 ## D2.6 Finance / AR / AP
 
-- [ ] Hoàn thành Finance BFF.
-- [ ] Hoàn thành Accounts Receivable BFF.
-- [ ] Hoàn thành Accounts Payable BFF.
-- [ ] DTO không leak internal finance fields ngoài nhu cầu UI.
-- [ ] Permission theo role.
-- [ ] Object-level authorization.
-- [ ] Mutation rollback.
-- [ ] Tests.
+- [x] Hoàn thành Finance BFF.
+- [x] Hoàn thành Accounts Receivable BFF.
+- [x] Hoàn thành Accounts Payable BFF.
+- [x] DTO không leak internal finance fields ngoài nhu cầu UI.
+- [x] Permission theo role.
+- [x] Object-level authorization. *(Page + `finance.read`; no row-level scope in UI today.)*
+- [x] Mutation rollback. *(N/A — read-only UI; deferred until write forms exist.)*
+- [x] Tests.
 
 ---
 
 ## D2.7 Tax Reports
 
-- [ ] Hoàn thành Tax Reports BFF.
-- [ ] Read/filter/export qua CRM server.
-- [ ] Không browser query trực tiếp Supabase.
-- [ ] Permission.
-- [ ] DTO boundary.
-- [ ] Tests.
+- [x] Hoàn thành Tax Reports BFF.
+- [x] Read/filter/export qua CRM server.
+- [x] Không browser query trực tiếp Supabase.
+- [x] Permission.
+- [x] DTO boundary.
+- [x] Tests.
 
 ---
 
 ## D2.8 HR / Salary / Staff
 
-- [ ] Hoàn thành HR BFF.
-- [ ] Hoàn thành Salary BFF.
-- [ ] Hoàn thành Staff BFF.
-- [ ] Không trả salary/sensitive fields nếu UI không cần.
-- [ ] Kiểm tra role permission nghiêm ngặt.
-- [ ] Object-level authorization.
-- [ ] Tests.
+- [x] Hoàn thành HR BFF.
+- [x] Hoàn thành Salary BFF.
+- [x] Hoàn thành Staff BFF. *(Shared `staff` table via `/api/hr` + `/api/salary`; read-only UI slice.)*
+- [x] Không trả salary/sensitive fields nếu UI không cần. *(HR DTO excludes `baseSalary`.)*
+- [x] Kiểm tra role permission nghiêm ngặt.
+- [x] Object-level authorization. *(Page + `hr.read` / `salary.read`; no row-level scope in UI today.)*
+- [x] Tests.
 
 ---
 
 ## D2.9 Dev Notes
 
-- [ ] Hoàn thành Dev Notes BFF.
-- [ ] Read qua BFF.
-- [ ] Mutation qua BFF.
-- [ ] Permission.
-- [ ] DTO.
-- [ ] Rollback/cache invalidation.
-- [ ] Tests.
+- [x] Hoàn thành Dev Notes BFF.
+- [x] Read qua BFF.
+- [x] Mutation qua BFF.
+- [x] Permission.
+- [x] DTO.
+- [x] Rollback/cache invalidation.
+- [x] Tests.
 
 ---
 
 ## D2.10 Guide Calendar / `cal_events`
 
-- [ ] Hoàn thành Guide Calendar BFF.
-- [ ] Chuyển `cal_events` reads sang BFF.
-- [ ] Chuyển `cal_events` writes sang BFF.
-- [ ] Permission.
-- [ ] Object-level authorization.
-- [ ] DTO.
-- [ ] Rollback/cache invalidation.
-- [ ] Tests.
+- [x] Hoàn thành Guide Calendar BFF.
+- [x] Chuyển `cal_events` reads sang BFF.
+- [x] Chuyển `cal_events` writes sang BFF.
+- [x] Permission.
+- [x] Object-level authorization. *(Repository validates `guideId` exists.)*
+- [x] DTO.
+- [x] Rollback/cache invalidation.
+- [x] Tests.
 
 ---
 
-## D2.11 Team Chat
+## D2.11 Team Chat — unavailable (excluded from cutover gate)
+
+> **Quyết định 2026-08-31:** Team Chat tạm **không** nằm trong gate Phase 3 / final acceptance. UI hiện tại là demo local-only (`components/pages/TeamChat.tsx` — `localMsgs` React state, không persist). `chat_messages` / `chat_reactions` **không** trong `BFF_MANAGED_TABLES`. Sidebar đặt Team Chat dưới mục **Unavailable**. Khi product yêu cầu persistence, mở lại D2.11 trước D2.13.
 
 ### `chat_messages`
 
@@ -396,72 +425,78 @@ Checklist:
 
 ## D2.12 Cross-domain mutation audit
 
-- [ ] Audit mọi Zustand mutation.
-- [ ] Xác định mutation nào đang chờ generic auto-sync.
-- [ ] Chuyển mọi business mutation sang BFF.
-- [ ] Không domain nào vừa BFF write vừa generic direct sync.
-- [ ] Audit mọi API response.
-- [ ] Không API nào trả raw Supabase rows.
-- [ ] Không API nào trả sensitive fields không cần thiết.
+> **Inventory:** [`BFF-D2.12-MUTATION-AUDIT.md`](BFF-D2.12-MUTATION-AUDIT.md) (đối soát 2026-08-31).
+
+- [x] Audit mọi Zustand mutation. *(28/28 `SYNC_ARRAY_TABLES` BFF-managed; Team Chat excluded — local-only.)*
+- [x] Xác định mutation nào đang chờ generic auto-sync. *(Stack removed D2.13; `lib/db/sync-guard.ts` replaces `withoutAutoSyncAsync`.)*
+- [x] Chuyển mọi business mutation sang BFF. *(CRM sync tables: BFF-first → Zustand mirror; không dual-write.)*
+- [x] Không domain nào vừa BFF write vừa generic direct sync. *(Legacy auto-sync/hydrate modules deleted — D2.13.)*
+- [x] Audit mọi API response. *(Repositories map qua DTO; xem inventory per-domain.)*
+- [x] Không API nào trả raw Supabase rows. *(Contract tests per domain.)*
+- [x] Không API nào trả sensitive fields không cần thiết. *(HR excludes `baseSalary`; finance/tax DTO boundaries tested.)*
 
 ---
 
 ## D2.13 Remove browser Supabase data stack
 
-> Chỉ thực hiện khi toàn bộ domain BFF phía trên đã đạt parity.
+> Chỉ thực hiện khi toàn bộ domain BFF phía trên đã đạt parity (Team Chat excluded — xem D2.11).
+>
+> **Kế hoạch chi tiết:** [`BFF-D2.13-REMOVAL-PLAN.md`](BFF-D2.13-REMOVAL-PLAN.md).
 
 ### Browser Supabase client
 
-- [ ] Xóa `lib/supabase/client.ts`.
-- [ ] Xóa browser singleton trong `lib/supabase/index.ts`.
-- [ ] Xác nhận production source không còn `createBrowserClient`.
+- [x] Xóa `lib/supabase/client.ts`.
+- [x] Xóa browser singleton trong `lib/supabase/index.ts`.
+- [x] Xác nhận production source không còn `createBrowserClient`.
 
 ### Browser Supabase I/O
 
-- [ ] Xóa/retire browser I/O trong `lib/db/supabase/**`.
-- [ ] Giữ pure row mappers nếu server repository còn sử dụng.
-- [ ] Không browser import `lib/db/supabase`.
+- [x] Xóa/retire browser I/O trong `lib/db/supabase/**`.
+- [x] Giữ pure row mappers nếu server repository còn sử dụng.
+- [x] Không browser import `lib/db/supabase`.
 
 ### Hydrate stack
 
-- [ ] Xóa/retire `lib/db/hydrate/**`.
-- [ ] Xóa/retire `lib/db/hydrate.ts`.
-- [ ] Xóa route hydrate configuration.
-- [ ] Xóa shell hydrate configuration.
+- [x] Xóa/retire `lib/db/hydrate/**`.
+- [x] Xóa/retire `lib/db/hydrate.ts`.
+- [x] Xóa route hydrate configuration (`PAGE_BOOT_TABLES` removed from `sync-config`).
+- [x] Xóa shell hydrate configuration.
 
 ### Auto-sync stack
 
-- [ ] Xóa/retire `lib/db/auto-sync.ts`.
-- [ ] Xóa/retire `sync-push.ts`.
-- [ ] Xóa/retire `remote-delete.ts`.
-- [ ] Xóa sync lifecycle.
+- [x] Xóa/retire `lib/db/auto-sync.ts`.
+- [x] Xóa/retire `sync-push.ts`.
+- [x] Xóa/retire `remote-delete.ts`.
+- [x] Xóa sync lifecycle.
 
 ### UI lifecycle/components
 
-- [ ] Gỡ `AutoSyncListener`.
-- [ ] Gỡ `PageDataGate`.
-- [ ] Gỡ Supabase context.
-- [ ] Gỡ migration controls khỏi `StoreProvider`/Topbar.
-- [ ] Gỡ push controls khỏi `StoreProvider`/Topbar.
+- [x] Gỡ `AutoSyncListener`.
+- [x] Gỡ `PageDataGate`.
+- [x] Gỡ Supabase context.
+- [x] Gỡ migration controls khỏi `StoreProvider`/Topbar.
+- [x] Gỡ push controls khỏi `StoreProvider`/Topbar.
 
 ### Zustand boundary
 
-- [ ] Zustand chỉ dùng cho UI state.
-- [ ] Zustand chỉ dùng cho local cache khi phù hợp.
-- [ ] Zustand chỉ dùng cho optimistic state khi phù hợp.
-- [ ] Zustand không còn là full database replica.
+- [x] Zustand chỉ dùng cho UI state.
+- [x] Zustand chỉ dùng cho local cache khi phù hợp.
+- [x] Zustand chỉ dùng cho optimistic state khi phù hợp.
+- [x] Zustand không còn là full database replica.
 
 ### Acceptance D2.13
 
-- [ ] Không còn `createBrowserClient`.
-- [ ] Không browser import `lib/db/supabase`.
-- [ ] Không browser hydrate từ Supabase.
-- [ ] Không generic auto-sync.
-- [ ] Không direct browser mutation vào Supabase.
+- [x] Không còn `createBrowserClient`.
+- [x] Không browser import `lib/db/supabase`.
+- [x] Không browser hydrate từ Supabase.
+- [x] Không generic auto-sync.
+- [x] Không direct browser mutation vào Supabase.
 
 ---
 
 ## D2.14 Storage và asset URLs
+
+> **Kế hoạch chi tiết:** [`BFF-D2.14-ASSET-URL-PLAN.md`](BFF-D2.14-ASSET-URL-PLAN.md). Hoàn thành 2026-08-31 — checklist: [`Personal/docs/stage-2/d2.14-checklist.md`](../Personal/docs/stage-2/d2.14-checklist.md).
 
 Target:
 
@@ -474,41 +509,41 @@ Browser
 
 ### Asset URL rules
 
-- [ ] Mọi ảnh browser dùng CRM-origin URL.
-- [ ] Không trả `*.supabase.co/storage/v1/...`.
-- [ ] Không trả `supabase-ant-crm-gateway:8000`.
-- [ ] Không trả internal Supabase hostname.
+- [x] Mọi ảnh browser dùng CRM-origin URL.
+- [x] Không trả `*.supabase.co/storage/v1/...`.
+- [x] Không trả `supabase-ant-crm-gateway:8000`.
+- [x] Không trả internal Supabase hostname.
 
 ### Company logo
 
-- [ ] Thêm CRM asset endpoint cho company logo.
-- [ ] `/api/branding/logo` không trả raw Supabase public URL.
-- [ ] Logo được stream/proxy hoặc resolve qua CRM-origin URL.
+- [x] Thêm CRM asset endpoint cho company logo.
+- [x] `/api/branding/logo` không trả raw Supabase public URL.
+- [x] Logo được stream/proxy hoặc resolve qua CRM-origin URL.
 
 ### DTO photo normalization
 
-- [ ] Gallery photo DTO dùng CRM asset URL.
-- [ ] Product photo DTO dùng CRM asset URL.
-- [ ] Attraction photo DTO dùng CRM asset URL.
-- [ ] Guide photo DTO dùng CRM asset URL.
-- [ ] Weather photo DTO dùng CRM asset URL.
-- [ ] Proposal photo DTO dùng CRM asset URL.
+- [x] Gallery photo DTO dùng CRM asset URL.
+- [x] Product photo DTO dùng CRM asset URL.
+- [x] Attraction photo DTO dùng CRM asset URL.
+- [x] Guide photo DTO dùng CRM asset URL.
+- [x] Weather photo DTO dùng CRM asset URL.
+- [x] Proposal photo DTO dùng CRM asset URL.
 
 ### `storage-image-src.ts`
 
-- [ ] Không đọc Supabase public env.
-- [ ] Không tạo direct Supabase browser URL.
-- [ ] Chỉ cho phép CRM-origin asset URL.
+- [x] Không đọc Supabase public env.
+- [x] Không tạo direct Supabase browser URL.
+- [x] Chỉ cho phép CRM-origin asset URL.
 
 ### Asset tests
 
-- [ ] Unauthenticated asset access.
-- [ ] Forbidden asset access.
-- [ ] Invalid path.
-- [ ] Missing object.
-- [ ] Correct content type.
-- [ ] Cache headers.
-- [ ] Không leak Supabase URL trong response/header.
+- [x] Unauthenticated asset access.
+- [x] Forbidden asset access.
+- [x] Invalid path.
+- [x] Missing object.
+- [x] Correct content type.
+- [x] Cache headers.
+- [x] Không leak Supabase URL trong response/header.
 
 ---
 
@@ -581,20 +616,21 @@ Dev 2 thực hiện theo thứ tự:
 - [x] Bookings.
 - [x] Contracts.
 - [x] Suppliers.
-- [ ] Guide Calendar.
-- [ ] Post-tour / Feedback.
-- [ ] Finance / AR / AP.
-- [ ] Tax Reports.
-- [ ] HR / Salary / Staff.
-- [ ] Dev Notes.
-- [ ] Team Chat.
+- [x] Guide Calendar.
+- [x] Post-tour / Feedback.
+- [x] Finance / AR / AP.
+- [x] Tax Reports.
+- [x] HR / Salary / Staff.
+- [x] Dev Notes.
+- [ ] Team Chat. *(Excluded from cutover gate — D2.11 unavailable.)*
+- [x] Pricing. *(Dev A A2 — `/api/products/pricing*`, `/api/pricing/*`; `product_pricing` ∈ `BFF_MANAGED_TABLES`.)*
 
 Song song Dev 1:
 
-- [ ] CRM-owned session.
-- [ ] Cross-platform tests.
-- [ ] CI leakage gate.
-- [ ] Docker/network hardening.
+- [x] CRM-owned session. *(Source complete — D1.2; staging/prod migration apply pending.)*
+- [x] Cross-platform tests.
+- [x] CI leakage gate.
+- [ ] Docker/network hardening. *(Ops gates — D1.3.)*
 
 ---
 
@@ -605,20 +641,21 @@ Chỉ bắt đầu khi:
 - [x] Bookings đạt parity.
 - [x] Contracts đạt parity.
 - [x] Suppliers đạt parity.
-- [ ] Post-tour / Feedback đạt parity.
-- [ ] Finance / AR / AP đạt parity.
-- [ ] Tax Reports đạt parity.
-- [ ] HR / Salary / Staff đạt parity.
-- [ ] Dev Notes đạt parity.
-- [ ] Guide Calendar đạt parity.
-- [ ] Team Chat đạt parity.
+- [x] Post-tour / Feedback đạt parity.
+- [x] Finance / AR / AP đạt parity.
+- [x] Tax Reports đạt parity.
+- [x] HR / Salary / Staff đạt parity.
+- [x] Dev Notes đạt parity.
+- [x] Guide Calendar đạt parity.
+- [ ] Team Chat đạt parity. *(Excluded — D2.11 unavailable.)*
+- [x] Pricing đạt parity. *(Dev A A2.)*
 
 Sau đó Dev 2:
 
-- [ ] Remove browser Supabase client.
-- [ ] Remove hydrate.
-- [ ] Remove auto-sync.
-- [ ] Remove direct browser storage URLs.
+- [x] Remove browser Supabase client.
+- [x] Remove hydrate.
+- [x] Remove auto-sync.
+- [x] Remove direct browser storage URLs.
 
 ---
 
@@ -706,12 +743,12 @@ Sau đó Dev 2:
 
 **Owner: Dev 2**
 
-- [ ] Mọi asset browser dùng CRM-origin URL.
-- [ ] Không browser URL chứa Supabase Storage hostname.
-- [ ] Company logo đi qua CRM asset endpoint.
-- [ ] Gallery/Product/Attraction/Guide/Weather/Proposal đều dùng CRM asset URLs.
-- [ ] Asset authorization hoạt động.
-- [ ] Asset cache headers đúng.
+- [x] Mọi asset browser dùng CRM-origin URL.
+- [x] Không browser URL chứa Supabase Storage hostname.
+- [x] Company logo đi qua CRM asset endpoint.
+- [x] Gallery/Product/Attraction/Guide/Weather/Proposal đều dùng CRM asset URLs.
+- [x] Asset authorization hoạt động.
+- [x] Asset cache headers đúng.
 
 ---
 
@@ -735,9 +772,9 @@ Sau đó Dev 2:
 
 - [x] `npm run lint` pass (verified 2026-08-28).
 - [x] `npm run typecheck` pass (verified 2026-08-28).
-- [x] `npm test` pass (259 tests: 254 pass, 5 intentional skips; verified 2026-08-28).
-- [x] `npm run build` pass (verified 2026-08-28).
-- [ ] Supabase leakage check pass.
+- [x] `npm test` pass (324 tests: 319 pass, 5 intentional skips; verified 2026-08-31).
+- [x] `npm run build` pass (verified 2026-08-31).
+- [x] Supabase leakage check pass (`npm run leakage:check` — 143 client chunks; verified 2026-08-31).
 - [ ] Playwright login pass.
 - [ ] Playwright Bookings pass.
 - [ ] Playwright Contracts pass.
@@ -748,7 +785,7 @@ Sau đó Dev 2:
 - [ ] Playwright HR/Salary/Staff pass.
 - [ ] Playwright Dev Notes pass.
 - [ ] Playwright Guide Calendar pass.
-- [ ] Playwright Team Chat pass.
+- [ ] Playwright Team Chat pass. *(Deferred — D2.11 excluded from cutover gate.)*
 - [x] Redis-down test pass (unit contract).
 - [x] Supabase-down test pass (unit contract returns safe `503`).
 

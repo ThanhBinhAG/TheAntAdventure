@@ -69,7 +69,10 @@ export default function Planner() {
     let active = true;
     void getBffArray<Task>('/api/planner/all', 'Không thể tải danh sách công việc.')
       .then((rows) => {
-        if (active) setTasks(rows);
+        if (active) {
+          setTasks(rows);
+          useStore.getState().rolloverIncompleteTasks();
+        }
       })
       .catch((error: unknown) => {
         if (active) setLoadError(error instanceof Error ? error.message : 'Không thể tải danh sách công việc.');

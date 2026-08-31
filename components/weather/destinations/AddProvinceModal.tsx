@@ -10,6 +10,8 @@ import type { PhotoFolder } from '@/lib/gallery/photo-folders';
 import { toast } from '@/lib/toast';
 import type { WeatherRegion } from '@/lib/weather/coordinates';
 import type { ProvinceFormInput } from '@/components/weather/hooks/useProvinceList';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type Props = {
   open: boolean;
@@ -58,6 +60,10 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
     setPickerOpen(false);
     setSaving(false);
   }
+
+  const { language } = useLanguage();
+  const dirty = useFormDirty(open, EMPTY, form, undefined, formKey);
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
 
   if (!open) return null;
 
@@ -114,7 +120,7 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
 
   return (
     <>
-      <div className="overlay open" onClick={onClose} role="presentation">
+      <div className="overlay open" onClick={() => void requestClose()} role="presentation">
         <div
           className="modal wg-province-modal"
           onClick={(e) => e.stopPropagation()}
@@ -124,7 +130,7 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
         >
           <div className="modal-hd modal-hd-green">
             <h2 id="wg-add-title">Add new province</h2>
-            <button type="button" className="gallery-modal-close" onClick={onClose} aria-label="Đóng">
+            <button type="button" className="gallery-modal-close" onClick={() => void requestClose()} aria-label="Đóng">
               ×
             </button>
           </div>
@@ -246,7 +252,7 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
           </div>
 
           <div className="wg-detail-ft">
-            <button type="button" className="btn btn-s" onClick={onClose} disabled={saving}>
+            <button type="button" className="btn btn-s" onClick={() => void requestClose()} disabled={saving}>
               Cancel
             </button>
             <button type="button" className="btn btn-p" onClick={() => void handleSave()} disabled={saving}>

@@ -38,6 +38,7 @@ import {
     type ManagedRoleCode,
 } from './access-control-api';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
 import {
     tac,
     tacPermission,
@@ -73,6 +74,15 @@ export default function UserAccessDrawer({
             () => user?.role_code ??
                 roles.find((role) => role.is_active)?.role_code ?? '',
         );
+
+    const dirty = Boolean(user && selectedRole !== user.role_code);
+    const { requestClose } = useConfirmClose({
+        open: Boolean(user),
+        dirty,
+        onClose,
+        disabled: saving,
+        language,
+    });
 
     // UserDirectory truyền key riêng theo user (và fallback khác Edit drawer)
     // để remount form khi đổi user, không đụng key trùng sibling.
@@ -203,7 +213,7 @@ export default function UserAccessDrawer({
             title={tac('assignUserRole', language)}
             open={Boolean(user)}
             size={560}
-            onClose={onClose}
+            onClose={() => void requestClose()}
             destroyOnHidden
         >
             {user && (
@@ -315,7 +325,7 @@ export default function UserAccessDrawer({
                     )}
 
                     <div className={styles.drawerActions}>
-                        <Button onClick={onClose} disabled={saving}>
+                        <Button onClick={() => void requestClose()} disabled={saving}>
                             {tac('cancel', language)}
                         </Button>
 

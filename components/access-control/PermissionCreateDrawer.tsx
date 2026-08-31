@@ -15,6 +15,7 @@ import {
     Input,
 } from 'antd';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
 import { tac } from '@/lib/i18n/pages/access-control';
 import type {
     CreateAccessControlPermissionInput,
@@ -48,6 +49,21 @@ export default function PermissionCreateDrawer({
 }: PermissionCreateDrawerProps) {
     const { language } = useLanguage();
     const [form] = Form.useForm<CreateAccessControlPermissionInput>();
+    const groupCode = Form.useWatch('groupCode', form);
+    const groupLabel = Form.useWatch('groupLabel', form);
+    const code = Form.useWatch('code', form);
+    const description = Form.useWatch('description', form);
+    const dirty = open && Boolean(groupCode || groupLabel || code || description);
+    const { requestClose } = useConfirmClose({
+        open,
+        dirty,
+        onClose: () => {
+            form.resetFields();
+            onClose();
+        },
+        disabled: saving,
+        language,
+    });
 
     async function handleFinish(
         values: CreateAccessControlPermissionInput,
@@ -73,7 +89,7 @@ export default function PermissionCreateDrawer({
             open={open}
             size={480}
             destroyOnHidden
-            onClose={onClose}
+            onClose={() => void requestClose()}
             afterOpenChange={(visible) => {
                 // Chỉ xóa form sau khi đóng để dữ liệu vẫn còn nếu API báo lỗi.
                 if (!visible) form.resetFields();
@@ -166,7 +182,7 @@ export default function PermissionCreateDrawer({
                 </Form.Item>
 
                 <div className={styles.drawerActions}>
-                    <Button onClick={onClose} disabled={saving}>
+                    <Button onClick={() => void requestClose()} disabled={saving}>
                         {tac('cancel', language)}
                     </Button>
                     <Button

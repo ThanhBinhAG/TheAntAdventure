@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { WeatherDestinationMeta } from '@/lib/weather/types';
 import { toast } from '@/lib/toast';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type Props = {
   open: boolean;
@@ -38,6 +40,14 @@ export default function FeaturedSlotsModal({
     setSaving(false);
   }
 
+  const { language } = useLanguage();
+  const baseline = useMemo(
+    () => ({ slot1: featuredIds[0] ?? '', slot2: featuredIds[1] ?? '' }),
+    [formKey], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const dirty = useFormDirty(open, baseline, { slot1, slot2 }, undefined, formKey);
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
+
   if (!open) return null;
 
   async function handleSave() {
@@ -70,7 +80,7 @@ export default function FeaturedSlotsModal({
   }
 
   return (
-    <div className="overlay open" onClick={onClose} role="presentation">
+    <div className="overlay open" onClick={() => void requestClose()} role="presentation">
       <div
         className="modal wg-province-modal wg-featured-modal"
         onClick={(e) => e.stopPropagation()}
@@ -83,7 +93,7 @@ export default function FeaturedSlotsModal({
             <h2 id="wg-featured-title">Adjust featured destinations</h2>
             <p className="wg-featured-modal-sub">Two major destinations at the top of the Weather Guide page</p>
           </div>
-          <button type="button" className="gallery-modal-close" onClick={onClose} aria-label="Close">
+          <button type="button" className="gallery-modal-close" onClick={() => void requestClose()} aria-label="Close">
             ×
           </button>
         </div>
@@ -134,7 +144,7 @@ export default function FeaturedSlotsModal({
         </div>
 
         <div className="wg-detail-ft">
-          <button type="button" className="btn btn-s" onClick={onClose} disabled={saving}>
+          <button type="button" className="btn btn-s" onClick={() => void requestClose()} disabled={saving}>
             Cancel
           </button>
           <button type="button" className="btn btn-p" onClick={() => void handleSave()} disabled={saving}>

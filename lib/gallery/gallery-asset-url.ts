@@ -5,7 +5,11 @@ import {
   crmGalleryThumbUrl,
   isCrmGalleryAssetUrl,
 } from '@/lib/gallery/crm-gallery-asset-url';
-import { PHOTOS_BUCKET_PUBLIC_URL_PREFIX } from '@/lib/storage/photo-paths';
+import {
+  companyLogoObjectPathFromUrl,
+  LEGACY_COMPANY_LOGO_PATH,
+  PHOTOS_BUCKET_PUBLIC_URL_PREFIX,
+} from '@/lib/storage/photo-paths';
 
 export {
   CRM_BRANDING_LOGO_FILE_ROUTE,
@@ -53,9 +57,26 @@ export function legacyPublicUrlToCrmGalleryUrl(
   return crmGalleryAssetUrl(path, version);
 }
 
+function brandingVersionFromObjectPath(path: string | null | undefined): string | null {
+  if (!path) return null;
+  const versioned = path.match(/^branding\/logo-([^.]+)\.webp$/i);
+  if (versioned?.[1]) return versioned[1];
+  if (path === LEGACY_COMPANY_LOGO_PATH || path === 'branding/logo.webp') return null;
+  return null;
+}
+
 export function mapBrandingLogoUrlForClient(logoUrl: string | null | undefined): string | null {
   if (!logoUrl) return null;
   if (isCrmBrandingLogoFileUrl(logoUrl)) return logoUrl;
+
+  const legacyPath = companyLogoObjectPathFromUrl(logoUrl);
+  if (legacyPath?.startsWith('branding/')) {
+    return crmBrandingLogoFileUrl(brandingVersionFromObjectPath(legacyPath));
+  }
+  if (isLegacyPhotosBucketPublicUrl(logoUrl) && logoUrl.includes('/branding/')) {
+    return crmBrandingLogoFileUrl(null);
+  }
+
   const version = logoUrl.split('?')[1]?.match(/(?:^|&)v=([^&]+)/)?.[1];
   return crmBrandingLogoFileUrl(version ?? null);
 }

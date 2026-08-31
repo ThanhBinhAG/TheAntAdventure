@@ -2,17 +2,19 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import GuideCalendar from '@/components/guides/GuideCalendar';
 import PaginationBar from '@/components/PaginationBar';
 import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
+import { useGuidesPage } from '@/hooks/useGuidesPage';
 import { useStore } from '@/hooks/useStore';
-import { getBffArray } from '@/lib/bff/client';
 import { uploadGuideAvatarClient } from '@/lib/guides/guide-avatar-client';
 import type { Guide } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 const REG_COLORS: Record<string, string> = { North: 'bdg-g', Central: 'bdg-a', South: 'bdg-b' };
 const STATUS_C: Record<string, string> = {
@@ -49,8 +51,7 @@ const emptyGuide = (): Partial<Guide> => ({
 
 export default function Guides() {
   const { canWrite } = usePagePermission('guides');
-  const guides = useStore((s) => s.guides);
-  const setGuides = useStore((s) => s.setGuides);
+  const { guides, error: loadError } = useGuidesPage();
   const addGuide = useStore((s) => s.addGuide);
   const updateGuide = useStore((s) => s.updateGuide);
 
@@ -64,23 +65,6 @@ export default function Guides() {
   const [form, setForm] = useState<Partial<Guide>>(emptyGuide());
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    void getBffArray<Guide>('/api/guides', 'Không thể tải danh sách hướng dẫn viên.')
-      .then((rows) => {
-        if (!active) return;
-        setGuides(rows);
-        setLoadError(null);
-      })
-      .catch((error: unknown) => {
-        if (active) setLoadError(error instanceof Error ? error.message : 'Không thể tải danh sách hướng dẫn viên.');
-      });
-    return () => {
-      active = false;
-    };
-  }, [setGuides]);
 
   const filtered = useMemo(
     () =>
@@ -105,6 +89,32 @@ export default function Guides() {
 
   const available = guides.filter((g) => g.status === 'Available').length;
   const onTour = guides.filter((g) => g.status === 'On Tour').length;
+
+  const guideModalKey = showAdd ? `${editId ?? 'new'}` : 'closed';
+  const baselineGuide = useMemo(() => {
+    if (!showAdd) return emptyGuide();
+    if (editId) {
+      const guide = guides.find((g) => g.id === editId);
+      return guide ? { ...guide } : emptyGuide();
+    }
+    return emptyGuide();
+  }, [showAdd, editId, guides]);
+  const { language } = useLanguage();
+  const guideDirty = useFormDirty(
+    showAdd,
+    { form: baselineGuide, hasAvatar: false },
+    { form, hasAvatar: Boolean(avatarFile) },
+    (v) => JSON.stringify(v),
+    guideModalKey,
+  );
+  const closeGuideModal = () => setShowAdd(false);
+  const { requestClose: requestGuideClose } = useConfirmClose({
+    open: showAdd,
+    dirty: guideDirty,
+    onClose: closeGuideModal,
+    disabled: saving,
+    language,
+  });
 
   const openAdd = (g?: Guide) => {
     if (g) {
@@ -363,11 +373,11 @@ export default function Guides() {
       )}
 
       {showAdd && (
-        <div className="overlay open" onClick={() => setShowAdd(false)}>
+        <div className="overlay open" onClick={() => void requestGuideClose()}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 700, maxHeight: '92vh', overflow: 'auto' }}>
             <div className="modal-hd modal-hd-green">
               <span style={{ color: '#fff', fontWeight: 700 }}>{editId ? '✏ Edit Guide' : '＋ Add New Guide'}</span>
-              <button className="modal-close-btn" type="button" onClick={() => setShowAdd(false)}>
+              <button className="modal-close-btn" type="button" onClick={() => void requestGuideClose()}>
                 ✕
               </button>
             </div>
@@ -444,7 +454,7 @@ export default function Guides() {
                 <textarea rows={4} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--b)', paddingTop: 12 }}>
-                <button className="btn btn-s" type="button" onClick={() => setShowAdd(false)}>
+                <button className="btn btn-s" type="button" onClick={() => void requestGuideClose()}>
                   Cancel
                 </button>
                 <button className="btn btn-p" type="button" onClick={() => void saveGuide()} disabled={saving}>

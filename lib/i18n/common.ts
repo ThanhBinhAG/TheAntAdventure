@@ -31,6 +31,10 @@ export const COMMON = {
     noResponse: 'No response',
     changedPlans: 'Changed plans',
     other: 'Other',
+    unsavedChangesTitle: 'Unsaved changes',
+    unsavedChangesMessage: 'You have unsaved changes. Are you sure you want to leave?',
+    unsavedChangesStay: 'Stay',
+    unsavedChangesLeave: 'Leave',
   },
   vi: {
     newClientBtn: '+ Khách mới',
@@ -62,6 +66,10 @@ export const COMMON = {
     noResponse: 'Không phản hồi',
     changedPlans: 'Đổi kế hoạch',
     other: 'Khác',
+    unsavedChangesTitle: 'Thay đổi chưa lưu',
+    unsavedChangesMessage: 'Các thay đổi thực hiện chưa được lưu. Có chắc chắn là muốn thoát ra?',
+    unsavedChangesStay: 'Ở lại',
+    unsavedChangesLeave: 'Thoát',
   },
 } as const;
 

@@ -4,12 +4,12 @@
 React UI: CRM chrome at root, page shells in `pages/`, and domain widgets in sibling folders. Domain logic belongs in `lib/<domain>/`.
 
 ## Contents
-- Root: `Sidebar`, `Topbar`, `CRMShell`, `StoreProvider`, `PageDataGate`, `ToastHost`, `ConfirmHost`, `EmptyState` (shared empty lists; `access` variant for PermissionGate), `PermissionGate`, `AiCopilot*`, `AutoSyncListener`, `PaginationBar`, …
-- `Sidebar` — `useSidebarBadges` (count API when tables not hydrated; `prefetch={false}` on nav links)
+- Root: `Sidebar`, `Topbar`, `CRMShell`, `StoreProvider` (passthrough), `ToastHost`, `ConfirmHost`, `EmptyState` (shared empty lists; `access` variant for PermissionGate), `PermissionGate`, `AiCopilot*`, `PaginationBar`, …
+- `Sidebar` — `useSidebarBadges` (deferred `/api/sidebar/badges` or store counts; `prefetch={false}` on nav links)
 - `sidebar/` — company logo editor (gallery pick + crop)
 - `pages/` — slug → page components for `(crm)/[page]`
 - `tour-design/` — Tour Design wizard (`TourDesignPage` + steps; URL slug still `tourdesign`)
-- `sales/`, `bookings/`, `contracts/`, `dashboard/` — page roots for Sales / Bookings / Contracts / Dashboard
+- `sales/`, `bookings/`, `contracts/`, `dashboard/`, `post-tour/`, `finance/`, `tax/`, `hr/`, `salary/`, `dev-notes/` — page roots
 - `pricing/`, `products/`, `suppliers/`, `attractions/`, `gallery/`, `customers/`
 - Thin domains: `agents/`, `guides/`, `planner/`, `weather/`, `auth/`, `system/`
 

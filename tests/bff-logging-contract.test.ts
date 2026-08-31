@@ -224,7 +224,6 @@ test('Phase 3 sensitive direct routes use the HTTP completion wrapper', () => {
 test('server console logging is restricted to the explicit migration allowlist', () => {
   const root = process.cwd();
   const allowedConsoleCallCounts = new Map([
-    ['lib/db/supabase/table-api.ts', 6],
     ['lib/system/client-logger.ts', 3],
   ]);
   const files: string[] = [];

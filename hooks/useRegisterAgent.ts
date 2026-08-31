@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { useStore } from '@/hooks/useStore';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 import type { AgentFormFields } from '@/lib/agents/agent-list-input';
 import type { Agent } from '@/lib/types';
 

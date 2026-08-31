@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 import type { BookingInput, BookingListItem } from '@/lib/bookings/booking-input';
 import type { Booking } from '@/lib/types';
 import { useStore } from '@/hooks/useStore';

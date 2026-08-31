@@ -53,9 +53,8 @@ test('photo folder create/patch bodies validate name', () => {
   assert.equal(patch.success, true);
 });
 
-test('Gallery BFF cutover: API hooks and denylist', () => {
+test('Gallery BFF cutover: API hooks', () => {
   const bffManaged = source('lib/db/bff-managed-tables.ts');
-  const syncConfig = source('lib/db/sync-config.ts');
   const workspace = source('components/gallery/GalleryWorkspace.tsx');
   const galleryPageHook = source('hooks/useGalleryPage.ts');
   const updateHook = source('hooks/useUpdatePhoto.ts');
@@ -68,7 +67,6 @@ test('Gallery BFF cutover: API hooks and denylist', () => {
 
   assert.match(bffManaged, /'photos'/);
   assert.match(bffManaged, /'photo_folders'/);
-  assert.match(syncConfig, /gallery:\s*\[\]/);
   assert.match(galleryPageHook, /\/api\/photo-folders/);
   assert.match(galleryPageHook, /\/api\/photos\/all/);
   assert.match(updateHook, /\/api\/photos/);

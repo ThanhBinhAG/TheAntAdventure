@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import type { PhotoFolder } from '@/lib/gallery/photo-folders';
 import { getBffArray } from '@/lib/bff/client';

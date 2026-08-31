@@ -13,6 +13,7 @@ import {
     Switch,
 } from 'antd';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
 import { tac } from '@/lib/i18n/pages/access-control';
 import type {
     AccessControlStaffRole,
@@ -40,6 +41,22 @@ export default function StaffRoleEditDrawer({
 }: StaffRoleEditDrawerProps) {
     const { language } = useLanguage();
     const [form] = Form.useForm();
+    const label = Form.useWatch('label', form);
+    const description = Form.useWatch('description', form);
+    const isActive = Form.useWatch('isActive', form);
+    const dirty = Boolean(
+        role &&
+            (label !== role.role_label ||
+                (description ?? '') !== (role.role_description ?? '') ||
+                isActive !== role.is_active),
+    );
+    const { requestClose } = useConfirmClose({
+        open: Boolean(role),
+        dirty,
+        onClose,
+        disabled: saving,
+        language,
+    });
 
     async function handleFinish(values: {
         label: string;
@@ -64,7 +81,7 @@ export default function StaffRoleEditDrawer({
             open={Boolean(role)}
             size={480}
             destroyOnHidden
-            onClose={onClose}
+            onClose={() => void requestClose()}
             afterOpenChange={(visible) => {
                 if (visible && role) {
                     form.setFieldsValue({
@@ -89,7 +106,7 @@ export default function StaffRoleEditDrawer({
                     <Switch checkedChildren={tac('yes', language)} unCheckedChildren={tac('no', language)} />
                 </Form.Item>
                 <div className={styles.drawerActions}>
-                    <Button onClick={onClose} disabled={saving}>{tac('cancel', language)}</Button>
+                    <Button onClick={() => void requestClose()} disabled={saving}>{tac('cancel', language)}</Button>
                     <Button type="primary" htmlType="submit" loading={saving}>{tac('saveChanges', language)}</Button>
                 </div>
             </Form>

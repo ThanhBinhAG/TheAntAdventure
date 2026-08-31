@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 import type {
   ExtendedSupplierInput,
   ExtendedSupplierListItem,

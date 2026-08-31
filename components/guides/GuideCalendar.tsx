@@ -2,8 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
-import type { CalEvent } from '@/lib/types';
+import { useCalEventsPage } from '@/hooks/useCalEventsPage';
+import { useCreateCalEvent } from '@/hooks/useCreateCalEvent';
+import { useDeleteCalEvent } from '@/hooks/useDeleteCalEvent';
+import { calEventStatusSchema, type CalEventCreatePayload, type CalEventListItem } from '@/lib/cal-events/cal-events-input';
 import { toast } from '@/lib/toast';
+import EmptyState from '@/components/EmptyState';
 
 import { confirmDialog } from '@/lib/confirm';
 
@@ -17,7 +21,9 @@ const CAL_STATUS: Record<string, { cls: string; emoji: string; label: string }> 
 
 const REG_COLORS: Record<string, string> = { North: '#2E7D52', Central: '#856404', South: '#1565C0' };
 
-const emptyEvent = {
+type CalEventFormState = Omit<CalEventCreatePayload, 'status'> & Pick<CalEventCreatePayload, 'status'>;
+
+const emptyEvent: CalEventFormState = {
   guideId: '',
   bookingCode: '',
   tour: '',
@@ -30,14 +36,15 @@ const emptyEvent = {
 
 export default function GuideCalendar({ canWrite }: { canWrite?: boolean }) {
   const guides = useStore((s) => s.guides);
-  const calEvents = useStore((s) => s.calEvents) as CalEvent[];
-  const addCalEvent = useStore((s) => s.addCalEvent);
-  const removeCalEvent = useStore((s) => s.removeCalEvent);
+  const { items: calEvents, loading, error, reload } = useCalEventsPage();
+  const { createCalEvent } = useCreateCalEvent();
+  const { deleteCalEvent } = useDeleteCalEvent();
 
   const [calDate, setCalDate] = useState(() => new Date());
   const [guideF, setGuideF] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(emptyEvent);
+  const [saving, setSaving] = useState(false);
 
   const year = calDate.getFullYear();
   const month = calDate.getMonth();
@@ -67,7 +74,11 @@ export default function GuideCalendar({ canWrite }: { canWrite?: boolean }) {
     setShowAdd(true);
   };
 
-  const saveEvent = () => {
+  const saveEvent = async () => {
+    if (!canWrite) {
+      toast.warning('You need write permission to manage calendar events');
+      return;
+    }
     if (!form.guideId || !form.clients || !form.start || !form.end) {
       toast.warning('Please fill in Guide, Guests, Start and End dates.');
       return;
@@ -76,12 +87,28 @@ export default function GuideCalendar({ canWrite }: { canWrite?: boolean }) {
       toast.warning('End date must be after start date.');
       return;
     }
-    addCalEvent({ id: `CE-${Date.now()}`, ...form });
+    setSaving(true);
+    const result = await createCalEvent({
+      guideId: form.guideId,
+      bookingCode: form.bookingCode || undefined,
+      tour: form.tour || undefined,
+      clients: form.clients,
+      start: form.start,
+      end: form.end,
+      status: form.status,
+      notes: form.notes || undefined,
+    });
+    setSaving(false);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
     setShowAdd(false);
     setForm(emptyEvent);
+    toast.success('Event saved.');
   };
 
-  const editEvent = (ev: CalEvent) => {
+  const editEvent = (ev: CalEventListItem) => {
     if (!canWrite) {
       toast.warning('You need write permission to manage calendar events');
       return;
@@ -94,10 +121,33 @@ export default function GuideCalendar({ canWrite }: { canWrite?: boolean }) {
         title: 'Delete event',
       });
       if (!ok) return;
-      removeCalEvent(ev.id);
+      const result = await deleteCalEvent(ev.id);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
       toast.success('Event deleted.');
     })();
   };
+
+  if (loading && calEvents.length === 0) {
+    return <div className="crm-loading-hint">Đang tải lịch hướng dẫn viên…</div>;
+  }
+
+  if (error && calEvents.length === 0) {
+    return (
+      <EmptyState
+        variant="access"
+        title="Không thể tải lịch"
+        description={error}
+        action={
+          <button className="btn btn-p btn-sm" type="button" onClick={() => void reload()}>
+            Thử lại
+          </button>
+        }
+      />
+    );
+  }
 
   return (
     <div className="guide-cal-wrap">
@@ -125,9 +175,9 @@ export default function GuideCalendar({ canWrite }: { canWrite?: boolean }) {
           ))}
         </select>
         <div style={{ flex: 1 }} />
-        <button 
-          className="btn btn-p btn-sm" 
-          type="button" 
+        <button
+          className="btn btn-p btn-sm"
+          type="button"
           onClick={openAdd}
           disabled={!canWrite}
           title={!canWrite ? 'You need write permission to log tours/bookings' : undefined}
@@ -258,7 +308,12 @@ export default function GuideCalendar({ canWrite }: { canWrite?: boolean }) {
               </div>
               <div className="fg">
                 <label className="lbl">Status</label>
-                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                <select
+                  value={form.status}
+                  onChange={(e) =>
+                    setForm({ ...form, status: calEventStatusSchema.parse(e.target.value) })
+                  }
+                >
                   <option value="booked">🩵 Booked (Confirmed, not departed)</option>
                   <option value="ontour">🔵 On Tour</option>
                   <option value="standby">🟡 Standby</option>
@@ -274,7 +329,7 @@ export default function GuideCalendar({ canWrite }: { canWrite?: boolean }) {
                 <button className="btn btn-s" type="button" onClick={() => setShowAdd(false)}>
                   Cancel
                 </button>
-                <button className="btn btn-p" type="button" onClick={saveEvent}>
+                <button className="btn btn-p" type="button" onClick={() => void saveEvent()} disabled={saving}>
                   Save Event
                 </button>
               </div>

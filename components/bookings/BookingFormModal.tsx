@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
 import { parseMoneyInput } from '@/lib/core/money';
 import type { BookingInput } from '@/lib/bookings/booking-input';
@@ -12,6 +12,17 @@ import {
 } from '@/lib/bookings/booking-form';
 import type { Customer } from '@/lib/types';
 import type { CreateBookingOutcome } from '@/hooks/useCreateBooking';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
+
+const BOOKING_STATUSES = [
+  'Confirmed',
+  'Deposit Paid',
+  'Fully Paid',
+  'On Tour',
+  'Completed',
+  'Cancelled',
+] as const;
 
 type BookingFormModalProps = {
   open: boolean;
@@ -34,6 +45,15 @@ function revealField(field: BookingFormErrorField) {
       el.focus({ preventScroll: true });
     }
   });
+}
+
+function computeNights(start: string, end: string): number | null {
+  if (!start || !end) return null;
+  const s = new Date(`${start}T00:00:00`);
+  const e = new Date(`${end}T00:00:00`);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return null;
+  const nights = Math.round((e.getTime() - s.getTime()) / 86_400_000);
+  return nights >= 0 ? nights : null;
 }
 
 export default function BookingFormModal({
@@ -59,6 +79,21 @@ export default function BookingFormModal({
     setFormError(null);
     setErrorField(null);
   }
+
+  const total = parseMoneyInput(totalInput, { absolute: true });
+  const deposit = Math.min(parseMoneyInput(depositInput, { absolute: true }), total);
+  const balance = Math.max(0, total - deposit);
+  const nights = useMemo(() => computeNights(form.start, form.end), [form.start, form.end]);
+
+  const { language } = useLanguage();
+  const dirty = useFormDirty(
+    open,
+    { form: { ...EMPTY_BOOKING_FORM }, totalInput: '', depositInput: '' },
+    { form, totalInput, depositInput },
+    undefined,
+    formKey,
+  );
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
 
   if (!open) return null;
 
@@ -120,22 +155,22 @@ export default function BookingFormModal({
   }
 
   return (
-    <div className="overlay open" onClick={onClose}>
-      <div className="modal nc-modal" onClick={(e) => e.stopPropagation()} style={{ width: 640, maxWidth: '96vw' }}>
+    <div className="overlay open" onClick={() => void requestClose()}>
+      <div className="modal nc-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green nc-modal-hd">
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>+ New Booking</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>New Booking</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 1 }}>
-              Tạo booking mới
+              Create a confirmed trip record for operations and finance
             </div>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose}>
+          <button type="button" className="modal-close-btn" onClick={() => void requestClose()}>
             ✕
           </button>
         </div>
 
         <div className="nc-modal-body">
-          <div className="nc-section-title">Booking details</div>
+          <div className="nc-section-title">Trip</div>
           <div className="nc-grid-2" style={{ marginBottom: 16 }}>
             <div className="fg">
               <label className={`lbl${fieldInvalid('custId') ? ' nc-field-invalid-label' : ''}`}>
@@ -151,7 +186,7 @@ export default function BookingFormModal({
                 <option value="">— Select customer —</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {c.name} · {c.id}
                   </option>
                 ))}
               </select>
@@ -184,17 +219,19 @@ export default function BookingFormModal({
             <div className="fg">
               <label className="lbl">Status</label>
               <select value={form.status} onChange={(e) => set('status', e.target.value)}>
-                <option>Confirmed</option>
-                <option>Deposit Paid</option>
-                <option>Fully Paid</option>
-                <option>On Tour</option>
+                {BOOKING_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
-          <div className="nc-section-title">Travel dates</div>
-          <p style={{ fontSize: 12, color: 'var(--m)', margin: '0 0 10px' }}>
+          <div className="nc-section-title">Travel Dates</div>
+          <p className="nc-form-hint">
             Optional — leave blank if dates are not confirmed yet (shown as TBD in the list).
+            {nights != null ? ` · ${nights} night${nights === 1 ? '' : 's'}` : ''}
           </p>
           <div className="nc-grid-2" style={{ marginBottom: 16 }}>
             <div className="fg">
@@ -221,8 +258,8 @@ export default function BookingFormModal({
             </div>
           </div>
 
-          <div className="nc-section-title">Payment</div>
-          <div className="nc-grid-2" style={{ marginBottom: 16 }}>
+          <div className="nc-section-title">Commercial</div>
+          <div className="nc-grid-2" style={{ marginBottom: 12 }}>
             <div className="fg">
               <label className={`lbl${fieldInvalid('total') ? ' nc-field-invalid-label' : ''}`}>Total (USD)</label>
               <input
@@ -256,20 +293,42 @@ export default function BookingFormModal({
               />
             </div>
           </div>
+          <div className="nc-form-summary">
+            <div className="nc-form-summary-item">
+              <div className="nc-form-summary-lbl">Total</div>
+              <div className="nc-form-summary-val">${fmt(total)}</div>
+            </div>
+            <div className="nc-form-summary-item">
+              <div className="nc-form-summary-lbl">Deposit</div>
+              <div className="nc-form-summary-val" style={{ color: 'var(--blue)' }}>
+                ${fmt(deposit)}
+              </div>
+            </div>
+            <div className="nc-form-summary-item">
+              <div className="nc-form-summary-lbl">Balance Due</div>
+              <div className="nc-form-summary-val" style={{ color: balance > 0 ? 'var(--amb)' : 'var(--g)' }}>
+                ${fmt(balance)}
+              </div>
+            </div>
+          </div>
 
           <div className="nc-section-title">Operations</div>
           <div className="nc-grid-2">
             <div className="fg">
-              <label className="lbl">Guide</label>
+              <label className="lbl">Assigned Guide</label>
               <input
                 value={form.guide}
                 onChange={(e) => set('guide', e.target.value)}
-                placeholder="Minh N."
+                placeholder="e.g. Minh N."
               />
             </div>
             <div className="fg">
-              <label className="lbl">Hotel</label>
-              <input value={form.hotel} onChange={(e) => set('hotel', e.target.value)} />
+              <label className="lbl">Primary Hotel</label>
+              <input
+                value={form.hotel}
+                onChange={(e) => set('hotel', e.target.value)}
+                placeholder="e.g. La Siesta Premium Hanoi"
+              />
             </div>
           </div>
         </div>
@@ -281,11 +340,11 @@ export default function BookingFormModal({
             </div>
           ) : null}
           <div className="nc-modal-ft-actions">
-            <button className="btn btn-s" type="button" onClick={onClose}>
+            <button className="btn btn-s" type="button" onClick={() => void requestClose()} disabled={saving}>
               Cancel
             </button>
             <button className="btn btn-p" type="button" onClick={() => void handleCreate()} disabled={saving}>
-              ✓ Create Booking
+              {saving ? 'Creating…' : 'Create Booking'}
             </button>
           </div>
         </div>

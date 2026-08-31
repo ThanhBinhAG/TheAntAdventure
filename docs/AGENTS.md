@@ -10,6 +10,9 @@ Tracked product documentation: database schema reference and Supabase setup. Sou
 - `BFF-TASKS.md` — ordered implementation backlog for the BFF migration
 - `BFF-TASKS-vi.md` — Vietnamese two-developer BFF implementation backlog
 - `BFF-TASK.md` — verified final-cutover checklist covering source, tests, browser leakage, sessions, and production networking
+- `BFF-D2.12-MUTATION-AUDIT.md` — D2.12 cross-domain mutation inventory and PASS summary (2026-08-31)
+- `BFF-D2.13-REMOVAL-PLAN.md` — phased plan to remove browser hydrate/auto-sync stack (D2.13)
+- `BFF-D2.14-ASSET-URL-PLAN.md` — CRM-origin asset URL audit and implementation plan (D2.14)
 - `BFF-DEV1-PHASE-0-BASELINE.md` — recorded Dev 1 verification, leakage, session, and ownership baseline before cutover work
 - `BFF-DEV1-HANDOFF.md` — stable platform-auth contract, final gate, and ownership boundary for Dev 2
 - `GRAPHRAG-MEMORY.md` — verified codebase retrieval and flow map

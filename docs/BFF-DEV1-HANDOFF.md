@@ -14,4 +14,4 @@ Domain routes should use `bffRoute`; it turns unavailable auth/JWKS/Supabase ver
 
 ## Final acceptance ownership
 
-Run `npm run final:acceptance` for lint, typecheck, unit tests, build, and hard browser-leakage scan. Run `FINAL_ACCEPTANCE_E2E=1 npm run final:acceptance` only with the isolated mutable Supabase test target. Dev 2 must remove the remaining browser `/storage/v1` path before the leakage gate can pass; operations must apply the session migration and prove the private-network deploy/runbook gates.
+Run `npm run final:acceptance` for lint, typecheck, unit tests, build, and hard browser-leakage scan. Run `FINAL_ACCEPTANCE_E2E=1 npm run final:acceptance` only with the isolated mutable Supabase test target. Browser bundle leakage gate passes as of 2026-08-31 (`npm run leakage:check` on `.next/static`). Operations must apply the session migration and prove the private-network deploy/runbook gates.

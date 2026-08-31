@@ -16,6 +16,8 @@ import { deletePhotoViaApi } from '@/lib/gallery/photo-api';
 import GalleryPhotoModal, { type GalleryPhotoSavePayload } from '@/components/gallery/GalleryPhotoModal';
 import { toast } from '@/lib/toast';
 import { confirmDialog } from '@/lib/confirm';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export type AttractionFormData = {
   id: string;
@@ -140,6 +142,14 @@ export default function AttractionEditModal({
     setPreviousFormKey(formKey);
     setForm(initialForm(mode, attraction, attractions, defaultRegion, nextId));
   }
+
+  const { language } = useLanguage();
+  const baselineForm = useMemo(
+    () => initialForm(mode, attraction, attractions, defaultRegion, nextId),
+    [formKey], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const dirty = useFormDirty(open, baselineForm, form, undefined, formKey);
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
 
   const allPhotos = storePhotos.length ? storePhotos : photos;
 
@@ -304,11 +314,11 @@ export default function AttractionEditModal({
 
   return (
     <>
-      <div className="overlay open prod-form-overlay" onClick={onClose}>
+      <div className="overlay open prod-form-overlay" onClick={() => void requestClose()}>
         <div className="modal att-edit-modal" onClick={(e) => e.stopPropagation()}>
           <div className="modal-hd">
             <span className="modal-title">{mode === 'edit' ? 'Edit Attraction' : 'Add Attraction'}</span>
-            <button type="button" className="modal-x att-edit-close-btn" onClick={onClose} aria-label="Close modal">
+            <button type="button" className="modal-x att-edit-close-btn" onClick={() => void requestClose()} aria-label="Close modal">
               ✕
             </button>
           </div>
@@ -544,7 +554,7 @@ export default function AttractionEditModal({
               </button>
             )}
             <div className="att-edit-ft-actions">
-              <button type="button" className="btn btn-s" onClick={onClose}>
+              <button type="button" className="btn btn-s" onClick={() => void requestClose()}>
                 Cancel
               </button>
               <button

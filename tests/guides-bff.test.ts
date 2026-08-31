@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { BFF_MANAGED_TABLES } from '@/lib/db/bff-managed-tables';
-import { PAGE_BOOT_TABLES } from '@/lib/db/sync-config';
 import { guideAvatarApiUrl } from '@/lib/guides/guide-avatar-url';
 import { guideSchema } from '@/lib/guides/guide-input';
 
@@ -13,12 +12,17 @@ function source(path: string): string {
 
 test('Guides page uses CRM BFF instead of the browser Supabase client', () => {
   const page = source('components/guides/GuidesPage.tsx');
-  assert.match(page, /getBffArray<Guide>\('\/api\/guides'/);
+  const hook = source('hooks/useGuidesPage.ts');
+  assert.match(page, /useGuidesPage/);
+  assert.doesNotMatch(page, /getBffArray<Guide>\('\/api\/guides'/);
   assert.match(page, /fetch\('\/api\/guides'/);
   assert.match(page, /uploadGuideAvatarClient/);
   assert.doesNotMatch(page, /lib\/supabase\/client/);
   assert.doesNotMatch(page, /upload-guide-avatar/);
-  assert.equal((PAGE_BOOT_TABLES.guides ?? []).length, 0);
+  assert.match(hook, /getBffArray/);
+  assert.match(hook, /\/api\/guides/);
+  assert.match(hook, /withoutAutoSyncAsync/);
+  assert.match(hook, /inflight/);
   assert.equal(BFF_MANAGED_TABLES.has('guides'), true);
 });
 

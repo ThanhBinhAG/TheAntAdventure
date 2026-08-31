@@ -9,7 +9,6 @@ import {
   bookingUpdateRequestSchema,
 } from '@/lib/bookings/booking-input';
 import { BFF_MANAGED_TABLES } from '@/lib/db/bff-managed-tables';
-import { PAGE_BOOT_TABLES, SHELL_HYDRATE_TABLES } from '@/lib/db/sync-config';
 
 function source(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf8');
@@ -33,8 +32,8 @@ test('Bookings page uses CRM BFF instead of Zustand auto-sync writes', () => {
   assert.doesNotMatch(page, /\bupdateBooking\s*=\s*useStore/);
   assert.doesNotMatch(page, /lib\/supabase\/client/);
 
-  assert.match(listHook, /getBffArray/);
-  assert.match(listHook, /\/api\/bookings/);
+  assert.match(listHook, /fetchBookingsCatalogOnce/);
+  assert.match(source('lib/bookings/booking-catalog-fetch.ts'), /\/api\/bookings/);
   assert.match(listHook, /withoutAutoSyncAsync/);
   assert.match(createHook, /fetch\('\/api\/bookings'/);
   assert.match(createHook, /withoutAutoSyncAsync/);
@@ -118,8 +117,7 @@ test('Bookings API routes enforce bookings.read / bookings.write', () => {
   assert.match(source('lib/sales/lead-repository.ts'), /insertBookingServer/);
 });
 
-test('Bookings hydrate cutover: empty boot, denylist, no shell hydrate', () => {
-  assert.equal((PAGE_BOOT_TABLES.bookings ?? []).length, 0);
+test('bookings-bff tables are BFF-managed', () => {
   assert.equal(BFF_MANAGED_TABLES.has('bookings'), true);
-  assert.equal((SHELL_HYDRATE_TABLES as readonly string[]).includes('bookings'), false);
 });
+

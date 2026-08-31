@@ -13,6 +13,8 @@ import type {
   CatalogWorkbook,
   EssentialsCatalog,
 } from '@/lib/pricing/catalog-types';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type ParsedEssentials = CatalogParseResult<EssentialsCatalog>;
 type ParsedAccommodation = CatalogParseResult<AccommodationCatalog>;
@@ -48,13 +50,21 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
     if (fileRef.current) fileRef.current.value = '';
   }, []);
 
-  if (!open) return null;
-
-  const handleClose = () => {
-    if (busy) return;
+  const { language } = useLanguage();
+  const dirty = parsed !== null || fileName.length > 0;
+  const finishClose = useCallback(() => {
     reset();
     onClose();
-  };
+  }, [onClose, reset]);
+  const { requestClose } = useConfirmClose({
+    open,
+    dirty,
+    onClose: finishClose,
+    disabled: busy,
+    language,
+  });
+
+  if (!open) return null;
 
   const handleFile = async (file: File | null) => {
     if (!file) return;
@@ -100,7 +110,7 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
   };
 
   return (
-    <div className="overlay open prod-form-overlay" onClick={handleClose} role="presentation">
+    <div className="overlay open prod-form-overlay" onClick={() => void requestClose()} role="presentation">
       <div className="modal prod-form-modal pcx-import-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green prod-form-modal-hd">
           <div>
@@ -109,7 +119,7 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
               Every sheet is imported and replaces the current data for this section.
             </div>
           </div>
-          <button className="modal-close-btn" type="button" onClick={handleClose} aria-label="Close">
+          <button className="modal-close-btn" type="button" onClick={() => void requestClose()} aria-label="Close">
             ✕
           </button>
         </div>
@@ -206,7 +216,7 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
         </div>
 
         <div className="prod-form-modal-ft">
-          <button className="btn btn-s" type="button" onClick={handleClose} disabled={busy}>
+          <button className="btn btn-s" type="button" onClick={() => void requestClose()} disabled={busy}>
             Cancel
           </button>
           <button

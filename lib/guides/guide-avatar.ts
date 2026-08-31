@@ -2,17 +2,33 @@ import 'server-only';
 
 import sharp from 'sharp';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  isLegacyPhotosBucketPublicUrl,
+  legacyPublicUrlToStoragePath,
+} from '@/lib/gallery/gallery-asset-url';
 import { guideAvatarPath, PHOTOS_BUCKET } from '@/lib/storage/photo-paths';
 import { guideAvatarApiUrl } from './guide-avatar-url';
 
 const MAX_AVATAR_BYTES = 20 * 1024 * 1024;
 
+const GUIDE_AVATAR_OBJECT_PATH = /^guides\/[^/]+\/avatar\.webp$/;
+
+function isLegacyGuideAvatarUrl(photo: string): boolean {
+  if (!photo || photo.startsWith('/api/guides/avatar')) return false;
+  const path = legacyPublicUrlToStoragePath(photo);
+  if (path && GUIDE_AVATAR_OBJECT_PATH.test(path)) return true;
+  if (GUIDE_AVATAR_OBJECT_PATH.test(photo)) return true;
+  return (
+    isLegacyPhotosBucketPublicUrl(photo) &&
+    (photo.includes('/guides/') || photo.includes('%2Fguides%2F'))
+  );
+}
+
 export function guidePhotoForBrowser(guideId: string, photo: string): string {
   if (!photo) return '';
   if (photo === guideAvatarApiUrl(guideId)) return photo;
-  return new RegExp(`/storage/v1/object/(?:public|sign)/${PHOTOS_BUCKET}/guides/`).test(photo)
-    ? guideAvatarApiUrl(guideId)
-    : photo;
+  if (photo.startsWith('/api/guides/avatar')) return photo;
+  return isLegacyGuideAvatarUrl(photo) ? guideAvatarApiUrl(guideId) : photo;
 }
 
 export async function uploadGuideAvatarServer(

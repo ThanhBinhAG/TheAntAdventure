@@ -15,7 +15,11 @@ Baseline ban đầu ngày 2026-08-26; đối soát local gần nhất ngày 2026
 
 ---
 
+
+
 # Phân công tổng quan
+
+
 
 ## Dev 1 — Platform / Auth / Infra / CI
 
@@ -32,6 +36,8 @@ Baseline ban đầu ngày 2026-08-26; đối soát local gần nhất ngày 2026
 ```text
 feature/bff-cutover-platform-auth
 ```
+
+
 
 ## Dev 2 — Domain BFF / Browser Cutover / Storage
 
@@ -51,11 +57,15 @@ feature/bff-cutover-domains
 
 ---
 
+
+
 # DEV 1 CHECKLIST — Platform / Auth / Infra / CI
 
 > Last reconciled: 2026-08-29. `[x]` means the source/configuration and its
 > local regression coverage are complete. Deployment evidence is recorded only
 > when the corresponding GitLab job or operator check has succeeded.
+
+
 
 ## D1.1 Server-only Supabase configuration
 
@@ -70,6 +80,8 @@ feature/bff-cutover-domains
 - [x] Cập nhật `docs/SUPABASE-SETUP.md` và `docs/CURRENT-SYSTEM.md` theo server-only config, durable CRM session và private-network boundary.
 - [x] Legacy Storage URL parsing đã ở server DTO; browser bundle chỉ dùng CRM media routes và hard leakage check pass.
 
+
+
 ### Acceptance D1.1
 
 - [x] Production build không cần bất kỳ `NEXT_PUBLIC_SUPABASE_*` variable nào.
@@ -78,6 +90,8 @@ feature/bff-cutover-domains
 - [x] Final browser leakage check passes after Dev 2 storage cutover.
 
 ---
+
+
 
 ## D1.2 CRM-owned session
 
@@ -91,6 +105,8 @@ feature/bff-cutover-domains
 - [ ] Apply the migration and run the same lifecycle E2E on staging.
 - [x] Đã kiểm tra login/refresh/logout/revoke/disable trên Supabase Auth và Postgres test thật.
 
+
+
 ### Auth/session tests
 
 - [x] Unit tests: login success/failure, refresh success/failure, logout, revoke, disabled account, legacy-cookie cleanup, JWT/JWKS outage và Redis graceful degradation.
@@ -98,6 +114,8 @@ feature/bff-cutover-domains
 - [x] E2E login/session lifecycle against a dedicated test Supabase instance (`E2E_ALLOW_DATABASE_MUTATION=1`).
 
 ---
+
+
 
 ## D1.3 Production network and secrets
 
@@ -108,32 +126,36 @@ feature/bff-cutover-domains
 - [x] Production Compose giữ CRM `${APP_PORT:-3006}:3006` để không thay đổi upstream proxy hiện có.
 - [x] Không còn yêu cầu `CRM_PROXY_NETWORK` hoặc thay đổi cấu hình reverse proxy từ CRM Compose.
 - [x] Redis production không có host `ports:` mapping.
-- [ ] Supabase gateway không có host port mapping.
-- [ ] Supabase Auth không có host port mapping.
-- [ ] Supabase REST không có host port mapping.
-- [ ] Supabase Storage không có host port mapping.
-- [ ] Supabase Realtime không có host port mapping.
-- [ ] Supabase Studio không có host port mapping.
-- [ ] Supabase Postgres không có host port mapping.
+- [x] Supabase gateway không có host port mapping (Ops confirmed).
+- [x] Supabase Auth không có host port mapping (Ops confirmed).
+- [x] Supabase REST không có host port mapping (Ops confirmed).
+- [x] Supabase Storage không có host port mapping (Ops confirmed).
+- [x] Supabase Realtime không có host port mapping (Ops confirmed).
+- [x] Supabase Studio không có host port mapping (Ops confirmed).
+- [x] Supabase Postgres không có host port mapping (Ops confirmed).
 - [x] Existing Ops-managed ingress continues to route to `APP_PORT` after the 2026-08-29 main deployment; repository does not own its configuration.
 - [x] Deploy verifier kiểm tra DNS/reachability gateway, Redis và `/api/health` từ CRM container.
-- [ ] Browser/máy người dùng không resolve được Supabase internal hostname.
-- [ ] Browser/máy người dùng không kết nối được Supabase internal service.
+- [x] Browser/máy người dùng không resolve được Supabase internal hostname.
+- [x] Browser/máy người dùng không kết nối được Supabase internal service.
 - [ ] Rotate anon key sau khi browser leakage đã được loại bỏ.
 - [ ] Rotate service-role key nếu từng xuất hiện trong deploy/build history.
 - [ ] Kiểm tra firewall.
 - [x] Docker healthcheck and CI post-deploy verifier cover CRM readiness and private dependencies.
 - [x] Runbook covers deploy, rollback, backup/restore, Redis flush recovery and key rotation.
 
+
+
 ### Acceptance D1.3
 
-- [ ] `docker compose ps` xác nhận CRM bind đúng `${APP_PORT:-3006}:3006` và ingress hiện có hoạt động.
+- [x] `docker compose ps` xác nhận CRM bind đúng `${APP_PORT:-3006}:3006` và ingress hiện có hoạt động.
 - [x] CRM → Supabase private gateway: PASS through the successful deploy-time verifier.
 - [ ] Browser/host external → Supabase internal services: BLOCKED.
-- [ ] Redis không public port.
-- [ ] Postgres không public port.
+- [x] Redis không public port.
+- [x] Postgres không public port (covered by the confirmed Supabase Postgres host-port check).
 
 ---
+
+
 
 ## D1.4 Test infrastructure and CI gates
 
@@ -147,12 +169,16 @@ feature/bff-cutover-domains
 - [x] Launcher/build matrix đã xác minh trên Windows và GitLab runner.
 - [x] CI leakage check là hard-fail sau khi Dev 2 hoàn tất private photo/BFF cutover.
 
+
+
 ### Dev 1 chịu trách nhiệm sửa các test fail thuộc
 
 - [x] Auth, middleware/proxy, session, request context, `cookies()`, env and test infrastructure regressions have an assigned platform suite.
 - [x] Windows, GitLab and isolated E2E matrix completed without a remaining platform failure to triage; future failures remain Dev 1 triage work.
 
 > Test fail thuộc domain business cụ thể giao Dev 2.
+
+
 
 ## D1.5 Handoff and final acceptance
 
@@ -166,7 +192,11 @@ feature/bff-cutover-domains
 
 ---
 
+
+
 # DEV 2 CHECKLIST — Domain BFF / Browser Cutover / Storage
+
+
 
 ## D2.1 Chuẩn vertical slice bắt buộc cho mỗi domain
 
@@ -235,6 +265,8 @@ Mỗi domain chỉ được đánh dấu DONE khi đủ toàn bộ:
 
 ---
 
+
+
 ## D2.2 Bookings — PRIORITY 1
 
 Hiện trạng cần loại bỏ:
@@ -283,6 +315,8 @@ Checklist:
 
 ---
 
+
+
 ## D2.3 Contracts
 
 - [x] Hoàn thành full vertical slice cho Contracts.
@@ -298,27 +332,41 @@ Checklist:
 
 ---
 
+
+
 ## D2.4 Suppliers
+
+
 
 ### Hotels
 
 - [x] Hoàn thành full vertical slice Hotels.
 
+
+
 ### Hotel Rooms
 
 - [x] Hoàn thành full vertical slice Hotel Rooms.
+
+
 
 ### Transport
 
 - [x] Hoàn thành full vertical slice Transport.
 
+
+
 ### Restaurants
 
 - [x] Hoàn thành full vertical slice Restaurants.
 
+
+
 ### Cruises
 
 - [x] Hoàn thành full vertical slice Cruises.
+
+
 
 ### Extended suppliers
 
@@ -329,6 +377,8 @@ Checklist:
 
 ---
 
+
+
 ## D2.5 Post-tour / Feedback
 
 - [x] Hoàn thành full vertical slice Post-tour.
@@ -337,6 +387,8 @@ Checklist:
 - [x] Không browser direct Supabase.
 
 ---
+
+
 
 ## D2.6 Finance / AR / AP
 
@@ -351,6 +403,8 @@ Checklist:
 
 ---
 
+
+
 ## D2.7 Tax Reports
 
 - [x] Hoàn thành Tax Reports BFF.
@@ -361,6 +415,8 @@ Checklist:
 - [x] Tests.
 
 ---
+
+
 
 ## D2.8 HR / Salary / Staff
 
@@ -374,6 +430,8 @@ Checklist:
 
 ---
 
+
+
 ## D2.9 Dev Notes
 
 - [x] Hoàn thành Dev Notes BFF.
@@ -385,6 +443,8 @@ Checklist:
 - [x] Tests.
 
 ---
+
+
 
 ## D2.10 Guide Calendar / `cal_events`
 
@@ -399,9 +459,13 @@ Checklist:
 
 ---
 
-## D2.11 Team Chat — unavailable (excluded from cutover gate)
 
-> **Quyết định 2026-08-31:** Team Chat tạm **không** nằm trong gate Phase 3 / final acceptance. UI hiện tại là demo local-only (`components/pages/TeamChat.tsx` — `localMsgs` React state, không persist). `chat_messages` / `chat_reactions` **không** trong `BFF_MANAGED_TABLES`. Sidebar đặt Team Chat dưới mục **Unavailable**. Khi product yêu cầu persistence, mở lại D2.11 trước D2.13.
+
+
+## D2.11 Team Chat
+
+
+
 
 ### `chat_messages`
 
@@ -412,6 +476,8 @@ Checklist:
 - [ ] Object-level authorization.
 - [ ] DTO.
 - [ ] Tests.
+
+
 
 ### `chat_reactions`
 
@@ -424,6 +490,8 @@ Checklist:
 - [ ] Tests.
 
 ---
+
+
 
 ## D2.12 Cross-domain mutation audit
 
@@ -439,11 +507,15 @@ Checklist:
 
 ---
 
+
+
 ## D2.13 Remove browser Supabase data stack
 
 > Chỉ thực hiện khi toàn bộ domain BFF phía trên đã đạt parity (Team Chat excluded — xem D2.11).
 >
 > **Kế hoạch chi tiết:** [`BFF-D2.13-REMOVAL-PLAN.md`](BFF-D2.13-REMOVAL-PLAN.md).
+
+
 
 ### Browser Supabase client
 
@@ -451,11 +523,15 @@ Checklist:
 - [x] Xóa browser singleton trong `lib/supabase/index.ts`.
 - [x] Xác nhận production source không còn `createBrowserClient`.
 
+
+
 ### Browser Supabase I/O
 
 - [x] Xóa/retire browser I/O trong `lib/db/supabase/**`.
 - [x] Giữ pure row mappers nếu server repository còn sử dụng.
 - [x] Không browser import `lib/db/supabase`.
+
+
 
 ### Hydrate stack
 
@@ -464,12 +540,16 @@ Checklist:
 - [x] Xóa route hydrate configuration (`PAGE_BOOT_TABLES` removed from `sync-config`).
 - [x] Xóa shell hydrate configuration.
 
+
+
 ### Auto-sync stack
 
 - [x] Xóa/retire `lib/db/auto-sync.ts`.
 - [x] Xóa/retire `sync-push.ts`.
 - [x] Xóa/retire `remote-delete.ts`.
 - [x] Xóa sync lifecycle.
+
+
 
 ### UI lifecycle/components
 
@@ -479,12 +559,16 @@ Checklist:
 - [x] Gỡ migration controls khỏi `StoreProvider`/Topbar.
 - [x] Gỡ push controls khỏi `StoreProvider`/Topbar.
 
+
+
 ### Zustand boundary
 
 - [x] Zustand chỉ dùng cho UI state.
 - [x] Zustand chỉ dùng cho local cache khi phù hợp.
 - [x] Zustand chỉ dùng cho optimistic state khi phù hợp.
 - [x] Zustand không còn là full database replica.
+
+
 
 ### Acceptance D2.13
 
@@ -495,6 +579,8 @@ Checklist:
 - [x] Không direct browser mutation vào Supabase.
 
 ---
+
+
 
 ## D2.14 Storage và asset URLs
 
@@ -509,6 +595,8 @@ Browser
   -> Supabase Storage private network
 ```
 
+
+
 ### Asset URL rules
 
 - [x] Mọi ảnh browser dùng CRM-origin URL.
@@ -516,11 +604,15 @@ Browser
 - [x] Không trả `supabase-ant-crm-gateway:8000`.
 - [x] Không trả internal Supabase hostname.
 
+
+
 ### Company logo
 
 - [x] Thêm CRM asset endpoint cho company logo.
 - [x] `/api/branding/logo` không trả raw Supabase public URL.
 - [x] Logo được stream/proxy hoặc resolve qua CRM-origin URL.
+
+
 
 ### DTO photo normalization
 
@@ -531,11 +623,15 @@ Browser
 - [x] Weather photo DTO dùng CRM asset URL.
 - [x] Proposal photo DTO dùng CRM asset URL.
 
+
+
 ### `storage-image-src.ts`
 
 - [x] Không đọc Supabase public env.
 - [x] Không tạo direct Supabase browser URL.
 - [x] Chỉ cho phép CRM-origin asset URL.
+
+
 
 ### Asset tests
 
@@ -549,9 +645,15 @@ Browser
 
 ---
 
+
+
 # SHARED CHECKLIST — Hai Dev cùng chịu trách nhiệm
 
+
+
 ## S1. Boundary/module ownership
+
+
 
 ### Dev 1 sở hữu
 
@@ -566,6 +668,8 @@ GitLab CI
 test infrastructure
 ```
 
+
+
 ### Dev 2 sở hữu
 
 ```text
@@ -578,6 +682,8 @@ domain tests
 asset BFF endpoints
 ```
 
+
+
 ### Shared rules
 
 - [ ] Dev 2 không tự tạo auth/session implementation riêng trong từng domain.
@@ -588,9 +694,15 @@ asset BFF endpoints
 
 ---
 
+
+
 # MERGE / EXECUTION ORDER
 
+
+
 ## Phase 1 — Foundation
+
+
 
 ### Dev 1
 
@@ -598,6 +710,8 @@ asset BFF endpoints
 - [ ] Hoàn thành server Supabase client boundary.
 - [ ] Hoàn thành auth/session interface cơ bản.
 - [ ] Hoàn thành permission context cơ bản.
+
+
 
 ### Dev 2
 
@@ -610,6 +724,8 @@ asset BFF endpoints
 - [ ] Dev 2 có thể dùng ổn định auth/session/server client boundary của Dev 1.
 
 ---
+
+
 
 ## Phase 2 — Domain migration
 
@@ -636,6 +752,8 @@ Song song Dev 1:
 
 ---
 
+
+
 ## Phase 3 — Browser Supabase removal
 
 Chỉ bắt đầu khi:
@@ -661,7 +779,11 @@ Sau đó Dev 2:
 
 ---
 
+
+
 ## Phase 4 — Production cutover
+
+
 
 ### Dev 1
 
@@ -669,6 +791,8 @@ Sau đó Dev 2:
 - [ ] Remove public service ports.
 - [ ] Rotate keys.
 - [ ] Run deploy/rollback verification.
+
+
 
 ### Dev 2
 
@@ -678,6 +802,8 @@ Sau đó Dev 2:
 
 ---
 
+
+
 # FINAL ACCEPTANCE
 
 > This is the cross-owner production sign-off matrix, not a second source-code
@@ -685,34 +811,40 @@ Sau đó Dev 2:
 > leave the items below unchecked until their manual browser, host, or Owner/Ops
 > evidence is recorded.
 
+
+
 ## A. Browser boundary
 
 **Owner: Dev 1 + Dev 2**
 
-- [ ] Browser DevTools Fetch chỉ gọi CRM origin.
-- [ ] Browser DevTools XHR chỉ gọi CRM origin.
+- [x] Browser DevTools Fetch chỉ gọi CRM origin (verified manually on production).
+- [x] Browser DevTools XHR chỉ gọi CRM origin (verified manually on production).
 - [ ] Browser WebSocket chỉ gọi CRM origin.
-- [ ] Browser cookies không chứa Supabase token.
-- [ ] Browser cookies không chứa Supabase key.
-- [ ] Browser localStorage không chứa Supabase token/key/URL.
-- [ ] Browser sessionStorage không chứa Supabase token/key/URL.
+- [x] Browser cookies không chứa Supabase token.
+- [x] Browser cookies không chứa Supabase key.
+- [x] Browser localStorage không chứa Supabase token/key/URL.
+- [x] Browser sessionStorage không chứa Supabase token/key/URL.
 - [ ] Chặn outbound browser access tới Supabase không ảnh hưởng CRM.
 
 ---
+
+
 
 ## B. Production bundle leakage
 
 **Owner: Dev 1**
 
-- [ ] `.next/static` không chứa Supabase hostname.
-- [ ] `.next/static` không chứa Supabase key.
-- [ ] `.next/static` không chứa `NEXT_PUBLIC_SUPABASE`.
-- [ ] `.next/static` không chứa `/auth/v1`.
-- [ ] `.next/static` không chứa `/rest/v1`.
-- [ ] `.next/static` không chứa `/storage/v1`.
-- [ ] `.next/static` không chứa `/realtime/v1`.
+- [x] `.next/static` không chứa Supabase hostname.
+- [x] `.next/static` không chứa Supabase key.
+- [x] `.next/static` không chứa `NEXT_PUBLIC_SUPABASE`.
+- [x] `.next/static` không chứa `/auth/v1`.
+- [x] `.next/static` không chứa `/rest/v1`.
+- [x] `.next/static` không chứa `/storage/v1`.
+- [x] `.next/static` không chứa `/realtime/v1`.
 
 ---
+
+
 
 ## C. Domain cutover
 
@@ -730,21 +862,25 @@ Sau đó Dev 2:
 
 ---
 
+
+
 ## D. Session boundary
 
 **Owner: Dev 1**
 
-- [ ] Browser chỉ giữ CRM session.
-- [ ] Không Supabase access token trong browser.
-- [ ] Không Supabase refresh token trong browser.
-- [ ] Không Supabase auth legacy cookie.
-- [ ] Session source of truth là durable server-side store.
-- [ ] Redis chỉ là optional cache.
-- [ ] Revoke hoạt động.
-- [ ] Disabled account bị chặn.
-- [ ] Logout cleanup đầy đủ.
+- [x] Browser chỉ giữ CRM session.
+- [x] Không Supabase access token trong browser.
+- [x] Không Supabase refresh token trong browser.
+- [x] Không Supabase auth legacy cookie.
+- [x] Session source of truth là durable server-side store.
+- [x] Redis chỉ là optional cache.
+- [x] Revoke hoạt động.
+- [x] Disabled account bị chặn.
+- [x] Logout cleanup đầy đủ.
 
 ---
+
+
 
 ## E. Storage
 
@@ -759,19 +895,23 @@ Sau đó Dev 2:
 
 ---
 
+
+
 ## F. Production network
 
 **Owner: Dev 1**
 
 - [x] CRM giữ `${APP_PORT:-3006}:3006` để tương thích ingress/proxy hiện có; cấu hình proxy không thuộc CRM Compose.
 - [ ] Redis không publish host port.
-- [ ] Supabase gateway không publish host port.
-- [ ] Supabase services không publish host port.
-- [ ] Postgres không publish host port.
+- [x] Supabase gateway không publish host port.
+- [x] Supabase services không publish host port.
+- [x] Postgres không publish host port.
 - [ ] CRM resolve được `supabase-ant-crm-gateway:8000`.
 - [ ] Browser không resolve/kết nối Supabase internal hostname.
 
 ---
+
+
 
 ## G. Test gates
 
@@ -798,6 +938,8 @@ Sau đó Dev 2:
 
 ---
 
+
+
 ## H. Documentation / Ops sign-off
 
 **Owner: Shared + Owner/Ops**
@@ -813,6 +955,8 @@ Sau đó Dev 2:
 - [ ] Owner/Ops xác nhận rollback.
 
 ---
+
+
 
 # Definition of Done
 
@@ -833,7 +977,7 @@ Cutover chỉ được đánh dấu **DONE** khi tất cả điều kiện sau c
 - [ ] Typecheck pass.
 - [ ] Unit test pass.
 - [ ] Production build pass.
-- [ ] Leakage check pass.
+- [x] Leakage check pass.
 - [ ] Playwright pass.
 - [ ] Documentation cập nhật.
 - [ ] Owner/Ops sign-off.

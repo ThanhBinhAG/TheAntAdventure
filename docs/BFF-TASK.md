@@ -150,7 +150,7 @@ feature/bff-cutover-domains
 ### Dev 1 chịu trách nhiệm sửa các test fail thuộc
 
 - [x] Auth, middleware/proxy, session, request context, `cookies()`, env and test infrastructure regressions have an assigned platform suite.
-- [ ] Triage any failure found by Windows/GitLab matrix or real E2E separately from Dev 2 domain suites.
+- [x] Windows, GitLab and isolated E2E matrix completed without a remaining platform failure to triage; future failures remain Dev 1 triage work.
 
 > Test fail thuộc domain business cụ thể giao Dev 2.
 
@@ -159,7 +159,7 @@ feature/bff-cutover-domains
 - [x] Stable handoff contract documents `getAuthContext()`, permission checks, user/admin server clients, `bffRoute`, request ID, and safe auth-outage behavior.
 - [x] `npm run final:acceptance` runs lint → typecheck → unit tests → build → hard browser-leakage check in one cross-platform command.
 - [x] Real session E2E is explicitly opt-in with `FINAL_ACCEPTANCE_E2E=1`, preventing an accidental mutation of a shared database.
-- [ ] Dev 2 confirms domain routes follow the handoff contract and no browser Supabase client/API path remains.
+- [x] Dev 2 confirms domain routes follow the handoff contract and no browser Supabase client/API path remains.
 - [ ] Staging applies durable-session migration and passes real login/refresh/logout/revoke/disable E2E.
 - [x] Production verifier confirms private Supabase/Redis dependencies and the existing ingress remains unchanged.
 - [ ] Ops completes planned anon-key rotation; service-role rotation remains conditional on an exposure-history audit.

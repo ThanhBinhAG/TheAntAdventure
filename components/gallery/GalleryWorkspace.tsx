@@ -12,8 +12,7 @@ import {
 } from '@dnd-kit/core';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/hooks/useStore';
-import { persistRouteCacheFromStore } from '@/lib/db/hydrate';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 import { useGalleryPage } from '@/hooks/useGalleryPage';
 import { useUpdatePhoto } from '@/hooks/useUpdatePhoto';
 import { useDeletePhoto } from '@/hooks/useDeletePhoto';
@@ -62,10 +61,6 @@ import type { Attraction } from '@/lib/types';
 /** One Sharp/upload at a time to avoid RAM spikes on heavy originals. */
 const GALLERY_UPLOAD_CONCURRENCY = 1;
 const GALLERY_DELETE_CONCURRENCY = 3;
-
-function syncGalleryRouteCache() {
-  persistRouteCacheFromStore('gallery');
-}
 
 async function mapWithConcurrency<T>(
   items: T[],
@@ -252,7 +247,6 @@ export default function GalleryWorkspace() {
         toast.success('Folder renamed.');
       }
       setFolderNameModal(null);
-      syncGalleryRouteCache();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save folder');
       toast.error(e instanceof Error ? e.message : 'Could not save folder');
@@ -278,7 +272,6 @@ export default function GalleryWorkspace() {
     try {
       await deleteFolder(folder.id);
       if (currentFolderId === folder.id) goRoot();
-      syncGalleryRouteCache();
       toast.success('Folder deleted.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not delete folder');
@@ -375,7 +368,6 @@ export default function GalleryWorkspace() {
         if (!completed.length) {
           throw new Error(failures[0] ?? 'Upload failed');
         }
-        syncGalleryRouteCache();
       } else if (id && editing) {
         let record: GalleryPhoto = {
           ...editing,
@@ -411,7 +403,6 @@ export default function GalleryWorkspace() {
           });
           if (!result.ok) throw new Error(result.message);
         }
-        syncGalleryRouteCache();
       }
       setModalOpen(false);
     } catch (e) {
@@ -440,7 +431,6 @@ export default function GalleryWorkspace() {
         next.delete(id);
         return next;
       });
-      syncGalleryRouteCache();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
@@ -469,7 +459,6 @@ export default function GalleryWorkspace() {
 
       setSelected(new Set());
       toast.success('Photos deleted.');
-      syncGalleryRouteCache();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Bulk delete failed');
       toast.error(e instanceof Error ? e.message : 'Bulk delete failed');
@@ -490,7 +479,6 @@ export default function GalleryWorkspace() {
       setSelected(new Set());
       setMoveOpen(false);
       toast.success(`Moved ${photoIds.length} photo(s).`);
-      syncGalleryRouteCache();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Move failed');
       toast.error(e instanceof Error ? e.message : 'Move failed');

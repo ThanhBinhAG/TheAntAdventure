@@ -26,15 +26,13 @@ test('dashboard query accepts empty filters and b2b/market', () => {
   assert.equal(bad.success, false);
 });
 
-test('Dashboard BFF cutover: API hook and empty boot', () => {
-  const syncConfig = source('lib/db/sync-config.ts');
+test('Dashboard BFF cutover: API hook', () => {
   const page = source('components/dashboard/DashboardPage.tsx');
   const hook = source('hooks/useDashboardPage.ts');
   const api = source('app/api/dashboard/route.ts');
   const forecast = source('components/dashboard/DashboardForecast.tsx');
   const leadRepo = source('lib/sales/lead-repository.ts');
 
-  assert.match(syncConfig, /dashboard:\s*\[\]/);
   assert.match(hook, /\/api\/dashboard/);
   assert.match(hook, /fetchDashboardOnce/);
   assert.match(page, /useDashboardPage/);

@@ -17,7 +17,6 @@ import {
   extendedSupplierSchema,
 } from '@/lib/suppliers/extended-supplier-input';
 import { BFF_MANAGED_TABLES } from '@/lib/db/bff-managed-tables';
-import { PAGE_BOOT_TABLES, SHELL_HYDRATE_TABLES } from '@/lib/db/sync-config';
 import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
 
 function source(path: string): string {
@@ -141,10 +140,8 @@ test('Suppliers API routes enforce suppliers.read / suppliers.write', () => {
   assert.match(source('lib/suppliers/extended-supplier-repository.ts'), /import 'server-only'/);
 });
 
-test('Suppliers hydrate cutover: empty boot, denylist, no shell hydrate', () => {
-  assert.equal((PAGE_BOOT_TABLES.suppliers ?? []).length, 0);
+test('Suppliers tables are BFF-managed', () => {
   for (const table of ['hotels', 'transport', 'restaurants', 'cruises', 'suppliers'] as const) {
     assert.equal(BFF_MANAGED_TABLES.has(table), true);
-    assert.equal((SHELL_HYDRATE_TABLES as readonly string[]).includes(table), false);
   }
 });

@@ -15,8 +15,6 @@ import {
   filterClientNameSuggestions,
 } from '@/lib/contracts/contract-booking-fill';
 import { BFF_MANAGED_TABLES } from '@/lib/db/bff-managed-tables';
-import { ROUTE_CACHE_DENYLIST } from '@/lib/db/route-cache';
-import { PAGE_BOOT_TABLES, SHELL_HYDRATE_TABLES } from '@/lib/db/sync-config';
 
 function source(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf8');
@@ -111,11 +109,8 @@ test('Contracts API routes enforce contracts.read / contracts.write', () => {
   assert.match(source('lib/contracts/contract-repository.ts'), /deleteContractServer/);
 });
 
-test('Contracts hydrate cutover: empty boot, denylist, no shell hydrate', () => {
-  assert.equal((PAGE_BOOT_TABLES.contracts ?? []).length, 0);
+test('contracts-bff tables are BFF-managed', () => {
   assert.equal(BFF_MANAGED_TABLES.has('contracts'), true);
-  assert.equal((SHELL_HYDRATE_TABLES as readonly string[]).includes('contracts'), false);
-  assert.equal((ROUTE_CACHE_DENYLIST as readonly string[]).includes('contracts'), true);
 });
 
 test('Contract booking fill maps booking + customer into form fields', () => {

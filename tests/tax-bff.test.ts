@@ -4,8 +4,6 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { rowToTax } from '@/lib/db/mappers/finance';
 import { BFF_MANAGED_TABLES } from '@/lib/db/bff-managed-tables';
-import { ROUTE_CACHE_DENYLIST } from '@/lib/db/route-cache';
-import { PAGE_BOOT_TABLES, SHELL_HYDRATE_TABLES } from '@/lib/db/sync-config';
 import { buildTaxCsv, taxExportFilename } from '@/lib/tax/tax-export';
 
 function source(path: string): string {
@@ -71,9 +69,7 @@ test('Tax export helper builds CSV filename and content', () => {
   assert.match(csv, /Q1 2026/);
 });
 
-test('Tax hydrate cutover: empty boot, denylist, no shell hydrate', () => {
-  assert.equal((PAGE_BOOT_TABLES.tax ?? []).length, 0);
+test('tax-bff tables are BFF-managed', () => {
   assert.equal(BFF_MANAGED_TABLES.has('tax_reports'), true);
-  assert.equal((SHELL_HYDRATE_TABLES as readonly string[]).includes('tax_reports'), false);
-  assert.equal((ROUTE_CACHE_DENYLIST as readonly string[]).includes('tax_reports'), true);
 });
+

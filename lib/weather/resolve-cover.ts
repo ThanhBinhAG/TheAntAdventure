@@ -1,6 +1,5 @@
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import { photoDisplayUrl, photoThumbUrl } from '@/lib/gallery/gallery-helpers';
-import { isTableHydrated } from '@/lib/db/sync-lifecycle';
 import type { WeatherDestinationMeta } from './types';
 
 export type ResolvedCover = {
@@ -30,10 +29,6 @@ export function resolveDestinationCover(
         coverUrl,
         coverThumbUrl: photoThumbUrl(photo) || coverUrl,
       };
-    }
-
-    if (isTableHydrated('photos')) {
-      return { coverUrl: null, coverThumbUrl: null };
     }
 
     if (meta.coverUrl || meta.coverThumbUrl) {

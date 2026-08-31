@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getBffData } from '@/lib/bff/client';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 import type { TaxListItem, TaxReportsResponse } from '@/lib/tax/tax-input';
 import { useStore } from '@/hooks/useStore';
 

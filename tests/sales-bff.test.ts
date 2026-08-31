@@ -86,7 +86,8 @@ test('Sales BFF cutover: API hooks and denylist', () => {
   assert.match(apiApprove, /sales\.write/);
 });
 
-test('Sales page boot does not PostgREST-hydrate sales tables', () => {
-  const syncConfig = source('lib/db/sync-config.ts');
-  assert.match(syncConfig, /sales:\s*\[\]/);
+test('Sales page uses CRM BFF without browser hydrate', () => {
+  const page = source('components/sales/SalesPage.tsx');
+  assert.match(page, /useSalesPage/);
+  assert.doesNotMatch(page, /lib\/db\/hydrate/);
 });

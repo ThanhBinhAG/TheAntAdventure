@@ -9,8 +9,7 @@ import {
   customerDeleteBlockedMessage,
   restoreCustomerDeleteSnapshot,
 } from '@/lib/customers/customer-delete';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
-import { persistRouteCacheFromStore } from '@/lib/db/hydrate';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 
 export type CustomerDeleteResult =
   | { ok: true }
@@ -134,7 +133,6 @@ export function useDeleteCustomer() {
           });
         }
 
-        persistRouteCacheFromStore('customers');
         return { ok: true };
       } catch {
         if (snapshot) {

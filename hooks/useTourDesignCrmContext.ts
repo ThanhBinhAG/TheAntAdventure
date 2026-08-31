@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect } from 'react';
 import { useStore } from '@/hooks/useStore';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 import type { TourDesignCrmContext } from '@/lib/tour-design/tour-design-types';
 
 const CRM_CONTEXT_URL = '/api/tour-design/crm-context';

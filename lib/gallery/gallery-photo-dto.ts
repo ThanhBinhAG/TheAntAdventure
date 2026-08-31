@@ -73,3 +73,6 @@ export function mapGalleryPhotoForClient(row: GalleryPhotoRowLike): GalleryPhoto
     tags: row.tags ?? [],
   };
 }
+
+/** Alias for gallery-shaped photo rows — single server mapper for CRM asset URLs. */
+export const mapPhotoUrlForClient = mapGalleryPhotoForClient;

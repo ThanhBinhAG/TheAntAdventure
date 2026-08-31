@@ -7,7 +7,7 @@ import type { CustomerFormData } from '@/lib/customers/customer-form';
 import {
   formatDuplicateEmailMessage,
 } from '@/lib/customers/customer-onboarding';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 import type { Comm, Customer, Lead } from '@/lib/types';
 
 export type CustomerSaveOutcome =

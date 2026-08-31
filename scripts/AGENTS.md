@@ -9,6 +9,7 @@ Ops shell helpers (not npm package scripts). Separate from `Personal/scripts` on
 - `supabase-db.sh` — Supabase CLI wrapper (`db:push`, `db:bootstrap`, …)
 - `docker-with-env.sh` — resolve env then compose `print|build|up|deploy|down|status` (CI uses print → build → deploy)
 - `check-supabase-leakage.mjs` — cross-platform browser-bundle scan for Supabase URLs, anon keys, or service paths
+- `audit-legacy-asset-urls.mjs` — prints SQL to find legacy `storage/v1` rows in photos/branding/guides (dev diagnostic)
 - `cleanup-crm-sessions.mjs` — host-scheduled expiry/revocation cleanup via the service-role-only database RPC
 - `test-runner.mjs`, `run-next-dev.mjs` — cross-platform Node launchers for unit tests and Next development/Playwright
 - `report-supabase-leakage.mjs` — legacy non-blocking diagnostic; CI uses `leakage:check` as its hard gate

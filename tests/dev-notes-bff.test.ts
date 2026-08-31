@@ -3,8 +3,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { BFF_MANAGED_TABLES } from '@/lib/db/bff-managed-tables';
-import { ROUTE_CACHE_DENYLIST } from '@/lib/db/route-cache';
-import { PAGE_BOOT_TABLES, SHELL_HYDRATE_TABLES } from '@/lib/db/sync-config';
 
 function source(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf8');
@@ -45,9 +43,7 @@ test('Dev Notes API routes enforce devnotes.read / devnotes.write', () => {
   assert.match(source('lib/dev-notes/dev-notes-repository.ts'), /deleteDevNoteServer/);
 });
 
-test('Dev Notes hydrate cutover: empty boot, denylist, no shell hydrate', () => {
-  assert.equal((PAGE_BOOT_TABLES.devnotes ?? []).length, 0);
+test('dev-notes-bff tables are BFF-managed', () => {
   assert.equal(BFF_MANAGED_TABLES.has('dev_notes'), true);
-  assert.equal((SHELL_HYDRATE_TABLES as readonly string[]).includes('dev_notes'), false);
-  assert.equal((ROUTE_CACHE_DENYLIST as readonly string[]).includes('dev_notes'), true);
 });
+

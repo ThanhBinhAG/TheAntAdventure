@@ -13,7 +13,6 @@ import ProposalExportStep from '@/components/tour-design/ProposalExportStep';
 import type { OverridePatch } from '@/components/tour-design/SelectedExperiencesPanel';
 import type { TourPackage } from '@/lib/seeds/tourPackages';
 import { customerToBrief } from '@/lib/customers/customer-to-brief';
-import { isExperiencesBlocked } from '@/lib/tour-design/tour-design-gate';
 import { ensureTourDesignLead } from '@/lib/tour-design/tour-design-lead';
 import {
   getOutlineAwaitingApproval,
@@ -187,7 +186,6 @@ export default function TourDesignPage() {
     };
   }, [products, selectedCodes, setProductPricing, setProducts]);
 
-  const experiencesBlocked = isExperiencesBlocked(leadId, outlineRows.length, outlineStatus);
   const pendingLeads = useMemo(() => getPendingTourDesignLeads(leads), [leads]);
   const awaitingOutline = useMemo(
     () => getOutlineAwaitingApproval(leads, tourDrafts),
@@ -774,7 +772,6 @@ export default function TourDesignPage() {
   }
 
   function handleStepClick(i: number) {
-    if (i === 2 && experiencesBlocked) return;
     goToStep(i);
   }
 
@@ -793,7 +790,7 @@ export default function TourDesignPage() {
         {STEPS.map((label, i) => (
           <div
             key={label}
-            className={`td-step${step === i ? ' on' : ''}${step > i ? ' done' : ''}${i === 2 && experiencesBlocked ? ' td-step-locked' : ''}`}
+            className={`td-step${step === i ? ' on' : ''}${step > i ? ' done' : ''}`}
             onClick={() => handleStepClick(i)}
             role="button"
             tabIndex={0}
@@ -832,7 +829,6 @@ export default function TourDesignPage() {
           outlineNotes={outlineNotes}
           onOutlineNotesChange={setOutlineNotes}
           saveState={saveState}
-          experiencesBlocked={experiencesBlocked}
           clientName={brief.clientName || custName}
           onUpdateRow={updateOutlineRow}
           onAddDay={addOutlineDay}
@@ -880,7 +876,7 @@ export default function TourDesignPage() {
                 persistDraft({ step: 3, selectedCodes, selectedPackageId });
                 goToStep(3);
               }}
-              disabled={(selectedCodes.length === 0 && !selectedPackageId) || !canWrite}
+              disabled={!canWrite}
             >
               Next: Pricing →
             </button>

@@ -108,7 +108,7 @@ export default function OutlineWorkflowPanel({
       <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 8 }}>
         Status: <strong>{outlineStatusLabel(outlineStatus)}</strong>
         {outlineStatus !== 'approved' && (
-          <span> — Tour Experiences unlocks after client approval.</span>
+          <span> — Record client approval before finalizing the tour.</span>
         )}
       </div>
     </div>

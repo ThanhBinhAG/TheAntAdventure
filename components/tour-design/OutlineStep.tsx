@@ -16,7 +16,6 @@ interface Props {
   outlineNotes: string;
   onOutlineNotesChange: (notes: string) => void;
   saveState: 'idle' | 'saving' | 'saved' | 'error';
-  experiencesBlocked: boolean;
   clientName?: string;
   onUpdateRow: (id: string, patch: Partial<TourOutlineDay>) => void;
   onAddDay: () => void;
@@ -46,7 +45,6 @@ export default function OutlineStep({
   outlineNotes,
   onOutlineNotesChange,
   saveState,
-  experiencesBlocked,
   clientName,
   onUpdateRow,
   onAddDay,
@@ -221,18 +219,13 @@ export default function OutlineStep({
           )}
         </div>
 
-        {experiencesBlocked && (
-          <div className="outline-notice outline-notice-blocked">
-            Outline must be approved by the client before continuing to Tour Experiences.
-          </div>
-        )}
       </div>
 
       <div className="td-nav" style={{ padding: '0 16px 16px' }}>
         <button className="btn btn-s" type="button" onClick={onBack}>
           ← Back
         </button>
-        <button className="btn btn-p" type="button" onClick={onNext} disabled={experiencesBlocked}>
+        <button className="btn btn-p" type="button" onClick={onNext} disabled={!canWrite}>
           Next: Tour Experiences →
         </button>
       </div>

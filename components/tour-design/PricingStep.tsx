@@ -233,7 +233,7 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
           <button className="btn btn-s" type="button" onClick={onBack}>
             ← Back
           </button>
-          <button className="btn btn-p" type="button" onClick={onNext} disabled={!selectedProducts.length}>
+          <button className="btn btn-p" type="button" onClick={onNext} disabled={!canWrite}>
             Next: Export →
           </button>
         </div>

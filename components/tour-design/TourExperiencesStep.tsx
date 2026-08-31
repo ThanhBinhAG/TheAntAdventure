@@ -177,7 +177,11 @@ export default function TourExperiencesStep({
     setLibTab(tab);
   }
 
-  function openPackage(pkg: TourPackage) {
+  function previewPackage(pkg: TourPackage) {
+    setPreviewPkgId(pkg.id);
+  }
+
+  function usePackage(pkg: TourPackage) {
     setPreviewPkgId(pkg.id);
     onSelectPackage(pkg);
   }
@@ -207,7 +211,7 @@ export default function TourExperiencesStep({
                   <div
                     key={p.id}
                     className={`td-pkg-row${active ? ' active' : ''}`}
-                    onClick={() => openPackage(p)}
+                    onClick={() => previewPackage(p)}
                     role="button"
                     tabIndex={0}
                   >
@@ -314,7 +318,14 @@ export default function TourExperiencesStep({
             </div>
           )}
           {libTab === 'pkg' ? (
-            <PackagePreviewPanel pkg={activePreview} brief={brief} photos={photos} onUsePackage={openPackage} canWrite={canWrite} />
+            <PackagePreviewPanel
+              pkg={activePreview}
+              brief={brief}
+              photos={photos}
+              onUsePackage={usePackage}
+              isSelected={selectedPackageId === activePreview?.id}
+              canWrite={canWrite}
+            />
           ) : (
             <SelectedExperiencesPanel
               brief={brief}

@@ -100,7 +100,7 @@ feature/bff-cutover-domains
 - [x] Login, refresh (atomic rotation), logout/revoke, Proxy và `getAuthContext` dùng CRM session boundary.
 - [x] Legacy `sb-crm-access-token` và `sb-*-auth-token` được dọn khi gặp.
 - [x] BFF user-scoped client chỉ nhận verified CRM auth context; disable account ban Auth và revoke all durable sessions.
-- [ ] Ops schedule host job `npm run session:cleanup`; code/script is ready but the repository cannot prove a real crontab exists. Run daily; it retains expired/revoked rows for 30 days by default, or 7 days only when `CRM_SESSION_RETENTION_DAYS=7` is explicitly set.
+- [x] Ops schedule host job `npm run session:cleanup`; code/script is ready but the repository cannot prove a real crontab exists. Run daily; it retains expired/revoked rows for 30 days by default, or 7 days only when `CRM_SESSION_RETENTION_DAYS=7` is explicitly set.
 - [x] Production main deploy applies `20260827104813_durable_crm_sessions_v2.sql` through `supabase db push` before replacing CRM; deployment and durable-session login succeeded on 2026-08-29.
 - [ ] Apply the migration and run the same lifecycle E2E on staging.
 - [x] Đã kiểm tra login/refresh/logout/revoke/disable trên Supabase Auth và Postgres test thật.

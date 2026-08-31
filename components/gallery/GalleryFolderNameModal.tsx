@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type Props = {
   open: boolean;
@@ -28,14 +30,19 @@ export default function GalleryFolderNameModal({
     if (open) setName(initialName);
   }
 
+  const formKey = `${open}-${initialName}`;
+  const { language } = useLanguage();
+  const dirty = useFormDirty(open, initialName, name, undefined, formKey);
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
+
   if (!open) return null;
 
   return (
-    <div className="overlay open" onClick={onClose} role="presentation">
+    <div className="overlay open" onClick={() => void requestClose()} role="presentation">
       <div className="modal phlib-folder-name-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="modal-hd modal-hd-green phlib-modal-hd">
           <div className="phlib-modal-title">{title}</div>
-          <button type="button" className="modal-close-btn" onClick={onClose} disabled={saving}>
+          <button type="button" className="modal-close-btn" onClick={() => void requestClose()} disabled={saving}>
             ✕
           </button>
         </div>
@@ -57,7 +64,7 @@ export default function GalleryFolderNameModal({
         <div className="phlib-modal-ft">
           <div />
           <div className="phlib-modal-ft-right">
-            <button type="button" className="btn btn-o" onClick={onClose} disabled={saving}>
+            <button type="button" className="btn btn-o" onClick={() => void requestClose()} disabled={saving}>
               Cancel
             </button>
             <button

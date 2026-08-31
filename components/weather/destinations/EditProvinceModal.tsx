@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import PhotoLibraryPicker from '@/components/gallery/PhotoLibraryPicker';
 import StorageImage from '@/components/gallery/StorageImage';
 import { useStore } from '@/hooks/useStore';
@@ -12,6 +12,8 @@ import { toast } from '@/lib/toast';
 import type { WeatherRegion } from '@/lib/weather/coordinates';
 import type { WeatherDestinationMeta } from '@/lib/weather/types';
 import type { ProvinceFormInput } from '@/components/weather/hooks/useProvinceList';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type Props = {
   open: boolean;
@@ -89,6 +91,14 @@ export default function EditProvinceModal({
     setPickerOpen(false);
     setSaving(false);
   }
+
+  const { language } = useLanguage();
+  const baselineForm = useMemo(
+    () => (destination ? fromDest(destination) : form),
+    [formKey], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const dirty = useFormDirty(open && !!destination, baselineForm, form, undefined, formKey);
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
 
   if (!open || !destination) return null;
 
@@ -171,7 +181,7 @@ export default function EditProvinceModal({
 
   return (
     <>
-      <div className="overlay open" onClick={onClose} role="presentation">
+      <div className="overlay open" onClick={() => void requestClose()} role="presentation">
         <div
           className="modal wg-province-modal"
           onClick={(e) => e.stopPropagation()}
@@ -181,7 +191,7 @@ export default function EditProvinceModal({
         >
           <div className="modal-hd modal-hd-green">
             <h2 id="wg-edit-title">Sửa tỉnh thành</h2>
-            <button type="button" className="gallery-modal-close" onClick={onClose} aria-label="Đóng">
+            <button type="button" className="gallery-modal-close" onClick={() => void requestClose()} aria-label="Đóng">
               ×
             </button>
           </div>
@@ -308,7 +318,7 @@ export default function EditProvinceModal({
               Xóa
             </button>
             <div className="wg-detail-ft-right">
-              <button type="button" className="btn btn-s" onClick={onClose} disabled={saving}>
+              <button type="button" className="btn btn-s" onClick={() => void requestClose()} disabled={saving}>
                 Hủy
               </button>
               <button type="button" className="btn btn-p" onClick={() => void handleSave()} disabled={saving}>

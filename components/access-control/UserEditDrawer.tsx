@@ -24,6 +24,7 @@ import {
 } from 'antd';
 import type { AccessControlUser } from './access-control-api';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
 import { tac } from '@/lib/i18n/pages/access-control';
 import styles from './AccessControlPage.module.css';
 
@@ -50,6 +51,15 @@ export default function UserEditDrawer({
     const [error, setError] =
         useState<string | null>(null);
 
+    const dirty = Boolean(user && displayName !== (user.display_name ?? ''));
+    const { requestClose } = useConfirmClose({
+        open: Boolean(user),
+        dirty,
+        onClose,
+        disabled: saving,
+        language,
+    });
+
     // UserDirectory truyền key theo user_id, nên form tự khởi tạo lại khi đổi user.
 
     async function handleSubmit(
@@ -75,7 +85,7 @@ export default function UserEditDrawer({
             title={tac('editUserInfo', language)}
             open={Boolean(user)}
             size={480}
-            onClose={onClose}
+            onClose={() => void requestClose()}
             destroyOnHidden
         >
             {user && (
@@ -112,7 +122,7 @@ export default function UserEditDrawer({
                     <div className={styles.drawerActions}>
                         <Button
                             disabled={saving}
-                            onClick={onClose}
+                            onClick={() => void requestClose()}
                         >
                             {tac('cancel', language)}
                         </Button>

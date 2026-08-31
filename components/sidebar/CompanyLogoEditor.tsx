@@ -7,6 +7,8 @@ import type { PhotoFolder } from '@/lib/gallery/photo-folders';
 import { blobUrlFromRemote, getCroppedImageBlob } from '@/lib/gallery/crop-image';
 import { photoDisplayUrl } from '@/lib/gallery/gallery-helpers';
 import { useStore } from '@/hooks/useStore';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 import CompanyLogoGalleryPicker from '@/components/sidebar/CompanyLogoGalleryPicker';
 import {
   clearCompanyLogoClient,
@@ -44,10 +46,19 @@ export default function CompanyLogoEditor({ open, onClose, onSaved }: Props) {
     setBusy(false);
   }, [blobUrl]);
 
-  const handleClose = () => {
+  const { language } = useLanguage();
+  const dirty = step === 'crop';
+  const finishClose = useCallback(() => {
     reset();
     onClose();
-  };
+  }, [onClose, reset]);
+  const { requestClose } = useConfirmClose({
+    open,
+    dirty,
+    onClose: finishClose,
+    disabled: busy,
+    language,
+  });
 
   const handlePick = async (photo: GalleryPhoto) => {
     const url = photoDisplayUrl(photo) || photo.url;
@@ -81,7 +92,8 @@ export default function CompanyLogoEditor({ open, onClose, onSaved }: Props) {
       const logoUrl = await saveCompanyLogoClient(file);
       toast.success('Company logo updated');
       onSaved(logoUrl);
-      handleClose();
+      reset();
+      onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Save failed');
       setBusy(false);
@@ -94,7 +106,8 @@ export default function CompanyLogoEditor({ open, onClose, onSaved }: Props) {
       await clearCompanyLogoClient();
       toast.success('Restored default logo');
       onSaved(null);
-      handleClose();
+      reset();
+      onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Reset failed');
       setBusy(false);
@@ -109,7 +122,7 @@ export default function CompanyLogoEditor({ open, onClose, onSaved }: Props) {
         open
         photos={photos}
         folders={photoFolders}
-        onClose={handleClose}
+        onClose={() => void requestClose()}
         onPick={(p) => {
           void handlePick(p);
         }}
@@ -118,14 +131,14 @@ export default function CompanyLogoEditor({ open, onClose, onSaved }: Props) {
   }
 
   return (
-    <div className="overlay open" onClick={handleClose}>
+    <div className="overlay open" onClick={() => void requestClose()}>
       <div className="modal logo-crop-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green">
           <div>
             <div className="phlib-modal-title">Adjust logo</div>
             <div className="phlib-modal-sub">Drag to center · scroll or slider to zoom</div>
           </div>
-          <button type="button" className="modal-close-btn" onClick={handleClose} disabled={busy}>
+          <button type="button" className="modal-close-btn" onClick={() => void requestClose()} disabled={busy}>
             ✕
           </button>
         </div>

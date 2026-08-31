@@ -30,6 +30,8 @@ import type { Product } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
 import { confirmDialog } from '@/lib/confirm';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type SourceTab = 'library' | 'modules';
 
@@ -138,6 +140,9 @@ export default function ProductEditPanel({
   const cleanSaved = saveState === 'saved' && !dirty;
   const saveDisabled = busy || !canWrite;
 
+  const { language } = useLanguage();
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: busy, language });
+
   const rebuildCode = useCallback(
     (state: ProductFormState): ProductFormState => {
       if (!isNew) return state;
@@ -180,11 +185,6 @@ export default function ProductEditPanel({
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [saveState]);
-
-  const requestClose = () => {
-    if (busy) return;
-    onClose();
-  };
 
   const typeSegmentOptions = useMemo(() => {
     const set = new Set<string>(TYPE_SEGMENT_OPTIONS);
@@ -316,7 +316,7 @@ export default function ProductEditPanel({
         <button
           type="button"
           className="tp-edit-aside-close"
-          onClick={requestClose}
+          onClick={() => void requestClose()}
           disabled={busy}
           aria-label="Close editor"
         >
@@ -570,7 +570,7 @@ export default function ProductEditPanel({
           </button>
         )}
         <div className="tp-edit-aside-ft-actions">
-          <button className="btn btn-s" type="button" onClick={requestClose} disabled={busy}>
+          <button className="btn btn-s" type="button" onClick={() => void requestClose()} disabled={busy}>
             Cancel
           </button>
           <button

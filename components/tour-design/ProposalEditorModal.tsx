@@ -12,6 +12,8 @@ import type { ProposalTemplateOverrides } from '@/lib/proposals/proposal-content
 import { buildProposalHTML } from '@/lib/proposals/proposal-html';
 import type { ProposalDoc, ProposalVariant } from '@/lib/proposals/proposal-types';
 import { toast } from '@/lib/toast';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 import ProposalDocumentCanvas from '@/components/tour-design/ProposalDocumentCanvas';
 import ProposalTemplateForm from '@/components/tour-design/ProposalTemplateForm';
 
@@ -100,17 +102,8 @@ export default function ProposalEditorModal({
 
   const dirty = stableSnapshot(draft) !== seedSnapshot;
 
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  const { language } = useLanguage();
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
 
   function applyAnchor(anchorId: string) {
     const iDoc = iframeRef.current?.contentDocument;
@@ -164,9 +157,7 @@ export default function ProposalEditorModal({
   return (
     <div
       className="modal-overlay open"
-      onClick={() => {
-        if (!dirty) onClose();
-      }}
+      onClick={() => void requestClose()}
       role="presentation"
     >
       <div
@@ -186,7 +177,7 @@ export default function ProposalEditorModal({
               ) : null}
             </span>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose}>
+          <button type="button" className="modal-close-btn" onClick={() => void requestClose()}>
             ✕
           </button>
         </div>
@@ -245,7 +236,7 @@ export default function ProposalEditorModal({
           </button>
           <div style={{ flex: 1 }} />
           {dirty ? <span className="td-export-pill is-busy">Unsaved changes</span> : null}
-          <button type="button" className="btn btn-s" onClick={onClose}>
+          <button type="button" className="btn btn-s" onClick={() => void requestClose()}>
             Cancel
           </button>
           <button type="button" className="btn btn-s" onClick={handleSaveQuote}>

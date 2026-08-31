@@ -16,6 +16,10 @@ Next.js Route Handlers for server-side auth, media, exports, weather, and diagno
 - `feedback/` — Post-tour feedback BFF: list + create
 - `finance/` — Finance / AR / AP aggregate read
 - `tax-reports/` — Tax reports read + CSV export
+- `hr/` — HR staff directory read
+- `salary/` — Salary payroll staff read
+- `dev-notes/` — Dev Notes list/create/update
+- `cal-events/` — Guide calendar events list/create/delete
 - `hotels/` — Hotels BFF (+ nested rooms): list/create + `[id]` read/update/delete
 - `transport/` / `restaurants/` / `cruises/` — QuickList supplier BFFs
 - `suppliers/` — Extended suppliers BFF (`suppliers` + tags)

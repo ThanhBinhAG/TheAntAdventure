@@ -13,10 +13,11 @@ interface Props {
   brief: TourBrief;
   photos: GalleryPhoto[];
   onUsePackage: (pkg: TourPackage) => void;
+  isSelected?: boolean;
   canWrite?: boolean;
 }
 
-export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, canWrite = true }: Props) {
+export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, isSelected = false, canWrite = true }: Props) {
   const heroPhoto = useMemo(() => {
     if (!pkg?.days?.length) return null;
     const day = pkg.days[0];
@@ -120,7 +121,7 @@ export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, 
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--g)' }}>{pkg.price4pax}</div>
           </div>
           <button className="btn btn-p" type="button" onClick={() => onUsePackage(pkg)} disabled={!canWrite}>
-            Use This Package →
+            {isSelected ? 'Package Selected ✓' : 'Use This Package →'}
           </button>
         </div>
       </div>

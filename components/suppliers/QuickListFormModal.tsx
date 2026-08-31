@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
 import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/lib/types';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export type QuickListKind = 'transport' | 'restaurant' | 'cruise';
 
@@ -97,6 +99,11 @@ export default function QuickListFormModal({ open, kind, mode, row, existing, on
     setFormError(null);
   }
 
+  const { language } = useLanguage();
+  const baselineForm = useMemo(() => initialForm(mode, row, cfg, existing), [formKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = useFormDirty(open, baselineForm, form, undefined, formKey);
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
+
   if (!open) return null;
 
   const gridFields = cfg.fields.filter((f) => !f.fullWidth);
@@ -117,7 +124,7 @@ export default function QuickListFormModal({ open, kind, mode, row, existing, on
   }
 
   return (
-    <div className="overlay open" onClick={onClose}>
+    <div className="overlay open" onClick={() => void requestClose()}>
       <div className="modal nc-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green nc-modal-hd">
           <div>
@@ -128,7 +135,7 @@ export default function QuickListFormModal({ open, kind, mode, row, existing, on
               Partner catalog entry for quotations and operations
             </div>
           </div>
-          <button className="modal-close-btn" type="button" onClick={onClose}>
+          <button className="modal-close-btn" type="button" onClick={() => void requestClose()}>
             ✕
           </button>
         </div>
@@ -174,7 +181,7 @@ export default function QuickListFormModal({ open, kind, mode, row, existing, on
             </div>
           ) : null}
           <div className="nc-modal-ft-actions">
-            <button className="btn btn-s" type="button" onClick={onClose}>
+            <button className="btn btn-s" type="button" onClick={() => void requestClose()}>
               Cancel
             </button>
             <button className="btn btn-p" type="button" onClick={handleSave}>

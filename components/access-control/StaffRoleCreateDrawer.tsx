@@ -14,6 +14,7 @@ import {
     Input,
 } from 'antd';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
 import { tac } from '@/lib/i18n/pages/access-control';
 import {
     getAccessControlErrorMessage,
@@ -51,6 +52,20 @@ export default function StaffRoleCreateDrawer({
 }: StaffRoleCreateDrawerProps) {
     const { language } = useLanguage();
     const [form] = Form.useForm<CreateAccessControlStaffRoleInput>();
+    const label = Form.useWatch('label', form);
+    const code = Form.useWatch('code', form);
+    const description = Form.useWatch('description', form);
+    const dirty = open && Boolean(label || code || description);
+    const { requestClose } = useConfirmClose({
+        open,
+        dirty,
+        onClose: () => {
+            form.resetFields();
+            onClose();
+        },
+        disabled: saving,
+        language,
+    });
 
     async function handleFinish(
         values: CreateAccessControlStaffRoleInput,
@@ -88,7 +103,7 @@ export default function StaffRoleCreateDrawer({
             open={open}
             size={480}
             destroyOnHidden
-            onClose={onClose}
+            onClose={() => void requestClose()}
         >
             <Form
                 form={form}
@@ -149,7 +164,7 @@ export default function StaffRoleCreateDrawer({
                 </Form.Item>
 
                 <div className={styles.drawerActions}>
-                    <Button onClick={onClose} disabled={saving}>
+                    <Button onClick={() => void requestClose()} disabled={saving}>
                         {tac('cancel', language)}
                     </Button>
                     <Button type="primary" htmlType="submit" loading={saving}>

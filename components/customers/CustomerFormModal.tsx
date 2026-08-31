@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { COUNTRIES, isKnownCountry, normalizeCountry } from '@/lib/customers/countries';
 import {
   AGENT_DATALIST,
@@ -22,6 +22,8 @@ import {
 } from '@/lib/customers/nationalities';
 import type { Customer } from '@/lib/types';
 import type { CustomerSaveOutcome } from '@/hooks/useRegisterCustomer';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 const CHILD_TAGS = ['Infant 0–2', 'Toddler 3–5', 'Child 6–9', 'Pre-teen 10–12', 'Teen 13–17'];
 const EMAIL_CHECK_DEBOUNCE_MS = 400;
@@ -96,6 +98,17 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     setEmailCheck('idle');
     setDuplicateCustomer(null);
   }
+
+  const { language } = useLanguage();
+  const baselineForm = useMemo(() => initialForm(mode, customer), [formKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = useFormDirty(
+    open,
+    { form: baselineForm, logInquiry: true },
+    { form, logInquiry },
+    undefined,
+    formKey,
+  );
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
 
   const excludeId = mode === 'edit' && customer ? customer.id : undefined;
   const emailTrimmed = form.email.trim();
@@ -277,7 +290,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
   }
 
   return (
-    <div className="overlay open" onClick={onClose}>
+    <div className="overlay open" onClick={() => void requestClose()}>
       <div className="modal nc-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green nc-modal-hd">
           <div>
@@ -288,7 +301,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
               {mode === 'edit' ? 'Chỉnh sửa khách hàng' : 'Thêm khách hàng mới'}
             </div>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose}>
+          <button type="button" className="modal-close-btn" onClick={() => void requestClose()}>
             ✕
           </button>
         </div>
@@ -621,7 +634,7 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             </div>
           ) : null}
           <div className="nc-modal-ft-actions">
-            <button className="btn btn-s" type="button" onClick={onClose}>
+            <button className="btn btn-s" type="button" onClick={() => void requestClose()}>
               Cancel
             </button>
             <button className="btn btn-p" type="button" onClick={() => void handleSave()} disabled={saveDisabled}>

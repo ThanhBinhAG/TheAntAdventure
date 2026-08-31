@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   EXTENDED_CATEGORY_OPTIONS,
   EXTENDED_TAG_OPTIONS,
@@ -8,6 +8,8 @@ import {
   nextSupplierId,
 } from '@/lib/suppliers/supplier-utils';
 import type { ExtendedSupplier } from '@/lib/types';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface Props {
   open: boolean;
@@ -76,6 +78,14 @@ export default function ExtendedSupplierFormModal({
     setFormError(null);
   }
 
+  const { language } = useLanguage();
+  const baselineForm = useMemo(
+    () => initialForm(mode, supplier, defaultCat, existing),
+    [formKey], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const dirty = useFormDirty(open, baselineForm, form, undefined, formKey);
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
+
   if (!open) return null;
 
   function setField<K extends keyof ExtendedSupplier>(key: K, value: ExtendedSupplier[K]) {
@@ -119,7 +129,7 @@ export default function ExtendedSupplierFormModal({
   }
 
   return (
-    <div className="overlay open" onClick={onClose}>
+    <div className="overlay open" onClick={() => void requestClose()}>
       <div className="modal nc-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green nc-modal-hd">
           <div>
@@ -130,7 +140,7 @@ export default function ExtendedSupplierFormModal({
               Extended partner catalog — logistics, experiences, personnel
             </div>
           </div>
-          <button className="modal-close-btn" type="button" onClick={onClose}>
+          <button className="modal-close-btn" type="button" onClick={() => void requestClose()}>
             ✕
           </button>
         </div>
@@ -298,7 +308,7 @@ export default function ExtendedSupplierFormModal({
             </div>
           ) : null}
           <div className="nc-modal-ft-actions">
-            <button className="btn btn-s" type="button" onClick={onClose}>
+            <button className="btn btn-s" type="button" onClick={() => void requestClose()}>
               Cancel
             </button>
             <button className="btn btn-p" type="button" onClick={handleSave}>

@@ -10,6 +10,8 @@ import { parsePortfolioFile } from '@/lib/products/portfolio-xlsx';
 import type { PortfolioDraftProduct } from '@/lib/products/portfolio-classify';
 import { replaceCatalogueFromDrafts } from '@/lib/products/replace-catalogue';
 import { confirmDialog } from '@/lib/confirm';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 const REGIONS = [
   { value: 'south', label: 'South' },
@@ -37,11 +39,6 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
 
   const reviewCount = useMemo(() => drafts.filter((d) => d.needsReview).length, [drafts]);
 
-  const visible = useMemo(
-    () => (reviewOnly ? drafts.filter((d) => d.needsReview) : drafts),
-    [drafts, reviewOnly]
-  );
-
   const reset = useCallback(() => {
     setDrafts([]);
     setWarnings([]);
@@ -53,11 +50,24 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
     if (fileRef.current) fileRef.current.value = '';
   }, []);
 
-  const handleClose = () => {
-    if (busy) return;
+  const { language } = useLanguage();
+  const dirty = drafts.length > 0 || fileName.length > 0;
+  const finishClose = useCallback(() => {
     reset();
     onClose();
-  };
+  }, [onClose, reset]);
+  const { requestClose } = useConfirmClose({
+    open,
+    dirty,
+    onClose: finishClose,
+    disabled: busy,
+    language,
+  });
+
+  const visible = useMemo(
+    () => (reviewOnly ? drafts.filter((d) => d.needsReview) : drafts),
+    [drafts, reviewOnly]
+  );
 
   const handleFile = async (file: File | null) => {
     if (!file) return;
@@ -135,7 +145,7 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
   if (!open) return null;
 
   return (
-    <div className="overlay open prod-form-overlay" onClick={handleClose}>
+    <div className="overlay open prod-form-overlay" onClick={() => void requestClose()}>
       <div
         className="modal prod-form-modal portfolio-import-modal"
         onClick={(e) => e.stopPropagation()}
@@ -152,7 +162,7 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
               Supabase.
             </div>
           </div>
-          <button type="button" className="modal-close-btn" onClick={handleClose} disabled={busy} aria-label="Close">
+          <button type="button" className="modal-close-btn" onClick={() => void requestClose()} disabled={busy} aria-label="Close">
             ✕
           </button>
         </div>
@@ -320,7 +330,7 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
         </div>
 
         <div className="prod-form-modal-ft">
-          <button type="button" className="btn btn-s" onClick={handleClose} disabled={busy}>
+          <button type="button" className="btn btn-s" onClick={() => void requestClose()} disabled={busy}>
             Cancel
           </button>
           <button

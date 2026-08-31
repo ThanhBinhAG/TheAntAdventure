@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import type { PhotoFolder } from '@/lib/gallery/photo-folders';
 import { folderTreeRows } from '@/lib/gallery/photo-folders';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type Props = {
   open: boolean;
@@ -25,20 +27,30 @@ export default function GalleryMovePhotosModal({
 }: Props) {
   const rows = useMemo(() => folderTreeRows(folders), [folders]);
   const [targetId, setTargetId] = useState<string | null>(null);
+  const [prevOpen, setPrevOpen] = useState(open);
+
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setTargetId(null);
+  }
+
+  const { language } = useLanguage();
+  const dirty = useFormDirty(open, null, targetId, (v) => String(v), `${open}-${currentFolderId}`);
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
 
   if (!open) return null;
 
   const effectiveTarget = targetId ?? rows.find((r) => r.folder.id !== currentFolderId)?.folder.id ?? null;
 
   return (
-    <div className="overlay open" onClick={onClose} role="presentation">
+    <div className="overlay open" onClick={() => void requestClose()} role="presentation">
       <div className="modal phlib-move-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="modal-hd modal-hd-green phlib-modal-hd">
           <div>
             <div className="phlib-modal-title">Move {photoCount} photo{photoCount === 1 ? '' : 's'}</div>
             <div className="phlib-modal-sub">Choose a destination folder</div>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose} disabled={saving}>
+          <button type="button" className="modal-close-btn" onClick={() => void requestClose()} disabled={saving}>
             ✕
           </button>
         </div>
@@ -67,7 +79,7 @@ export default function GalleryMovePhotosModal({
         <div className="phlib-modal-ft">
           <div />
           <div className="phlib-modal-ft-right">
-            <button type="button" className="btn btn-o" onClick={onClose} disabled={saving}>
+            <button type="button" className="btn btn-o" onClick={() => void requestClose()} disabled={saving}>
               Cancel
             </button>
             <button

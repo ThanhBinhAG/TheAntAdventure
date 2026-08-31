@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
 import type { Hotel, HotelRoom } from '@/lib/types';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 const EMPTY_ROOM = (): HotelRoom => ({
   type: '',
@@ -69,6 +71,11 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
     setFormError(null);
   }
 
+  const { language } = useLanguage();
+  const baselineForm = useMemo(() => initialForm(mode, hotel, existing), [formKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = useFormDirty(open, baselineForm, form, undefined, formKey);
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
+
   if (!open) return null;
 
   function updateRoom(index: number, patch: Partial<HotelRoom>) {
@@ -108,7 +115,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
   }
 
   return (
-    <div className="overlay open" onClick={onClose}>
+    <div className="overlay open" onClick={() => void requestClose()}>
       <div className="modal nc-modal" style={{ width: 900, maxWidth: '96vw' }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green nc-modal-hd">
           <div>
@@ -119,7 +126,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
               Property details and room rates (USD / room / night)
             </div>
           </div>
-          <button className="modal-close-btn" type="button" onClick={onClose}>
+          <button className="modal-close-btn" type="button" onClick={() => void requestClose()}>
             ✕
           </button>
         </div>
@@ -218,7 +225,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
             </div>
           ) : null}
           <div className="nc-modal-ft-actions">
-            <button className="btn btn-s" type="button" onClick={onClose}>
+            <button className="btn btn-s" type="button" onClick={() => void requestClose()}>
               Cancel
             </button>
             <button className="btn btn-p" type="button" onClick={handleSave}>

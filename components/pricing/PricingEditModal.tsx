@@ -8,6 +8,8 @@ import {
   ICO_LABELS,
 } from '@/lib/pricing/pricing-utils';
 import type { ProductPricing, ProductPricingInclusions } from '@/lib/types';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface PricingEditModalProps {
   open: boolean;
@@ -52,6 +54,16 @@ export default function PricingEditModal({
     setOpenPax(DEFAULT_OPEN_PAX);
   }
 
+  const { language } = useLanguage();
+  const dirty = useFormDirty(
+    open && !!form && !!original,
+    { form: original, openPax: DEFAULT_OPEN_PAX },
+    { form, openPax },
+    (v) => JSON.stringify(v),
+    formKey,
+  );
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
+
   if (!open || !form) return null;
 
   const setSell = (n: number, value: number) => {
@@ -77,7 +89,7 @@ export default function PricingEditModal({
   const groupTotal = openRate * openPax;
 
   return (
-    <div className="overlay open prod-form-overlay" onClick={onClose}>
+    <div className="overlay open prod-form-overlay" onClick={() => void requestClose()}>
       <div className="modal prod-form-modal pricing-edit-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green prod-form-modal-hd">
           <div>
@@ -87,7 +99,7 @@ export default function PricingEditModal({
               <span className="pricing-edit-name">{productName}</span>
             </div>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose}>
+          <button type="button" className="modal-close-btn" onClick={() => void requestClose()}>
             ✕
           </button>
         </div>
@@ -196,7 +208,7 @@ export default function PricingEditModal({
         </div>
 
         <div className="prod-form-modal-ft">
-          <button type="button" className="btn btn-s" onClick={onClose}>
+          <button type="button" className="btn btn-s" onClick={() => void requestClose()}>
             Cancel
           </button>
           <button type="button" className="btn btn-p" onClick={handleSave}>

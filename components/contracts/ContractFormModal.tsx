@@ -17,6 +17,8 @@ import {
 import type { BookingListItem } from '@/lib/bookings/booking-input';
 import type { Customer } from '@/lib/types';
 import type { CreateContractOutcome } from '@/hooks/useCreateContract';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 import ContractClientNameCombobox from '@/components/contracts/ContractClientNameCombobox';
 
 const LINKABLE_STATUSES = ['Confirmed', 'On Tour', 'Completed', 'Deposit Paid', 'Fully Paid'];
@@ -83,6 +85,10 @@ export default function ContractFormModal({
     : null;
 
   const depositAmt = contractDepositAmount(form.total, form.depositPct);
+
+  const { language } = useLanguage();
+  const dirty = useFormDirty(open, { ...EMPTY_CONTRACT_FORM }, form, undefined, formKey);
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
 
   if (!open) return null;
 
@@ -170,7 +176,7 @@ export default function ContractFormModal({
   }
 
   return (
-    <div className="overlay open" onClick={onClose}>
+    <div className="overlay open" onClick={() => void requestClose()}>
       <div className="modal nc-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green nc-modal-hd">
           <div>
@@ -179,7 +185,7 @@ export default function ContractFormModal({
               Select a booking to auto-fill, or enter details manually
             </div>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose}>
+          <button type="button" className="modal-close-btn" onClick={() => void requestClose()}>
             ✕
           </button>
         </div>
@@ -472,7 +478,7 @@ export default function ContractFormModal({
             </div>
           ) : null}
           <div className="nc-modal-ft-actions">
-            <button className="btn btn-s" type="button" onClick={onClose}>
+            <button className="btn btn-s" type="button" onClick={() => void requestClose()} disabled={saving}>
               Cancel
             </button>
             <button className="btn btn-p" type="button" onClick={() => void handleSave()} disabled={saving}>

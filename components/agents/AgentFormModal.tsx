@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Agent } from '@/lib/types';
 import { toast } from '@/lib/toast';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export type AgentFormData = {
   id: string;
@@ -76,6 +78,11 @@ export default function AgentFormModal({ open, mode, agent, agents, onClose, onS
     setForm(initialForm(mode, agent, agents));
   }
 
+  const { language } = useLanguage();
+  const baselineForm = useMemo(() => initialForm(mode, agent, agents), [formKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = useFormDirty(open, baselineForm, form, undefined, formKey);
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
+
   if (!open) return null;
 
   function set<K extends keyof AgentFormData>(key: K, value: AgentFormData[K]) {
@@ -109,11 +116,11 @@ export default function AgentFormModal({ open, mode, agent, agents, onClose, onS
   }
 
   return (
-    <div className="overlay open" onClick={onClose}>
+    <div className="overlay open" onClick={() => void requestClose()}>
       <div className="modal agent-form-modal" style={{ width: 520 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green">
           <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{mode === 'edit' ? 'Edit B2B Agent' : 'Add B2B Agent'}</div>
-          <button type="button" className="modal-close-btn" onClick={onClose}>
+          <button type="button" className="modal-close-btn" onClick={() => void requestClose()}>
             ✕
           </button>
         </div>
@@ -172,7 +179,7 @@ export default function AgentFormModal({ open, mode, agent, agents, onClose, onS
             <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} style={{ minHeight: 60 }} />
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button className="btn btn-s btn-sm" type="button" onClick={onClose}>
+            <button className="btn btn-s btn-sm" type="button" onClick={() => void requestClose()}>
               Cancel
             </button>
             <button className="btn btn-p btn-sm" type="button" onClick={handleSave}>

@@ -30,6 +30,7 @@ import type {
     ManagedRoleCode,
 } from './access-control-api';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useConfirmClose } from '@/hooks/useConfirmClose';
 import { tac } from '@/lib/i18n/pages/access-control';
 import styles from './AccessControlPage.module.css';
 
@@ -67,6 +68,25 @@ export default function UserCreateDrawer({
         null;
     const selectedRoleCode = roleCode ?? defaultRoleCode;
 
+    const dirty = Boolean(
+        email.trim() ||
+            displayName.trim() ||
+            password ||
+            confirmPassword ||
+            roleCode,
+    );
+    const finishClose = () => {
+        resetForm();
+        onClose();
+    };
+    const { requestClose } = useConfirmClose({
+        open,
+        dirty,
+        onClose: finishClose,
+        disabled: saving,
+        language,
+    });
+
     /** Đưa form về trạng thái ban đầu, đồng thời xóa mật khẩu khỏi bộ nhớ UI. */
     function resetForm() {
         setEmail('');
@@ -79,10 +99,7 @@ export default function UserCreateDrawer({
 
     /** Đóng Drawer an toàn, không cho đóng trong lúc request đang chạy. */
     function handleClose() {
-        if (saving) return;
-
-        resetForm();
-        onClose();
+        void requestClose();
     }
 
     /** Kiểm tra form trước khi chuyển dữ liệu tạo tài khoản cho component cha. */

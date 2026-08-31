@@ -7,6 +7,8 @@ import { formatBytes, photoSizeLabel, photoThumbUrl } from '@/lib/gallery/galler
 import GalleryTagSelector from '@/components/gallery/GalleryTagSelector';
 import GalleryUploadZone from '@/components/gallery/GalleryUploadZone';
 import GalleryRemovePhotoAction from '@/components/gallery/GalleryRemovePhotoAction';
+import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export type GalleryPhotoRecord = GalleryPhoto;
 
@@ -118,6 +120,23 @@ export default function GalleryPhotoModal({
     setCustomTag('');
   }, [customTag, tags]);
 
+  const { language } = useLanguage();
+  const baseline = useMemo(() => initialForm(mode, initial, defaultRegion), [formKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = useFormDirty(
+    open,
+    { ...baseline, hasFile: false, replaceImage: false },
+    {
+      caption,
+      region,
+      tags,
+      hasFile: Boolean(file || extraFiles.length),
+      replaceImage,
+    },
+    (v) => JSON.stringify(v),
+    formKey,
+  );
+  const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
+
   if (!open) return null;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -143,7 +162,7 @@ export default function GalleryPhotoModal({
   }
 
   return (
-    <div className="overlay open" onClick={onClose}>
+    <div className="overlay open" onClick={() => void requestClose()}>
       <div className="modal phlib-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green phlib-modal-hd">
           <div>
@@ -152,7 +171,7 @@ export default function GalleryPhotoModal({
               {mode === 'edit' ? initial?.id : 'Server Sharp resizes & compresses to WebP (any file size)'}
             </div>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose} disabled={saving}>
+          <button type="button" className="modal-close-btn" onClick={() => void requestClose()} disabled={saving}>
             ✕
           </button>
         </div>
@@ -282,7 +301,7 @@ export default function GalleryPhotoModal({
               />
             )}
             <div className="phlib-modal-ft-right">
-              <button type="button" className="btn btn-o" onClick={onClose} disabled={saving}>
+              <button type="button" className="btn btn-o" onClick={() => void requestClose()} disabled={saving}>
                 Cancel
               </button>
               <button type="submit" className="btn btn-g" disabled={saving}>

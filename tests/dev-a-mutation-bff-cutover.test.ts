@@ -1,24 +1,25 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 function source(path: string) {
   return readFileSync(join(process.cwd(), path), 'utf8');
 }
 
-test('Dev A mutations stay BFF-managed and never enter browser auto-sync', () => {
+test('Dev A mutations stay BFF-managed without browser auto-sync stack', () => {
   const bffManaged = source('lib/db/bff-managed-tables.ts');
-  const autoSync = source('lib/db/auto-sync.ts');
-  const syncPush = source('lib/db/sync-push.ts');
   const store = source('lib/store.ts');
   const tourDesign = source('components/tour-design/TourDesignPage.tsx');
+
+  assert.equal(existsSync(join(process.cwd(), 'lib/db/auto-sync.ts')), false);
+  assert.equal(existsSync(join(process.cwd(), 'lib/db/sync-push.ts')), false);
+  assert.match(source('lib/db/sync-guard.ts'), /withoutAutoSyncAsync/);
 
   for (const table of ['customers', 'agents', 'products', 'product_pricing', 'tasks', 'attractions', 'tour_drafts', 'tour_outline_days']) {
     assert.match(bffManaged, new RegExp(`'${table}'`));
   }
-  assert.match(autoSync, /filterBffManagedTables/);
-  assert.match(syncPush, /filterBffManagedTables/);
   assert.doesNotMatch(store, /deleteProductFromRemote|deleteProductPricingFromRemote/);
 
   const persistStart = tourDesign.indexOf('const persistDraft = useCallback');

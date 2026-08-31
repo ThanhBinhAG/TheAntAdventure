@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { BFF_MANAGED_TABLES } from '@/lib/db/bff-managed-tables';
-import { PAGE_BOOT_TABLES } from '@/lib/db/sync-config';
 import { guideAvatarApiUrl } from '@/lib/guides/guide-avatar-url';
 import { guideSchema } from '@/lib/guides/guide-input';
 
@@ -24,7 +23,6 @@ test('Guides page uses CRM BFF instead of the browser Supabase client', () => {
   assert.match(hook, /\/api\/guides/);
   assert.match(hook, /withoutAutoSyncAsync/);
   assert.match(hook, /inflight/);
-  assert.equal((PAGE_BOOT_TABLES.guides ?? []).length, 0);
   assert.equal(BFF_MANAGED_TABLES.has('guides'), true);
 });
 

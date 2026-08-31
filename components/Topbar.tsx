@@ -6,8 +6,6 @@ import { PAGE_TITLES } from '@/lib/constants';
 import { localTodayIso } from '@/lib/core/date-utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStore } from '@/hooks/useStore';
-import { useSupabasePanel } from '@/lib/context/SupabaseContext';
-import { isAutoSyncEnabled } from '@/lib/env';
 import { cancelSessionRefreshRequest } from '@/lib/auth/refresh-request-control';
 import { AiCopilotTrigger } from '@/components/AiCopilot';
 import type { PageSlug } from '@/lib/types';
@@ -40,7 +38,6 @@ export default function Topbar({
   const fileRef = useRef<HTMLInputElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
-  const supabase = useSupabasePanel();
 
   const title = pageTitle(PAGE_TITLES[page] || page);
 
@@ -55,25 +52,7 @@ export default function Topbar({
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [toolsOpen]);
 
-  const connDotClass = `crm-conn-dot${
-    supabase?.conn?.ok ? ' ok' : supabase?.conn ? ' fail' : supabase?.remoteEnabled ? '' : ' fail'
-  }`;
-
-  const autoSyncOn = isAutoSyncEnabled();
-  const readOnly = Boolean(supabase?.readOnly);
-
-  const syncStatusLine =
-    (supabase?.remoteEnabled && supabase.autoSync?.status === 'synced' && supabase.autoSync.lastSyncedAt
-      ? `Supabase saved: ${supabase.autoSync.lastSyncedAt} · `
-      : supabase?.remoteEnabled && supabase.autoSync?.status === 'error'
-        ? `Supabase save failed${supabase.autoSync.lastError ? `: ${supabase.autoSync.lastError}` : ''} · `
-        : supabase?.remoteEnabled && readOnly
-          ? 'Read-only · '
-          : supabase?.remoteEnabled && autoSyncOn
-            ? 'Auto-sync on · '
-            : supabase?.remoteEnabled
-              ? 'Auto-sync off · '
-              : '') + `Last backup: ${lastBackup || 'never'}`;
+  const backupStatusLine = `Last backup: ${lastBackup || 'never'}`;
 
   const handleExport = () => {
     const data = exportBackup();
@@ -84,7 +63,7 @@ export default function Topbar({
     a.download = `ant-crm-backup-${localTodayIso()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    const ts = new Date().toLocaleString("en-US");
+    const ts = new Date().toLocaleString('en-US');
     setLastBackup(ts);
   };
 
@@ -197,27 +176,10 @@ export default function Topbar({
           aria-hidden={!toolsOpen}
         >
           <button
-            className="btn btn-s btn-sm crm-supabase-topbtn"
-            type="button"
-            title={
-              supabase?.remoteEnabled
-                ? `Supabase — click to open panel · ${syncStatusLine}`
-                : 'Supabase chưa bật — kiểm tra .env.local'
-            }
-            onClick={() => supabase?.setPanelOpen(!supabase?.panelOpen)}
-            style={supabase?.remoteEnabled ? undefined : { opacity: 0.55 }}
-            tabIndex={toolsOpen ? undefined : -1}
-          >
-            <span className={connDotClass} />
-            ☁ Supabase
-            {supabase?.autoSync?.status === 'syncing' ? ' ↻' : ''}
-            {supabase?.autoSync?.status === 'pending' ? ' …' : ''}
-          </button>
-          <button
             className="btn btn-s btn-sm"
             onClick={handleExport}
             type="button"
-            title={`Download JSON backup · Last backup: ${lastBackup || 'never'}`}
+            title={`Download JSON backup · ${backupStatusLine}`}
             tabIndex={toolsOpen ? undefined : -1}
           >
             ⬇ Backup
@@ -248,14 +210,13 @@ export default function Topbar({
           title={
             toolsOpen
               ? 'Thu gọn công cụ hệ thống'
-              : `Mở công cụ hệ thống · ${syncStatusLine}`
+              : `Mở công cụ hệ thống · ${backupStatusLine}`
           }
           aria-expanded={toolsOpen}
           aria-controls="tb-tools-rail"
           aria-label={toolsOpen ? 'Thu gọn công cụ hệ thống' : 'Mở công cụ hệ thống'}
           onClick={() => setToolsOpen((v) => !v)}
         >
-          {!toolsOpen && <span className={connDotClass} aria-hidden />}
           <span className="tb-tools-toggle-icon" aria-hidden>
             ☰
           </span>

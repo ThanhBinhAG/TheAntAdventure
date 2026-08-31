@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { getHydrationState, subscribeHydration } from '@/lib/db/hydrate';
+import { useEffect, useMemo, useState } from 'react';
 import { sidebarBadgeTablesForPermissions } from '@/lib/db/sidebar-badge-tables';
 import { countActiveTasks } from '@/lib/planner/planner-task-utils';
 import { countTourDesignAttention } from '@/lib/tour-design/tour-design-leads';
@@ -19,10 +18,6 @@ type ApiBadgeCounts = {
 };
 
 let badgeInflight: Promise<ApiBadgeCounts> | null = null;
-
-function badgesHydrated(hydratedTables: readonly string[], tables: readonly string[]): boolean {
-  return tables.length === 0 || tables.every((t) => hydratedTables.includes(t));
-}
 
 async function fetchSidebarBadgeCounts(): Promise<ApiBadgeCounts> {
   if (badgeInflight) return badgeInflight;
@@ -58,18 +53,15 @@ function scheduleIdleWork(run: () => void): () => void {
 }
 
 /**
- * Sidebar badge counts: from Zustand when badge tables are hydrated,
+ * Sidebar badge counts from Zustand when CRM rows are already mirrored locally,
  * otherwise a deferred count-only API (no full-table GET).
  */
 export function useSidebarBadges(permissionCodes: ReadonlySet<string>): SidebarBadgeSnapshot {
   const tables = useMemo(
     () => sidebarBadgeTablesForPermissions(permissionCodes),
-    [permissionCodes]
+    [permissionCodes],
   );
   const tableKey = tables.join(',');
-  const hydration = useSyncExternalStore(subscribeHydration, getHydrationState, getHydrationState);
-  const storeHydrated = badgesHydrated(hydration.hydratedTables, tables);
-  const isHydrationReady = hydration.phase === 'ready';
 
   const leads = useStore((s) => s.leads) as Lead[];
   const tourDrafts = useStore((s) => s.tourDrafts) as TourDraft[];
@@ -80,13 +72,16 @@ export function useSidebarBadges(permissionCodes: ReadonlySet<string>): SidebarB
       tourDesignAttention: countTourDesignAttention(leads, tourDrafts),
       activeTasks: countActiveTasks(tasks),
     }),
-    [leads, tourDrafts, tasks]
+    [leads, tourDrafts, tasks],
   );
+
+  const storeHasBadgeData =
+    leads.length > 0 || tourDrafts.length > 0 || tasks.length > 0;
 
   const [apiCounts, setApiCounts] = useState<ApiBadgeCounts | null>(null);
 
   useEffect(() => {
-    if (!tables.length || storeHydrated || !isHydrationReady) return;
+    if (!tables.length || storeHasBadgeData) return;
 
     let cancelled = false;
     const cancelIdle = scheduleIdleWork(() => {
@@ -104,15 +99,10 @@ export function useSidebarBadges(permissionCodes: ReadonlySet<string>): SidebarB
       cancelled = true;
       cancelIdle();
     };
-  }, [tables, storeHydrated, tableKey, isHydrationReady]);
+  }, [tables.length, storeHasBadgeData, tableKey]);
 
-  if (storeHydrated) {
+  if (storeHasBadgeData || !tables.length) {
     return storeCounts;
-  }
-
-  if (!isHydrationReady) {
-    // While hydration is still pending, avoid extra badge API overlap.
-    return { tourDesignAttention: 0, activeTasks: 0 };
   }
 
   return {

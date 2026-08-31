@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 import { fetchBookingsCatalogOnce } from '@/lib/bookings/booking-catalog-fetch';
 import type { BookingListItem } from '@/lib/bookings/booking-input';
 import type { Booking } from '@/lib/types';

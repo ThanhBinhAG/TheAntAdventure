@@ -1,11 +1,7 @@
-import { countBackupRows } from '@/lib/db/sync-config';
-import { updateBaselineCounts } from '@/lib/db/sync-lifecycle';
-import { isRemoteDataEnabled, isSupabaseReadOnly } from '@/lib/env';
 import { emptyProductPricing } from '@/lib/products/product-pricing-helpers';
 import type { PortfolioDraftProduct } from '@/lib/products/portfolio-classify';
 import { useStore } from '@/lib/store';
 import type { Product, ProductPricing } from '@/lib/types';
-
 
 export interface ReplaceCatalogueResult {
   ok: boolean;
@@ -20,19 +16,11 @@ export function buildEmptyPricingStubs(products: Product[]): ProductPricing[] {
 }
 
 /**
- * Wipe all remote products (pricing cascades), upsert imported catalogue,
- * then create empty product_pricing stubs linked by product_code for every product.
+ * Replace catalogue via CRM BFF (`POST /api/products/import`), then mirror products/pricing in Zustand.
  */
 export async function replaceCatalogueFromDrafts(
-  drafts: PortfolioDraftProduct[]
+  drafts: PortfolioDraftProduct[],
 ): Promise<ReplaceCatalogueResult> {
-  if (!isRemoteDataEnabled()) {
-    return { ok: false, imported: 0, pricingStubs: 0, error: 'Supabase is not enabled' };
-  }
-  if (isSupabaseReadOnly()) {
-    return { ok: false, imported: 0, pricingStubs: 0, error: 'Supabase is read-only' };
-  }
-
   try {
     const res = await fetch('/api/products/import', {
       method: 'POST',
@@ -54,8 +42,6 @@ export async function replaceCatalogueFromDrafts(
 
     useStore.getState().setProducts(products);
     useStore.getState().setProductPricing(pricingStubs);
-
-    updateBaselineCounts(countBackupRows(useStore.getState().exportBackup()));
 
     return { ok: true, imported: products.length, pricingStubs: pricingStubs.length };
   } catch (e) {

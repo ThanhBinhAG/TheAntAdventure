@@ -118,14 +118,11 @@ test('Agents BFF cutover: API hooks and denylist', () => {
   assert.match(apiId, /blocked/);
 });
 
-test('Agents page boot does not PostgREST-hydrate agents or leads', () => {
-  const syncConfig = source('lib/db/sync-config.ts');
+test('Agents page uses CRM BFF catalog without browser hydrate', () => {
   const catalog = source('hooks/useEnsureAgentsCatalogLoaded.ts');
   const page = source('components/agents/AgentsPage.tsx');
-  const ping = source('lib/db/hydrate/connection.ts');
   const list = source('hooks/useAgentPage.ts');
 
-  assert.match(syncConfig, /agents:\s*\[\]/);
   assert.match(catalog, /pageSize: 96/);
   assert.match(catalog, /withoutAutoSyncAsync/);
   assert.match(catalog, /fetchAgentJsonOnce/);
@@ -133,7 +130,6 @@ test('Agents page boot does not PostgREST-hydrate agents or leads', () => {
   assert.match(page, /useEnsureAgentsCatalogLoaded/);
   assert.match(page, /applyCatalogItems/);
   assert.match(page, /unfilteredFullSet/);
-  assert.match(ping, /\/api\/health/);
-  assert.doesNotMatch(ping, /quickPing\(\)/);
+  assert.doesNotMatch(page, /lib\/db\/hydrate/);
   assert.match(list, /export function fetchAgentJsonOnce/);
 });

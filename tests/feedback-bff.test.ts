@@ -8,8 +8,6 @@ import {
   feedbackSchema,
 } from '@/lib/feedback/feedback-input';
 import { BFF_MANAGED_TABLES } from '@/lib/db/bff-managed-tables';
-import { ROUTE_CACHE_DENYLIST } from '@/lib/db/route-cache';
-import { PAGE_BOOT_TABLES, SHELL_HYDRATE_TABLES } from '@/lib/db/sync-config';
 
 function source(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf8');
@@ -71,9 +69,7 @@ test('Feedback API routes enforce posttour.read / posttour.write', () => {
   assert.match(source('lib/feedback/feedback-repository.ts'), /invalidateDashboardCache/);
 });
 
-test('Feedback hydrate cutover: empty boot, denylist, no shell hydrate', () => {
-  assert.equal((PAGE_BOOT_TABLES.posttour ?? []).length, 0);
+test('feedback-bff tables are BFF-managed', () => {
   assert.equal(BFF_MANAGED_TABLES.has('feedback'), true);
-  assert.equal((SHELL_HYDRATE_TABLES as readonly string[]).includes('feedback'), false);
-  assert.equal((ROUTE_CACHE_DENYLIST as readonly string[]).includes('feedback'), true);
 });
+

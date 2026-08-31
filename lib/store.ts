@@ -149,6 +149,7 @@ interface CRMState {
   updateTask: (id: string, data: Record<string, unknown>) => void;
   rolloverIncompleteTasks: () => void;
 
+  /** Local JSON backup/restore for dev support — not a Supabase sync path (D2.13). */
   exportBackup: () => BackupData;
   importBackup: (data: BackupData) => void;
   resetToSeeds: () => void;

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useStore } from '@/hooks/useStore';
 import { getBffData } from '@/lib/bff/client';
-import { withoutAutoSyncAsync } from '@/lib/db/auto-sync';
+import { withoutAutoSyncAsync } from '@/lib/db/sync-guard';
 import type { TourDesignReferenceData } from '@/lib/tour-design/tour-design-types';
 
 const REFERENCE_DATA_URL = '/api/tour-design/reference-data';

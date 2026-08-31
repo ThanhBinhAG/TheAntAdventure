@@ -85,9 +85,9 @@ export const PAGE_BOOT_TABLES: Partial<Record<PageSlug, readonly SyncArrayTable[
   posttour: [],
   finance: [],
   tax: [],
-  salary: ['staff'],
-  hr: ['staff'],
-  devnotes: ['dev_notes'],
+  hr: [],
+  salary: [],
+  devnotes: [],
   teamchat: [],
 };
 

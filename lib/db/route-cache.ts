@@ -36,6 +36,9 @@ export const ROUTE_CACHE_DENYLIST: readonly SyncArrayTable[] = [
   'accounts_receivable',
   'accounts_payable',
   'tax_reports',
+  'staff',
+  'dev_notes',
+  'cal_events',
 ] as const;
 
 /** Drop order when payload exceeds ROUTE_CACHE_MAX_BYTES (heaviest first). */

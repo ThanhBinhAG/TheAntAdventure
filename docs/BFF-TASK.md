@@ -335,42 +335,42 @@ Checklist:
 
 ## D2.8 HR / Salary / Staff
 
-- [ ] Hoàn thành HR BFF.
-- [ ] Hoàn thành Salary BFF.
-- [ ] Hoàn thành Staff BFF.
-- [ ] Không trả salary/sensitive fields nếu UI không cần.
-- [ ] Kiểm tra role permission nghiêm ngặt.
-- [ ] Object-level authorization.
-- [ ] Tests.
+- [x] Hoàn thành HR BFF.
+- [x] Hoàn thành Salary BFF.
+- [x] Hoàn thành Staff BFF. *(Shared `staff` table via `/api/hr` + `/api/salary`; read-only UI slice.)*
+- [x] Không trả salary/sensitive fields nếu UI không cần. *(HR DTO excludes `baseSalary`.)*
+- [x] Kiểm tra role permission nghiêm ngặt.
+- [x] Object-level authorization. *(Page + `hr.read` / `salary.read`; no row-level scope in UI today.)*
+- [x] Tests.
 
 ---
 
 ## D2.9 Dev Notes
 
-- [ ] Hoàn thành Dev Notes BFF.
-- [ ] Read qua BFF.
-- [ ] Mutation qua BFF.
-- [ ] Permission.
-- [ ] DTO.
-- [ ] Rollback/cache invalidation.
-- [ ] Tests.
+- [x] Hoàn thành Dev Notes BFF.
+- [x] Read qua BFF.
+- [x] Mutation qua BFF.
+- [x] Permission.
+- [x] DTO.
+- [x] Rollback/cache invalidation.
+- [x] Tests.
 
 ---
 
 ## D2.10 Guide Calendar / `cal_events`
 
-- [ ] Hoàn thành Guide Calendar BFF.
-- [ ] Chuyển `cal_events` reads sang BFF.
-- [ ] Chuyển `cal_events` writes sang BFF.
-- [ ] Permission.
-- [ ] Object-level authorization.
-- [ ] DTO.
-- [ ] Rollback/cache invalidation.
-- [ ] Tests.
+- [x] Hoàn thành Guide Calendar BFF.
+- [x] Chuyển `cal_events` reads sang BFF.
+- [x] Chuyển `cal_events` writes sang BFF.
+- [x] Permission.
+- [x] Object-level authorization. *(Repository validates `guideId` exists.)*
+- [x] DTO.
+- [x] Rollback/cache invalidation.
+- [x] Tests.
 
 ---
 
-## D2.11 Team Chat
+## D2.11 Team Chat — unavailable
 
 ### `chat_messages`
 
@@ -581,13 +581,14 @@ Dev 2 thực hiện theo thứ tự:
 - [x] Bookings.
 - [x] Contracts.
 - [x] Suppliers.
-- [ ] Guide Calendar.
+- [x] Guide Calendar.
 - [x] Post-tour / Feedback.
 - [x] Finance / AR / AP.
 - [x] Tax Reports.
-- [ ] HR / Salary / Staff.
-- [ ] Dev Notes.
+- [x] HR / Salary / Staff.
+- [x] Dev Notes.
 - [ ] Team Chat.
+- [ ] Pricing.
 
 Song song Dev 1:
 
@@ -608,10 +609,11 @@ Chỉ bắt đầu khi:
 - [x] Post-tour / Feedback đạt parity.
 - [x] Finance / AR / AP đạt parity.
 - [x] Tax Reports đạt parity.
-- [ ] HR / Salary / Staff đạt parity.
-- [ ] Dev Notes đạt parity.
-- [ ] Guide Calendar đạt parity.
+- [x] HR / Salary / Staff đạt parity.
+- [x] Dev Notes đạt parity.
+- [x] Guide Calendar đạt parity.
 - [ ] Team Chat đạt parity.
+- [ ] Pricing đạt parity.
 
 Sau đó Dev 2:
 

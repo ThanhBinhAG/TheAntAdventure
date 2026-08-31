@@ -188,6 +188,45 @@ export const NAV_SECTIONS: NavSection[] = [
       { page: 'suppliers', icon: '◫', en: 'Suppliers', vi: 'Nhà cung cấp' },
       { page: 'guides', icon: '◑', en: 'Guides', vi: 'Hướng dẫn viên' },
       { page: 'posttour', icon: '⭐', en: 'Post-Tour & Feedback', vi: 'Hậu tour & Phản hồi', badge: 'NEW', badgeType: 'new' },
+    ],
+  },
+  {
+    en: 'Finance',
+    vi: 'Tài chính',
+    items: [
+      { page: 'finance', icon: '◧', en: 'Finance', vi: 'Tài chính' },
+      { page: 'tax', icon: '◩', en: 'Tax', vi: 'Thuế' },
+      { page: 'salary', icon: '$', en: 'Salary', vi: 'Lương thưởng' },
+    ],
+  },
+  {
+    en: 'Company Portal',
+    vi: 'Cổng thông tin',
+    items: [
+      { page: 'about', icon: '🐜', en: 'About Us', vi: 'Về chúng tôi' },
+      { page: 'culture', icon: '🌿', en: 'Culture', vi: 'Văn hóa' },
+      { page: 'regulations', icon: '📋', en: 'Regulations', vi: 'Quy định' },
+      { page: 'hr', icon: '👥', en: 'Human Resources', vi: 'Nhân sự' },
+      { page: 'ai', icon: '⚡', en: 'AI Requirements', vi: 'Yêu cầu AI', badge: 'NEW', badgeType: 'new' },
+      { page: 'devnotes', icon: '📝', en: 'Dev Notes', vi: 'Ghi chú kỹ thuật' },
+    ],
+  },
+  {
+    en: 'System Administration',
+    vi: 'Quản trị hệ thống',
+    items: [
+      {
+        page: 'access-control',
+        icon: '🛡',
+        en: 'Access Control',
+        vi: 'Quản lý quyền',
+      },
+    ],
+  },
+  {
+    en: 'Unavailable',
+    vi: 'Tạm ngưng',
+    items: [
       {
         page: 'pricing',
         icon: '◈',
@@ -213,40 +252,7 @@ export const NAV_SECTIONS: NavSection[] = [
           },
         ],
       },
-    ],
-  },
-  {
-    en: 'Finance',
-    vi: 'Tài chính',
-    items: [
-      { page: 'finance', icon: '◧', en: 'Finance', vi: 'Tài chính' },
-      { page: 'tax', icon: '◩', en: 'Tax', vi: 'Thuế' },
-      { page: 'salary', icon: '$', en: 'Salary', vi: 'Lương thưởng' },
-    ],
-  },
-  {
-    en: 'Company Portal',
-    vi: 'Cổng thông tin',
-    items: [
-      { page: 'about', icon: '🐜', en: 'About Us', vi: 'Về chúng tôi' },
-      { page: 'culture', icon: '🌿', en: 'Culture', vi: 'Văn hóa' },
-      { page: 'regulations', icon: '📋', en: 'Regulations', vi: 'Quy định' },
-      { page: 'hr', icon: '👥', en: 'Human Resources', vi: 'Nhân sự' },
-      { page: 'ai', icon: '⚡', en: 'AI Requirements', vi: 'Yêu cầu AI', badge: 'NEW', badgeType: 'new' },
-      { page: 'devnotes', icon: '📝', en: 'Dev Notes', vi: 'Ghi chú kỹ thuật' },
       { page: 'teamchat', icon: '💬', en: 'Team Chat', vi: 'Chat nội bộ' },
-    ],
-  },
-  {
-    en: 'System Administration',
-    vi: 'Quản trị hệ thống',
-    items: [
-      {
-        page: 'access-control',
-        icon: '🛡',
-        en: 'Access Control',
-        vi: 'Quản lý quyền',
-      },
     ],
   },
 ];

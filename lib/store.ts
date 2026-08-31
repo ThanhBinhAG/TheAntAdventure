@@ -113,9 +113,12 @@ interface CRMState {
   setAr: (ar: unknown[]) => void;
   setAp: (ap: unknown[]) => void;
   setTax: (tax: unknown[]) => void;
+  setStaff: (staff: StaffMember[]) => void;
   setFeedback: (feedback: unknown[]) => void;
   addFeedback: (item: Record<string, unknown>) => void;
+  setDevNotes: (notes: unknown[]) => void;
   addDevNote: (note: Record<string, unknown>) => void;
+  removeDevNote: (id: string) => void;
   updateDevNote: (id: string, data: Record<string, unknown>) => void;
   addSpecialSupplier: (supplier: ExtendedSupplier) => void;
   updateSpecialSupplier: (id: string, data: Partial<ExtendedSupplier>) => void;
@@ -137,6 +140,7 @@ interface CRMState {
   updateCruise: (id: string, data: Partial<CruiseSupplier>) => void;
   removeCruise: (id: string) => void;
   setCruises: (rows: CruiseSupplier[]) => void;
+  setCalEvents: (events: unknown[]) => void;
   addCalEvent: (event: Record<string, unknown>) => void;
   removeCalEvent: (id: string) => void;
   setPhotos: (photos: Record<string, unknown>[]) => void;
@@ -311,6 +315,7 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
       setAr: (ar) => set({ ar }),
       setAp: (ap) => set({ ap }),
       setTax: (tax) => set({ tax }),
+      setStaff: (staff) => set({ staff }),
       addContract: (contract) => set((s) => ({ contracts: [contract, ...s.contracts] })),
       updateContract: (id, data) =>
         set((s) => ({
@@ -325,7 +330,12 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         })),
       setFeedback: (feedback) => set({ feedback }),
       addFeedback: (item) => set((s) => ({ feedback: [...s.feedback, item] })),
+      setDevNotes: (devNotes) => set({ devNotes }),
       addDevNote: (note) => set((s) => ({ devNotes: [note, ...s.devNotes] })),
+      removeDevNote: (id) =>
+        set((s) => ({
+          devNotes: s.devNotes.filter((n) => (n as { id?: string }).id !== id),
+        })),
       updateDevNote: (id, data) =>
         set((s) => ({
           devNotes: s.devNotes.map((n) => {
@@ -372,6 +382,7 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
         })),
       removeCruise: (id) => set((s) => ({ cruises: s.cruises.filter((c) => c.id !== id) })),
       setCruises: (cruises) => set({ cruises }),
+      setCalEvents: (calEvents) => set({ calEvents }),
       addCalEvent: (event) => set((s) => ({ calEvents: [...s.calEvents, event] })),
       removeCalEvent: (id) =>
         set((s) => ({

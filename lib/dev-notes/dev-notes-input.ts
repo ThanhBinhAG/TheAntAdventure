@@ -48,6 +48,9 @@ export const devNoteUpdateRequestSchema = z.object({
 
 export type DevNoteInput = z.infer<typeof devNoteSchema>;
 export type DevNoteUpdateInput = z.infer<typeof devNoteUpdateRequestSchema>['note'];
+export type DevNotePriority = z.infer<typeof devNotePrioritySchema>;
+export type DevNoteCategory = z.infer<typeof devNoteCategorySchema>;
+export type DevNoteStatus = z.infer<typeof devNoteStatusSchema>;
 
 /** List/detail DTO returned by Dev Notes BFF. */
 export type DevNoteListItem = {
@@ -74,7 +77,7 @@ export type DevNoteEditPayload = {
   title: string;
   body: string;
   assignee?: string;
-  priority: 'high' | 'medium' | 'low' | 'info' | string;
-  category: 'feature' | 'bug' | 'design' | 'data' | 'other' | string;
-  status: 'open' | 'inprogress' | 'done' | string;
+  priority: DevNotePriority;
+  category: DevNoteCategory;
+  status: DevNoteStatus;
 };

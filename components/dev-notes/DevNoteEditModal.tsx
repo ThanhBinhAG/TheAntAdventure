@@ -1,7 +1,13 @@
 'use client';
 
 import type { FormEvent } from 'react';
-import type { DevNoteEditPayload, DevNoteListItem } from '@/lib/dev-notes/dev-notes-input';
+import {
+  devNoteCategorySchema,
+  devNotePrioritySchema,
+  devNoteStatusSchema,
+  type DevNoteEditPayload,
+  type DevNoteListItem,
+} from '@/lib/dev-notes/dev-notes-input';
 
 type Props = {
   note: DevNoteListItem;
@@ -22,9 +28,9 @@ export default function DevNoteEditModal({ note, saving, onClose, onSave }: Prop
       title,
       body,
       assignee: String(data.get('assignee') ?? '').trim() || undefined,
-      priority: String(data.get('priority') ?? 'medium'),
-      category: String(data.get('category') ?? 'feature'),
-      status: String(data.get('status') ?? 'open'),
+      priority: devNotePrioritySchema.parse(String(data.get('priority') ?? 'medium')),
+      category: devNoteCategorySchema.parse(String(data.get('category') ?? 'feature')),
+      status: devNoteStatusSchema.parse(String(data.get('status') ?? 'open')),
     });
   };
 

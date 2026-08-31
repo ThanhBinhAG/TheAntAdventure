@@ -5,7 +5,7 @@ import { useStore } from '@/hooks/useStore';
 import { useCalEventsPage } from '@/hooks/useCalEventsPage';
 import { useCreateCalEvent } from '@/hooks/useCreateCalEvent';
 import { useDeleteCalEvent } from '@/hooks/useDeleteCalEvent';
-import type { CalEventListItem } from '@/lib/cal-events/cal-events-input';
+import { calEventStatusSchema, type CalEventCreatePayload, type CalEventListItem } from '@/lib/cal-events/cal-events-input';
 import { toast } from '@/lib/toast';
 import EmptyState from '@/components/EmptyState';
 
@@ -21,7 +21,9 @@ const CAL_STATUS: Record<string, { cls: string; emoji: string; label: string }> 
 
 const REG_COLORS: Record<string, string> = { North: '#2E7D52', Central: '#856404', South: '#1565C0' };
 
-const emptyEvent = {
+type CalEventFormState = Omit<CalEventCreatePayload, 'status'> & Pick<CalEventCreatePayload, 'status'>;
+
+const emptyEvent: CalEventFormState = {
   guideId: '',
   bookingCode: '',
   tour: '',
@@ -93,7 +95,7 @@ export default function GuideCalendar({ canWrite }: { canWrite?: boolean }) {
       clients: form.clients,
       start: form.start,
       end: form.end,
-      status: form.status as CalEventListItem['status'],
+      status: form.status,
       notes: form.notes || undefined,
     });
     setSaving(false);
@@ -306,7 +308,12 @@ export default function GuideCalendar({ canWrite }: { canWrite?: boolean }) {
               </div>
               <div className="fg">
                 <label className="lbl">Status</label>
-                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                <select
+                  value={form.status}
+                  onChange={(e) =>
+                    setForm({ ...form, status: calEventStatusSchema.parse(e.target.value) })
+                  }
+                >
                   <option value="booked">🩵 Booked (Confirmed, not departed)</option>
                   <option value="ontour">🔵 On Tour</option>
                   <option value="standby">🟡 Standby</option>

@@ -10,7 +10,13 @@ import { usePagePermission } from '@/hooks/usePagePermission';
 import { useUpdateDevNote } from '@/hooks/useUpdateDevNote';
 import { confirmDialog } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
-import type { DevNoteEditPayload, DevNoteListItem } from '@/lib/dev-notes/dev-notes-input';
+import type {
+  DevNoteCategory,
+  DevNoteEditPayload,
+  DevNoteListItem,
+  DevNotePriority,
+  DevNoteStatus,
+} from '@/lib/dev-notes/dev-notes-input';
 
 const PRIORITY_META: Record<string, { dot: string; label: string; bg: string; fg: string }> = {
   high: { dot: '🔴', label: 'High', bg: '#FDECEA', fg: '#C0392B' },
@@ -51,8 +57,8 @@ export default function DevNotesPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [assignee, setAssignee] = useState('');
-  const [priority, setPriority] = useState('medium');
-  const [category, setCategory] = useState('feature');
+  const [priority, setPriority] = useState<DevNotePriority>('medium');
+  const [category, setCategory] = useState<DevNoteCategory>('feature');
   const [statusF, setStatusF] = useState('');
   const [catF, setCatF] = useState('');
   const [saving, setSaving] = useState(false);
@@ -106,7 +112,7 @@ export default function DevNotesPage() {
 
   const onStatusChange = async (note: DevNoteListItem, status: string) => {
     if (!canWrite || !note.id) return;
-    const result = await patchDevNote(note.id, { status: status as 'open' | 'inprogress' | 'done' });
+    const result = await patchDevNote(note.id, { status: status as DevNoteStatus });
     if (!result.ok) {
       toast.error(result.message);
     }
@@ -132,9 +138,9 @@ export default function DevNotesPage() {
       title: payload.title,
       body: payload.body,
       assignee: payload.assignee,
-      priority: payload.priority as DevNoteEditPayload['priority'],
-      category: payload.category as DevNoteEditPayload['category'],
-      status: payload.status as 'open' | 'inprogress' | 'done',
+      priority: payload.priority,
+      category: payload.category,
+      status: payload.status,
     });
     setEditSaving(false);
     if (!result.ok) {
@@ -171,13 +177,23 @@ export default function DevNotesPage() {
           <div className="card-hd">
             <span className="card-title">📝 New Requirement / Note</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <select value={priority} onChange={(e) => setPriority(e.target.value)} disabled={!canWrite} style={{ fontSize: 12, padding: '4px 8px' }}>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as DevNotePriority)}
+                disabled={!canWrite}
+                style={{ fontSize: 12, padding: '4px 8px' }}
+              >
                 <option value="high">🔴 High Priority</option>
                 <option value="medium">🟡 Medium</option>
                 <option value="low">🟢 Low</option>
                 <option value="info">💡 Info / Idea</option>
               </select>
-              <select value={category} onChange={(e) => setCategory(e.target.value)} disabled={!canWrite} style={{ fontSize: 12, padding: '4px 8px' }}>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as DevNoteCategory)}
+                disabled={!canWrite}
+                style={{ fontSize: 12, padding: '4px 8px' }}
+              >
                 <option value="feature">✨ New Feature</option>
                 <option value="bug">🐛 Bug Fix</option>
                 <option value="design">🎨 Design Change</option>

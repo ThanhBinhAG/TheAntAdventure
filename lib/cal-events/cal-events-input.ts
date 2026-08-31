@@ -42,6 +42,7 @@ export const calEventCreateRequestSchema = z.object({
 });
 
 export type CalEventInput = z.infer<typeof calEventSchema>;
+export type CalEventStatus = z.infer<typeof calEventStatusSchema>;
 
 /** List/detail DTO returned by cal-events BFF. */
 export type CalEventListItem = {

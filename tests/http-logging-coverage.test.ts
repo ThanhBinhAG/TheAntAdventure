@@ -13,11 +13,11 @@ function collectRouteFiles(directory: string): string[] {
   });
 }
 
-test('all 96 API routes use a supported HTTP logging contract', () => {
+test('all 102 API routes use a supported HTTP logging contract', () => {
   const root = process.cwd();
   const routes = collectRouteFiles(join(root, 'app/api'));
 
-  assert.equal(routes.length, 96, 'update this acceptance count when an API route is added or removed');
+  assert.equal(routes.length, 102, 'update this acceptance count when an API route is added or removed');
   const missingContract = routes
     .filter((route) => !HTTP_LOGGING_CONTRACT.test(readFileSync(route, 'utf8')))
     .map((route) => route.slice(root.length + 1));

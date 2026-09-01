@@ -26,6 +26,7 @@ import type {
   TransportSupplier,
 } from './types';
 import { emptyProductPricing, priceLabelFromRow } from './products/product-pricing-helpers';
+import { readStoredLanguage, writeStoredLanguage } from './i18n/language-storage';
 
 interface CRMState {
   customers: Customer[];
@@ -189,10 +190,13 @@ const emptyState = () => ({
 
 const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
       ...emptyState(),
-      language: 'en',
+      language: readStoredLanguage(),
       lastBackup: null,
 
-      setLanguage: (language) => set({ language }),
+      setLanguage: (language) => {
+        writeStoredLanguage(language);
+        set({ language });
+      },
       setLastBackup: (lastBackup) => set({ lastBackup }),
 
       setCustomers: (customers) => set({ customers }),

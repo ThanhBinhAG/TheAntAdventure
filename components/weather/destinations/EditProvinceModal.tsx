@@ -92,7 +92,7 @@ export default function EditProvinceModal({
     setSaving(false);
   }
 
-  const { language } = useLanguage();
+  const { tp, tpl, tc, language } = useLanguage();
   const baselineForm = useMemo(
     () => (destination ? fromDest(destination) : form),
     [formKey], // eslint-disable-line react-hooks/exhaustive-deps
@@ -114,23 +114,23 @@ export default function EditProvinceModal({
   async function handleSave() {
     const name = form.name.trim();
     if (!name) {
-      toast.warning('Tên tỉnh thành là bắt buộc.');
+      toast.warning(tp('weather', 'toastProvinceNameRequired'));
       return;
     }
     const lat = Number(form.latitude);
     const lng = Number(form.longitude);
     if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-      toast.warning('Latitude phải trong khoảng -90 đến 90.');
+      toast.warning(tp('weather', 'toastLatitudeRange'));
       return;
     }
     if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
-      toast.warning('Longitude phải trong khoảng -180 đến 180.');
+      toast.warning(tp('weather', 'toastLongitudeRange'));
       return;
     }
     if (form.isFeatured && !dest.isFeatured) {
       const others = featuredCount;
       if (others >= 2) {
-        toast.warning('Đã có 2 điểm nổi bật. Dùng “Chỉnh 2 điểm nổi bật” để đổi slot.');
+        toast.warning(tp('weather', 'toastFeaturedFull'));
         return;
       }
     }
@@ -148,32 +148,29 @@ export default function EditProvinceModal({
         coverPhotoId: form.coverPhotoId || undefined,
         isFeatured: form.isFeatured,
       });
-      toast.success('Đã cập nhật tỉnh thành.');
+      toast.success(tp('weather', 'toastProvinceUpdated'));
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Không thể lưu.');
+      toast.error(err instanceof Error ? err.message : tp('weather', 'toastSaveFailed'));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete() {
-    const ok = await confirmDialog(
-      `Ẩn "${dest.name}" khỏi Weather Guide? Dữ liệu cache sẽ được giữ.`,
-      {
-        title: 'Xóa tỉnh thành?',
-        confirmLabel: 'Xóa',
-        danger: true,
-      }
-    );
+    const ok = await confirmDialog(tpl('weather', 'hideFromGuideConfirm', { name: dest.name }), {
+      title: tp('weather', 'deleteProvinceTitle'),
+      confirmLabel: tp('weather', 'deleteConfirmLabel'),
+      danger: true,
+    });
     if (!ok) return;
     setSaving(true);
     try {
       await onDelete(dest.id);
-      toast.success('Đã xóa tỉnh thành.');
+      toast.success(tp('weather', 'toastProvinceDeleted'));
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Không thể xóa.');
+      toast.error(err instanceof Error ? err.message : tp('weather', 'toastDeleteFailed'));
     } finally {
       setSaving(false);
     }
@@ -190,18 +187,18 @@ export default function EditProvinceModal({
           aria-labelledby="wg-edit-title"
         >
           <div className="modal-hd modal-hd-green">
-            <h2 id="wg-edit-title">Sửa tỉnh thành</h2>
-            <button type="button" className="gallery-modal-close" onClick={() => void requestClose()} aria-label="Đóng">
+            <h2 id="wg-edit-title">{tp('weather', 'editProvinceTitle')}</h2>
+            <button type="button" className="gallery-modal-close" onClick={() => void requestClose()} aria-label={tc('close')}>
               ×
             </button>
           </div>
 
           <div className="wg-province-form">
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Thông tin</h3>
+              <h3 className="wg-form-section-title">{tp('weather', 'sectionInformation')}</h3>
               <div className="fg">
                 <label className="lbl" htmlFor="wg-edit-name">
-                  Tên tỉnh thành *
+                  {tp('weather', 'provinceNameRequired')}
                 </label>
                 <input
                   id="wg-edit-name"
@@ -211,21 +208,21 @@ export default function EditProvinceModal({
               </div>
               <div className="fg">
                 <label className="lbl" htmlFor="wg-edit-region">
-                  Vùng
+                  {tp('weather', 'region')}
                 </label>
                 <select
                   id="wg-edit-region"
                   value={form.region}
                   onChange={(e) => set('region', e.target.value as WeatherRegion)}
                 >
-                  <option value="north">Miền Bắc</option>
-                  <option value="central">Miền Trung</option>
-                  <option value="south">Miền Nam</option>
+                  <option value="north">{tp('weather', 'regionNorth')}</option>
+                  <option value="central">{tp('weather', 'regionCentral')}</option>
+                  <option value="south">{tp('weather', 'regionSouth')}</option>
                 </select>
               </div>
               <div className="fg">
                 <label className="lbl" htmlFor="wg-edit-desc">
-                  Mô tả ngắn
+                  {tp('weather', 'shortDescription')}
                 </label>
                 <input
                   id="wg-edit-desc"
@@ -236,11 +233,11 @@ export default function EditProvinceModal({
             </section>
 
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Tọa độ (Open-Meteo)</h3>
+              <h3 className="wg-form-section-title">{tp('weather', 'sectionCoordinates')}</h3>
               <div className="wg-coord-row">
                 <div className="fg">
                   <label className="lbl" htmlFor="wg-edit-lat">
-                    Latitude *
+                    {tp('weather', 'latitudeRequired')}
                   </label>
                   <input
                     id="wg-edit-lat"
@@ -251,7 +248,7 @@ export default function EditProvinceModal({
                 </div>
                 <div className="fg">
                   <label className="lbl" htmlFor="wg-edit-lng">
-                    Longitude *
+                    {tp('weather', 'longitudeRequired')}
                   </label>
                   <input
                     id="wg-edit-lng"
@@ -264,23 +261,23 @@ export default function EditProvinceModal({
             </section>
 
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Ảnh đại diện</h3>
+              <h3 className="wg-form-section-title">{tp('weather', 'sectionCoverImage')}</h3>
               <div className="wg-cover-pick">
                 {coverThumb ? (
                   <div className="wg-cover-preview">
                     <StorageImage src={coverThumb} alt="" fill sizes="120px" className="phlib-img" />
                   </div>
                 ) : (
-                  <div className="wg-cover-empty">Chưa có ảnh — thêm sau được</div>
+                  <div className="wg-cover-empty">{tp('weather', 'noCoverYet')}</div>
                 )}
                 <button type="button" className="btn btn-s btn-sm" onClick={() => setPickerOpen(true)}>
-                  Đổi ảnh từ thư viện
+                  {tp('weather', 'changeCoverFromLibrary')}
                 </button>
               </div>
             </section>
 
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Ghi chú</h3>
+              <h3 className="wg-form-section-title">{tp('weather', 'sectionNotes')}</h3>
               <div className="fg">
                 <textarea
                   id="wg-edit-notes"
@@ -297,11 +294,11 @@ export default function EditProvinceModal({
                   onChange={(e) => set('isFeatured', e.target.checked)}
                 />
                 <span>
-                  Hiển thị nổi bật (featured)
+                  {tp('weather', 'displayFeatured')}
                   <span className="wg-check-hint">
                     {!form.isFeatured && featuredCount >= 2
-                      ? 'Đã đủ 2 slot — dùng “Chỉnh 2 điểm nổi bật” trên trang.'
-                      : 'Tối đa 2 điểm trên trang chính.'}
+                      ? tp('weather', 'featuredSlotsFull')
+                      : tp('weather', 'featuredMaxTwo')}
                   </span>
                 </span>
               </label>
@@ -315,14 +312,14 @@ export default function EditProvinceModal({
               onClick={() => void handleDelete()}
               disabled={saving}
             >
-              Xóa
+              {tp('weather', 'deleteConfirmLabel')}
             </button>
             <div className="wg-detail-ft-right">
               <button type="button" className="btn btn-s" onClick={() => void requestClose()} disabled={saving}>
-                Hủy
+                {tc('cancel')}
               </button>
               <button type="button" className="btn btn-p" onClick={() => void handleSave()} disabled={saving}>
-                {saving ? 'Đang lưu…' : 'Lưu'}
+                {saving ? tp('weather', 'saving') : tc('save')}
               </button>
             </div>
           </div>
@@ -333,7 +330,7 @@ export default function EditProvinceModal({
         variant="modal"
         mode="single"
         open={pickerOpen}
-        title="Chọn ảnh đại diện"
+        title={tp('weather', 'selectCoverImage')}
         photos={photos}
         folders={folders}
         linkedPhotoIds={form.coverPhotoId ? [form.coverPhotoId] : []}

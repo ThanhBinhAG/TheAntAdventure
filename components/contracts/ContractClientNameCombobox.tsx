@@ -8,6 +8,8 @@ import {
 import type { BookingListItem } from '@/lib/bookings/booking-input';
 import type { Customer } from '@/lib/types';
 
+import { useLanguage } from '@/hooks/useLanguage';
+
 type ContractClientNameComboboxProps = {
   value: string;
   customers: Customer[];
@@ -27,6 +29,7 @@ export default function ContractClientNameCombobox({
   onChange,
   onPick,
 }: ContractClientNameComboboxProps) {
+  const { tp } = useLanguage();
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -80,7 +83,7 @@ export default function ContractClientNameCombobox({
         className={invalid ? 'nc-field-invalid' : undefined}
         value={value}
         list={listId}
-        placeholder="Type to search clients…"
+        placeholder={tp('contracts', 'formClientSearchPlaceholder')}
         autoComplete="off"
         aria-autocomplete="list"
         aria-invalid={invalid}

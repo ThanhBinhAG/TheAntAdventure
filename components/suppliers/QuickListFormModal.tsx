@@ -5,6 +5,7 @@ import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
 import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/lib/types';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
 import { useLanguage } from '@/hooks/useLanguage';
+import type { SUPPLIERSKey } from '@/lib/i18n/pages/suppliers';
 
 export type QuickListKind = 'transport' | 'restaurant' | 'cruise';
 
@@ -12,7 +13,7 @@ type QuickRow = TransportSupplier | RestaurantSupplier | CruiseSupplier;
 
 type FieldDef = {
   key: string;
-  label: string;
+  labelKey: SUPPLIERSKey;
   placeholder?: string;
   type?: string;
   fullWidth?: boolean;
@@ -20,43 +21,43 @@ type FieldDef = {
 
 const CONFIG: Record<
   QuickListKind,
-  { title: string; idPrefix: string; fields: FieldDef[] }
+  { titleKey: SUPPLIERSKey; idPrefix: string; fields: FieldDef[] }
 > = {
   transport: {
-    title: 'Transport',
+    titleKey: 'titleTransport',
     idPrefix: 'SUP-T-',
     fields: [
-      { key: 'name', label: 'Company *', placeholder: 'Hanoi Luxury Transfer' },
-      { key: 'region', label: 'Region', placeholder: 'North' },
-      { key: 'vehicles', label: 'Vehicles', placeholder: '4-seat, 7-seat' },
-      { key: 'rate', label: 'Day Rate', placeholder: '$55–$120/day' },
-      { key: 'notes', label: 'Notes', fullWidth: true },
+      { key: 'name', labelKey: 'fieldCompany', placeholder: 'Hanoi Luxury Transfer' },
+      { key: 'region', labelKey: 'fieldRegion', placeholder: 'North' },
+      { key: 'vehicles', labelKey: 'fieldVehicles', placeholder: '4-seat, 7-seat' },
+      { key: 'rate', labelKey: 'fieldDayRate', placeholder: '$55–$120/day' },
+      { key: 'notes', labelKey: 'fieldNotes', fullWidth: true },
     ],
   },
   restaurant: {
-    title: 'Restaurant',
+    titleKey: 'titleRestaurant',
     idPrefix: 'SUP-R-',
     fields: [
-      { key: 'name', label: 'Restaurant *', placeholder: 'Cha Ca La Vong' },
-      { key: 'city', label: 'City', placeholder: 'Hanoi' },
-      { key: 'cuisine', label: 'Cuisine', placeholder: 'Vietnamese Traditional' },
-      { key: 'set', label: 'Set Menu From', placeholder: '$18/pax' },
-      { key: 'cap', label: 'Capacity', type: 'number' },
-      { key: 'rating', label: 'Rating', placeholder: '★★★★' },
-      { key: 'notes', label: 'Notes', fullWidth: true },
+      { key: 'name', labelKey: 'fieldRestaurant', placeholder: 'Cha Ca La Vong' },
+      { key: 'city', labelKey: 'fieldCity', placeholder: 'Hanoi' },
+      { key: 'cuisine', labelKey: 'fieldCuisine', placeholder: 'Vietnamese Traditional' },
+      { key: 'set', labelKey: 'fieldSetMenu', placeholder: '$18/pax' },
+      { key: 'cap', labelKey: 'fieldCapacity', type: 'number' },
+      { key: 'rating', labelKey: 'fieldRating', placeholder: '★★★★' },
+      { key: 'notes', labelKey: 'fieldNotes', fullWidth: true },
     ],
   },
   cruise: {
-    title: 'Cruise',
+    titleKey: 'titleCruise',
     idPrefix: 'SUP-C-',
     fields: [
-      { key: 'name', label: 'Cruise *', placeholder: 'Bhaya Cruise Halong' },
-      { key: 'route', label: 'Route', placeholder: 'Halong Bay 2N3D' },
-      { key: 'cabins', label: 'Cabin Types', placeholder: 'Deluxe / Suite' },
-      { key: 'rate', label: 'Rate', placeholder: '$165–$280/cabin/night' },
-      { key: 'valid', label: 'Validity', placeholder: 'Dec 2026' },
-      { key: 'rating', label: 'Rating', placeholder: '★★★★★' },
-      { key: 'notes', label: 'Notes', fullWidth: true },
+      { key: 'name', labelKey: 'fieldCruise', placeholder: 'Bhaya Cruise Halong' },
+      { key: 'route', labelKey: 'fieldRoute', placeholder: 'Halong Bay 2N3D' },
+      { key: 'cabins', labelKey: 'fieldCabins', placeholder: 'Deluxe / Suite' },
+      { key: 'rate', labelKey: 'fieldRate', placeholder: '$165–$280/cabin/night' },
+      { key: 'valid', labelKey: 'fieldValidity', placeholder: 'Dec 2026' },
+      { key: 'rating', labelKey: 'fieldRating', placeholder: '★★★★★' },
+      { key: 'notes', labelKey: 'fieldNotes', fullWidth: true },
     ],
   },
 };
@@ -99,7 +100,7 @@ export default function QuickListFormModal({ open, kind, mode, row, existing, on
     setFormError(null);
   }
 
-  const { language } = useLanguage();
+  const { tp, tpl, tc, language } = useLanguage();
   const baselineForm = useMemo(() => initialForm(mode, row, cfg, existing), [formKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = useFormDirty(open, baselineForm, form, undefined, formKey);
   const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
@@ -111,7 +112,7 @@ export default function QuickListFormModal({ open, kind, mode, row, existing, on
 
   function handleSave() {
     if (!form.name?.trim()) {
-      setFormError('Name is required.');
+      setFormError(tp('suppliers', 'errorNameRequired'));
       return;
     }
     const saved: Record<string, unknown> = { id: form.id };
@@ -129,10 +130,12 @@ export default function QuickListFormModal({ open, kind, mode, row, existing, on
         <div className="modal-hd modal-hd-green nc-modal-hd">
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>
-              {mode === 'edit' ? `Edit ${cfg.title}` : `Add ${cfg.title}`}
+              {mode === 'edit'
+                ? tpl('suppliers', 'editPartner', { kind: tp('suppliers', cfg.titleKey) })
+                : tpl('suppliers', 'addPartnerModal', { kind: tp('suppliers', cfg.titleKey) })}
             </div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 1 }}>
-              Partner catalog entry for quotations and operations
+              {tp('suppliers', 'quickModalSub')}
             </div>
           </div>
           <button className="modal-close-btn" type="button" onClick={() => void requestClose()}>
@@ -141,11 +144,11 @@ export default function QuickListFormModal({ open, kind, mode, row, existing, on
         </div>
 
         <div className="nc-modal-body">
-          <div className="nc-section-title">Details</div>
+          <div className="nc-section-title">{tp('suppliers', 'sectionDetails')}</div>
           <div className="nc-grid-2">
             {gridFields.map((f) => (
               <div className="fg" key={f.key}>
-                <label className="lbl">{f.label}</label>
+                <label className="lbl">{tp('suppliers', f.labelKey)}</label>
                 <input
                   type={f.type || 'text'}
                   value={form[f.key] ?? ''}
@@ -160,7 +163,7 @@ export default function QuickListFormModal({ open, kind, mode, row, existing, on
           </div>
           {fullFields.map((f) => (
             <div className="fg" key={f.key} style={{ marginTop: 12 }}>
-              <label className="lbl">{f.label}</label>
+              <label className="lbl">{tp('suppliers', f.labelKey)}</label>
               <textarea
                 value={form[f.key] ?? ''}
                 placeholder={f.placeholder}
@@ -182,10 +185,10 @@ export default function QuickListFormModal({ open, kind, mode, row, existing, on
           ) : null}
           <div className="nc-modal-ft-actions">
             <button className="btn btn-s" type="button" onClick={() => void requestClose()}>
-              Cancel
+              {tc('cancel')}
             </button>
             <button className="btn btn-p" type="button" onClick={handleSave}>
-              Save
+              {tc('save')}
             </button>
           </div>
         </div>

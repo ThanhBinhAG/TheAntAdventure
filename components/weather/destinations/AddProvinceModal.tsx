@@ -61,7 +61,7 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
     setSaving(false);
   }
 
-  const { language } = useLanguage();
+  const { tp, tpl, tc, language } = useLanguage();
   const dirty = useFormDirty(open, EMPTY, form, undefined, formKey);
   const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
 
@@ -78,21 +78,21 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
   async function handleSave() {
     const name = form.name.trim();
     if (!name) {
-      toast.warning('Province name is required.');
+      toast.warning(tp('weather', 'toastProvinceNameRequired'));
       return;
     }
     const lat = Number(form.latitude);
     const lng = Number(form.longitude);
     if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-      toast.warning('Latitude must be between -90 and 90.');
+      toast.warning(tp('weather', 'toastLatitudeRange'));
       return;
     }
     if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
-      toast.warning('Longitude must be between -180 and 180.');
+      toast.warning(tp('weather', 'toastLongitudeRange'));
       return;
     }
     if (form.isFeatured && featuredFull) {
-      toast.warning('Already have 2 featured destinations. Use “Edit featured destinations” to change the slot.');
+      toast.warning(tp('weather', 'toastFeaturedFull'));
       return;
     }
 
@@ -109,10 +109,10 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
         coverPhotoId: form.coverPhotoId || null,
         isFeatured: form.isFeatured,
       });
-      toast.success('The province has been added.');
+      toast.success(tp('weather', 'toastProvinceAdded'));
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save.');
+      toast.error(err instanceof Error ? err.message : tp('weather', 'toastSaveFailed'));
     } finally {
       setSaving(false);
     }
@@ -129,43 +129,43 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
           aria-labelledby="wg-add-title"
         >
           <div className="modal-hd modal-hd-green">
-            <h2 id="wg-add-title">Add new province</h2>
-            <button type="button" className="gallery-modal-close" onClick={() => void requestClose()} aria-label="Đóng">
+            <h2 id="wg-add-title">{tp('weather', 'addProvinceTitle')}</h2>
+            <button type="button" className="gallery-modal-close" onClick={() => void requestClose()} aria-label={tc('close')}>
               ×
             </button>
           </div>
 
           <div className="wg-province-form">
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Information</h3>
+              <h3 className="wg-form-section-title">{tp('weather', 'sectionInformation')}</h3>
               <div className="fg">
                 <label className="lbl" htmlFor="wg-add-name">
-                  Province name *
+                  {tp('weather', 'provinceNameRequired')}
                 </label>
                 <input
                   id="wg-add-name"
                   value={form.name}
                   onChange={(e) => set('name', e.target.value)}
-                  placeholder="Example: Da Lat"
+                  placeholder={tp('weather', 'provinceNamePlaceholder')}
                 />
               </div>
               <div className="fg">
                 <label className="lbl" htmlFor="wg-add-region">
-                  Region
+                  {tp('weather', 'region')}
                 </label>
                 <select
                   id="wg-add-region"
                   value={form.region}
                   onChange={(e) => set('region', e.target.value as WeatherRegion)}
                 >
-                  <option value="north">North</option>
-                  <option value="central">Central</option>
-                  <option value="south">South</option>
+                  <option value="north">{tp('weather', 'regionNorth')}</option>
+                  <option value="central">{tp('weather', 'regionCentral')}</option>
+                  <option value="south">{tp('weather', 'regionSouth')}</option>
                 </select>
               </div>
               <div className="fg">
                 <label className="lbl" htmlFor="wg-add-desc">
-                  Short description
+                  {tp('weather', 'shortDescription')}
                 </label>
                 <input
                   id="wg-add-desc"
@@ -176,11 +176,11 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
             </section>
 
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Coordinates (Open-Meteo)</h3>
+              <h3 className="wg-form-section-title">{tp('weather', 'sectionCoordinates')}</h3>
               <div className="wg-coord-row">
                 <div className="fg">
                   <label className="lbl" htmlFor="wg-add-lat">
-                    Latitude *
+                    {tp('weather', 'latitudeRequired')}
                   </label>
                   <input
                     id="wg-add-lat"
@@ -192,7 +192,7 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
                 </div>
                 <div className="fg">
                   <label className="lbl" htmlFor="wg-add-lng">
-                    Longitude *
+                    {tp('weather', 'longitudeRequired')}
                   </label>
                   <input
                     id="wg-add-lng"
@@ -206,30 +206,30 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
             </section>
 
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Cover image</h3>
+              <h3 className="wg-form-section-title">{tp('weather', 'sectionCoverImage')}</h3>
               <div className="wg-cover-pick">
                 {coverThumb ? (
                   <div className="wg-cover-preview">
                     <StorageImage src={coverThumb} alt="" fill sizes="120px" className="phlib-img" />
                   </div>
                 ) : (
-                  <div className="wg-cover-empty">No image yet — add later</div>
+                  <div className="wg-cover-empty">{tp('weather', 'noCoverYet')}</div>
                 )}
                 <button type="button" className="btn btn-s btn-sm" onClick={() => setPickerOpen(true)}>
-                  Select from library
+                  {tp('weather', 'selectFromLibrary')}
                 </button>
               </div>
             </section>
 
             <section className="wg-form-section">
-              <h3 className="wg-form-section-title">Notes</h3>
+              <h3 className="wg-form-section-title">{tp('weather', 'sectionNotes')}</h3>
               <div className="fg">
                 <textarea
                   id="wg-add-notes"
                   rows={3}
                   value={form.notes}
                   onChange={(e) => set('notes', e.target.value)}
-                  placeholder="Internal notes…"
+                  placeholder={tp('weather', 'internalNotesPlaceholder')}
                 />
               </div>
               <label className="wg-check">
@@ -240,11 +240,11 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
                   onChange={(e) => set('isFeatured', e.target.checked)}
                 />
                 <span>
-                  Display featured
+                  {tp('weather', 'displayFeatured')}
                   <span className="wg-check-hint">
                     {featuredFull
-                      ? 'Already have 2 slots — use “Edit featured destinations” on the page.'
-                      : `Still ${2 - featuredCount} slots available.`}
+                      ? tp('weather', 'featuredSlotsFull')
+                      : tpl('weather', 'featuredSlotsAvailable', { slotsRemaining: 2 - featuredCount })}
                   </span>
                 </span>
               </label>
@@ -253,10 +253,10 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
 
           <div className="wg-detail-ft">
             <button type="button" className="btn btn-s" onClick={() => void requestClose()} disabled={saving}>
-              Cancel
+              {tc('cancel')}
             </button>
             <button type="button" className="btn btn-p" onClick={() => void handleSave()} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? tp('weather', 'saving') : tc('save')}
             </button>
           </div>
         </div>
@@ -266,7 +266,7 @@ export default function AddProvinceModal({ open, onClose, onSave, featuredCount 
         variant="modal"
         mode="single"
         open={pickerOpen}
-        title="Select cover image"
+        title={tp('weather', 'selectCoverImage')}
         photos={photos}
         folders={folders}
         linkedPhotoIds={form.coverPhotoId ? [form.coverPhotoId] : []}

@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { formatBytes } from '@/lib/gallery/gallery-helpers';
 import { collectDroppedImageFiles, collectPickedImageFiles } from '@/lib/gallery/upload-intake';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface Props {
   label: string;
@@ -31,6 +32,7 @@ export default function GalleryUploadZone({
   slotNum,
   multiple = false,
 }: Props) {
+  const { tp, tpl } = useLanguage();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -75,16 +77,24 @@ export default function GalleryUploadZone({
         if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
       }}
     >
-      {slotNum && <span className="gallery-upload-zone-badge">Slot {slotNum}</span>}
+      {slotNum && (
+        <span className="gallery-upload-zone-badge">{tpl('gallery', 'slotBadge', { num: slotNum })}</span>
+      )}
 
       {hasPreview ? (
         <>
           <div className="gallery-upload-zone-preview" style={{ backgroundImage: `url(${previewUrl})` }} />
           <div className="gallery-upload-zone-overlay">
-            <span className="gallery-upload-zone-change">Change image</span>
+            <span className="gallery-upload-zone-change">{tp('gallery', 'changeImage')}</span>
             {file && <span className="gallery-upload-zone-size">{formatBytes(file.size)}</span>}
           </div>
-          <button type="button" className="gallery-upload-zone-clear" onClick={clear} disabled={disabled} title="Remove">
+          <button
+            type="button"
+            className="gallery-upload-zone-clear"
+            onClick={clear}
+            disabled={disabled}
+            title={tp('gallery', 'removeTitle')}
+          >
             ✕
           </button>
         </>
@@ -93,10 +103,10 @@ export default function GalleryUploadZone({
           <div className="gallery-upload-zone-icon">📷</div>
           <div className="gallery-upload-zone-label">
             {label}
-            {optional && <span className="gallery-upload-zone-opt">optional</span>}
+            {optional && <span className="gallery-upload-zone-opt">{tp('gallery', 'optional')}</span>}
           </div>
           {sublabel && <div className="gallery-upload-zone-sub">{sublabel}</div>}
-          <div className="gallery-upload-zone-hint">Drop image or click to browse</div>
+          <div className="gallery-upload-zone-hint">{tp('gallery', 'dropOrBrowseHint')}</div>
         </div>
       )}
 

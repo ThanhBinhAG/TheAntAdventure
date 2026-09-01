@@ -2,9 +2,8 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { PAGE_TITLES } from '@/lib/constants';
-import { localTodayIso } from '@/lib/core/date-utils';
 import { useLanguage } from '@/hooks/useLanguage';
+import { localTodayIso } from '@/lib/core/date-utils';
 import { useStore } from '@/hooks/useStore';
 import { cancelSessionRefreshRequest } from '@/lib/auth/refresh-request-control';
 import { AiCopilotTrigger } from '@/components/AiCopilot';
@@ -27,7 +26,7 @@ export default function Topbar({
   const pathname = usePathname();
   const router = useRouter();
   const page = (pathname.split('/').pop() || 'dashboard') as PageSlug;
-  const { language, setLanguage, pageTitle, t } = useLanguage();
+  const { language, setLanguage, pageTitle, tp } = useLanguage();
   const exportBackup = useStore((s) => s.exportBackup);
   const importBackup = useStore((s) => s.importBackup);
   const setLastBackup = useStore((s) => s.setLastBackup);
@@ -39,7 +38,7 @@ export default function Topbar({
   const toolsRef = useRef<HTMLDivElement>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
 
-  const title = pageTitle(PAGE_TITLES[page] || page);
+  const title = pageTitle(page);
 
   useEffect(() => {
     if (!toolsOpen) return;
@@ -52,7 +51,10 @@ export default function Topbar({
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [toolsOpen]);
 
-  const backupStatusLine = `Last backup: ${lastBackup || 'never'}`;
+  const backupStatusLine = tp('chrome', 'toolsExpand').replace(
+    '{status}',
+    lastBackup || tp('chrome', 'lastBackupNever')
+  );
 
   const handleExport = () => {
     const data = exportBackup();
@@ -76,7 +78,7 @@ export default function Topbar({
         const data = JSON.parse(reader.result as string);
         importBackup(data);
       } catch {
-        toast.error('Invalid backup file');
+        toast.error(tp('chrome', 'toastInvalidBackup'));
       }
     };
     reader.readAsText(file);
@@ -100,9 +102,9 @@ export default function Topbar({
         id="menu-toggle"
         className={showMenuToggle ? 'menu-toggle-visible' : undefined}
         onClick={onMenuToggle}
-        title="Menu"
+        title={tp('chrome', 'menuTitle')}
         type="button"
-        aria-label="Mở menu điều hướng"
+        aria-label={tp('chrome', 'menuAriaOpen')}
       >
         ☰
       </button>
@@ -111,7 +113,7 @@ export default function Topbar({
         {sessionEmailMasked ? (
           <span className="tb-welcome" title={sessionEmailMasked}>
             {' '}
-            {t('Welcome', 'Chào mừng')}, <span className="tb-welcome-id">{sessionEmailMasked}</span>
+            {tp('chrome', 'welcome')}, <span className="tb-welcome-id">{sessionEmailMasked}</span>
           </span>
         ) : null}
       </div>
@@ -120,7 +122,7 @@ export default function Topbar({
         <input
           id="gsearch-input"
           type="text"
-          placeholder="🔍 Search clients, tours, bookings…"
+          placeholder={tp('chrome', 'searchPlaceholder')}
           style={{
             width: '100%',
             padding: '6px 12px',
@@ -150,7 +152,7 @@ export default function Topbar({
       <AiCopilotTrigger />
       <div
         className="tb-lang"
-        title="Switch language / Đổi ngôn ngữ"
+        title={tp('chrome', 'langSwitchTitle')}
       >
         <button
           id="lang-en-btn"
@@ -179,28 +181,28 @@ export default function Topbar({
             className="btn btn-s btn-sm"
             onClick={handleExport}
             type="button"
-            title={`Download JSON backup · ${backupStatusLine}`}
+            title={backupStatusLine}
             tabIndex={toolsOpen ? undefined : -1}
           >
-            ⬇ Backup
+            {tp('chrome', 'backup')}
           </button>
           <button
             className="btn btn-s btn-sm"
             onClick={() => fileRef.current?.click()}
             type="button"
-            title="Restore from backup"
+            title={tp('chrome', 'restoreTitle')}
             tabIndex={toolsOpen ? undefined : -1}
           >
-            ⬆ Restore
+            {tp('chrome', 'restore')}
           </button>
           <button
             className="btn btn-s btn-sm"
             onClick={handleLogout}
             type="button"
-            title="Đăng xuất"
+            title={tp('chrome', 'logoutTitle')}
             tabIndex={toolsOpen ? undefined : -1}
           >
-            ⎋ Logout
+            {tp('chrome', 'logout')}
           </button>
           <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
         </div>
@@ -209,12 +211,15 @@ export default function Topbar({
           type="button"
           title={
             toolsOpen
-              ? 'Thu gọn công cụ hệ thống'
-              : `Mở công cụ hệ thống · ${backupStatusLine}`
+              ? tp('chrome', 'toolsCollapse')
+              : tp('chrome', 'toolsExpand').replace(
+                  '{status}',
+                  lastBackup || tp('chrome', 'lastBackupNever')
+                )
           }
           aria-expanded={toolsOpen}
           aria-controls="tb-tools-rail"
-          aria-label={toolsOpen ? 'Thu gọn công cụ hệ thống' : 'Mở công cụ hệ thống'}
+          aria-label={toolsOpen ? tp('chrome', 'toolsCollapse') : tp('chrome', 'toolsExpand').replace('{status}', lastBackup || tp('chrome', 'lastBackupNever'))}
           onClick={() => setToolsOpen((v) => !v)}
         >
           <span className="tb-tools-toggle-icon" aria-hidden>

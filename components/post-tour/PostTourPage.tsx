@@ -14,15 +14,10 @@ import { usePagePermission } from '@/hooks/usePagePermission';
 import type { FeedbackCreatePayload } from '@/lib/feedback/feedback-input';
 import type { BookingListItem } from '@/lib/bookings/booking-input';
 import { toast } from '@/lib/toast';
+import { useLanguage } from '@/hooks/useLanguage';
+import { POST_TOUR_TYPE_KEYS } from '@/lib/i18n/pages/post-tour';
 
 type PtTab = 'log' | 'ops' | 'guide' | 'client' | 'agent';
-
-const TYPE_LABELS: Record<string, string> = {
-  client: 'Client Survey',
-  guide: 'Guide Report',
-  ops: 'Ops Debrief',
-  agent: 'Agent Feedback',
-};
 
 function BookingSelect({
   name,
@@ -30,12 +25,16 @@ function BookingSelect({
   onChange,
   required,
   bookings,
+  emptyLabel,
+  loadingLabel,
 }: {
   name: string;
   value: string;
   onChange: (bookingId: string) => void;
   required?: boolean;
   bookings: BookingListItem[];
+  emptyLabel: string;
+  loadingLabel: string;
 }) {
   return (
     <select
@@ -44,7 +43,7 @@ function BookingSelect({
       required={required}
       onChange={(e) => onChange(e.target.value)}
     >
-      <option value="">{bookings.length ? 'Select booking…' : 'Loading bookings…'}</option>
+      <option value="">{bookings.length ? emptyLabel : loadingLabel}</option>
       {bookings.map((b) => (
         <option key={b.id} value={b.id}>
           {b.id} — {b.customerName || b.tour}
@@ -55,6 +54,7 @@ function BookingSelect({
 }
 
 export default function PostTourPage() {
+  const { tp, tc } = useLanguage();
   const { canWrite } = usePagePermission('posttour');
   const { items: feedback, loading, error, reload } = useFeedbackPage();
   const { createFeedback } = useCreateFeedback();
@@ -118,7 +118,7 @@ export default function PostTourPage() {
       toast.error(result.message);
       return;
     }
-    toast.success('Feedback saved.');
+    toast.success(tp('post-tour', 'feedbackSaved'));
     await reload();
     setTab('log');
     setNpsSelected(null);
@@ -131,7 +131,7 @@ export default function PostTourPage() {
 
   const saveClientSurvey = async (form: HTMLFormElement) => {
     if (npsSelected == null) {
-      toast.warning('Please select an NPS score (0–10) before submitting.');
+      toast.warning(tp('post-tour', 'npsRequiredToast'));
       return;
     }
     const fd = new FormData(form);
@@ -199,16 +199,21 @@ export default function PostTourPage() {
     form.reset();
   };
 
+  const typeLabel = (type: string) => {
+    const key = POST_TOUR_TYPE_KEYS[type || 'client'];
+    return key ? tp('post-tour', key) : type;
+  };
+
   return (
     <div>
       <div className="tabs">
         {(
           [
-            ['log', '📋 Feedback Log'],
-            ['ops', '🔧 Ops Debrief'],
-            ['guide', '🧭 Guide Report'],
-            ['client', '⭐ Client Survey'],
-            ['agent', '🤝 Agent Feedback'],
+            ['log', tp('post-tour', 'tabLog')],
+            ['ops', tp('post-tour', 'tabOps')],
+            ['guide', tp('post-tour', 'tabGuide')],
+            ['client', tp('post-tour', 'tabClient')],
+            ['agent', tp('post-tour', 'tabAgent')],
           ] as const
         ).map(([id, label]) => (
           <div
@@ -227,50 +232,50 @@ export default function PostTourPage() {
         <>
           <div className="pt-log-filters">
             <select value={typeF} onChange={(e) => setTypeF(e.target.value)}>
-              <option value="">All Types</option>
-              <option value="client">Client Survey</option>
-              <option value="guide">Guide Report</option>
-              <option value="ops">Ops Debrief</option>
-              <option value="agent">Agent Feedback</option>
+              <option value="">{tp('post-tour', 'filterAllTypes')}</option>
+              <option value="client">{tp('post-tour', 'typeClient')}</option>
+              <option value="guide">{tp('post-tour', 'typeGuide')}</option>
+              <option value="ops">{tp('post-tour', 'typeOps')}</option>
+              <option value="agent">{tp('post-tour', 'typeAgent')}</option>
             </select>
             <select value={npsF} onChange={(e) => setNpsF(e.target.value)}>
-              <option value="">All NPS</option>
-              <option value="promoter">Promoter (9–10)</option>
-              <option value="passive">Passive (7–8)</option>
-              <option value="detractor">Detractor (0–6)</option>
+              <option value="">{tp('post-tour', 'filterAllNps')}</option>
+              <option value="promoter">{tp('post-tour', 'filterPromoter')}</option>
+              <option value="passive">{tp('post-tour', 'filterPassive')}</option>
+              <option value="detractor">{tp('post-tour', 'filterDetractor')}</option>
             </select>
             <div style={{ flex: 1 }} />
             <div className="pt-nps-summary">
               <span>
-                Avg NPS: <b style={{ color: 'var(--g)' }}>{loading ? '…' : avgNps.toFixed(1)}</b>
+                {tp('post-tour', 'avgNps')} <b style={{ color: 'var(--g)' }}>{loading ? '…' : avgNps.toFixed(1)}</b>
               </span>
               <span>
-                Promoters: <b>{loading ? '…' : promoters}</b>
+                {tp('post-tour', 'promoters')} <b>{loading ? '…' : promoters}</b>
               </span>
               <span>
-                Detractors: <b style={{ color: 'var(--red)' }}>{loading ? '…' : detractors}</b>
+                {tp('post-tour', 'detractors')} <b style={{ color: 'var(--red)' }}>{loading ? '…' : detractors}</b>
               </span>
             </div>
           </div>
           <div className="card">
             <div className="card-body" style={{ padding: 0 }}>
               {loading ? (
-                <EmptyState title="Loading feedback…" size="compact" />
+                <EmptyState title={tp('post-tour', 'loadingFeedback')} size="compact" />
               ) : error ? (
                 <EmptyState
-                  title="Could not load feedback"
+                  title={tp('post-tour', 'loadErrorTitle')}
                   description={error}
                   action={
                     <button type="button" className="btn btn-s" onClick={() => void reload()}>
-                      Retry
+                      {tc('retry')}
                     </button>
                   }
                   role="alert"
                 />
               ) : paginatedItems.length === 0 ? (
                 <EmptyState
-                  title="No feedback yet"
-                  description="Submit a client survey or debrief from the tabs above."
+                  title={tp('post-tour', 'noFeedbackTitle')}
+                  description={tp('post-tour', 'noFeedbackDesc')}
                   size="compact"
                 />
               ) : (
@@ -278,14 +283,14 @@ export default function PostTourPage() {
                   <table className="tbl">
                     <thead>
                       <tr>
-                        <th>Booking</th>
-                        <th>Client</th>
-                        <th>Type</th>
-                        <th>Submitted</th>
-                        <th>NPS</th>
-                        <th>Overall</th>
-                        <th>Highlights</th>
-                        <th>Issues</th>
+                        <th>{tp('post-tour', 'colBooking')}</th>
+                        <th>{tp('post-tour', 'colClient')}</th>
+                        <th>{tp('post-tour', 'colType')}</th>
+                        <th>{tp('post-tour', 'colSubmitted')}</th>
+                        <th>{tp('post-tour', 'colNps')}</th>
+                        <th>{tp('post-tour', 'colOverall')}</th>
+                        <th>{tp('post-tour', 'colHighlights')}</th>
+                        <th>{tp('post-tour', 'colIssues')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -299,7 +304,7 @@ export default function PostTourPage() {
                           </td>
                           <td>
                             <span className="bdg bdg-w">
-                              {TYPE_LABELS[f.type || 'client'] || f.type}
+                              {typeLabel(f.type || 'client')}
                             </span>
                           </td>
                           <td style={{ color: 'var(--m)', fontSize: 12 }}>{f.date}</td>
@@ -330,7 +335,7 @@ export default function PostTourPage() {
       {tab === 'ops' && (
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">🔧 Operations Post-Tour Debrief</span>
+            <span className="card-title">{tp('post-tour', 'opsTitle')}</span>
           </div>
           <div className="card-body">
             <form
@@ -341,53 +346,55 @@ export default function PostTourPage() {
             >
               <div className="pt-form-grid-3">
                 <div className="fg">
-                  <label className="lbl">Booking Reference *</label>
+                  <label className="lbl">{tp('post-tour', 'lblBookingRef')}</label>
                   <BookingSelect
                     name="bkid"
                     value={opsBkid}
                     onChange={setOpsBkid}
                     required
                     bookings={bookings}
+                    emptyLabel={tp('post-tour', 'selectBooking')}
+                    loadingLabel={tp('post-tour', 'loadingBookings')}
                   />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Tour Name</label>
-                  <input name="tour" placeholder="Vietnam Full 12D" />
+                  <label className="lbl">{tp('post-tour', 'lblTourName')}</label>
+                  <input name="tour" placeholder={tp('post-tour', 'placeholderTour')} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Lead Guide</label>
-                  <input name="leadGuide" placeholder="Minh N." />
+                  <label className="lbl">{tp('post-tour', 'lblLeadGuide')}</label>
+                  <input name="leadGuide" placeholder={tp('post-tour', 'placeholderGuide')} />
                 </div>
               </div>
               <div className="pt-form-grid-2">
                 <div className="fg">
-                  <label className="lbl">What went well ✓</label>
+                  <label className="lbl">{tp('post-tour', 'lblWentWell')}</label>
                   <textarea
                     name="best"
                     style={{ minHeight: 90 }}
-                    placeholder="Hotels exceeded expectations..."
+                    placeholder={tp('post-tour', 'placeholderWentWell')}
                   />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Issues encountered ✗</label>
+                  <label className="lbl">{tp('post-tour', 'lblIssues')}</label>
                   <textarea
                     name="improve"
                     style={{ minHeight: 90 }}
-                    placeholder="Transfer delay on Day 3..."
+                    placeholder={tp('post-tour', 'placeholderIssues')}
                   />
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9, marginTop: 14 }}>
                 <button className="btn btn-s" type="button" onClick={() => setTab('log')}>
-                  Cancel
+                  {tp('post-tour', 'cancel')}
                 </button>
                 <button
                   className="btn btn-p"
                   type="submit"
                   disabled={!canWrite || saving}
-                  title={!canWrite ? 'You need write permission to save debrief' : undefined}
+                  title={!canWrite ? tp('post-tour', 'readOnlyDebrief') : undefined}
                 >
-                  {saving ? 'Saving…' : '✓ Save Debrief'}
+                  {saving ? tp('post-tour', 'saving') : tp('post-tour', 'saveDebrief')}
                 </button>
               </div>
             </form>
@@ -398,7 +405,7 @@ export default function PostTourPage() {
       {tab === 'guide' && (
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">🧭 Post-Tour Guide Report</span>
+            <span className="card-title">{tp('post-tour', 'guideTitle')}</span>
           </div>
           <div className="card-body">
             <form
@@ -409,45 +416,47 @@ export default function PostTourPage() {
             >
               <div className="pt-form-grid-3">
                 <div className="fg">
-                  <label className="lbl">Booking Reference *</label>
+                  <label className="lbl">{tp('post-tour', 'lblBookingRef')}</label>
                   <BookingSelect
                     name="bkid"
                     value={guideBkid}
                     onChange={setGuideBkid}
                     required
                     bookings={bookings}
+                    emptyLabel={tp('post-tour', 'selectBooking')}
+                    loadingLabel={tp('post-tour', 'loadingBookings')}
                   />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Guide Name</label>
-                  <input name="guideName" placeholder="Minh N." />
+                  <label className="lbl">{tp('post-tour', 'lblGuideName')}</label>
+                  <input name="guideName" placeholder={tp('post-tour', 'placeholderGuide')} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Tour Name</label>
-                  <input name="tour" placeholder="Vietnam Full 12D" />
+                  <label className="lbl">{tp('post-tour', 'lblTourName')}</label>
+                  <input name="tour" placeholder={tp('post-tour', 'placeholderTour')} />
                 </div>
               </div>
               <div className="pt-form-grid-2">
                 <div className="fg">
-                  <label className="lbl">Client highlights</label>
+                  <label className="lbl">{tp('post-tour', 'lblClientHighlights')}</label>
                   <textarea name="best" style={{ minHeight: 90 }} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Client complaints</label>
+                  <label className="lbl">{tp('post-tour', 'lblClientComplaints')}</label>
                   <textarea name="improve" style={{ minHeight: 90 }} />
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9, marginTop: 14 }}>
                 <button className="btn btn-s" type="button" onClick={() => setTab('log')}>
-                  Cancel
+                  {tp('post-tour', 'cancel')}
                 </button>
                 <button
                   className="btn btn-p"
                   type="submit"
                   disabled={!canWrite || saving}
-                  title={!canWrite ? 'You need write permission to submit report' : undefined}
+                  title={!canWrite ? tp('post-tour', 'readOnlyReport') : undefined}
                 >
-                  {saving ? 'Saving…' : '✓ Submit Report'}
+                  {saving ? tp('post-tour', 'saving') : tp('post-tour', 'submitReport')}
                 </button>
               </div>
             </form>
@@ -458,8 +467,8 @@ export default function PostTourPage() {
       {tab === 'client' && (
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">⭐ Client Satisfaction Survey</span>
-            <span style={{ fontSize: 11.5, color: 'var(--m)' }}>Sent D+2 after tour</span>
+            <span className="card-title">{tp('post-tour', 'clientTitle')}</span>
+            <span style={{ fontSize: 11.5, color: 'var(--m)' }}>{tp('post-tour', 'clientSubtitle')}</span>
           </div>
           <div className="card-body">
             <form
@@ -470,33 +479,35 @@ export default function PostTourPage() {
             >
               <div className="pt-form-grid-3">
                 <div className="fg">
-                  <label className="lbl">Booking Reference *</label>
+                  <label className="lbl">{tp('post-tour', 'lblBookingRef')}</label>
                   <BookingSelect
                     name="bkid"
                     value={clientBkid}
                     onChange={fillClientFromBooking}
                     required
                     bookings={bookings}
+                    emptyLabel={tp('post-tour', 'selectBooking')}
+                    loadingLabel={tp('post-tour', 'loadingBookings')}
                   />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Client Name</label>
+                  <label className="lbl">{tp('post-tour', 'lblClientName')}</label>
                   <input
                     name="client"
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
-                    placeholder="James & Sarah Miller"
+                    placeholder={tp('post-tour', 'placeholderClient')}
                   />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Submission Date</label>
+                  <label className="lbl">{tp('post-tour', 'lblSubmissionDate')}</label>
                   <input name="date" type="date" defaultValue={localTodayIso()} />
                 </div>
               </div>
               <div className="nps-block">
-                <div className="nps-title">NPS — Net Promoter Score *</div>
+                <div className="nps-title">{tp('post-tour', 'npsTitle')}</div>
                 <div style={{ fontSize: 12.5, color: 'var(--m)', marginBottom: 8 }}>
-                  How likely are you to recommend The Ant Adventures? (0–10)
+                  {tp('post-tour', 'npsQuestion')}
                 </div>
                 <div className="nps-buttons">
                   {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
@@ -513,7 +524,7 @@ export default function PostTourPage() {
               </div>
               <div className="pt-form-grid-3">
                 <div className="fg">
-                  <label className="lbl">Overall Experience</label>
+                  <label className="lbl">{tp('post-tour', 'lblOverallExperience')}</label>
                   <select name="overall" defaultValue="5">
                     {[5, 4, 3, 2, 1].map((n) => (
                       <option key={n} value={n}>
@@ -523,7 +534,7 @@ export default function PostTourPage() {
                   </select>
                 </div>
                 <div className="fg">
-                  <label className="lbl">Guide Rating</label>
+                  <label className="lbl">{tp('post-tour', 'lblGuideRating')}</label>
                   <select name="guide_r" defaultValue="5">
                     {[5, 4, 3, 2, 1].map((n) => (
                       <option key={n} value={n}>
@@ -533,7 +544,7 @@ export default function PostTourPage() {
                   </select>
                 </div>
                 <div className="fg">
-                  <label className="lbl">Hotel Rating</label>
+                  <label className="lbl">{tp('post-tour', 'lblHotelRating')}</label>
                   <select name="hotel_r" defaultValue="5">
                     {[5, 4, 3, 2, 1].map((n) => (
                       <option key={n} value={n}>
@@ -545,43 +556,43 @@ export default function PostTourPage() {
               </div>
               <div className="pt-form-grid-2">
                 <div className="fg">
-                  <label className="lbl">Best moments</label>
+                  <label className="lbl">{tp('post-tour', 'lblBestMoments')}</label>
                   <textarea name="best" style={{ minHeight: 90 }} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">What could improve?</label>
+                  <label className="lbl">{tp('post-tour', 'lblImprove')}</label>
                   <textarea name="improve" style={{ minHeight: 90 }} />
                 </div>
               </div>
               <div className="fg">
-                <label className="lbl">Other comments</label>
+                <label className="lbl">{tp('post-tour', 'lblOtherComments')}</label>
                 <textarea name="comments" style={{ minHeight: 70 }} />
               </div>
               <div className="fg">
-                <label className="lbl">Would you travel with us again?</label>
+                <label className="lbl">{tp('post-tour', 'lblTravelAgain')}</label>
                 <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
                   <label>
-                    <input type="radio" name="again" value="yes" defaultChecked /> Yes
+                    <input type="radio" name="again" value="yes" defaultChecked /> {tp('post-tour', 'againYes')}
                   </label>
                   <label>
-                    <input type="radio" name="again" value="maybe" /> Maybe
+                    <input type="radio" name="again" value="maybe" /> {tp('post-tour', 'againMaybe')}
                   </label>
                   <label>
-                    <input type="radio" name="again" value="no" /> Not likely
+                    <input type="radio" name="again" value="no" /> {tp('post-tour', 'againNo')}
                   </label>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9, marginTop: 14 }}>
                 <button className="btn btn-s" type="button" onClick={() => setTab('log')}>
-                  Cancel
+                  {tp('post-tour', 'cancel')}
                 </button>
                 <button
                   className="btn btn-p"
                   type="submit"
                   disabled={!canWrite || saving}
-                  title={!canWrite ? 'You need write permission to save survey' : undefined}
+                  title={!canWrite ? tp('post-tour', 'readOnlySurvey') : undefined}
                 >
-                  {saving ? 'Saving…' : '✓ Save Survey'}
+                  {saving ? tp('post-tour', 'saving') : tp('post-tour', 'saveSurvey')}
                 </button>
               </div>
             </form>
@@ -592,7 +603,7 @@ export default function PostTourPage() {
       {tab === 'agent' && (
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">🤝 B2B Agent Feedback Form</span>
+            <span className="card-title">{tp('post-tour', 'agentTitle')}</span>
           </div>
           <div className="card-body">
             <form
@@ -603,20 +614,22 @@ export default function PostTourPage() {
             >
               <div className="pt-form-grid-3">
                 <div className="fg">
-                  <label className="lbl">Agent Name *</label>
-                  <input name="agentName" required placeholder="Virtuoso — Smith Travel" />
+                  <label className="lbl">{tp('post-tour', 'lblAgentName')}</label>
+                  <input name="agentName" required placeholder={tp('post-tour', 'placeholderAgent')} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Booking Reference</label>
+                  <label className="lbl">{tp('post-tour', 'lblBookingRef')}</label>
                   <BookingSelect
                     name="bkid"
                     value={agentBkid}
                     onChange={setAgentBkid}
                     bookings={bookings}
+                    emptyLabel={tp('post-tour', 'selectBooking')}
+                    loadingLabel={tp('post-tour', 'loadingBookings')}
                   />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Overall Rating (1–5)</label>
+                  <label className="lbl">{tp('post-tour', 'lblOverallRating')}</label>
                   <select name="overall" defaultValue="5">
                     {[5, 4, 3, 2, 1].map((n) => (
                       <option key={n} value={n}>
@@ -627,24 +640,24 @@ export default function PostTourPage() {
                 </div>
               </div>
               <div className="fg">
-                <label className="lbl">Agent feedback & commission notes</label>
+                <label className="lbl">{tp('post-tour', 'lblAgentFeedback')}</label>
                 <textarea
                   name="comments"
                   style={{ minHeight: 100 }}
-                  placeholder="Service quality, communication, would book again..."
+                  placeholder={tp('post-tour', 'placeholderAgentComments')}
                 />
               </div>
               <div className="info-bar" style={{ marginTop: 12 }}>
-                Agent commission paid within 14 days of tour completion per B2B policy.
+                {tp('post-tour', 'commissionPolicy')}
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9, marginTop: 14 }}>
                 <button
                   className="btn btn-p"
                   type="submit"
                   disabled={!canWrite || saving}
-                  title={!canWrite ? 'You need write permission to save agent feedback' : undefined}
+                  title={!canWrite ? tp('post-tour', 'readOnlyAgent') : undefined}
                 >
-                  {saving ? 'Saving…' : '✓ Save Agent Feedback'}
+                  {saving ? tp('post-tour', 'saving') : tp('post-tour', 'saveAgentFeedback')}
                 </button>
               </div>
             </form>

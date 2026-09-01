@@ -1,5 +1,7 @@
 'use client';
 
+import { useLanguage } from '@/hooks/useLanguage';
+
 interface Props {
   hasContent: boolean;
   pdfLoading: boolean;
@@ -23,6 +25,8 @@ export default function ProposalExportActionBar({
   onReset,
   canWrite = true,
 }: Props) {
+  const { tp } = useLanguage();
+
   return (
     <div className="td-export-action-bar">
       {error ? (
@@ -33,10 +37,10 @@ export default function ProposalExportActionBar({
       <div className="td-export-action-row">
         <div className="td-export-action-left">
           <button className="btn btn-s" type="button" onClick={onBack}>
-            ← Back
+            {tp('tour-design', 'outlineBack')}
           </button>
           <button className="btn btn-s" type="button" onClick={onReset} disabled={!canWrite}>
-            + New Design
+            {tp('tour-design', 'exportNewDesign')}
           </button>
         </div>
         <div className="td-export-action-right">
@@ -46,7 +50,7 @@ export default function ProposalExportActionBar({
             onClick={onDownloadPdf}
             disabled={pdfLoading || !hasContent || !canWrite}
           >
-            {pdfLoading ? 'Generating PDF…' : 'Download PDF'}
+            {pdfLoading ? tp('tour-design', 'exportGeneratingPdf') : tp('tour-design', 'exportDownloadPdf')}
           </button>
           <button
             className="btn btn-s"
@@ -54,10 +58,10 @@ export default function ProposalExportActionBar({
             onClick={onPrintPdf}
             disabled={pdfLoading || !hasContent || !canWrite}
           >
-            Print / Save PDF
+            {tp('tour-design', 'exportPrintSavePdf')}
           </button>
           <button className="btn btn-s" type="button" onClick={onDownloadWord} disabled={!hasContent || !canWrite}>
-            Download Word
+            {tp('tour-design', 'exportDownloadWord')}
           </button>
         </div>
       </div>

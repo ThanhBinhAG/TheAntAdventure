@@ -11,6 +11,7 @@ import StorageImage from '@/components/gallery/StorageImage';
 import { useStore } from '@/hooks/useStore';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import type { Product } from '@/lib/types';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export type ProductDrawerMode = 'view' | 'preview';
 
@@ -23,11 +24,11 @@ interface ProductDetailDrawerProps {
   canWrite?: boolean;
 }
 
-const PRICING_BADGE: Record<string, { label: string; cls: string }> = {
-  complete: { label: 'Pricing ✓', cls: 'bdg-g' },
-  incomplete: { label: 'Pricing partial', cls: 'bdg-a' },
-  missing: { label: 'No pricing', cls: 'bdg-r' },
-};
+const PRICING_BADGE_KEYS = {
+  complete: 'pricingCompleteShort',
+  incomplete: 'pricingPartial',
+  missing: 'pricingMissing',
+} as const;
 
 export default function ProductDetailDrawer({
   product: p,
@@ -37,6 +38,7 @@ export default function ProductDetailDrawer({
   onEdit,
   canWrite = true,
 }: ProductDetailDrawerProps) {
+  const { tp, tpl, tc } = useLanguage();
   const isPreview = mode === 'preview';
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
   const storeProduct = useStore((s) => (p && !isPreview ? s.products.find((x) => x.code === p.code) : undefined));
@@ -85,7 +87,15 @@ export default function ProductDetailDrawer({
   const priceLabel = product.price || (product.code ? getLibPriceLabel(product.code, 2) : '');
   const pStatus = pricingStatus(pricingRow);
   const photoStatus = productPhotoSlotStatus(product);
-  const badge = PRICING_BADGE[pStatus];
+  const badgeCls =
+    pStatus === 'complete' ? 'bdg-g' : pStatus === 'incomplete' ? 'bdg-a' : 'bdg-r';
+  const badgeLabel = tp('products', PRICING_BADGE_KEYS[pStatus]);
+  const statusBadgeLabel =
+    product.status === 'draft'
+      ? tp('products', 'statusDraftBadge')
+      : product.status === 'archived'
+        ? tp('products', 'statusArchivedBadge')
+        : product.status;
   return (
     <>
       <div
@@ -102,14 +112,14 @@ export default function ProductDetailDrawer({
       >
         <header className="tp-drawer-hd">
           <div className="tp-drawer-hd-text">
-            {isPreview && <div className="tp-drawer-preview-badge">Live preview</div>}
+            {isPreview && <div className="tp-drawer-preview-badge">{tp('products', 'livePreview')}</div>}
             {product.code && <code className="tp-drawer-code">{product.code}</code>}
             <h2 id="tp-drawer-title" className="tp-drawer-title">
-              {product.name || 'Untitled product'}
+              {product.name || tp('products', 'untitledProduct')}
             </h2>
             {product.dest && <div className="tp-drawer-dest">📍 {product.dest}</div>}
           </div>
-          <button type="button" className="tp-drawer-close" onClick={onClose} aria-label="Close">
+          <button type="button" className="tp-drawer-close" onClick={onClose} aria-label={tc('close')}>
             ✕
           </button>
         </header>
@@ -119,6 +129,8 @@ export default function ProductDetailDrawer({
             <ProductHero
               key={`${open}-${product.code}-${product.photoIds?.join(',') ?? ''}-${product.linkedPhotoIds?.join(',') ?? ''}`}
               images={heroImages}
+              noPhotosLabel={tp('products', 'noPhotosYet')}
+              photoAriaLabel={(index) => tpl('products', 'photoAria', { index: index + 1 })}
             />
           </div>
 
@@ -130,40 +142,47 @@ export default function ProductDetailDrawer({
             {product.cat && <span className="prod-tag-pill prod-tag-cat">{product.cat}</span>}
             {product.lvl && <span className="prod-tag-pill prod-tag-lvl">{product.lvl}</span>}
             {(product.status === 'draft' || product.status === 'archived') && (
-              <span className={`bdg ${product.status === 'draft' ? 'bdg-a' : 'bdg-r'}`}>{product.status}</span>
+              <span className={`bdg ${product.status === 'draft' ? 'bdg-a' : 'bdg-r'}`}>{statusBadgeLabel}</span>
             )}
-            <span className={`bdg ${badge.cls}`}>{badge.label}</span>
+            <span className={`bdg ${badgeCls}`}>{badgeLabel}</span>
             {!photoStatus.complete && (
               <span className="bdg bdg-a">
-                Photos {photoStatus.linked}/{photoStatus.needed}
+                {tpl('products', 'photosCount', {
+                  linked: photoStatus.linked,
+                  needed: photoStatus.needed,
+                })}
               </span>
             )}
           </div>
 
-          {priceLabel && <div className="tp-drawer-price">Price: {priceLabel}</div>}
+          {priceLabel && (
+            <div className="tp-drawer-price">{tpl('products', 'priceLabel', { price: priceLabel })}</div>
+          )}
 
           {product.desc?.trim() ? (
             <section className="tp-drawer-section">
-              <h3 className="tp-drawer-section-title">Description</h3>
+              <h3 className="tp-drawer-section-title">{tp('products', 'sectionDescription')}</h3>
               <div className="tp-drawer-section-body">{product.desc}</div>
             </section>
           ) : isPreview ? (
             <section className="tp-drawer-section">
-              <h3 className="tp-drawer-section-title">Description</h3>
-              <div className="tp-drawer-section-body tp-edit-preview-empty">Add a description to see it here.</div>
+              <h3 className="tp-drawer-section-title">{tp('products', 'sectionDescription')}</h3>
+              <div className="tp-drawer-section-body tp-edit-preview-empty">
+                {tp('products', 'descriptionEmptyPreview')}
+              </div>
             </section>
           ) : null}
 
           {product.usp?.trim() && (
             <section className="tp-drawer-section">
-              <h3 className="tp-drawer-section-title">USP</h3>
+              <h3 className="tp-drawer-section-title">{tp('products', 'sectionUsp')}</h3>
               <div className="tp-drawer-section-body tp-drawer-usp">{product.usp}</div>
             </section>
           )}
 
           {product.notesToSales?.trim() && (
             <section className="tp-drawer-section tp-drawer-section--notes">
-              <h3 className="tp-drawer-section-title">Notes to Sales</h3>
+              <h3 className="tp-drawer-section-title">{tp('products', 'sectionNotesToSales')}</h3>
               <div className="tp-drawer-section-body tp-drawer-notes">{product.notesToSales}</div>
             </section>
           )}
@@ -174,11 +193,11 @@ export default function ProductDetailDrawer({
             {product.code && (
               canWrite ? (
                 <Link href={pricingUrlForProduct(product.code)} className="btn btn-s btn-sm">
-                  Edit pricing
+                  {tp('products', 'editPricing')}
                 </Link>
               ) : (
                 <button type="button" className="btn btn-s btn-sm" disabled>
-                  Edit pricing
+                  {tp('products', 'editPricing')}
                 </button>
               )
             )}
@@ -189,7 +208,7 @@ export default function ProductDetailDrawer({
                 onClick={() => onEdit(product)}
                 disabled={!canWrite}
               >
-                Edit
+                {tp('products', 'edit')}
               </button>
             )}
           </footer>
@@ -199,7 +218,15 @@ export default function ProductDetailDrawer({
   );
 }
 
-function ProductHero({ images }: { images: { url: string; alt: string }[] }) {
+function ProductHero({
+  images,
+  noPhotosLabel,
+  photoAriaLabel,
+}: {
+  images: { url: string; alt: string }[];
+  noPhotosLabel: string;
+  photoAriaLabel: (index: number) => string;
+}) {
   const [heroIndex, setHeroIndex] = useState(0);
   const currentHero = images[heroIndex] ?? null;
 
@@ -217,7 +244,7 @@ function ProductHero({ images }: { images: { url: string; alt: string }[] }) {
       ) : (
         <div className="tp-drawer-hero-placeholder">
           <span>🗺</span>
-          <span>No photos yet</span>
+          <span>{noPhotosLabel}</span>
         </div>
       )}
       {images.length > 1 && (
@@ -228,7 +255,7 @@ function ProductHero({ images }: { images: { url: string; alt: string }[] }) {
               type="button"
               className={`tp-drawer-hero-dot${i === heroIndex ? ' on' : ''}`}
               onClick={() => setHeroIndex(i)}
-              aria-label={`Photo ${i + 1}`}
+              aria-label={photoAriaLabel(i)}
             />
           ))}
         </div>

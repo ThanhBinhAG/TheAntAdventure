@@ -17,13 +17,15 @@ import { toast } from '@/lib/toast';
 const TABS = ['overview', 'pipeline', 'communications', 'bookings', 'notes', 'feedback'] as const;
 type Tab = (typeof TABS)[number];
 
-const TAB_LABELS: Record<Tab, string> = {
-  overview: 'Overview',
-  pipeline: 'Pipeline',
-  communications: 'Communications',
-  bookings: 'Bookings',
-  notes: 'Notes',
-  feedback: 'Feedback',
+import type { CUSTOMERSKey } from '@/lib/i18n/pages/customers';
+
+const TAB_LABEL_KEYS: Record<Tab, CUSTOMERSKey> = {
+  overview: 'profileTabOverview',
+  pipeline: 'profileTabPipeline',
+  communications: 'profileTabComms',
+  bookings: 'profileTabBookings',
+  notes: 'profileTabNotes',
+  feedback: 'profileTabFeedback',
 };
 
 interface CustomerProfileModalProps {
@@ -35,26 +37,27 @@ interface CustomerProfileModalProps {
 }
 
 function PipelineLeadCard({ lead, customerId }: { lead: Lead; customerId: string }) {
+  const { tp, tStage } = useLanguage();
   return (
     <article className="prof-lead-card">
       <div className="prof-lead-card-top">
         <div className="prof-lead-card-main">
-          <div className="prof-lead-tour">{lead.tour?.trim() || 'Untitled inquiry'}</div>
+          <div className="prof-lead-tour">{lead.tour?.trim() || tp('customers', 'profileUntitledInquiry')}</div>
           <code className="prof-lead-id">{lead.id}</code>
         </div>
-        <span className={`bdg ${STAGE_COLORS[lead.stage] || 'bdg-w'}`}>{lead.stage}</span>
+        <span className={`bdg ${STAGE_COLORS[lead.stage] || 'bdg-w'}`}>{tStage(lead.stage)}</span>
       </div>
       <dl className="prof-lead-meta">
         <div>
-          <dt>Value</dt>
+          <dt>{tp('customers', 'profileLeadValue')}</dt>
           <dd>{lead.value > 0 ? `$${fmt(lead.value)}` : '—'}</dd>
         </div>
         <div>
-          <dt>Travel</dt>
+          <dt>{tp('customers', 'profileLeadTravel')}</dt>
           <dd>{lead.month || '—'}</dd>
         </div>
         <div>
-          <dt>Owner</dt>
+          <dt>{tp('customers', 'profileLeadOwner')}</dt>
           <dd>{lead.owner || '—'}</dd>
         </div>
       </dl>
@@ -63,13 +66,13 @@ function PipelineLeadCard({ lead, customerId }: { lead: Lead; customerId: string
           href={`/sales?custId=${encodeURIComponent(customerId)}&leadId=${encodeURIComponent(lead.id)}&tab=list`}
           className="btn btn-s btn-sm"
         >
-          Open in Sales
+          {tp('customers', 'profileOpenSales')}
         </Link>
         <Link
           href={`/tourdesign?leadId=${encodeURIComponent(lead.id)}&custId=${encodeURIComponent(customerId)}`}
           className="btn btn-p btn-sm"
         >
-          Tour Design
+          {tp('customers', 'profileTourDesign')}
         </Link>
       </div>
     </article>
@@ -109,7 +112,7 @@ export default function CustomerProfileModal({
   });
   const [aiDraft, setAiDraft] = useState<string | null>(null);
 
-  const { language } = useLanguage();
+  const { language, tp, tpl, tStage } = useLanguage();
   const emptyCommForm = {
     type: 'Email',
     dir: 'outbound' as const,
@@ -146,7 +149,7 @@ export default function CustomerProfileModal({
 
   async function logComm() {
     if (!commForm.subj.trim()) {
-      toast.warning('Please add a subject.');
+      toast.warning(tp('customers', 'toastSubjectRequired'));
       return;
     }
     const result = await logCommRemote(customer.id, {
@@ -178,14 +181,14 @@ export default function CustomerProfileModal({
         customer?: { notes?: string };
       };
       if (!res.ok || !body.ok) {
-        toast.error(typeof body.error === 'string' ? body.error : 'Không thể lưu notes.');
+        toast.error(typeof body.error === 'string' ? body.error : tp('customers', 'toastNotesSaveFailed'));
         return;
       }
       // Notes already saved via BFF; customers is BFF-managed (no browser upsert).
       updateCustomer(customer.id, { notes: notesDraft });
-      toast.success('Notes saved.');
+      toast.success(tp('customers', 'toastNotesSaved'));
     } catch {
-      toast.error('Không thể lưu notes.');
+      toast.error(tp('customers', 'toastNotesSaveFailed'));
     }
   }
 
@@ -235,13 +238,13 @@ The Ant Adventures`;
 
         <div className="prof-modal-toolbar">
           <button type="button" className="prof-toolbar-btn" onClick={onEdit} disabled={!canWrite}>
-            ✎ Edit
+            {tp('customers', 'profileEdit')}
           </button>
           <button type="button" className="prof-toolbar-btn prof-toolbar-danger" onClick={onDelete} disabled={!canWrite}>
-            ✕ Delete
+            {tp('customers', 'profileDelete')}
           </button>
           <button type="button" className="prof-toolbar-btn" onClick={() => void requestClose()}>
-            ✕ Close
+            {tp('customers', 'profileClose')}
           </button>
         </div>
 
@@ -252,12 +255,12 @@ The Ant Adventures`;
             </div>
           )}
           {profileLoading && (
-            <div style={{ padding: '8px 0', fontSize: 12, color: 'var(--m)' }}>Loading profile…</div>
+            <div style={{ padding: '8px 0', fontSize: 12, color: 'var(--m)' }}>{tp('customers', 'profileLoading')}</div>
           )}
           <div className="prof-tabs">
             {TABS.map((t) => (
               <div key={t} className={`prof-tab${tab === t ? ' on' : ''}`} onClick={() => setTab(t)} role="button" tabIndex={0}>
-                {TAB_LABELS[t]}
+                {tp('customers', TAB_LABEL_KEYS[t])}
               </div>
             ))}
           </div>
@@ -265,21 +268,21 @@ The Ant Adventures`;
           {tab === 'overview' && (
             <div className="prof-overview-grid">
               <div>
-                <div className="prof-section-lbl">Profile / Hồ sơ</div>
+                <div className="prof-section-lbl">{tp('customers', 'profileSectionProfile')}</div>
                 {[
-                  ['Customer ID', customer.id],
-                  ['Country', customer.country],
-                  ['Nationality', customer.nat || '—'],
-                  ['Travel Style', customer.style],
-                  ['Language', customer.lang],
-                  ['Source', customer.source],
-                  ['Hotel Tier', customer.hotelTier || '—'],
-                  ['Budget', customer.budget || '—'],
-                  ['Travel Month', customer.travelMonth || '—'],
-                  ['Sales Person', customer.salesperson || '—'],
-                  ['Agent', customer.agentName || '—'],
-                  ['Phone', customer.phone || '—'],
-                  ['WhatsApp', customer.whatsapp || '—'],
+                  [tp('customers', 'profileCustomerId'), customer.id],
+                  [tp('customers', 'profileCountry'), customer.country],
+                  [tp('customers', 'profileNationality'), customer.nat || '—'],
+                  [tp('customers', 'profileTravelStyle'), customer.style],
+                  [tp('customers', 'profileLanguage'), customer.lang],
+                  [tp('customers', 'profileSource'), customer.source],
+                  [tp('customers', 'profileHotelTier'), customer.hotelTier || '—'],
+                  [tp('customers', 'profileBudget'), customer.budget || '—'],
+                  [tp('customers', 'profileTravelMonth'), customer.travelMonth || '—'],
+                  [tp('customers', 'profileSalesPerson'), customer.salesperson || '—'],
+                  [tp('customers', 'profileAgent'), customer.agentName || '—'],
+                  [tp('customers', 'profilePhone'), customer.phone || '—'],
+                  [tp('customers', 'profileWhatsapp'), customer.whatsapp || '—'],
                 ].map(([l, v]) => (
                   <div key={l} className="prof-kv-row">
                     <span>{l}</span>
@@ -288,20 +291,24 @@ The Ant Adventures`;
                 ))}
               </div>
               <div>
-                <div className="prof-section-lbl">Activity</div>
+                <div className="prof-section-lbl">{tp('customers', 'profileSectionActivity')}</div>
                 <div className="prof-stat-box">
                   <div className="prof-stat-num">{custComms.length}</div>
-                  <div className="prof-stat-lbl">Communications logged</div>
+                  <div className="prof-stat-lbl">{tp('customers', 'profileCommsLogged')}</div>
                 </div>
                 <div className="prof-stat-box">
                   <div className="prof-stat-num">{custBookings.length}</div>
-                  <div className="prof-stat-lbl">Confirmed bookings</div>
+                  <div className="prof-stat-lbl">{tp('customers', 'profileConfirmedBookings')}</div>
                 </div>
                 <div className="prof-stat-box" style={{ background: 'var(--pur-l)' }}>
                   <div className="prof-stat-num" style={{ color: 'var(--pur)', fontSize: 18 }}>
                     {pipeline.count} · ${fmt(pipeline.value)}
                   </div>
-                  <div className="prof-stat-lbl">Active pipeline · {pipeline.stage || 'No stage'}</div>
+                  <div className="prof-stat-lbl">
+                    {tpl('customers', 'profileActivePipeline', {
+                      stage: pipeline.stage ? tStage(pipeline.stage) : tp('customers', 'profileNoStage'),
+                    })}
+                  </div>
                 </div>
                 {avgNps !== null && (
                   <div className="prof-stat-box">
@@ -312,14 +319,14 @@ The Ant Adventures`;
                 )}
                 {customer.notes && (
                   <div className="prof-notes-box">
-                    <div className="prof-notes-lbl">Notes</div>
+                    <div className="prof-notes-lbl">{tp('customers', 'profileNotes')}</div>
                     {customer.notes}
                   </div>
                 )}
                 {(customer.interests || customer.donts) && (
                   <div style={{ marginTop: 10, fontSize: 12.5 }}>
-                    {customer.interests && <div>✦ Interests: {customer.interests}</div>}
-                    {customer.donts && <div style={{ marginTop: 4 }}>✕ Avoid: {customer.donts}</div>}
+                    {customer.interests && <div>{tp('customers', 'profileInterests')} {customer.interests}</div>}
+                    {customer.donts && <div style={{ marginTop: 4 }}>{tp('customers', 'profileAvoid')} {customer.donts}</div>}
                   </div>
                 )}
               </div>
@@ -330,18 +337,18 @@ The Ant Adventures`;
             <div>
               <div className="prof-tab-toolbar">
                 <div className="prof-section-lbl" style={{ marginBottom: 0 }}>
-                  Inquiries & quotes ({activeLeads.length})
+                  {tpl('customers', 'profilePipelineTitle', { count: activeLeads.length })}
                 </div>
                 <button className="btn btn-p btn-sm" type="button" onClick={startNewInquiry} disabled={!canWrite}>
-                  + Start New Inquiry
+                  {tp('customers', 'profileStartInquiry')}
                 </button>
               </div>
 
               {activeLeads.length === 0 ? (
                 <div className="prof-empty" style={{ textAlign: 'center', padding: 28 }}>
-                  <div style={{ fontSize: 13, marginBottom: 12 }}>No inquiries yet for this client.</div>
+                  <div style={{ fontSize: 13, marginBottom: 12 }}>{tp('customers', 'profileNoInquiries')}</div>
                   <button className="btn btn-p btn-sm" type="button" onClick={startNewInquiry} disabled={!canWrite}>
-                    Start New Inquiry
+                    {tp('customers', 'profileStartInquiryBtn')}
                   </button>
                 </div>
               ) : (
@@ -360,7 +367,9 @@ The Ant Adventures`;
                     style={{ marginBottom: 10 }}
                     onClick={() => setShowLostLeads((v) => !v)}
                   >
-                    {showLostLeads ? 'Hide' : 'Show'} lost leads ({lostLeads.length})
+                    {showLostLeads
+                      ? tpl('customers', 'profileHideLost', { count: lostLeads.length })
+                      : tpl('customers', 'profileShowLost', { count: lostLeads.length })}
                   </button>
                   {showLostLeads && (
                     <div className="prof-lead-stack prof-lead-stack-muted">
@@ -378,23 +387,23 @@ The Ant Adventures`;
             <div>
               <div className="card" style={{ marginBottom: 14 }}>
                 <div className="card-hd">
-                  <span className="card-title">Log New Communication</span>
+                  <span className="card-title">{tp('customers', 'profileLogCommTitle')}</span>
                   <button className="btn btn-pu btn-sm" type="button" style={{ fontSize: 11 }} onClick={aiDraftEmail}>
-                    ✉ AI Draft Email
+                    {tp('customers', 'profileAiDraftEmail')}
                   </button>
                 </div>
                 <div className="card-body">
                   {aiDraft && (
                     <div className="ai-draft-banner">
-                      ✦ AI draft loaded below — edit before logging.
+                      {tp('customers', 'profileAiDraftBanner')}
                       <button type="button" onClick={() => setAiDraft(null)} style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--pur)' }}>
-                        dismiss
+                        {tp('customers', 'profileDismiss')}
                       </button>
                     </div>
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
                     <div className="fg">
-                      <label className="lbl">Type</label>
+                      <label className="lbl">{tp('customers', 'profileCommType')}</label>
                       <select value={commForm.type} onChange={(e) => setCommForm({ ...commForm, type: e.target.value })}>
                         {['Email', 'WhatsApp', 'Phone', 'Meeting', 'Note'].map((t) => (
                           <option key={t}>{t}</option>
@@ -402,35 +411,35 @@ The Ant Adventures`;
                       </select>
                     </div>
                     <div className="fg">
-                      <label className="lbl">Direction</label>
+                      <label className="lbl">{tp('customers', 'profileCommDirection')}</label>
                       <select value={commForm.dir} onChange={(e) => setCommForm({ ...commForm, dir: e.target.value as 'inbound' | 'outbound' })}>
-                        <option value="outbound">↑ Outbound (us→client)</option>
-                        <option value="inbound">↓ Inbound (client→us)</option>
+                        <option value="outbound">{tp('customers', 'profileCommOutbound')}</option>
+                        <option value="inbound">{tp('customers', 'profileCommInbound')}</option>
                       </select>
                     </div>
                     <div className="fg">
-                      <label className="lbl">Date</label>
+                      <label className="lbl">{tp('customers', 'profileCommDate')}</label>
                       <input type="date" value={commForm.date} onChange={(e) => setCommForm({ ...commForm, date: e.target.value })} />
                     </div>
                   </div>
                   <div className="fg" style={{ marginBottom: 10 }}>
-                    <label className="lbl">Subject</label>
-                    <input value={commForm.subj} onChange={(e) => setCommForm({ ...commForm, subj: e.target.value })} placeholder="Email subject or call topic" />
+                    <label className="lbl">{tp('customers', 'profileCommSubject')}</label>
+                    <input value={commForm.subj} onChange={(e) => setCommForm({ ...commForm, subj: e.target.value })} placeholder={tp('customers', 'profileCommSubjectPlaceholder')} />
                   </div>
                   <div className="fg" style={{ marginBottom: 12 }}>
-                    <label className="lbl">Message</label>
-                    <textarea value={commForm.body} onChange={(e) => setCommForm({ ...commForm, body: e.target.value })} placeholder="Message content..." />
+                    <label className="lbl">{tp('customers', 'profileCommMessage')}</label>
+                    <textarea value={commForm.body} onChange={(e) => setCommForm({ ...commForm, body: e.target.value })} placeholder={tp('customers', 'profileCommMessagePlaceholder')} />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button className="btn btn-p btn-sm" type="button" onClick={logComm} disabled={!canWrite}>
-                      + Log Communication
+                      {tp('customers', 'profileLogComm')}
                     </button>
                   </div>
                 </div>
               </div>
-              <div className="prof-section-lbl">History ({custComms.length})</div>
+              <div className="prof-section-lbl">{tpl('customers', 'profileCommHistory', { count: custComms.length })}</div>
               {custComms.length === 0 ? (
-                <div className="prof-empty">No communications logged yet.</div>
+                <div className="prof-empty">{tp('customers', 'profileNoComms')}</div>
               ) : (
                 <div className="comm-timeline">
                   {custComms.map((cm) => (
@@ -441,7 +450,7 @@ The Ant Adventures`;
                       <header className="comm-card-hd">
                         <div className="comm-card-badges">
                           <span className={`comm-dir-badge ${cm.dir}`}>
-                            {cm.dir === 'outbound' ? '↑ Out' : '↓ In'}
+                            {cm.dir === 'outbound' ? tp('customers', 'profileCommOut') : tp('customers', 'profileCommIn')}
                           </span>
                           <span className="comm-type-badge">{cm.type}</span>
                         </div>
@@ -450,7 +459,7 @@ The Ant Adventures`;
                           {cm.author ? ` · ${cm.author}` : ''}
                         </time>
                       </header>
-                      <h4 className="comm-card-subj">{cm.subj || '(No subject)'}</h4>
+                      <h4 className="comm-card-subj">{cm.subj || tp('customers', 'profileNoSubject')}</h4>
                       {cm.body?.trim() ? (
                         <div className="comm-card-body">{cm.body}</div>
                       ) : null}
@@ -465,9 +474,9 @@ The Ant Adventures`;
             <div>
               {custBookings.length === 0 ? (
                 <div className="prof-empty">
-                  No bookings yet. Design a tour in Tour Design Studio.
+                  {tp('customers', 'profileNoBookings')}
                   <Link href="/tourdesign" className="btn btn-p btn-sm" style={{ marginTop: 12, display: 'inline-block' }}>
-                    Tour Design →
+                    {tp('customers', 'profileTourDesignLink')}
                   </Link>
                 </div>
               ) : (
@@ -490,11 +499,11 @@ The Ant Adventures`;
           {tab === 'notes' && (
             <div>
               <div className="fg" style={{ marginBottom: 12 }}>
-                <label className="lbl">Internal Notes / Ghi chú nội bộ</label>
+                <label className="lbl">{tp('customers', 'profileInternalNotes')}</label>
                 <textarea value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} style={{ minHeight: 140 }} />
               </div>
               <button className="btn btn-p btn-sm" type="button" onClick={saveNotes} disabled={!canWrite}>
-                Save Notes
+                {tp('customers', 'profileSaveNotes')}
               </button>
             </div>
           )}
@@ -504,9 +513,9 @@ The Ant Adventures`;
               {cfb.length === 0 ? (
                 <div className="prof-empty" style={{ textAlign: 'center', padding: 30 }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>⭐</div>
-                  <div style={{ fontSize: 13, marginBottom: 14 }}>No post-tour feedback recorded yet.</div>
+                  <div style={{ fontSize: 13, marginBottom: 14 }}>{tp('customers', 'profileNoFeedback')}</div>
                   <Link href="/posttour" className="btn btn-p btn-sm">
-                    Record Feedback →
+                    {tp('customers', 'profileRecordFeedback')}
                   </Link>
                 </div>
               ) : (
@@ -516,10 +525,11 @@ The Ant Adventures`;
                       <div className="prof-nps-big" style={{ color: avgNps! >= 9 ? 'var(--g)' : avgNps! >= 7 ? 'var(--amb)' : 'var(--red)' }}>
                         {avgNps!.toFixed(1)}
                       </div>
-                      <div style={{ fontSize: 10.5, color: 'var(--m)' }}>Average NPS / 10</div>
+                      <div style={{ fontSize: 10.5, color: 'var(--m)' }}>{tp('customers', 'profileAvgNps')}</div>
                     </div>
                     <div style={{ flex: 1, fontSize: 12.5 }}>
-                      <b>{cfb.length}</b> survey{cfb.length > 1 ? 's' : ''} on file
+                      <b>{cfb.length}</b>{' '}
+                      {tpl('customers', cfb.length > 1 ? 'profileSurveysOnFilePlural' : 'profileSurveysOnFile', { count: cfb.length })}
                     </div>
                   </div>
                   {cfb.map((f) => {
@@ -553,28 +563,28 @@ The Ant Adventures`;
         <div className="overlay open" style={{ zIndex: 10001 }} onClick={() => setCreatedLead(null)}>
           <div className="modal" style={{ width: 440 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-hd modal-hd-green">
-              <div style={{ color: '#fff', fontWeight: 700 }}>Inquiry created</div>
+              <div style={{ color: '#fff', fontWeight: 700 }}>{tp('customers', 'inquiryCreatedTitle')}</div>
               <button type="button" className="modal-close-btn" onClick={() => setCreatedLead(null)}>
                 ✕
               </button>
             </div>
             <div style={{ padding: 22 }}>
               <p style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
-                Lead <code>{createdLead.leadId}</code> added for <strong>{customer.name}</strong>.
+                {tpl('customers', 'inquiryCreatedLead', { leadId: createdLead.leadId, name: customer.name })}
               </p>
               <p style={{ fontSize: 13, marginBottom: 16 }}>
-                Continue in <strong>Tour Design</strong> to complete the client brief.
+                {tp('customers', 'inquiryCreatedContinue')}
               </p>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button className="btn btn-s" type="button" onClick={() => setCreatedLead(null)}>
-                  Stay here
+                  {tp('customers', 'inquiryStayHere')}
                 </button>
                 <Link
                   href={`/tourdesign?leadId=${encodeURIComponent(createdLead.leadId)}&custId=${encodeURIComponent(createdLead.custId)}`}
                   className="btn btn-p"
                   onClick={() => setCreatedLead(null)}
                 >
-                  Tour Design →
+                  {tp('customers', 'inquiryTourDesign')}
                 </Link>
               </div>
             </div>

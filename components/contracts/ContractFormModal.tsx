@@ -86,7 +86,7 @@ export default function ContractFormModal({
 
   const depositAmt = contractDepositAmount(form.total, form.depositPct);
 
-  const { language } = useLanguage();
+  const { language, tp, tpl, tc } = useLanguage();
   const dirty = useFormDirty(open, { ...EMPTY_CONTRACT_FORM }, form, undefined, formKey);
   const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
 
@@ -138,7 +138,7 @@ export default function ContractFormModal({
     clearErrors();
     const validated = validateContractForm(form);
     if (!validated.ok) {
-      fail(validated.field, validated.message);
+      fail(validated.field, tp('contracts', validated.errorKey));
       return;
     }
 
@@ -180,9 +180,9 @@ export default function ContractFormModal({
       <div className="modal nc-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green nc-modal-hd">
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>New Contract</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>{tp('contracts', 'formTitle')}</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 1 }}>
-              Select a booking to auto-fill, or enter details manually
+              {tp('contracts', 'formSubtitle')}
             </div>
           </div>
           <button type="button" className="modal-close-btn" onClick={() => void requestClose()}>
@@ -192,9 +192,9 @@ export default function ContractFormModal({
 
         <div className="nc-modal-body">
           <div className="nc-form-card">
-            <div className="nc-form-card-title">Link to Booking</div>
+            <div className="nc-form-card-title">{tp('contracts', 'formLinkBooking')}</div>
             <p className="nc-form-hint" style={{ marginTop: 0, marginBottom: 8 }}>
-              Pick a confirmed booking to fill client, tour, dates, pricing, and route.
+              {tp('contracts', 'formLinkBookingHint')}
             </p>
             <div className="fg" style={{ margin: 0 }}>
               <select
@@ -208,7 +208,7 @@ export default function ContractFormModal({
                   applyBookingFill(bkId);
                 }}
               >
-                <option value="">— Select a booking —</option>
+                <option value="">{tp('contracts', 'formSelectBooking')}</option>
                 {linkableBookings.map((b) => (
                   <option key={b.id} value={b.id}>
                     {bookingOptionLabel(b)}
@@ -230,10 +230,10 @@ export default function ContractFormModal({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
             <div>
-              <div className="nc-section-title">Client</div>
+              <div className="nc-section-title">{tp('contracts', 'formSectionClient')}</div>
               <div className="fg">
                 <label className={`lbl${fieldInvalid('clientName') ? ' nc-field-invalid-label' : ''}`}>
-                  Client Name <span className="req">*</span>
+                  {tp('contracts', 'formClientName')} <span className="req">*</span>
                 </label>
                 <ContractClientNameCombobox
                   inputId={fieldDomId('clientName')}
@@ -254,19 +254,19 @@ export default function ContractFormModal({
                   }}
                   onPick={handleClientPick}
                 />
-                <p className="nc-form-hint">Type to search clients from CRM or linked bookings.</p>
+                <p className="nc-form-hint">{tp('contracts', 'formClientSearchHint')}</p>
               </div>
               <div className="fg">
-                <label className="lbl">Nationality</label>
+                <label className="lbl">{tp('contracts', 'formNationality')}</label>
                 <input
                   value={form.nationality}
                   onChange={(e) => patch({ nationality: e.target.value })}
-                  placeholder="e.g. Australian"
+                  placeholder={tp('contracts', 'formNationalityPlaceholder')}
                 />
               </div>
               <div className="fg">
                 <label className={`lbl${fieldInvalid('pax') ? ' nc-field-invalid-label' : ''}`}>
-                  Pax <span className="req">*</span>
+                  {tp('contracts', 'formPax')} <span className="req">*</span>
                 </label>
                 <input
                   id={fieldDomId('pax')}
@@ -279,20 +279,20 @@ export default function ContractFormModal({
                 />
               </div>
               <div className="fg">
-                <label className="lbl">Rooms</label>
+                <label className="lbl">{tp('contracts', 'formRooms')}</label>
                 <input
                   value={form.rooms}
                   onChange={(e) => patch({ rooms: e.target.value })}
-                  placeholder="e.g. 1 DBL + 1 TWN"
+                  placeholder={tp('contracts', 'formRoomsPlaceholder')}
                 />
               </div>
             </div>
 
             <div>
-              <div className="nc-section-title">Tour</div>
+              <div className="nc-section-title">{tp('contracts', 'formSectionTour')}</div>
               <div className="fg">
                 <label className={`lbl${fieldInvalid('tourName') ? ' nc-field-invalid-label' : ''}`}>
-                  Tour Name <span className="req">*</span>
+                  {tp('contracts', 'formTourName')} <span className="req">*</span>
                 </label>
                 {form.bookingId ? (
                   <>
@@ -303,7 +303,7 @@ export default function ContractFormModal({
                       value={form.tourName}
                       aria-invalid={fieldInvalid('tourName')}
                     />
-                    <p className="nc-form-hint">From booking {form.bookingId}. Clear booking link above to edit manually.</p>
+                    <p className="nc-form-hint">{tpl('contracts', 'formTourFromBooking', { id: form.bookingId })}</p>
                   </>
                 ) : (
                   <>
@@ -317,7 +317,7 @@ export default function ContractFormModal({
                         if (bkId) applyBookingFill(bkId);
                       }}
                     >
-                      <option value="">— Select tour from bookings —</option>
+                      <option value="">{tp('contracts', 'formSelectTourFromBookings')}</option>
                       {linkableBookings.map((b) => (
                         <option key={b.id} value={b.id}>
                           {b.tour} · {b.customerName || b.custId}
@@ -327,24 +327,24 @@ export default function ContractFormModal({
                     <input
                       style={{ marginTop: 8 }}
                       value={form.tourName}
-                      placeholder="Or enter a custom tour name"
+                      placeholder={tp('contracts', 'formCustomTourPlaceholder')}
                       onChange={(e) => patch({ tourName: e.target.value, bookingId: '' })}
                     />
                   </>
                 )}
               </div>
               <div className="fg">
-                <label className="lbl">Duration</label>
+                <label className="lbl">{tp('contracts', 'formDuration')}</label>
                 <input
                   value={form.duration}
                   onChange={(e) => patch({ duration: e.target.value })}
-                  placeholder="10 Days / 9 Nights"
+                  placeholder={tp('contracts', 'formDurationPlaceholder')}
                 />
               </div>
               <div className="nc-grid-2">
                 <div className="fg">
                   <label className={`lbl${fieldInvalid('departureDate') ? ' nc-field-invalid-label' : ''}`}>
-                    Departure
+                    {tp('contracts', 'formDeparture')}
                   </label>
                   <input
                     id={fieldDomId('departureDate')}
@@ -356,7 +356,7 @@ export default function ContractFormModal({
                 </div>
                 <div className="fg">
                   <label className={`lbl${fieldInvalid('returnDate') ? ' nc-field-invalid-label' : ''}`}>
-                    Return
+                    {tp('contracts', 'formReturn')}
                   </label>
                   <input
                     id={fieldDomId('returnDate')}
@@ -368,20 +368,20 @@ export default function ContractFormModal({
                 </div>
               </div>
               <div className="fg">
-                <label className="lbl">Route</label>
+                <label className="lbl">{tp('contracts', 'formRoute')}</label>
                 <input
                   value={form.route}
                   onChange={(e) => patch({ route: e.target.value })}
-                  placeholder="Hanoi – Halong – Hoi An – Saigon"
+                  placeholder={tp('contracts', 'formRoutePlaceholder')}
                 />
               </div>
             </div>
           </div>
 
-          <div className="nc-section-title">Terms</div>
+          <div className="nc-section-title">{tp('contracts', 'formSectionTerms')}</div>
           <div className="nc-grid-2" style={{ marginBottom: 16 }}>
             <div className="fg">
-              <label className="lbl">Inclusions (one per line)</label>
+              <label className="lbl">{tp('contracts', 'formInclusions')}</label>
               <textarea
                 value={form.inclusions}
                 onChange={(e) => patch({ inclusions: e.target.value })}
@@ -389,7 +389,7 @@ export default function ContractFormModal({
               />
             </div>
             <div className="fg">
-              <label className="lbl">Exclusions (one per line)</label>
+              <label className="lbl">{tp('contracts', 'formExclusions')}</label>
               <textarea
                 value={form.exclusions}
                 onChange={(e) => patch({ exclusions: e.target.value })}
@@ -398,19 +398,19 @@ export default function ContractFormModal({
             </div>
           </div>
           <div className="fg" style={{ marginBottom: 16 }}>
-            <label className="lbl">Domestic Flights (optional, one per line)</label>
+            <label className="lbl">{tp('contracts', 'formFlights')}</label>
             <textarea
               value={form.flights}
               onChange={(e) => patch({ flights: e.target.value })}
-              placeholder="HAN–DAD Economy · DAD–SGN Economy"
+              placeholder={tp('contracts', 'formFlightsPlaceholder')}
               style={{ minHeight: 60 }}
             />
           </div>
 
-          <div className="nc-section-title">Pricing & Payment</div>
+          <div className="nc-section-title">{tp('contracts', 'formSectionPricing')}</div>
           <div className="nc-grid-2" style={{ marginBottom: 12 }}>
             <div className="fg">
-              <label className="lbl">Currency</label>
+              <label className="lbl">{tp('contracts', 'formCurrency')}</label>
               <select value={form.currency} onChange={(e) => patch({ currency: e.target.value })}>
                 <option>USD</option>
                 <option>AUD</option>
@@ -418,7 +418,7 @@ export default function ContractFormModal({
               </select>
             </div>
             <div className="fg">
-              <label className={`lbl${fieldInvalid('total') ? ' nc-field-invalid-label' : ''}`}>Total Value</label>
+              <label className={`lbl${fieldInvalid('total') ? ' nc-field-invalid-label' : ''}`}>{tp('contracts', 'formTotalValue')}</label>
               <input
                 id={fieldDomId('total')}
                 type="number"
@@ -429,7 +429,7 @@ export default function ContractFormModal({
               />
             </div>
             <div className="fg">
-              <label className="lbl">Deposit %</label>
+              <label className="lbl">{tp('contracts', 'formDepositPct')}</label>
               <select value={form.depositPct} onChange={(e) => patch({ depositPct: Number(e.target.value) })}>
                 <option value={30}>30%</option>
                 <option value={50}>50%</option>
@@ -437,7 +437,7 @@ export default function ContractFormModal({
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Balance Due Date</label>
+              <label className="lbl">{tp('contracts', 'formBalanceDueDate')}</label>
               <input
                 type="date"
                 value={form.balanceDueDate}
@@ -447,25 +447,25 @@ export default function ContractFormModal({
           </div>
           <div className="nc-form-summary" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <div className="nc-form-summary-item">
-              <div className="nc-form-summary-lbl">Deposit Amount</div>
+              <div className="nc-form-summary-lbl">{tp('contracts', 'formDepositAmount')}</div>
               <div className="nc-form-summary-val" style={{ color: 'var(--blue)' }}>
                 {form.currency} {depositAmt.toLocaleString('en-US')}
               </div>
             </div>
             <div className="nc-form-summary-item">
-              <div className="nc-form-summary-lbl">Balance</div>
+              <div className="nc-form-summary-lbl">{tp('contracts', 'formBalance')}</div>
               <div className="nc-form-summary-val">
                 {form.currency} {(form.total - depositAmt).toLocaleString('en-US')}
               </div>
             </div>
           </div>
 
-          <div className="nc-section-title">Notes</div>
+          <div className="nc-section-title">{tp('contracts', 'formSectionNotes')}</div>
           <div className="fg">
             <textarea
               value={form.notes}
               onChange={(e) => patch({ notes: e.target.value })}
-              placeholder="Internal notes (not shown on client contract)"
+              placeholder={tp('contracts', 'formNotesPlaceholder')}
               style={{ minHeight: 60 }}
             />
           </div>
@@ -479,10 +479,10 @@ export default function ContractFormModal({
           ) : null}
           <div className="nc-modal-ft-actions">
             <button className="btn btn-s" type="button" onClick={() => void requestClose()} disabled={saving}>
-              Cancel
+              {tc('cancel')}
             </button>
             <button className="btn btn-p" type="button" onClick={() => void handleSave()} disabled={saving}>
-              {saving ? 'Saving…' : 'Save as Draft'}
+              {saving ? tp('contracts', 'formSaving') : tp('contracts', 'formSaveDraft')}
             </button>
           </div>
         </div>

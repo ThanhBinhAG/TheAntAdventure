@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { useLanguage } from '@/hooks/useLanguage';
 import { getTourDraftForLead } from '@/lib/tour-design/tour-design-leads';
 import { getCustomerName } from '@/lib/core/crm-utils';
 import type { Customer, Lead, TourDraft } from '@/lib/types';
@@ -23,6 +24,7 @@ export function TourDesignQueueCards({
   customers: Customer[];
   tourDrafts: TourDraft[];
 }) {
+  const { tp, tpl } = useLanguage();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const total = pendingLeads.length + awaitingOutline.length;
@@ -54,7 +56,7 @@ export function TourDesignQueueCards({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <span>Tour tasks</span>
+        <span>{tp('tour-design', 'queueTourTasks')}</span>
         <span className="td-queue-badge">{total}</span>
         <span className="td-queue-chevron" aria-hidden>
           {open ? '▴' : '▾'}
@@ -62,10 +64,10 @@ export function TourDesignQueueCards({
       </button>
 
       {open && (
-        <div className="td-queue-popover" role="dialog" aria-label="Tour Design tasks">
+        <div className="td-queue-popover" role="dialog" aria-label={tp('tour-design', 'queueDialogAria')}>
           {pendingLeads.length > 0 && (
             <section className="td-queue-group">
-              <div className="td-queue-group-hd">New from Sales Pipeline</div>
+              <div className="td-queue-group-hd">{tp('tour-design', 'queueNewFromSales')}</div>
               <ul className="td-queue-list">
                 {pendingLeads.map((l) => {
                   const current = l.id === leadId;
@@ -76,14 +78,14 @@ export function TourDesignQueueCards({
                         {l.month ? <span className="td-queue-meta">{l.month}</span> : null}
                       </div>
                       {current ? (
-                        <span className="td-queue-current">Open</span>
+                        <span className="td-queue-current">{tp('tour-design', 'queueOpen')}</span>
                       ) : (
                         <Link
                           href={sessionHref(l, 0)}
                           className="btn btn-p btn-sm"
                           onClick={() => setOpen(false)}
                         >
-                          Open
+                          {tp('tour-design', 'queueOpen')}
                         </Link>
                       )}
                     </li>
@@ -95,7 +97,7 @@ export function TourDesignQueueCards({
 
           {awaitingOutline.length > 0 && (
             <section className="td-queue-group">
-              <div className="td-queue-group-hd">Awaiting outline approval</div>
+              <div className="td-queue-group-hd">{tp('tour-design', 'queueAwaitingApproval')}</div>
               <ul className="td-queue-list">
                 {awaitingOutline.map((l) => {
                   const draft = getTourDraftForLead(l.id, tourDrafts);
@@ -105,18 +107,20 @@ export function TourDesignQueueCards({
                       <div className="td-queue-item-copy">
                         <strong>{getCustomerName(customers, l.custId)}</strong>
                         <span className="td-queue-meta">
-                          Outline v{draft?.outlineRevision ?? 1} sent
+                          {tpl('tour-design', 'queueOutlineSent', {
+                            revision: draft?.outlineRevision ?? 1,
+                          })}
                         </span>
                       </div>
                       {current ? (
-                        <span className="td-queue-current">Open</span>
+                        <span className="td-queue-current">{tp('tour-design', 'queueOpen')}</span>
                       ) : (
                         <Link
                           href={sessionHref(l, 1)}
                           className="btn btn-s btn-sm"
                           onClick={() => setOpen(false)}
                         >
-                          Open
+                          {tp('tour-design', 'queueOpen')}
                         </Link>
                       )}
                     </li>

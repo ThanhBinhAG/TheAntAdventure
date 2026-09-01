@@ -99,7 +99,7 @@ export default function Guides() {
     }
     return emptyGuide();
   }, [showAdd, editId, guides]);
-  const { language } = useLanguage();
+  const { language, tp, tpl, tc } = useLanguage();
   const guideDirty = useFormDirty(
     showAdd,
     { form: baselineGuide, hasAvatar: false },
@@ -130,7 +130,7 @@ export default function Guides() {
 
   const saveGuide = async () => {
     if (!form.fullname || !form.id) {
-      toast.warning('Guide ID and Full Name are required.');
+      toast.warning(tp('guides', 'requiredToast'));
       return;
     }
     setSaving(true);
@@ -144,7 +144,7 @@ export default function Guides() {
       });
       const body = await response.json().catch(() => null) as { ok?: boolean; data?: Guide; error?: string } | null;
       if (!response.ok || !body?.ok || !body.data) {
-        throw new Error(body?.error ?? 'Không thể lưu hướng dẫn viên.');
+        throw new Error(body?.error ?? tp('guides', 'saveError'));
       }
       const saved = avatarFile
         ? { ...body.data, photo: await uploadGuideAvatarClient(body.data.id, avatarFile) }
@@ -154,7 +154,7 @@ export default function Guides() {
       setShowAdd(false);
       setAvatarFile(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Avatar upload failed');
+      toast.error(err instanceof Error ? err.message : tp('guides', 'avatarUploadFailed'));
     } finally {
       setSaving(false);
     }
@@ -165,81 +165,81 @@ export default function Guides() {
       {loadError && <div className="crm-page-hydrate-error" role="alert">{loadError}</div>}
       <div className="pt-banner">
         <span style={{ fontSize: 12.5, color: 'var(--gd)' }}>
-          📋 <b>Post-tour?</b> Log guide reports and debrief here:
+          📋 <b>{tp('guides', 'postTourBanner')}</b> {tp('guides', 'postTourBannerDesc')}
         </span>
         <Link href="/posttour" className="btn btn-p btn-sm">
-          → Guide Report Form
+          {tp('guides', 'guideReportForm')}
         </Link>
         <Link href="/posttour" className="btn btn-s btn-sm">
-          → Ops Debrief Form
+          {tp('guides', 'opsDebriefForm')}
         </Link>
         <Link href="/attractions" className="btn btn-s btn-sm">
-          🏛 Attraction Schedule
+          {tp('guides', 'attractionSchedule')}
         </Link>
       </div>
 
       <div className="tabs">
         <div className={`tab${tab === 'roster' ? ' on' : ''}`} onClick={() => setTab('roster')} role="button" tabIndex={0}>
-          Guide Roster
+          {tp('guides', 'tabRoster')}
         </div>
         <div className={`tab${tab === 'bios' ? ' on' : ''}`} onClick={() => setTab('bios')} role="button" tabIndex={0}>
-          Bio Cards
+          {tp('guides', 'tabBios')}
         </div>
         <div className={`tab${tab === 'calendar' ? ' on' : ''}`} onClick={() => setTab('calendar')} role="button" tabIndex={0}>
-          📅 Availability Calendar
+          {tp('guides', 'tabCalendar')}
         </div>
       </div>
 
       {tab === 'roster' && (
         <>
           <div className="search-row">
-            <input placeholder="Search guides..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 220 }} />
+            <input placeholder={tp('guides', 'searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 220 }} />
             <select value={regionF} onChange={(e) => setRegionF(e.target.value)}>
-              <option value="">All Regions</option>
+              <option value="">{tp('guides', 'allRegions')}</option>
               <option>North</option>
               <option>Central</option>
               <option>South</option>
             </select>
             <select value={langF} onChange={(e) => setLangF(e.target.value)}>
-              <option value="">All Languages</option>
+              <option value="">{tp('guides', 'allLanguages')}</option>
               <option>English</option>
               <option>French</option>
               <option>German</option>
             </select>
             <div style={{ flex: 1 }} />
             <button className="btn btn-s btn-sm" type="button" onClick={() => setTab('bios')}>
-              View Bio Cards →
+              {tp('guides', 'viewBioCards')}
             </button>
             <button
               className="btn btn-p btn-sm"
               type="button"
               onClick={() => openAdd()}
               disabled={!canWrite}
-              title={!canWrite ? 'You need write permission to add a guide' : undefined}
+              title={!canWrite ? tp('guides', 'readOnlyAdd') : undefined}
             >
-              ＋ Add Guide
+              {tp('guides', 'addGuide')}
             </button>
           </div>
 
           <div className="guides-kpi-bar">
             <div className="guides-kpi-item">
-              <div className="guides-kpi-l">Total Guides</div>
+              <div className="guides-kpi-l">{tp('guides', 'kpiTotal')}</div>
               <div className="guides-kpi-v">{guides.length}</div>
             </div>
             <div className="guides-kpi-item">
-              <div className="guides-kpi-l">Available</div>
+              <div className="guides-kpi-l">{tp('guides', 'kpiAvailable')}</div>
               <div className="guides-kpi-v" style={{ color: 'var(--g)' }}>
                 {available}
               </div>
             </div>
             <div className="guides-kpi-item">
-              <div className="guides-kpi-l">On Tour</div>
+              <div className="guides-kpi-l">{tp('guides', 'kpiOnTour')}</div>
               <div className="guides-kpi-v" style={{ color: 'var(--blue)' }}>
                 {onTour}
               </div>
             </div>
             <div className="guides-kpi-item">
-              <div className="guides-kpi-l">Shown</div>
+              <div className="guides-kpi-l">{tp('guides', 'kpiShown')}</div>
               <div className="guides-kpi-v">{filtered.length}</div>
             </div>
           </div>
@@ -249,17 +249,17 @@ export default function Guides() {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>Guide ID</th>
-                    <th>Full Name / City</th>
-                    <th>Display Name</th>
-                    <th>Region</th>
-                    <th>Languages</th>
-                    <th>Specialty</th>
-                    <th>Experience</th>
-                    <th>Day Rate</th>
-                    <th>Rating</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th>{tp('guides', 'colGuideId')}</th>
+                    <th>{tp('guides', 'colFullNameCity')}</th>
+                    <th>{tp('guides', 'colDisplayName')}</th>
+                    <th>{tp('guides', 'colRegion')}</th>
+                    <th>{tp('guides', 'colLanguages')}</th>
+                    <th>{tp('guides', 'colSpecialty')}</th>
+                    <th>{tp('guides', 'colExperience')}</th>
+                    <th>{tp('guides', 'colDayRate')}</th>
+                    <th>{tp('guides', 'colRating')}</th>
+                    <th>{tp('guides', 'colStatus')}</th>
+                    <th>{tp('guides', 'colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -280,16 +280,16 @@ export default function Guides() {
                       <td style={{ fontSize: 12 }}>{g.specialty}</td>
                       <td>
                         <span style={{ color: 'var(--g)', fontWeight: 600 }}>✓</span> {g.license}
-                        {g.years ? <div style={{ fontSize: 10.5, color: 'var(--m)' }}>{g.years} yrs</div> : null}
+                        {g.years ? <div style={{ fontSize: 10.5, color: 'var(--m)' }}>{tpl('guides', 'yearsSuffix', { count: g.years })}</div> : null}
                       </td>
-                      <td style={{ fontWeight: 600, color: g.rate > 0 ? 'var(--g)' : 'var(--m)' }}>{g.rate > 0 ? `$${g.rate}/day` : 'TBD'}</td>
+                      <td style={{ fontWeight: 600, color: g.rate > 0 ? 'var(--g)' : 'var(--m)' }}>{g.rate > 0 ? `$${g.rate}/day` : tp('guides', 'rateTbd')}</td>
                       <td style={{ color: 'var(--gold)' }}>{g.rating}</td>
                       <td>
                         <span className={`bdg ${STATUS_C[g.status] || 'bdg-w'}`}>{g.status}</span>
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>
                         <button className="btn btn-s btn-sm" type="button" onClick={() => setBioGuide(g)}>
-                          👤 Profile
+                          {tp('guides', 'profile')}
                         </button>
                         <button
                           className="btn btn-s btn-sm"
@@ -297,9 +297,9 @@ export default function Guides() {
                           style={{ marginLeft: 4 }}
                           onClick={() => openAdd(g)}
                           disabled={!canWrite}
-                          title={!canWrite ? 'You need write permission to edit a guide' : undefined}
+                          title={!canWrite ? tp('guides', 'readOnlyEdit') : undefined}
                         >
-                          ✏ Edit
+                          {tp('guides', 'edit')}
                         </button>
                       </td>
                     </tr>
@@ -376,7 +376,7 @@ export default function Guides() {
         <div className="overlay open" onClick={() => void requestGuideClose()}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 700, maxHeight: '92vh', overflow: 'auto' }}>
             <div className="modal-hd modal-hd-green">
-              <span style={{ color: '#fff', fontWeight: 700 }}>{editId ? '✏ Edit Guide' : '＋ Add New Guide'}</span>
+              <span style={{ color: '#fff', fontWeight: 700 }}>{editId ? tp('guides', 'editGuide') : tp('guides', 'addNewGuide')}</span>
               <button className="modal-close-btn" type="button" onClick={() => void requestGuideClose()}>
                 ✕
               </button>
@@ -384,21 +384,21 @@ export default function Guides() {
             <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 13 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                 <div className="fg">
-                  <label className="lbl">Guide ID *</label>
-                  <input value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })} placeholder="G-N06" disabled={!!editId} />
+                  <label className="lbl">{tp('guides', 'lblGuideId')}</label>
+                  <input value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })} placeholder={tp('guides', 'guideIdPlaceholder')} disabled={!!editId} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Full Name *</label>
+                  <label className="lbl">{tp('guides', 'lblFullName')}</label>
                   <input value={form.fullname} onChange={(e) => setForm({ ...form, fullname: e.target.value })} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">English Name</label>
+                  <label className="lbl">{tp('guides', 'lblEnglishName')}</label>
                   <input value={form.ename} onChange={(e) => setForm({ ...form, ename: e.target.value })} />
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                 <div className="fg">
-                  <label className="lbl">Region</label>
+                  <label className="lbl">{tp('guides', 'lblRegion')}</label>
                   <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>
                     <option>North</option>
                     <option>Central</option>
@@ -406,11 +406,11 @@ export default function Guides() {
                   </select>
                 </div>
                 <div className="fg">
-                  <label className="lbl">City / Base</label>
+                  <label className="lbl">{tp('guides', 'lblCityBase')}</label>
                   <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Status</label>
+                  <label className="lbl">{tp('guides', 'lblStatus')}</label>
                   <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
                     <option>Available</option>
                     <option>On Tour</option>
@@ -421,24 +421,24 @@ export default function Guides() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
                 <div className="fg">
-                  <label className="lbl">Languages</label>
+                  <label className="lbl">{tp('guides', 'lblLanguages')}</label>
                   <input value={form.langs} onChange={(e) => setForm({ ...form, langs: e.target.value })} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Specialty</label>
+                  <label className="lbl">{tp('guides', 'lblSpecialty')}</label>
                   <input value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Years Exp.</label>
+                  <label className="lbl">{tp('guides', 'lblYearsExp')}</label>
                   <input type="number" value={form.years || ''} onChange={(e) => setForm({ ...form, years: +e.target.value })} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Day Rate (USD)</label>
+                  <label className="lbl">{tp('guides', 'lblDayRate')}</label>
                   <input type="number" value={form.rate || ''} onChange={(e) => setForm({ ...form, rate: +e.target.value })} />
                 </div>
               </div>
               <div className="fg">
-                <label className="lbl">Avatar photo</label>
+                <label className="lbl">{tp('guides', 'lblAvatar')}</label>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
@@ -446,19 +446,19 @@ export default function Guides() {
                   disabled={saving}
                 />
                 {form.photo && !avatarFile && (
-                  <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>Current avatar will be kept unless you upload a new file.</div>
+                  <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>{tp('guides', 'avatarKeepHint')}</div>
                 )}
               </div>
               <div className="fg">
-                <label className="lbl">Biography</label>
+                <label className="lbl">{tp('guides', 'lblBiography')}</label>
                 <textarea rows={4} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--b)', paddingTop: 12 }}>
                 <button className="btn btn-s" type="button" onClick={() => void requestGuideClose()}>
-                  Cancel
+                  {tc('cancel')}
                 </button>
                 <button className="btn btn-p" type="button" onClick={() => void saveGuide()} disabled={saving}>
-                  {saving ? 'Saving…' : '✔ Save Guide'}
+                  {saving ? tp('guides', 'saving') : tp('guides', 'saveGuide')}
                 </button>
               </div>
             </div>

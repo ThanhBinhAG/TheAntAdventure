@@ -27,12 +27,8 @@ interface Props {
   onImported: (rowCount: number) => void;
 }
 
-const TITLES: Record<CatalogWorkbook, string> = {
-  essentials: 'Import Essentials workbook',
-  accommodation: 'Import Accommodation & Cruises workbook',
-};
-
 export default function CatalogImportModal({ open, workbook, onClose, onImported }: Props) {
+  const { tp, language } = useLanguage();
   const fileRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [fileName, setFileName] = useState('');
@@ -40,6 +36,9 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
   const [importError, setImportError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+
+  const titleKey = workbook === 'essentials' ? 'importEssentialsTitle' : 'importAccommodationTitle';
+  const confirmKey = workbook === 'essentials' ? 'importConfirmEssentials' : 'importConfirmAccommodation';
 
   const reset = useCallback(() => {
     setParsed(null);
@@ -50,7 +49,6 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
     if (fileRef.current) fileRef.current.value = '';
   }, []);
 
-  const { language } = useLanguage();
   const dirty = parsed !== null || fileName.length > 0;
   const finishClose = useCallback(() => {
     reset();
@@ -79,7 +77,7 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
       setFileName(file.name);
     } catch (e) {
       setParsed(null);
-      setParseError(e instanceof Error ? e.message : 'Could not read this Excel file.');
+      setParseError(e instanceof Error ? e.message : tp('pricing', 'importParseFailed'));
     } finally {
       setBusy(false);
     }
@@ -103,7 +101,7 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
       reset();
       onClose();
     } catch (e) {
-      setImportError(e instanceof Error ? e.message : 'The import failed.');
+      setImportError(e instanceof Error ? e.message : tp('pricing', 'importFailed'));
     } finally {
       setBusy(false);
     }
@@ -114,12 +112,10 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
       <div className="modal prod-form-modal pcx-import-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green prod-form-modal-hd">
           <div>
-            <div className="prod-form-modal-title">{TITLES[workbook]}</div>
-            <div className="prod-form-modal-sub">
-              Every sheet is imported and replaces the current data for this section.
-            </div>
+            <div className="prod-form-modal-title">{tp('pricing', titleKey)}</div>
+            <div className="prod-form-modal-sub">{tp('pricing', 'importReplaceWarning')}</div>
           </div>
-          <button className="modal-close-btn" type="button" onClick={() => void requestClose()} aria-label="Close">
+          <button className="modal-close-btn" type="button" onClick={() => void requestClose()} aria-label={tp('pricing', 'closeAria')}>
             ✕
           </button>
         </div>
@@ -133,9 +129,7 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
               onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
               disabled={busy}
             />
-            <p className="pcx-muted">
-              Choose the source .xlsx file. Nothing is written until you confirm the preview below.
-            </p>
+            <p className="pcx-muted">{tp('pricing', 'importChooseFile')}</p>
           </div>
 
           {parseError && <div className="pcx-alert pcx-alert-error">{parseError}</div>}
@@ -145,17 +139,17 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
               <div className="pcx-import-summary">
                 <div>
                   <span className="pcx-stat-value">{parsed.sheets.length}</span>
-                  <span className="pcx-stat-label">sheets read</span>
+                  <span className="pcx-stat-label">{tp('pricing', 'importSheetsRead')}</span>
                 </div>
                 <div>
                   <span className="pcx-stat-value">{parsed.rowCount.toLocaleString('en-US')}</span>
-                  <span className="pcx-stat-label">rows parsed</span>
+                  <span className="pcx-stat-label">{tp('pricing', 'importRowsParsed')}</span>
                 </div>
                 <div>
                   <span className={`pcx-stat-value${parsed.warnings.length ? ' warn' : ''}`}>
                     {parsed.warnings.length}
                   </span>
-                  <span className="pcx-stat-label">warnings</span>
+                  <span className="pcx-stat-label">{tp('pricing', 'importWarnings')}</span>
                 </div>
               </div>
 
@@ -164,9 +158,9 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
                   <table className="tbl">
                     <thead>
                       <tr>
-                        <th>Sheet</th>
-                        <th>Detected as</th>
-                        <th style={{ textAlign: 'right' }}>Rows</th>
+                        <th>{tp('pricing', 'importColSheet')}</th>
+                        <th>{tp('pricing', 'importColDetectedAs')}</th>
+                        <th style={{ textAlign: 'right' }}>{tp('pricing', 'importColRows')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -188,7 +182,7 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
 
               {parsed.warnings.length > 0 && (
                 <div className="pcx-alert pcx-alert-warn" style={{ marginTop: 12 }}>
-                  <b>Review before importing</b>
+                  <b>{tp('pricing', 'importReviewBefore')}</b>
                   <ul className="pcx-warn-list">
                     {parsed.warnings.map((warning) => (
                       <li key={warning}>{warning}</li>
@@ -204,10 +198,7 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
                   onChange={(e) => setConfirmed(e.target.checked)}
                   disabled={busy}
                 />
-                <span>
-                  Replace all existing {workbook === 'essentials' ? 'Essentials' : 'Accommodation & Cruises'} data
-                  with this workbook.
-                </span>
+                <span>{tp('pricing', confirmKey)}</span>
               </label>
             </>
           )}
@@ -217,7 +208,7 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
 
         <div className="prod-form-modal-ft">
           <button className="btn btn-s" type="button" onClick={() => void requestClose()} disabled={busy}>
-            Cancel
+            {tp('pricing', 'cancel')}
           </button>
           <button
             className="btn btn-p"
@@ -225,7 +216,7 @@ export default function CatalogImportModal({ open, workbook, onClose, onImported
             onClick={() => void handleImport()}
             disabled={!parsed || !confirmed || busy}
           >
-            {busy ? 'Working…' : 'Replace and import'}
+            {busy ? tp('pricing', 'importWorking') : tp('pricing', 'importReplaceAndImport')}
           </button>
         </div>
       </div>

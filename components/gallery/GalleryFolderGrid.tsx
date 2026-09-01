@@ -3,6 +3,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import type { PhotoFolder } from '@/lib/gallery/photo-folders';
 import { UNSORTED_FOLDER_ID } from '@/lib/gallery/photo-folders';
+import { useLanguage } from '@/hooks/useLanguage';
 
 function FolderTile({
   folder,
@@ -21,11 +22,17 @@ function FolderTile({
   onInfo?: () => void;
   droppable?: boolean;
 }) {
+  const { tp, tpl } = useLanguage();
   const { setNodeRef, isOver } = useDroppable({
     id: `folder-drop-${folder.id}`,
     data: { folderId: folder.id },
     disabled: !droppable,
   });
+
+  const countLabel =
+    photoCount === 1
+      ? tpl('gallery', 'folderPhotoCountOne', { count: photoCount })
+      : tpl('gallery', 'folderPhotoCountMany', { count: photoCount });
 
   return (
     <article
@@ -35,24 +42,22 @@ function FolderTile({
       <button type="button" className="phlib-folder-open" onDoubleClick={onOpen} onClick={onOpen}>
         <span className={`phlib-folder-icon${folder.id === UNSORTED_FOLDER_ID ? ' inbox' : ''}`} aria-hidden />
         <span className="phlib-folder-name">{folder.name}</span>
-        <span className="phlib-folder-count">
-          {photoCount} photo{photoCount === 1 ? '' : 's'}
-        </span>
+        <span className="phlib-folder-count">{countLabel}</span>
       </button>
       <div className="phlib-folder-actions">
         {onInfo && (
           <button type="button" onClick={onInfo}>
-            Info
+            {tp('gallery', 'info')}
           </button>
         )}
         {!folder.isSystem && onRename && (
           <button type="button" onClick={onRename}>
-            Rename
+            {tp('gallery', 'rename')}
           </button>
         )}
         {!folder.isSystem && onDelete && (
           <button type="button" onClick={onDelete}>
-            Delete
+            {tp('gallery', 'delete')}
           </button>
         )}
       </div>
@@ -67,9 +72,7 @@ type Props = {
   onRename?: (folder: PhotoFolder) => void;
   onDelete?: (folder: PhotoFolder) => void;
   onInfo?: (folder: PhotoFolder) => void;
-  /** Enable drop targets for moving photos onto folders. */
   acceptPhotoDrop?: boolean;
-  /** Extra class on the grid (e.g. picker / move layouts). */
   className?: string;
 };
 

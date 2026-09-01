@@ -3,6 +3,8 @@
 import type { ExtendedSupplier, Hotel } from '@/lib/types';
 import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/lib/types';
 import type { SupplierFilters } from '@/lib/suppliers/supplier-utils';
+import { useLanguage } from '@/hooks/useLanguage';
+import type { SUPPLIERSKey } from '@/lib/i18n/pages/suppliers';
 
 export type SupTab =
   | 'hotels'
@@ -32,7 +34,16 @@ type Props = {
   onAdd?: () => void;
 };
 
+const TAB_KPI_KEY: Partial<Record<SupTab, SUPPLIERSKey>> = {
+  hotels: 'tabHotels',
+  transport: 'tabTransport',
+  restaurants: 'tabRestaurants',
+  cruises: 'tabCruises',
+};
+
 export default function SupplierFilterBar({ tab, filters, onFilterChange, counts, onAdd }: Props) {
+  const { tp } = useLanguage();
+
   const activeCount = (() => {
     switch (tab) {
       case 'hotels':
@@ -49,50 +60,55 @@ export default function SupplierFilterBar({ tab, filters, onFilterChange, counts
   })();
 
   const showExtendedKpi = ['logistics', 'water', 'adventure', 'experience', 'personnel'].includes(tab);
+  const kpiLabel = showExtendedKpi
+    ? tp('suppliers', 'kpiExtended')
+    : TAB_KPI_KEY[tab]
+      ? tp('suppliers', TAB_KPI_KEY[tab]!)
+      : tab.charAt(0).toUpperCase() + tab.slice(1);
 
   return (
     <div className="sup-top-bar">
       <input
         className="sup-search"
-        placeholder="🔍  Search all suppliers…"
+        placeholder={tp('suppliers', 'searchPlaceholder')}
         value={filters.search}
         onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
       />
       <select value={filters.region} onChange={(e) => onFilterChange({ ...filters, region: e.target.value })}>
-        <option value="">All Regions</option>
-        <option value="north">🔵 Northern Vietnam</option>
-        <option value="central">🟡 Central Vietnam</option>
-        <option value="south">🟠 Southern Vietnam</option>
-        <option value="national">🇻🇳 Nationwide</option>
+        <option value="">{tp('suppliers', 'filterAllRegions')}</option>
+        <option value="north">{tp('suppliers', 'filterNorth')}</option>
+        <option value="central">{tp('suppliers', 'filterCentral')}</option>
+        <option value="south">{tp('suppliers', 'filterSouth')}</option>
+        <option value="national">{tp('suppliers', 'filterNational')}</option>
       </select>
       <select value={filters.tier} onChange={(e) => onFilterChange({ ...filters, tier: e.target.value })}>
-        <option value="">All Tiers</option>
-        <option value="luxury">💎 Luxury</option>
-        <option value="premium">⭐ Premium</option>
-        <option value="preferred">♥ Preferred</option>
+        <option value="">{tp('suppliers', 'filterAllTiers')}</option>
+        <option value="luxury">{tp('suppliers', 'filterLuxury')}</option>
+        <option value="premium">{tp('suppliers', 'filterPremium')}</option>
+        <option value="preferred">{tp('suppliers', 'filterPreferred')}</option>
       </select>
       <div style={{ flex: 1 }} />
       <div className="sup-kpi-strip">
         <div className="sup-kpi-pill">
           <div className="sup-kpi-pill-v">{activeCount}</div>
-          <div className="sup-kpi-pill-l">{showExtendedKpi ? 'Extended' : tab.charAt(0).toUpperCase() + tab.slice(1)}</div>
+          <div className="sup-kpi-pill-l">{kpiLabel}</div>
         </div>
         {showExtendedKpi && (
           <>
             <div className="sup-kpi-pill">
               <div className="sup-kpi-pill-v">{counts.extendedActive}</div>
-              <div className="sup-kpi-pill-l">Active</div>
+              <div className="sup-kpi-pill-l">{tp('suppliers', 'kpiActive')}</div>
             </div>
             <div className="sup-kpi-pill">
               <div className="sup-kpi-pill-v">{counts.extendedPreferred}</div>
-              <div className="sup-kpi-pill-l">Preferred ♥</div>
+              <div className="sup-kpi-pill-l">{tp('suppliers', 'kpiPreferred')}</div>
             </div>
           </>
         )}
       </div>
       {onAdd && (
         <button className="btn btn-p btn-sm" type="button" onClick={onAdd}>
-          ＋ Add New Supplier
+          {tp('suppliers', 'addNewSupplier')}
         </button>
       )}
     </div>

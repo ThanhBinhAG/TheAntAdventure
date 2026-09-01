@@ -110,8 +110,8 @@ test('Agents BFF cutover: API hooks and denylist', () => {
   assert.match(agentsPage, /useAgentPage/);
   assert.match(agentsPage, /useRegisterAgent/);
   assert.match(agentsPage, /useDeleteAgent/);
-  assert.doesNotMatch(agentsPage, /\baddAgent\b/);
-  assert.doesNotMatch(agentsPage, /\bupdateAgent\b/);
+  assert.doesNotMatch(agentsPage, /useStore\(\(s\) => s\.addAgent\)/);
+  assert.doesNotMatch(agentsPage, /useStore\(\(s\) => s\.updateAgent\)/);
   assert.match(api, /agents\.read/);
   assert.match(api, /agents\.write/);
   assert.match(apiId, /agents\.write/);

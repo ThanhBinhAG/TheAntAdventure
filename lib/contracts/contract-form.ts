@@ -61,29 +61,32 @@ export const EMPTY_CONTRACT_FORM: ContractFormData = {
   notes: '',
 };
 
+export type ContractFormErrorKey =
+  | 'errClientName'
+  | 'errTourName'
+  | 'errPaxMin'
+  | 'errReturnBeforeDeparture'
+  | 'errTotalMin';
+
 export type ContractFormValidationResult =
   | { ok: true }
-  | { ok: false; field: ContractFormErrorField | null; message: string };
+  | { ok: false; field: ContractFormErrorField | null; errorKey: ContractFormErrorKey };
 
 export function validateContractForm(form: ContractFormData): ContractFormValidationResult {
   if (!form.clientName.trim()) {
-    return { ok: false, field: 'clientName', message: 'Please enter the client name.' };
+    return { ok: false, field: 'clientName', errorKey: 'errClientName' };
   }
   if (!form.tourName.trim()) {
-    return { ok: false, field: 'tourName', message: 'Please enter the tour name.' };
+    return { ok: false, field: 'tourName', errorKey: 'errTourName' };
   }
   if (!Number.isFinite(form.pax) || form.pax < 1) {
-    return { ok: false, field: 'pax', message: 'Pax must be at least 1.' };
+    return { ok: false, field: 'pax', errorKey: 'errPaxMin' };
   }
   if (form.departureDate && form.returnDate && form.returnDate < form.departureDate) {
-    return {
-      ok: false,
-      field: 'returnDate',
-      message: 'Return date must be on or after the departure date.',
-    };
+    return { ok: false, field: 'returnDate', errorKey: 'errReturnBeforeDeparture' };
   }
   if (!Number.isFinite(form.total) || form.total < 0) {
-    return { ok: false, field: 'total', message: 'Total value must be zero or greater.' };
+    return { ok: false, field: 'total', errorKey: 'errTotalMin' };
   }
   return { ok: true };
 }

@@ -9,11 +9,19 @@ import { usePagination } from '@/hooks/usePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { useHotelMutations } from '@/hooks/useHotelMutations';
 import { useStore } from '@/hooks/useStore';
-import { filterByRegion, REG_BADGE, supplierMatchesSearch, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
+import { filterByRegion, supplierMatchesSearch, type SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import type { Hotel } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
 import { confirmDialog } from '@/lib/confirm';
+import { useLanguage } from '@/hooks/useLanguage';
+import type { SUPPLIERSKey } from '@/lib/i18n/pages/suppliers';
+
+const REG_BADGE_I18N: Record<string, SUPPLIERSKey> = {
+  north: 'regBadgeNorth',
+  central: 'regBadgeCentral',
+  south: 'regBadgeSouth',
+};
 
 type Props = {
   filters: SupplierFilters;
@@ -21,6 +29,7 @@ type Props = {
 };
 
 export default function HotelTab({ filters, canWrite }: Props) {
+  const { tp, tpl } = useLanguage();
   const hotels = useStore((s) => s.hotels);
   const { createHotel, patchHotel, deleteHotel } = useHotelMutations();
 
@@ -53,14 +62,16 @@ export default function HotelTab({ filters, canWrite }: Props) {
   };
 
   const handleDelete = async (id: string) => {
-    const ok = await confirmDialog('Remove this hotel?', { title: 'Remove hotel' });
+    const ok = await confirmDialog(tp('suppliers', 'confirmRemoveHotel'), {
+      title: tp('suppliers', 'confirmRemoveHotelTitle'),
+    });
     if (!ok) return;
     const result = await deleteHotel(id);
     if (!result.ok) {
       toast.error(result.message);
       return;
     }
-    toast.success('Hotel removed.');
+    toast.success(tp('suppliers', 'toastHotelRemoved'));
   };
 
   const handleSave = async (hotel: Hotel) => {
@@ -70,7 +81,7 @@ export default function HotelTab({ filters, canWrite }: Props) {
         toast.error(result.message);
         return;
       }
-      toast.success('Hotel updated.');
+      toast.success(tp('suppliers', 'toastHotelUpdated'));
       return;
     }
     const result = await createHotel(hotel);
@@ -78,26 +89,26 @@ export default function HotelTab({ filters, canWrite }: Props) {
       toast.error(result.message);
       return;
     }
-    toast.success('Hotel created.');
+    toast.success(tp('suppliers', 'toastHotelCreated'));
   };
 
   return (
     <>
       <div className="sup-hotel-bar">
         <div className="info-bar" style={{ margin: 0, flex: 1 }}>
-          Showing <b>{filtered.length}</b> of <b>{hotels.length}</b> hotels · MUP = client rate · NET = cost · USD/rm/nt
+          {tpl('suppliers', 'showingHotels', { filtered: filtered.length, total: hotels.length })}
         </div>
         <Link href="/attractions" className="btn btn-s btn-sm">
-          🏛 Attraction Schedule
+          {tp('suppliers', 'linkAttractionSchedule')}
         </Link>
         <button
           className="btn btn-p btn-sm"
           type="button"
           onClick={openAdd}
           disabled={!canWrite}
-          title={!canWrite ? 'You need write permission for Suppliers to add a hotel' : undefined}
+          title={!canWrite ? tp('suppliers', 'permAddHotel') : undefined}
         >
-          ＋ Add Hotel
+          {tp('suppliers', 'addHotel')}
         </button>
       </div>
       <div className="card">
@@ -105,20 +116,20 @@ export default function HotelTab({ filters, canWrite }: Props) {
           <table className="tbl sup-hotel-tbl">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Hotel</th>
-                <th>Destination</th>
-                <th>Stars</th>
-                <th>Room Type</th>
-                <th className="sup-th sup-th-low">Low MUP</th>
-                <th className="sup-th sup-th-high">High MUP</th>
-                <th className="sup-th sup-th-fest">Festive MUP</th>
-                <th className="sup-th sup-th-peak">Peak MUP</th>
-                <th className="sup-th sup-th-low sup-th-net">Low NET</th>
-                <th className="sup-th sup-th-high sup-th-net">High NET</th>
-                <th className="sup-th sup-th-fest sup-th-net">Fest NET</th>
-                <th className="sup-th sup-th-peak sup-th-net">Peak NET</th>
-                <th>Actions</th>
+                <th>{tp('suppliers', 'colId')}</th>
+                <th>{tp('suppliers', 'colHotel')}</th>
+                <th>{tp('suppliers', 'colDestination')}</th>
+                <th>{tp('suppliers', 'colStars')}</th>
+                <th>{tp('suppliers', 'colRoomType')}</th>
+                <th className="sup-th sup-th-low">{tp('suppliers', 'colLowMup')}</th>
+                <th className="sup-th sup-th-high">{tp('suppliers', 'colHighMup')}</th>
+                <th className="sup-th sup-th-fest">{tp('suppliers', 'colFestMup')}</th>
+                <th className="sup-th sup-th-peak">{tp('suppliers', 'colPeakMup')}</th>
+                <th className="sup-th sup-th-low sup-th-net">{tp('suppliers', 'colLowNet')}</th>
+                <th className="sup-th sup-th-high sup-th-net">{tp('suppliers', 'colHighNet')}</th>
+                <th className="sup-th sup-th-fest sup-th-net">{tp('suppliers', 'colFestNet')}</th>
+                <th className="sup-th sup-th-peak sup-th-net">{tp('suppliers', 'colPeakNet')}</th>
+                <th>{tp('suppliers', 'colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -130,7 +141,9 @@ export default function HotelTab({ filters, canWrite }: Props) {
                         <td rowSpan={h.rooms.length} style={{ verticalAlign: 'top', paddingTop: 12 }}>
                           <code style={{ fontSize: 10, color: 'var(--g)' }}>{h.id}</code>
                           <br />
-                          <span className="sup-reg-badge">{REG_BADGE[h.region]}</span>
+                          <span className="sup-reg-badge">
+                            {tp('suppliers', REG_BADGE_I18N[h.region] ?? 'regBadgeNorth')}
+                          </span>
                         </td>
                         <td rowSpan={h.rooms.length} style={{ verticalAlign: 'top', paddingTop: 12 }}>
                           <b>{h.name}</b>
@@ -175,7 +188,7 @@ export default function HotelTab({ filters, canWrite }: Props) {
                           type="button"
                           onClick={() => openEdit(h.id)}
                           disabled={!canWrite}
-                          title={!canWrite ? 'You need write permission to edit a hotel' : undefined}
+                          title={!canWrite ? tp('suppliers', 'permEditHotel') : undefined}
                         >
                           ✏
                         </button>
@@ -185,7 +198,7 @@ export default function HotelTab({ filters, canWrite }: Props) {
                           style={{ marginLeft: 4 }}
                           onClick={() => void handleDelete(h.id)}
                           disabled={!canWrite}
-                          title={!canWrite ? 'You need write permission to delete a hotel' : undefined}
+                          title={!canWrite ? tp('suppliers', 'permDeleteHotel') : undefined}
                         >
                           ✕
                         </button>
@@ -201,17 +214,17 @@ export default function HotelTab({ filters, canWrite }: Props) {
                       className="crm-empty-state--table"
                       size="compact"
                       variant="suppliers"
-                      title="No hotels found"
-                      description="Add a hotel partner, or adjust search/region filters."
+                      title={tp('suppliers', 'emptyHotels')}
+                      description={tp('suppliers', 'emptyHotelsDesc')}
                       action={
                         <button
                           type="button"
                           className="btn btn-p btn-sm"
                           onClick={openAdd}
                           disabled={!canWrite}
-                          title={!canWrite ? 'You need write permission for Suppliers to add a hotel' : undefined}
+                          title={!canWrite ? tp('suppliers', 'permAddHotel') : undefined}
                         >
-                          ＋ Add Hotel
+                          {tp('suppliers', 'addHotel')}
                         </button>
                       }
                     />

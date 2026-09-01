@@ -5,6 +5,7 @@ import { fmt } from '@/lib/constants';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import { useSalaryPage } from '@/hooks/useSalaryPage';
 import EmptyState from '@/components/EmptyState';
+import { useLanguage } from '@/hooks/useLanguage';
 
 const SALARY_BANDS = [
   { pos: 'CEO / Founder', dept: 'Management', min: 2000, mid: 3000, max: 5000, currency: 'USD', cycle: 'Annual' },
@@ -18,7 +19,13 @@ const SALARY_BANDS = [
 
 type SalTab = 'payroll' | 'structure' | 'bonus';
 
+const MONTH_KEYS = [
+  'monthJanuary', 'monthFebruary', 'monthMarch', 'monthApril', 'monthMay', 'monthJune',
+  'monthJuly', 'monthAugust', 'monthSeptember', 'monthOctober', 'monthNovember', 'monthDecember',
+] as const;
+
 export default function SalaryPage() {
+  const { tp, tpl, tc } = useLanguage();
   const { canWrite } = usePagePermission('salary');
   const { staff, loading, error, reload } = useSalaryPage();
   const [tab, setTab] = useState<SalTab>('payroll');
@@ -60,18 +67,18 @@ export default function SalaryPage() {
   };
 
   if (loading && staff.length === 0) {
-    return <div className="crm-loading-hint">Đang tải dữ liệu lương…</div>;
+    return <div className="crm-loading-hint">{tp('salary', 'loading')}</div>;
   }
 
   if (error && staff.length === 0) {
     return (
       <EmptyState
         variant="access"
-        title="Không thể tải Salary"
+        title={tp('salary', 'loadErrorTitle')}
         description={error}
         action={
           <button className="btn btn-p btn-sm" type="button" onClick={() => void reload()}>
-            Thử lại
+            {tc('retry')}
           </button>
         }
       />
@@ -83,9 +90,9 @@ export default function SalaryPage() {
       <div className="tabs">
         {(
           [
-            ['payroll', 'Monthly Payroll'],
-            ['structure', 'Salary Structure'],
-            ['bonus', 'Bonus & Commission'],
+            ['payroll', tp('salary', 'tabPayroll')],
+            ['structure', tp('salary', 'tabStructure')],
+            ['bonus', tp('salary', 'tabBonus')],
           ] as const
         ).map(([id, label]) => (
           <div key={id} className={`tab${tab === id ? ' on' : ''}`} onClick={() => setTab(id)} role="button" tabIndex={0}>
@@ -98,31 +105,31 @@ export default function SalaryPage() {
         <>
           <div className="sal-payroll-bar">
             <select value={month} onChange={(e) => setMonth(e.target.value)} className="sal-month-sel">
-              {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m) => (
-                <option key={m}>{m} 2026</option>
+              {MONTH_KEYS.map((key) => (
+                <option key={key}>{tp('salary', key)} 2026</option>
               ))}
             </select>
             <div style={{ flex: 1 }} />
-            <div className="sal-total-badge">Total: ${fmt(payroll.grand)}/month</div>
-            <button className="btn btn-p btn-sm" type="button" onClick={exportPayroll} disabled={!canWrite} title={!canWrite ? 'Read-only mode: export disabled' : undefined}>
-              ⬇ Export Payroll
+            <div className="sal-total-badge">{tpl('salary', 'totalBadge', { amount: fmt(payroll.grand) })}</div>
+            <button className="btn btn-p btn-sm" type="button" onClick={exportPayroll} disabled={!canWrite} title={!canWrite ? tp('salary', 'readOnlyExport') : undefined}>
+              {tp('salary', 'exportPayroll')}
             </button>
           </div>
           <div className="card sal-payroll-card">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Staff ID</th>
-                  <th>Name</th>
-                  <th>Department</th>
-                  <th>Position</th>
-                  <th>Base Salary (USD)</th>
-                  <th>Guide Days</th>
-                  <th>Day Rate</th>
-                  <th>Bonus</th>
-                  <th>Deductions</th>
-                  <th>Total Payable</th>
-                  <th>Status</th>
+                  <th>{tp('salary', 'colStaffId')}</th>
+                  <th>{tp('salary', 'colName')}</th>
+                  <th>{tp('salary', 'colDepartment')}</th>
+                  <th>{tp('salary', 'colPosition')}</th>
+                  <th>{tp('salary', 'colBaseSalary')}</th>
+                  <th>{tp('salary', 'colGuideDays')}</th>
+                  <th>{tp('salary', 'colDayRate')}</th>
+                  <th>{tp('salary', 'colBonus')}</th>
+                  <th>{tp('salary', 'colDeductions')}</th>
+                  <th>{tp('salary', 'colTotalPayable')}</th>
+                  <th>{tp('salary', 'colStatus')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,7 +152,7 @@ export default function SalaryPage() {
                     <td style={{ color: 'var(--red)' }}>-${fmt(s.deductions)}</td>
                     <td style={{ fontWeight: 700, color: 'var(--g)' }}>${fmt(s.total)}</td>
                     <td>
-                      <span className="bdg bdg-a">Pending</span>
+                      <span className="bdg bdg-a">{tp('salary', 'statusPending')}</span>
                     </td>
                   </tr>
                 ))}
@@ -158,21 +165,21 @@ export default function SalaryPage() {
       {tab === 'structure' && (
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">Salary Bands by Position</span>
+            <span className="card-title">{tp('salary', 'structureTitle')}</span>
             <button className="btn btn-p btn-sm" type="button">
-              + Add Band
+              {tp('salary', 'addBand')}
             </button>
           </div>
           <table className="tbl">
             <thead>
               <tr>
-                <th>Position</th>
-                <th>Department</th>
-                <th>Min (USD/mo)</th>
-                <th>Mid (USD/mo)</th>
-                <th>Max (USD/mo)</th>
-                <th>Currency</th>
-                <th>Review Cycle</th>
+                <th>{tp('salary', 'colPosition')}</th>
+                <th>{tp('salary', 'colDepartment')}</th>
+                <th>{tp('salary', 'colMin')}</th>
+                <th>{tp('salary', 'colMid')}</th>
+                <th>{tp('salary', 'colMax')}</th>
+                <th>{tp('salary', 'colCurrency')}</th>
+                <th>{tp('salary', 'colReviewCycle')}</th>
               </tr>
             </thead>
             <tbody>
@@ -200,15 +207,15 @@ export default function SalaryPage() {
         <div className="sal-bonus-grid">
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Guide Commission Structure</span>
+              <span className="card-title">{tp('salary', 'guideCommissionTitle')}</span>
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>Rating Tier</th>
-                    <th>Day Rate (USD)</th>
-                    <th>Condition</th>
+                    <th>{tp('salary', 'colRatingTier')}</th>
+                    <th>{tp('salary', 'colDayRateUsd')}</th>
+                    <th>{tp('salary', 'colCondition')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -238,20 +245,20 @@ export default function SalaryPage() {
           </div>
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Sales Bonus Policy</span>
+              <span className="card-title">{tp('salary', 'salesBonusTitle')}</span>
             </div>
             <div className="card-body" style={{ fontSize: 12.5, display: 'flex', flexDirection: 'column', gap: 9 }}>
               <div className="sal-bonus-pill">
-                <b>Monthly Target Bonus:</b> Achieve 100%+ of monthly sales target → 5% of overachievement
+                <b>{tp('salary', 'bonusMonthly')}</b> {tp('salary', 'bonusMonthlyDesc')}
               </div>
               <div className="sal-bonus-pill">
-                <b>Quarterly Bonus:</b> Top performer of quarter → $300 bonus + recognition
+                <b>{tp('salary', 'bonusQuarterly')}</b> {tp('salary', 'bonusQuarterlyDesc')}
               </div>
               <div className="sal-bonus-pill">
-                <b>Annual Bonus:</b> Company profit-sharing pool — distributed proportionally to salary grade
+                <b>{tp('salary', 'bonusAnnual')}</b> {tp('salary', 'bonusAnnualDesc')}
               </div>
               <div className="sal-bonus-pill sal-bonus-tet">
-                <b>Tet/Holiday Bonus:</b> 1 month base salary paid before Lunar New Year
+                <b>{tp('salary', 'bonusTet')}</b> {tp('salary', 'bonusTetDesc')}
               </div>
             </div>
           </div>

@@ -102,7 +102,7 @@ export default function ProposalEditorModal({
 
   const dirty = stableSnapshot(draft) !== seedSnapshot;
 
-  const { language } = useLanguage();
+  const { language, tp, tpl, tc } = useLanguage();
   const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
 
   function applyAnchor(anchorId: string) {
@@ -142,16 +142,16 @@ export default function ProposalEditorModal({
     try {
       await onSaveCompany(variant, serializeCompanyTemplate(draft));
       setSeedSnapshot(stableSnapshot(draft));
-      toast.success(`${variant.toUpperCase()} company template saved`);
+      toast.success(tpl('tour-design', 'editorCompanySaved', { variant: variant.toUpperCase() }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not save company template');
+      toast.error(e instanceof Error ? e.message : tp('tour-design', 'editorCompanySaveFailed'));
     }
   }
 
   if (!open) return null;
 
   const source = companySourceByVariant[variant];
-  const variantLabel = variant === 'b2b' ? 'B2B quotation' : 'B2C proposal';
+  const variantLabel = variant === 'b2b' ? tp('tour-design', 'editorB2bLabel') : tp('tour-design', 'editorB2cLabel');
   const updating = previewHtml !== liveHtml;
 
   return (
@@ -165,11 +165,11 @@ export default function ProposalEditorModal({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={`Edit Template — ${variantLabel}`}
+        aria-label={`${tp('tour-design', 'editorTitle')} — ${variantLabel}`}
       >
         <div className="modal-hd modal-hd-green proposal-template-hd">
           <div className="proposal-template-hd-main">
-            <span className="proposal-template-hd-title">Edit Template</span>
+            <span className="proposal-template-hd-title">{tp('tour-design', 'editorTitle')}</span>
             <span className="proposal-template-meta">
               <span className="td-export-pill is-ready">{variantLabel}</span>
               {doc.quoteRef ? (
@@ -184,18 +184,16 @@ export default function ProposalEditorModal({
 
         <div className="proposal-template-banner proposal-template-banner--compact">
           <div className="proposal-template-meta">
-            <span className="td-export-pill">Layout · itinerary · prices locked</span>
+            <span className="td-export-pill">{tp('tour-design', 'editorLockedPill')}</span>
             <span className={`td-export-pill${source === 'company' ? ' is-ready' : ''}`}>
-              {source === 'company' ? 'Company template' : 'System defaults'}
+              {source === 'company' ? tp('tour-design', 'exportCompanyTemplate') : tp('tour-design', 'exportSystemDefaults')}
             </span>
-            {dirty ? <span className="td-export-pill is-busy">Unsaved changes</span> : null}
+            {dirty ? <span className="td-export-pill is-busy">{tp('tour-design', 'editorUnsaved')}</span> : null}
           </div>
           <details className="proposal-template-help">
-            <summary>How this works</summary>
+            <summary>{tp('tour-design', 'editorHowItWorks')}</summary>
             <p>
-              Click a field to jump to it in the preview. Save as the company template (all future{' '}
-              {variant.toUpperCase()} tours) or apply to this quote only. Layout, itinerary, guest
-              names, and prices stay locked.
+              {tpl('tour-design', 'editorHowItWorksBody', { variant: variant.toUpperCase() })}
             </p>
           </details>
         </div>
@@ -212,18 +210,18 @@ export default function ProposalEditorModal({
           <div className="proposal-template-preview-col">
             <ProposalDocumentCanvas
               html={previewHtml}
-              title="Proposal template preview"
+              title={tp('tour-design', 'editorPreviewTitle')}
               iframeRef={iframeRef}
               onIframeLoad={handleIframeLoad}
               leading={
                 <>
                   <strong>{variantLabel}</strong>
-                  <span className="td-export-preview-meta">· live</span>
+                  <span className="td-export-preview-meta">{tp('tour-design', 'exportPreviewLive')}</span>
                 </>
               }
               status={
                 <span className={`td-export-pill${updating ? ' is-busy' : ' is-ready'}`}>
-                  {updating ? 'Updating…' : 'Updated'}
+                  {updating ? tp('tour-design', 'exportPreviewUpdating') : tp('tour-design', 'exportPreviewUpdated')}
                 </span>
               }
             />
@@ -232,15 +230,15 @@ export default function ProposalEditorModal({
 
         <div className="proposal-editor-footer">
           <button type="button" className="proposal-template-link" onClick={handleResetSystem}>
-            Reset to system defaults
+            {tp('tour-design', 'editorResetSystem')}
           </button>
           <div style={{ flex: 1 }} />
-          {dirty ? <span className="td-export-pill is-busy">Unsaved changes</span> : null}
+          {dirty ? <span className="td-export-pill is-busy">{tp('tour-design', 'editorUnsaved')}</span> : null}
           <button type="button" className="btn btn-s" onClick={() => void requestClose()}>
-            Cancel
+            {tc('cancel')}
           </button>
           <button type="button" className="btn btn-s" onClick={handleSaveQuote}>
-            Apply to this quote
+            {tp('tour-design', 'editorApplyQuote')}
           </button>
           <button
             type="button"
@@ -248,7 +246,7 @@ export default function ProposalEditorModal({
             disabled={savingCompany}
             onClick={() => void handleSaveCompany()}
           >
-            {savingCompany ? 'Saving…' : 'Save company template'}
+            {savingCompany ? tp('tour-design', 'editorSaving') : tp('tour-design', 'editorSaveCompany')}
           </button>
         </div>
       </div>

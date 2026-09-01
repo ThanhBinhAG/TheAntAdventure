@@ -46,12 +46,19 @@ import type {
   TourOutlineDay,
 } from '@/lib/types';
 import { toast } from '@/lib/toast';
+import { useLanguage } from '@/hooks/useLanguage';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import { useTourDesignCrmContext } from '@/hooks/useTourDesignCrmContext';
 import { useTourDesignReferenceData } from '@/hooks/useTourDesignReferenceData';
 import { TourDesignQueueCards } from '@/components/tour-design/TourDesignQueueCards';
 
-const STEPS = ['Client Brief', 'Outline', 'Tour Experiences', 'Pricing', 'Export'] as const;
+const STEP_KEYS = [
+  'stepClientBrief',
+  'stepOutline',
+  'stepTourExperiences',
+  'stepPricing',
+  'stepExport',
+] as const;
 type OutlineWorkflowAction = 'sent' | 'resent' | 'approved' | 'revised';
 
 type OutlineWorkflowResponse = {
@@ -66,6 +73,7 @@ type OutlineWorkflowResponse = {
 };
 
 export default function TourDesignPage() {
+  const { tp } = useLanguage();
   const { canWrite } = usePagePermission('tourdesign');
   const [step, setStep] = useState(0);
   useTourDesignCrmContext();
@@ -118,17 +126,17 @@ export default function TourDesignPage() {
 
   useEffect(() => {
     let active = true;
-    void getBffArray<GalleryPhoto>('/api/photos/all', 'Không thể tải thư viện ảnh.').then((galleryPhotos) => {
+    void getBffArray<GalleryPhoto>('/api/photos/all', tp('tour-design', 'loadGalleryFailed')).then((galleryPhotos) => {
       if (!active) return;
       setPhotos(galleryPhotos);
       setReadError(null);
     }).catch((error: unknown) => {
-      if (active) setReadError(error instanceof Error ? error.message : 'Không thể tải dữ liệu Tour Design.');
+      if (active) setReadError(error instanceof Error ? error.message : tp('tour-design', 'loadDataFailed'));
     });
     return () => {
       active = false;
     };
-  }, [setPhotos]);
+  }, [setPhotos, tp]);
 
   useEffect(() => {
     const leadIds = [...new Set(leads.map((lead) => lead.id).filter(Boolean))];
@@ -140,7 +148,7 @@ export default function TourDesignPage() {
     let active = true;
     void getBffArray<TourDraft>(
       `/api/tour-design/drafts?leadIds=${encodeURIComponent(leadIds.join(','))}`,
-      'Không thể tải bản nháp tour.'
+      tp('tour-design', 'loadDraftsFailed')
     ).then((drafts) => {
       if (!active) return;
       drafts.forEach((draft) => {
@@ -148,13 +156,13 @@ export default function TourDesignPage() {
       });
       setTourDrafts(drafts);
     }).catch((error: unknown) => {
-      if (active) setReadError(error instanceof Error ? error.message : 'Không thể tải bản nháp tour.');
+      if (active) setReadError(error instanceof Error ? error.message : tp('tour-design', 'loadDraftsFailed'));
     });
 
     return () => {
       active = false;
     };
-  }, [leads, setTourDrafts]);
+  }, [leads, setTourDrafts, tp]);
 
   useEffect(() => {
     const missingCodes = selectedCodes.filter((code) => !products.some((product) => product.code === code));
@@ -163,8 +171,8 @@ export default function TourDesignPage() {
     let active = true;
     void Promise.all(missingCodes.map(async (code) => {
       const [product, pricing] = await Promise.all([
-        getBffData<Product>(`/api/products?code=${encodeURIComponent(code)}`, 'Không thể tải Product đã chọn.'),
-        getBffData<ProductPricing>(`/api/products/pricing?productCode=${encodeURIComponent(code)}`, 'Không thể tải bảng giá Product đã chọn.'),
+        getBffData<Product>(`/api/products?code=${encodeURIComponent(code)}`, tp('tour-design', 'loadProductFailed')),
+        getBffData<ProductPricing>(`/api/products/pricing?productCode=${encodeURIComponent(code)}`, tp('tour-design', 'loadPricingFailed')),
       ]);
       return { product, pricing };
     })).then((loaded) => {
@@ -178,13 +186,13 @@ export default function TourDesignPage() {
       loaded.forEach(({ pricing }) => pricingByCode.set(pricing.productCode, pricing));
       setProductPricing([...pricingByCode.values()]);
     }).catch((error: unknown) => {
-      if (active) setReadError(error instanceof Error ? error.message : 'Không thể tải Product đã chọn.');
+      if (active) setReadError(error instanceof Error ? error.message : tp('tour-design', 'loadProductFailed'));
     });
 
     return () => {
       active = false;
     };
-  }, [products, selectedCodes, setProductPricing, setProducts]);
+  }, [products, selectedCodes, setProductPricing, setProducts, tp]);
 
   const pendingLeads = useMemo(() => getPendingTourDesignLeads(leads), [leads]);
   const awaitingOutline = useMemo(
@@ -286,7 +294,7 @@ export default function TourDesignPage() {
               currentSaveRevision?: number;
             } | null;
             if (!response.ok || !result?.ok) {
-              const error = new Error(result?.error ?? 'Không thể lưu thiết kế tour.') as Error & {
+              const error = new Error(result?.error ?? tp('tour-design', 'saveDraftFailed')) as Error & {
                 currentSaveRevision?: number;
               };
               if (typeof result?.currentSaveRevision === 'number') {
@@ -298,7 +306,7 @@ export default function TourDesignPage() {
             }
             const saveRevision = result.data?.saveRevision;
             if (typeof saveRevision !== 'number' || !Number.isInteger(saveRevision) || saveRevision < 1) {
-              throw new Error('Máy chủ không trả về phiên bản lưu hợp lệ.');
+              throw new Error(tp('tour-design', 'saveRevisionInvalid'));
             }
             return { saveRevision };
           },
@@ -345,6 +353,7 @@ export default function TourDesignPage() {
       upsertTourDraft,
       replaceOutlineDaysForDraft,
       canWrite,
+      tp,
     ]
   );
 
@@ -366,16 +375,16 @@ export default function TourDesignPage() {
           data?: { lead?: typeof lead | null; acknowledged?: boolean };
         };
         if (!response.ok || !body.ok || typeof body.data?.acknowledged !== 'boolean') {
-          throw new Error(body.error || 'Could not save the Tour Design task.');
+          throw new Error(body.error || tp('tour-design', 'ackFailed'));
         }
         if (body.data.lead?.id === lid) {
           updateLead(lid, body.data.lead);
         }
       } catch {
-        toast.warning('Could not save the Tour Design task. It will stay in the queue.');
+        toast.warning(tp('tour-design', 'ackWarning'));
       }
     },
-    [canWrite, updateLead]
+    [canWrite, updateLead, tp]
   );
 
   const openLeadSession = useCallback(
@@ -390,19 +399,19 @@ export default function TourDesignPage() {
       try {
         const loadedDraft = await getBffData<TourDraft | null>(
           `/api/tour-design/drafts?id=${encodeURIComponent(tourDraftIdForLead(lid))}`,
-          'Không thể tải bản nháp tour.'
+          tp('tour-design', 'loadDraftsFailed')
         );
         if (loadedDraft) {
           draft = loadedDraft;
           days = await getBffArray<TourOutlineDay>(
             `/api/tour-design/outlines?draftId=${encodeURIComponent(loadedDraft.id)}`,
-            'Không thể tải hành trình tour.'
+            tp('tour-design', 'loadOutlineFailed')
           );
           upsertTourDraft(loadedDraft);
           replaceOutlineDaysForDraft(loadedDraft.id, days);
         }
       } catch (error) {
-        setReadError(error instanceof Error ? error.message : 'Không thể tải bản nháp tour.');
+        setReadError(error instanceof Error ? error.message : tp('tour-design', 'loadDraftsFailed'));
         return;
       }
 
@@ -452,7 +461,7 @@ export default function TourDesignPage() {
         setSelectedPackageId(null);
       }
     },
-    [customers, replaceOutlineDaysForDraft, tourDrafts, upsertTourDraft]
+    [customers, replaceOutlineDaysForDraft, tourDrafts, upsertTourDraft, tp]
   );
 
   const ensureLeadSession = useCallback((): string => {
@@ -606,14 +615,14 @@ export default function TourDesignPage() {
   async function goToStep(next: number) {
     if (next === 1) {
       if (!custId) {
-        toast.warning('Please select a customer before building the outline.');
+        toast.warning(tp('tour-design', 'selectCustomerFirst'));
         return;
       }
       const lid = ensureLeadSession();
       if (!lid) return;
       const saved = await persistDraft({ step: next }, lid);
       if (!saved) {
-        toast.warning('Could not save the client brief.');
+        toast.warning(tp('tour-design', 'saveBriefFailed'));
         return;
       }
       setStep(next);
@@ -656,7 +665,7 @@ export default function TourDesignPage() {
 
   async function runOutlineWorkflow(action: OutlineWorkflowAction) {
     if (!canWrite) {
-      toast.warning('Bạn không có quyền chỉnh sửa Tour Design.');
+      toast.warning(tp('tour-design', 'noWritePermission'));
       return;
     }
     if (!leadId || !custId) return;
@@ -679,7 +688,7 @@ export default function TourDesignPage() {
         if (typeof body?.currentSaveRevision === 'number') {
           saveQueueRef.current.setSaveRevision(draft.id, body.currentSaveRevision);
         }
-        throw new Error(body?.error ?? 'Không thể cập nhật trạng thái Outline.');
+        throw new Error(body?.error ?? tp('tour-design', 'outlineUpdateFailed'));
       }
 
       const result = body.data as { draft: TourDraft; lead: Lead; comm?: Comm | null };
@@ -697,7 +706,7 @@ export default function TourDesignPage() {
       setSaveState('saved');
     } catch (error) {
       setSaveState('error');
-      toast.error(error instanceof Error ? error.message : 'Không thể cập nhật trạng thái Outline.');
+      toast.error(error instanceof Error ? error.message : tp('tour-design', 'outlineUpdateFailed'));
     }
   }
 
@@ -787,16 +796,16 @@ export default function TourDesignPage() {
       />
 
       <div className="td-steps">
-        {STEPS.map((label, i) => (
+        {STEP_KEYS.map((key, i) => (
           <div
-            key={label}
+            key={key}
             className={`td-step${step === i ? ' on' : ''}${step > i ? ' done' : ''}`}
             onClick={() => handleStepClick(i)}
             role="button"
             tabIndex={0}
           >
             <span className="td-step-num">{i + 1}</span>
-            <span className="td-step-label">{label}</span>
+            <span className="td-step-label">{tp('tour-design', key)}</span>
           </div>
         ))}
       </div>
@@ -867,7 +876,7 @@ export default function TourDesignPage() {
           />
           <div className="td-nav" style={{ marginTop: 14 }}>
             <button className="btn btn-s" type="button" onClick={() => goToStep(1)}>
-              ← Back
+              {tp('tour-design', 'expBack')}
             </button>
             <button
               className="btn btn-p"
@@ -878,7 +887,7 @@ export default function TourDesignPage() {
               }}
               disabled={!canWrite}
             >
-              Next: Pricing →
+              {tp('tour-design', 'expNextPricing')}
             </button>
           </div>
         </div>
@@ -947,7 +956,7 @@ export default function TourDesignPage() {
             return {
               ok: false as const,
               error: 'save_failed' as const,
-              message: err instanceof Error ? err.message : 'Không thể tạo khách hàng.',
+              message: err instanceof Error ? err.message : tp('tour-design', 'createCustomerFailed'),
             };
           }
         }}

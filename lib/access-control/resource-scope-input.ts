@@ -19,7 +19,6 @@ export const resourceScopeActionSchema = z.enum([
 
 export const resourceScopeScopeSchema = z.enum([
     'own',
-    'assigned',
     'all',
 ]);
 

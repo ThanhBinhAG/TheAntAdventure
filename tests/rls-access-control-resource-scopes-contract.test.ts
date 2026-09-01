@@ -15,10 +15,9 @@ test('role scope management is RPC-only and records scope audits', () => {
   assert.match(sql, /revoke all on function public\.replace_access_control_staff_role_resource_scopes/i);
 });
 
-test('core record access columns can only change through audited RPCs', () => {
+test('core record ownership columns can only change through audited RPCs', () => {
   assert.match(sql, /protect_core_record_access_columns/i);
   assert.match(sql, /app\.allow_core_record_access_change/i);
   assert.match(sql, /core_record_owner_reassigned/i);
-  assert.match(sql, /core_record_assignee_changed/i);
   assert.match(sql, /trg_tasks_protect_access_columns/i);
 });

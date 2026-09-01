@@ -78,7 +78,7 @@ export type AccessControlStaffRole = {
 export type AccessControlResourceScope = {
     resource_code: 'customers' | 'leads' | 'tour_drafts' | 'bookings' | 'tasks' | 'comms';
     action: 'read' | 'write' | 'delete';
-    scope: 'own' | 'assigned' | 'all';
+    scope: 'own' | 'all';
 };
 
 /** Dữ liệu tạo role nhân viên mới. */

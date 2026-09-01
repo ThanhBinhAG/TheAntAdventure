@@ -46,7 +46,7 @@ import {
   RobotOutlined,
   CodeOutlined,
   MessageOutlined,
-  KeyOutlined
+  SafetyCertificateOutlined
 } from '@ant-design/icons';
 
 const DEFAULT_LOGO = '/Logo-3.svg';
@@ -109,8 +109,8 @@ function getSidebarIcon(page: string) {
       return <CodeOutlined style={{ color: '#34d399' }} />; // Green
     case 'teamchat':
       return <MessageOutlined style={{ color: '#60a5fa' }} />; // Blue
-    case 'access_control':
-      return <KeyOutlined style={{ color: '#fbbf24' }} />; // Amber
+    case 'access-control':
+      return <SafetyCertificateOutlined style={{ color: '#fbbf24' }} />; // Amber / Access Control
     default:
       return null;
   }

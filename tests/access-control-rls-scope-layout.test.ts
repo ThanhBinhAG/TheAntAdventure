@@ -21,6 +21,8 @@ describe('RLS data scopes layout', () => {
     assert.match(scopesTab, /styles\.resourceScopesGrid/);
     assert.match(scopesTab, /styles\.resourceScopeCard/);
     assert.match(scopesTab, /styles\.resourceScopeActionRow/);
+    assert.doesNotMatch(scopesTab, /scopeAssigned/);
+    assert.doesNotMatch(scopesTab, /supportsAssigned/);
     assert.match(styles, /\.roleConfigurationTabs\s+:global\(\.ant-tabs-nav\)/);
     assert.match(styles, /\.resourceScopesSection\[hidden\]\s*\{/);
     assert.match(styles, /\.resourceScopesGrid\s*\{/);

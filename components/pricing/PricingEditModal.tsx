@@ -5,7 +5,6 @@ import { fmt } from '@/lib/constants';
 import {
   ICO_EMOJIS,
   ICO_KEYS,
-  ICO_LABELS,
 } from '@/lib/pricing/pricing-utils';
 import type { ProductPricing, ProductPricingInclusions } from '@/lib/types';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
@@ -22,6 +21,7 @@ interface PricingEditModalProps {
 
 const PAX_COLS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
 const DEFAULT_OPEN_PAX = 10;
+const INCL_LABEL_KEYS = ['inclGuide', 'inclTransport', 'inclTickets', 'inclWater', 'inclMeals'] as const;
 
 function clonePricing(base: ProductPricing): ProductPricing {
   return { ...base, incl: { ...base.incl } };
@@ -54,7 +54,7 @@ export default function PricingEditModal({
     setOpenPax(DEFAULT_OPEN_PAX);
   }
 
-  const { language } = useLanguage();
+  const { language, tp } = useLanguage();
   const dirty = useFormDirty(
     open && !!form && !!original,
     { form: original, openPax: DEFAULT_OPEN_PAX },
@@ -93,7 +93,7 @@ export default function PricingEditModal({
       <div className="modal prod-form-modal pricing-edit-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green prod-form-modal-hd">
           <div>
-            <div className="prod-form-modal-title">Edit pricing</div>
+            <div className="prod-form-modal-title">{tp('pricing', 'editModalTitle')}</div>
             <div className="prod-form-modal-sub">
               <code className="pricing-edit-code">{productCode}</code>
               <span className="pricing-edit-name">{productName}</span>
@@ -107,11 +107,8 @@ export default function PricingEditModal({
         <div className="prod-form-modal-bd">
           <section className="prod-form-section">
             <div className="prod-form-section-hd">
-              <h3 className="prod-form-section-title">Sell price by group size</h3>
-              <p className="prod-form-section-hint">
-                USD per guest · 1 = solo · last column is the open rate for that group size or larger ·
-                group total = rate × entered pax
-              </p>
+              <h3 className="prod-form-section-title">{tp('pricing', 'editSellByGroupSize')}</h3>
+              <p className="prod-form-section-hint">{tp('pricing', 'editSellHint')}</p>
             </div>
 
             <div className="pricing-edit-grid-wrap">
@@ -133,12 +130,12 @@ export default function PricingEditModal({
                             className="pricing-edit-pax-input"
                             value={openPax}
                             onChange={(e) => setOpenPax(clampOpenPax(Number(e.target.value)))}
-                            aria-label="Open-tier group size in pax"
+                            aria-label={tp('pricing', 'editOpenPaxAria')}
                           />
                         ) : (
                           n
                         )}
-                        <span className="pricing-edit-th-unit">pax</span>
+                        <span className="pricing-edit-th-unit">{tp('pricing', 'editPaxUnit')}</span>
                       </th>
                     ))}
                   </tr>
@@ -184,8 +181,8 @@ export default function PricingEditModal({
 
           <section className="prod-form-section">
             <div className="prod-form-section-hd">
-              <h3 className="prod-form-section-title">What&apos;s included</h3>
-              <p className="prod-form-section-hint">Shown on the price list and client proposals</p>
+              <h3 className="prod-form-section-title">{tp('pricing', 'editWhatsIncluded')}</h3>
+              <p className="prod-form-section-hint">{tp('pricing', 'editInclHint')}</p>
             </div>
             <div className="pricing-edit-incl">
               {ICO_KEYS.map((key, j) => {
@@ -196,10 +193,10 @@ export default function PricingEditModal({
                     type="button"
                     className={`pricing-edit-incl-btn${on ? ' on' : ''}`}
                     onClick={() => setIncl(key, !on)}
-                    title={ICO_LABELS[j]}
+                    title={tp('pricing', INCL_LABEL_KEYS[j])}
                   >
                     <span className="pricing-edit-incl-icon">{ICO_EMOJIS[j]}</span>
-                    <span className="pricing-edit-incl-label">{ICO_LABELS[j]}</span>
+                    <span className="pricing-edit-incl-label">{tp('pricing', INCL_LABEL_KEYS[j])}</span>
                   </button>
                 );
               })}
@@ -209,10 +206,10 @@ export default function PricingEditModal({
 
         <div className="prod-form-modal-ft">
           <button type="button" className="btn btn-s" onClick={() => void requestClose()}>
-            Cancel
+            {tp('pricing', 'cancel')}
           </button>
           <button type="button" className="btn btn-p" onClick={handleSave}>
-            Save pricing
+            {tp('pricing', 'savePricing')}
           </button>
         </div>
       </div>

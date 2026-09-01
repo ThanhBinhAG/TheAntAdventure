@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useLanguage } from '@/hooks/useLanguage';
 import type { ProposalTemplateOverrides } from '@/lib/proposals/proposal-content-overrides';
 import {
   DEFAULT_PROPOSAL_THEME,
@@ -8,6 +9,7 @@ import {
   type ProposalTemplateTheme,
 } from '@/lib/proposals/proposal-theme';
 import type { ProposalLegalText, ProposalVariant } from '@/lib/proposals/proposal-types';
+import type { TOUR_DESIGNKey } from '@/lib/i18n/pages/tour-design';
 
 type PolicyKey = keyof ProposalLegalText;
 
@@ -18,20 +20,20 @@ interface Props {
   onFocusAnchor?: (anchorId: string) => void;
 }
 
-const COLOR_SWATCHES: Array<{ token: keyof Required<ProposalTemplateTheme>; label: string }> = [
-  { token: 'brand', label: 'Brand' },
-  { token: 'brandDark', label: 'Brand dark' },
-  { token: 'tableHeader', label: 'Table header' },
-  { token: 'rowAlt', label: 'Alt row' },
+const COLOR_SWATCHES: Array<{ token: keyof Required<ProposalTemplateTheme>; key: TOUR_DESIGNKey }> = [
+  { token: 'brand', key: 'tplColourBrand' },
+  { token: 'brandDark', key: 'tplColourBrandDark' },
+  { token: 'tableHeader', key: 'tplColourTableHeader' },
+  { token: 'rowAlt', key: 'tplColourRowAlt' },
 ];
 
-const NAV_CHIPS: Array<{ id: string; label: string }> = [
-  { id: 'tpl-colours', label: 'Colours' },
-  { id: 'tpl-cover', label: 'Cover' },
-  { id: 'tpl-lists', label: 'Lists' },
-  { id: 'tpl-booking', label: 'Booking' },
-  { id: 'tpl-pricing', label: 'Pricing' },
-  { id: 'tpl-policies', label: 'Policies' },
+const NAV_CHIPS: Array<{ id: string; key: TOUR_DESIGNKey }> = [
+  { id: 'tpl-colours', key: 'tplNavColours' },
+  { id: 'tpl-cover', key: 'tplNavCover' },
+  { id: 'tpl-lists', key: 'tplNavLists' },
+  { id: 'tpl-booking', key: 'tplNavBooking' },
+  { id: 'tpl-pricing', key: 'tplNavPricing' },
+  { id: 'tpl-policies', key: 'tplNavPolicies' },
 ];
 
 function updateList(list: string[] | undefined, index: number, text: string): string[] {
@@ -44,9 +46,9 @@ function removeAt(list: string[] | undefined, index: number): string[] {
   return (list ?? []).filter((_, i) => i !== index);
 }
 
-function excerpt(text: string): string {
+function excerpt(text: string, emptyLabel: string): string {
   const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!plain) return 'Empty — click to edit';
+  if (!plain) return emptyLabel;
   return plain.length > 96 ? `${plain.slice(0, 96)}…` : plain;
 }
 
@@ -99,12 +101,16 @@ function LineList({
   anchor,
   onFocusAnchor,
   onChangeLines,
+  addLabel,
+  removeTitle,
 }: {
   title: string;
   lines: string[];
   anchor: string;
   onFocusAnchor?: (id: string) => void;
   onChangeLines: (next: string[]) => void;
+  addLabel: string;
+  removeTitle: string;
 }) {
   return (
     <div className="proposal-template-list">
@@ -118,7 +124,7 @@ function LineList({
             onChangeLines([...lines, '']);
           }}
         >
-          + Add
+          {addLabel}
         </button>
       </div>
       {lines.map((line, i) => (
@@ -137,7 +143,7 @@ function LineList({
           <button
             type="button"
             className="proposal-template-remove"
-            title="Remove line"
+            title={removeTitle}
             onClick={() => onChangeLines(removeAt(lines, i))}
           >
             −
@@ -149,6 +155,7 @@ function LineList({
 }
 
 export default function ProposalTemplateForm({ variant, value, onChange, onFocusAnchor }: Props) {
+  const { tp } = useLanguage();
   const inclusions = value.inclusions ?? [''];
   const exclusions = value.exclusions ?? [''];
   const isB2c = variant === 'b2c';
@@ -161,15 +168,15 @@ export default function ProposalTemplateForm({ variant, value, onChange, onFocus
     onClick: () => onFocusAnchor?.(anchorId),
   });
 
-  const policies: Array<{ key: PolicyKey; label: string; anchor: string }> = [
+  const policies: Array<{ key: PolicyKey; labelKey: TOUR_DESIGNKey; anchor: string }> = [
     {
       key: 'paymentTerms',
-      label: isB2c ? 'Payment policy' : 'Payment policy (B2B PDF hides legal)',
+      labelKey: isB2c ? 'tplPaymentPolicy' : 'tplPaymentPolicyB2b',
       anchor: 'legal.paymentTerms',
     },
-    { key: 'cancellation', label: 'Cancellation policy', anchor: 'legal.cancellation' },
-    { key: 'amendment', label: 'Amendment policy', anchor: 'legal.amendment' },
-    { key: 'importantNotes', label: 'Important notes', anchor: 'legal.importantNotes' },
+    { key: 'cancellation', labelKey: 'tplCancellation', anchor: 'legal.cancellation' },
+    { key: 'amendment', labelKey: 'tplAmendment', anchor: 'legal.amendment' },
+    { key: 'importantNotes', labelKey: 'tplImportantNotes', anchor: 'legal.importantNotes' },
   ];
 
   function togglePolicy(key: PolicyKey, anchor: string) {
@@ -196,27 +203,27 @@ export default function ProposalTemplateForm({ variant, value, onChange, onFocus
             className="proposal-template-nav-chip"
             onClick={() => scrollToSection(chip.id)}
           >
-            {chip.label}
+            {tp('tour-design', chip.key)}
           </button>
         ))}
       </div>
 
       <section id="tpl-colours" className="proposal-template-section">
         <div className="proposal-template-section-hd-row">
-          <div className="proposal-template-section-hd">Brand colours</div>
+          <div className="proposal-template-section-hd">{tp('tour-design', 'tplBrandColours')}</div>
           <button
             type="button"
             className="proposal-template-link"
             onClick={() => onChange({ ...value, theme: { ...DEFAULT_PROPOSAL_THEME } })}
           >
-            Reset colours
+            {tp('tour-design', 'tplResetColours')}
           </button>
         </div>
         <div className="proposal-template-swatches">
           {COLOR_SWATCHES.map((swatch) => (
             <ColorSwatch
               key={swatch.token}
-              label={swatch.label}
+              label={tp('tour-design', swatch.key)}
               token={swatch.token}
               theme={theme}
               onTheme={(next) => onChange({ ...value, theme: next })}
@@ -226,39 +233,43 @@ export default function ProposalTemplateForm({ variant, value, onChange, onFocus
       </section>
 
       <section id="tpl-cover" className="proposal-template-section">
-        <div className="proposal-template-section-hd">Cover</div>
-        <label className="lbl">Tagline (cover subtitle)</label>
+        <div className="proposal-template-section-hd">{tp('tour-design', 'tplCover')}</div>
+        <label className="lbl">{tp('tour-design', 'tplTagline')}</label>
         <textarea
           className="proposal-template-grow"
           rows={2}
           value={value.tagline ?? ''}
           onChange={(e) => onChange({ ...value, tagline: e.target.value })}
-          placeholder="Journey subtitle shown under the tour title"
+          placeholder={tp('tour-design', 'tplTaglinePlaceholder')}
           {...focus('tagline')}
         />
       </section>
 
       <section id="tpl-lists" className="proposal-template-section">
-        <div className="proposal-template-section-hd">Inclusions & exclusions</div>
+        <div className="proposal-template-section-hd">{tp('tour-design', 'tplInclExcl')}</div>
         <LineList
-          title="Inclusions"
+          title={tp('tour-design', 'tplInclusions')}
           lines={inclusions}
           anchor="inclusions"
           onFocusAnchor={onFocusAnchor}
           onChangeLines={(next) => onChange({ ...value, inclusions: next })}
+          addLabel={tp('tour-design', 'tplAdd')}
+          removeTitle={tp('tour-design', 'tplRemoveLine')}
         />
         <LineList
-          title="Exclusions"
+          title={tp('tour-design', 'tplExclusions')}
           lines={exclusions}
           anchor="exclusions"
           onFocusAnchor={onFocusAnchor}
           onChangeLines={(next) => onChange({ ...value, exclusions: next })}
+          addLabel={tp('tour-design', 'tplAdd')}
+          removeTitle={tp('tour-design', 'tplRemoveLine')}
         />
       </section>
 
       <section id="tpl-booking" className="proposal-template-section">
-        <div className="proposal-template-section-hd">Booking</div>
-        <label className="lbl">{isB2c ? 'Payment Terms' : 'Commission'}</label>
+        <div className="proposal-template-section-hd">{tp('tour-design', 'tplBooking')}</div>
+        <label className="lbl">{isB2c ? tp('tour-design', 'tplPaymentTerms') : tp('tour-design', 'tplCommission')}</label>
         <input
           type="text"
           value={
@@ -278,7 +289,7 @@ export default function ProposalTemplateForm({ variant, value, onChange, onFocus
           {...focus(isB2c ? 'booking.Payment Terms' : 'booking.Commission')}
         />
 
-        <label className="lbl">Valid Until</label>
+        <label className="lbl">{tp('tour-design', 'tplValidUntil')}</label>
         <input
           type="text"
           value={value.bookingFields?.['Valid Until'] ?? ''}
@@ -293,10 +304,10 @@ export default function ProposalTemplateForm({ variant, value, onChange, onFocus
       </section>
 
       <section id="tpl-pricing" className="proposal-template-section">
-        <div className="proposal-template-section-hd">Pricing copy</div>
+        <div className="proposal-template-section-hd">{tp('tour-design', 'tplPricingCopy')}</div>
         {isB2c ? (
           <>
-            <label className="lbl">Pricing footnote</label>
+            <label className="lbl">{tp('tour-design', 'tplPricingFootnote')}</label>
             <textarea
               className="proposal-template-grow"
               rows={2}
@@ -309,7 +320,7 @@ export default function ProposalTemplateForm({ variant, value, onChange, onFocus
           </>
         ) : (
           <>
-            <label className="lbl">Ground arrangements description</label>
+            <label className="lbl">{tp('tour-design', 'tplGroundDesc')}</label>
             <textarea
               className="proposal-template-grow"
               rows={2}
@@ -322,7 +333,7 @@ export default function ProposalTemplateForm({ variant, value, onChange, onFocus
               }
               {...focus('pricing.b2bGroundDesc')}
             />
-            <label className="lbl">Flights description</label>
+            <label className="lbl">{tp('tour-design', 'tplFlightsDesc')}</label>
             <textarea
               className="proposal-template-grow"
               rows={2}
@@ -335,7 +346,7 @@ export default function ProposalTemplateForm({ variant, value, onChange, onFocus
               }
               {...focus('pricing.b2bFlightsDesc')}
             />
-            <label className="lbl">Quotation footnote</label>
+            <label className="lbl">{tp('tour-design', 'tplQuotationFootnote')}</label>
             <textarea
               className="proposal-template-grow"
               rows={2}
@@ -350,7 +361,7 @@ export default function ProposalTemplateForm({ variant, value, onChange, onFocus
       </section>
 
       <section id="tpl-policies" className="proposal-template-section">
-        <div className="proposal-template-section-hd">Policies</div>
+        <div className="proposal-template-section-hd">{tp('tour-design', 'tplPolicies')}</div>
         <div className="proposal-template-policies">
           {policies.map((policy) => {
             const open = openPolicy === policy.key;
@@ -362,8 +373,8 @@ export default function ProposalTemplateForm({ variant, value, onChange, onFocus
                   className="proposal-template-policy-hd"
                   onClick={() => togglePolicy(policy.key, policy.anchor)}
                 >
-                  <span className="lbl">{policy.label}</span>
-                  {!open && <span className="proposal-template-policy-excerpt">{excerpt(text)}</span>}
+                  <span className="lbl">{tp('tour-design', policy.labelKey)}</span>
+                  {!open && <span className="proposal-template-policy-excerpt">{excerpt(text, tp('tour-design', 'tplEmptyExcerpt'))}</span>}
                 </button>
                 {open && (
                   <textarea

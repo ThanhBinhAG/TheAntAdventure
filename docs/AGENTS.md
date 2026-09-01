@@ -21,6 +21,7 @@ Tracked product documentation: database schema reference and Supabase setup. Sou
 - `LOGGING.md` — Pino logging contract and operational boundary
 - `runbooks/PRIVATE-NETWORK-CUTOVER.md` — production private-network, rollback, recovery, and key-rotation operator procedure
 - `DEV-A-MIGRATION-REVIEW-2026-08-21.md` — consolidated Dev A implementation, acceptance, build, and remaining-cutover report
+- `UI-UX-REDESIGN-PLAN-vi.md` — approved-design contract, two-developer backlog, migration boundaries, and acceptance plan for the travel CRM UI/UX redesign
 
 ## Boundaries
 - Do not move these into `Personal/`. Owner-only notes stay under `Personal/`.

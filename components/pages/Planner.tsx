@@ -5,7 +5,6 @@ import CompletedTasksPanel from '@/components/planner/CompletedTasksPanel';
 import {
   buildNoteTask,
   getTaskDisplayText,
-  getTaskStatusLabel,
   isTaskComplete,
   TASK_STATUSES,
   truncateTaskText,
@@ -15,6 +14,8 @@ import type { Task } from '@/lib/types';
 import { addDays, localTodayIso, mondayOfWeek } from '@/lib/core/date-utils';
 import { useStore } from '@/hooks/useStore';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { useLanguage } from '@/hooks/useLanguage';
+import { PLANNER_STATUS_KEYS } from '@/lib/i18n/pages/planner';
 import { toast } from '@/lib/toast';
 import { getBffArray } from '@/lib/bff/client';
 
@@ -31,18 +32,20 @@ function TaskStatusSelect({
   compact?: boolean;
   disabled?: boolean;
 }) {
+  const { tp } = useLanguage();
+
   return (
     <select
       className={compact ? 'planner-status-select planner-status-select-sm' : 'planner-status-select'}
       value={value || 'todo'}
       onChange={(e) => onChange(e.target.value as TaskStatusValue)}
-      aria-label="Tiến độ công việc"
+      aria-label={tp('planner', 'taskProgressAria')}
       disabled={disabled}
-      title={disabled ? 'You need write permission for Planner to update a task' : undefined}
+      title={disabled ? tp('planner', 'readOnlyUpdate') : undefined}
     >
       {TASK_STATUSES.map((s) => (
         <option key={s.value} value={s.value}>
-          {s.label}
+          {tp('planner', PLANNER_STATUS_KEYS[s.value] || 'statusTodo')}
         </option>
       ))}
     </select>
@@ -50,6 +53,7 @@ function TaskStatusSelect({
 }
 
 export default function Planner() {
+  const { tp, tpl } = useLanguage();
   const { canWrite } = usePagePermission('planner');
   const tasks = useStore((s) => s.tasks) as Task[];
   const addTask = useStore((s) => s.addTask);
@@ -67,7 +71,8 @@ export default function Planner() {
 
   useEffect(() => {
     let active = true;
-    void getBffArray<Task>('/api/planner/all', 'Không thể tải danh sách công việc.')
+    const loadErrorMsg = tp('planner', 'loadError');
+    void getBffArray<Task>('/api/planner/all', loadErrorMsg)
       .then((rows) => {
         if (active) {
           setTasks(rows);
@@ -75,12 +80,16 @@ export default function Planner() {
         }
       })
       .catch((error: unknown) => {
-        if (active) setLoadError(error instanceof Error ? error.message : 'Không thể tải danh sách công việc.');
+        if (active) setLoadError(error instanceof Error ? error.message : loadErrorMsg);
       });
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once; error string is not refetch trigger
   }, [setTasks]);
+
+  const taskStatusLabel = (status?: string) =>
+    tp('planner', PLANNER_STATUS_KEYS[status || 'todo'] || 'statusTodo');
 
   const today = localTodayIso();
   const allTasks = tasks as Task[];
@@ -105,7 +114,7 @@ export default function Planner() {
 
   async function saveNoteTask() {
     if (!canWrite) {
-      toast.warning('Bạn không có quyền chỉnh sửa Planner.');
+      toast.warning(tp('planner', 'noPermission'));
       return;
     }
     if (!noteText.trim()) return;
@@ -118,25 +127,25 @@ export default function Planner() {
       });
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json.error ?? 'Không thể tạo task mới.');
+        throw new Error(json.error ?? tp('planner', 'taskCreateFailed'));
       }
       const json = await res.json();
       if (!json.ok) {
-        throw new Error(json.error ?? 'Không thể tạo task mới.');
+        throw new Error(json.error ?? tp('planner', 'taskCreateFailed'));
       }
 
       addTask(newTask as Record<string, unknown>);
       setNoteText('');
       setNewTaskStatus('todo');
-      toast.success('Đã thêm công việc.');
+      toast.success(tp('planner', 'taskAdded'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Thêm công việc thất bại.');
+      toast.error(e instanceof Error ? e.message : tp('planner', 'taskAddFailed'));
     }
   }
 
   async function changeTaskStatus(id: string, status: TaskStatusValue) {
     if (!canWrite) {
-      toast.warning('Bạn không có quyền chỉnh sửa Planner.');
+      toast.warning(tp('planner', 'noPermission'));
       return;
     }
     try {
@@ -147,17 +156,17 @@ export default function Planner() {
       });
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json.error ?? 'Không thể cập nhật trạng thái.');
+        throw new Error(json.error ?? tp('planner', 'statusUpdateFailed'));
       }
       const json = await res.json();
       if (!json.ok) {
-        throw new Error(json.error ?? 'Không thể cập nhật trạng thái.');
+        throw new Error(json.error ?? tp('planner', 'statusUpdateFailed'));
       }
 
       updateTask(id, { status });
       if (status === 'done' && expandedTaskId === id) setExpandedTaskId(null);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Cập nhật trạng thái thất bại.');
+      toast.error(e instanceof Error ? e.message : tp('planner', 'statusUpdateFailedShort'));
     }
   }
 
@@ -202,7 +211,7 @@ export default function Planner() {
     <div>
       {loadError && <div className="crm-page-hydrate-error" role="alert">{loadError}</div>}
       <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--m)', marginBottom: 12 }}>
-        📆 Task Calendar & Team Planner
+        {tp('planner', 'pageTitle')}
       </div>
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
@@ -216,18 +225,18 @@ export default function Planner() {
           </button>
         </div>
         <button className="btn btn-s btn-sm" type="button" onClick={() => setWeekOffset(0)}>
-          Today
+          {tp('planner', 'today')}
         </button>
         <div className="planner-view-toggle">
           <button type="button" className={plannerView === 'strip' ? 'on' : ''} onClick={() => setPlannerView('strip')}>
-            ☷ Strip
+            {tp('planner', 'viewStrip')}
           </button>
           <button type="button" className={plannerView === 'grid' ? 'on' : ''} onClick={() => setPlannerView('grid')}>
-            ☷ Grid
+            {tp('planner', 'viewGrid')}
           </button>
         </div>
         <select value={teamF} onChange={(e) => setTeamF(e.target.value)} style={{ padding: '6px 10px', border: '1px solid var(--b)', borderRadius: 7, fontSize: 12 }}>
-          <option value="">All Team Members</option>
+          <option value="">{tp('planner', 'allTeamMembers')}</option>
           {TEAM.map((t) => (
             <option key={t}>{t}</option>
           ))}
@@ -238,9 +247,9 @@ export default function Planner() {
           type="button"
           onClick={focusNoteBoard}
           disabled={!canWrite}
-          title={!canWrite ? 'You need write permission for Planner to add a task' : undefined}
+          title={!canWrite ? tp('planner', 'readOnlyAdd') : undefined}
         >
-          + Add Task
+          {tp('planner', 'addTask')}
         </button>
       </div>
 
@@ -265,7 +274,7 @@ export default function Planner() {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Team Member</th>
+                <th>{tp('planner', 'colTeamMember')}</th>
                 {weekDays.map((day) => (
                   <th key={day} style={{ fontSize: 10.5, textAlign: 'center' }}>
                     {new Date(day + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}
@@ -296,7 +305,7 @@ export default function Planner() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14, marginTop: 16 }}>
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">📋 Today&apos;s Tasks</span>
+            <span className="card-title">{tp('planner', 'todaysTasks')}</span>
             <span style={{ fontSize: 11, color: 'var(--m)' }}>{today}</span>
           </div>
 
@@ -305,10 +314,10 @@ export default function Planner() {
               className="planner-note-textarea planner-note-textarea-inline"
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Add today's tasks..."
+              placeholder={tp('planner', 'notePlaceholder')}
               rows={6}
               disabled={!canWrite}
-              title={!canWrite ? 'You need write permission for Planner to add a task' : undefined}
+              title={!canWrite ? tp('planner', 'readOnlyAdd') : undefined}
             />
             <div className="planner-note-board-actions">
               <TaskStatusSelect value={newTaskStatus} onChange={setNewTaskStatus} disabled={!canWrite} />
@@ -317,9 +326,9 @@ export default function Planner() {
                 type="button"
                 onClick={saveNoteTask}
                 disabled={!noteText.trim() || !canWrite}
-                title={!canWrite ? 'You need write permission for Planner to add a task' : undefined}
+                title={!canWrite ? tp('planner', 'readOnlyAdd') : undefined}
               >
-                Add task
+                {tp('planner', 'addTaskBtn')}
               </button>
             </div>
           </div>
@@ -344,7 +353,7 @@ export default function Planner() {
               ))
             ) : (
               <div style={{ padding: 16, color: 'var(--m)', fontSize: 12.5 }}>
-                No tasks today. Add tasks to the white board above — tasks that are not completed will automatically move to tomorrow.
+                {tp('planner', 'noTasksToday')}
               </div>
             )}
           </div>
@@ -354,20 +363,20 @@ export default function Planner() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">📊 Progress Overview</span>
+              <span className="card-title">{tp('planner', 'progressOverview')}</span>
             </div>
             <div className="card-body">
               <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--g)' }}>
                 {totalCount ? Math.round((doneCount / totalCount) * 100) : 0}%
               </div>
               <div style={{ fontSize: 12, color: 'var(--m)', marginTop: 4 }}>
-                {doneCount} of {totalCount} tasks done
+                {tpl('planner', 'tasksDone', { done: doneCount, total: totalCount })}
               </div>
             </div>
           </div>
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">⚡ Upcoming Deadlines</span>
+              <span className="card-title">{tp('planner', 'upcomingDeadlines')}</span>
             </div>
             <div className="card-body" style={{ padding: 12 }}>
               {activeTasks.filter((t) => t.date && t.date >= today).length ? (
@@ -379,11 +388,11 @@ export default function Planner() {
                       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {truncateTaskText(getTaskDisplayText(t), 28)}
                       </span>
-                      <span style={{ color: 'var(--m)', flexShrink: 0 }}>{getTaskStatusLabel(t.status)}</span>
+                      <span style={{ color: 'var(--m)', flexShrink: 0 }}>{taskStatusLabel(t.status)}</span>
                     </div>
                   ))
               ) : (
-                <div style={{ fontSize: 12, color: 'var(--m)' }}>No deadlines.</div>
+                <div style={{ fontSize: 12, color: 'var(--m)' }}>{tp('planner', 'noDeadlines')}</div>
               )}
             </div>
           </div>

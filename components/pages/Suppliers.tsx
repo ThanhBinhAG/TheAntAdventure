@@ -10,22 +10,10 @@ import { useStore } from '@/hooks/useStore';
 import { useSuppliersPage } from '@/hooks/useSuppliersPage';
 import type { SupplierFilters } from '@/lib/suppliers/supplier-utils';
 import { usePagePermission } from '@/hooks/usePagePermission';
-
-const TABS: { id: SupTab; label: string }[] = [
-  { id: 'hotels', label: '🏨 Hotels' },
-  { id: 'cruises', label: '⛵ Cruises' },
-  { id: 'transport', label: '🚐 Transport' },
-  { id: 'restaurants', label: '🍜 Restaurants' },
-  { id: 'logistics', label: '✈️ Logistics & Immigration' },
-  { id: 'water', label: '🚤 Water Transport' },
-  { id: 'adventure', label: '🧗 Adventure & Equipment' },
-  { id: 'experience', label: '🎭 High-End Experiences' },
-  { id: 'personnel', label: '👥 Personnel & Safety' },
-];
-
-const EXTENDED_TABS: SupTab[] = ['logistics', 'water', 'adventure', 'experience', 'personnel'];
+import { useLanguage } from '@/hooks/useLanguage';
 
 export default function Suppliers() {
+  const { tp, tc } = useLanguage();
   const { canWrite } = usePagePermission('suppliers');
   const { loading, error, reload } = useSuppliersPage();
   const hotels = useStore((s) => s.hotels);
@@ -37,10 +25,27 @@ export default function Suppliers() {
   const [tab, setTab] = useState<SupTab>('hotels');
   const [filters, setFilters] = useState<SupplierFilters>({ search: '', region: '', tier: '' });
 
+  const TABS: { id: SupTab; label: string }[] = useMemo(
+    () => [
+      { id: 'hotels', label: tp('suppliers', 'tabHotels') },
+      { id: 'cruises', label: tp('suppliers', 'tabCruises') },
+      { id: 'transport', label: tp('suppliers', 'tabTransport') },
+      { id: 'restaurants', label: tp('suppliers', 'tabRestaurants') },
+      { id: 'logistics', label: tp('suppliers', 'tabLogistics') },
+      { id: 'water', label: tp('suppliers', 'tabWater') },
+      { id: 'adventure', label: tp('suppliers', 'tabAdventure') },
+      { id: 'experience', label: tp('suppliers', 'tabExperience') },
+      { id: 'personnel', label: tp('suppliers', 'tabPersonnel') },
+    ],
+    [tp]
+  );
+
   const counts = useMemo(
     () => computeSupplierCounts({ hotels, transport, restaurants, cruises, specialSuppliers }),
     [hotels, transport, restaurants, cruises, specialSuppliers]
   );
+
+  const EXTENDED_TABS: SupTab[] = ['logistics', 'water', 'adventure', 'experience', 'personnel'];
 
   if (loading && !hotels.length && !transport.length && !restaurants.length && !cruises.length && !specialSuppliers.length) {
     return (
@@ -48,8 +53,8 @@ export default function Suppliers() {
         <EmptyState
           size="compact"
           variant="suppliers"
-          title="Loading suppliers…"
-          description="Fetching partner catalogs from the CRM API."
+          title={tp('suppliers', 'loadingTitle')}
+          description={tp('suppliers', 'loadingDesc')}
         />
       </div>
     );
@@ -61,11 +66,11 @@ export default function Suppliers() {
         <EmptyState
           size="compact"
           variant="suppliers"
-          title="Could not load suppliers"
+          title={tp('suppliers', 'loadErrorTitle')}
           description={error}
           action={
             <button type="button" className="btn btn-p btn-sm" onClick={() => void reload()}>
-              Retry
+              {tc('retry')}
             </button>
           }
         />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useLanguage } from '@/hooks/useLanguage';
 import { fmt } from '@/lib/constants';
 import {
   PRICING_TIERS,
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function PricingStep({ briefPax, selectedProducts, markupPct: markup, onMarkupChange, onBack, onNext, canWrite = true }: Props) {
+  const { tp, tpl } = useLanguage();
   const [aiOpen, setAiOpen] = useState(false);
 
   const activeTierN = paxToTierN(briefPax);
@@ -63,19 +65,19 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
   return (
     <div className="card">
       <div className="card-hd">
-        <span className="card-title">Step 3 — Pricing Confirmation</span>
+        <span className="card-title">{tp('tour-design', 'pricingStepTitle')}</span>
         <button className="btn btn-pu btn-sm" type="button" onClick={aiReview} disabled={!canWrite}>
-          ✦ AI Pricing Review
+          ✦ {tp('tour-design', 'pricingAiReview')}
         </button>
       </div>
       <div className="card-body">
         <div className="td-markup-row">
           <div style={{ flex: 1, minWidth: 220 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7, color: 'var(--gd)' }}>✓ Auto-populated from Step 2</span>
-            <span style={{ fontSize: 11, color: 'var(--m)', marginLeft: 6 }}>· Review and adjust below</span>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7, color: 'var(--gd)' }}>✓ {tp('tour-design', 'pricingAutoPopulated')}</span>
+            <span style={{ fontSize: 11, color: 'var(--m)', marginLeft: 6 }}>· {tp('tour-design', 'pricingReviewAdjust')}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <label style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--gd)' }}>Markup %</label>
+            <label style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--gd)' }}>{tp('tour-design', 'pricingMarkupPct')}</label>
             <input
               type="range"
               min={10}
@@ -88,26 +90,26 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
             />
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--g)', minWidth: 36 }}>{markup}%</span>
             <button type="button" className="btn btn-s btn-sm" onClick={() => onMarkupChange(30)} disabled={!canWrite}>
-              Reset 30%
+              {tp('tour-design', 'pricingReset30')}
             </button>
           </div>
         </div>
 
         {!selectedProducts.length ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--m)', fontSize: 13 }}>
-            ℹ️ No products selected. Go back to Step 2 and add experiences to your itinerary.
+            ℹ️ {tp('tour-design', 'pricingNoProducts')}
           </div>
         ) : (
           <>
             {notFound > 0 && (
-              <div style={{ color: 'var(--amb)', fontSize: 11, marginBottom: 6 }}>⚠️ Some products not found in pricing library.</div>
+              <div style={{ color: 'var(--amb)', fontSize: 11, marginBottom: 6 }}>⚠️ {tp('tour-design', 'pricingSomeNotFound')}</div>
             )}
             <div className="td-pricing-note">
-              <b>Live pricing from Pricing Library</b> · Sell prices include {markup}% markup
+              <b>{tp('tour-design', 'pricingLiveNote')}</b> · {tpl('tour-design', 'pricingMarkupNote', { markup })}
               {usesOpenRate && (
                 <>
                   {' '}
-                  · Using <b>10+ rate</b> × {briefPax} guests
+                  · {tpl('tour-design', 'pricingOpenRateNote', { pax: briefPax })}
                 </>
               )}
             </div>
@@ -115,7 +117,7 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>Experience</th>
+                    <th>{tp('tour-design', 'pricingColExperience')}</th>
                     {PRICING_TIERS.map(({ n, label }) => (
                       <th
                         key={n}
@@ -127,7 +129,7 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
                         }}
                       >
                         {label}
-                        {n === activeTierN ? (usesOpenRate ? ' ★ (applied)' : ' ★') : ''}
+                        {n === activeTierN ? (usesOpenRate ? tp('tour-design', 'pricingApplied') : ' ★') : ''}
                       </th>
                     ))}
                   </tr>
@@ -150,7 +152,7 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
                     </tr>
                   ))}
                   <tr style={{ borderTop: '2px solid var(--g)', background: '#e8f5ee44' }}>
-                    <td style={{ fontWeight: 700, color: 'var(--gd)' }}>Total (per pax)</td>
+                    <td style={{ fontWeight: 700, color: 'var(--gd)' }}>{tp('tour-design', 'pricingTotalPerPax')}</td>
                     {grandTotals.map((t, i) => {
                       const n = PRICING_TIERS[i].n;
                       const hl = n === activeTierN;
@@ -167,25 +169,25 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
 
             <div className="td-pricing-kpi-grid">
               <div className="td-pricing-kpi">
-                <div className="td-kpi-lbl">Cost/pax ({briefPax} pax)</div>
+                <div className="td-kpi-lbl">{tpl('tour-design', 'pricingCostPerPax', { pax: briefPax })}</div>
                 <div className="td-kpi-val" style={{ fontSize: 14 }}>
                   ${fmt(grandCost)}
                 </div>
               </div>
               <div className="td-pricing-kpi">
-                <div className="td-kpi-lbl">Sell/pax ({briefPax} pax)</div>
+                <div className="td-kpi-lbl">{tpl('tour-design', 'pricingSellPerPax', { pax: briefPax })}</div>
                 <div className="td-kpi-val" style={{ fontSize: 14, color: 'var(--g)' }}>
                   ${fmt(grandSell)}
                 </div>
               </div>
               <div className="td-pricing-kpi">
-                <div className="td-kpi-lbl">Margin</div>
+                <div className="td-kpi-lbl">{tp('tour-design', 'pricingMargin')}</div>
                 <div className="td-kpi-val" style={{ fontSize: 14, color: 'var(--blue)' }}>
                   ${fmt(grandMargin)} <span style={{ fontSize: 11 }}>({marginPctVal}%)</span>
                 </div>
               </div>
               <div className="td-pricing-kpi">
-                <div className="td-kpi-lbl">After 15% Comm</div>
+                <div className="td-kpi-lbl">{tp('tour-design', 'pricingAfterComm')}</div>
                 <div className="td-kpi-val" style={{ fontSize: 14, color: 'var(--amb)' }}>
                   ${fmt(afterComm)}/pax
                 </div>
@@ -194,15 +196,15 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
 
             <div className="td-pkg-summary">
               <div className="td-section-lbl" style={{ marginBottom: 9 }}>
-                Package Summary — {briefPax} Pax
+                {tpl('tour-design', 'pricingPackageSummary', { pax: briefPax })}
               </div>
               <div className="td-pkg-summary-grid">
                 {[
-                  ['Experiences', String(selectedProducts.length)],
-                  ['Duration', `${totalD}D`],
-                  ['Sell/pax', `$${fmt(grandSell)}`],
-                  ['Group Total', `$${fmt(groupTotal)}`],
-                  ['After Comm', `$${fmt(afterCommGrp)}`],
+                  [tp('tour-design', 'pricingSummaryExperiences'), String(selectedProducts.length)],
+                  [tp('tour-design', 'pricingSummaryDuration'), `${totalD}D`],
+                  [tp('tour-design', 'pricingSummarySellPax'), `$${fmt(grandSell)}`],
+                  [tp('tour-design', 'pricingSummaryGroupTotal'), `$${fmt(groupTotal)}`],
+                  [tp('tour-design', 'pricingSummaryAfterComm'), `$${fmt(afterCommGrp)}`],
                 ].map(([l, v]) => (
                   <div key={l}>
                     <div className="td-kpi-lbl">{l}</div>
@@ -217,7 +219,7 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
         {aiOpen && (
           <div className="td-ai-panel" style={{ marginTop: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--pur)' }}>✦ AI Pricing Review</span>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--pur)' }}>✦ {tp('tour-design', 'pricingAiReview')}</span>
               <button type="button" onClick={() => setAiOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--m)' }}>
                 ✕
               </button>
@@ -231,10 +233,10 @@ export default function PricingStep({ briefPax, selectedProducts, markupPct: mar
 
         <div className="td-nav" style={{ marginTop: 14 }}>
           <button className="btn btn-s" type="button" onClick={onBack}>
-            ← Back
+            {tp('tour-design', 'outlineBack')}
           </button>
-          <button className="btn btn-p" type="button" onClick={onNext} disabled={!selectedProducts.length}>
-            Next: Export →
+          <button className="btn btn-p" type="button" onClick={onNext} disabled={!canWrite}>
+            {tp('tour-design', 'pricingNextExport')}
           </button>
         </div>
       </div>

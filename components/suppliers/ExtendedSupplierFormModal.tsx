@@ -10,6 +10,25 @@ import {
 import type { ExtendedSupplier } from '@/lib/types';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
 import { useLanguage } from '@/hooks/useLanguage';
+import type { SUPPLIERSKey } from '@/lib/i18n/pages/suppliers';
+
+const CAT_I18N: Record<string, SUPPLIERSKey> = {
+  visa: 'catVisa',
+  fasttrack: 'catFasttrack',
+  aviation: 'catAviation',
+  river: 'catRiver',
+  coastal: 'catCoastal',
+  park: 'catPark',
+  cycling: 'catCycling',
+  trekking: 'catTrekking',
+  wildlife: 'catWildlife',
+  artisan: 'catArtisan',
+  wellness: 'catWellness',
+  events: 'catEvents',
+  specguide: 'catSpecguide',
+  media: 'catMedia',
+  safety: 'catSafety',
+};
 
 interface Props {
   open: boolean;
@@ -78,7 +97,7 @@ export default function ExtendedSupplierFormModal({
     setFormError(null);
   }
 
-  const { language } = useLanguage();
+  const { tp, tc, language } = useLanguage();
   const baselineForm = useMemo(
     () => initialForm(mode, supplier, defaultCat, existing),
     [formKey], // eslint-disable-line react-hooks/exhaustive-deps
@@ -105,7 +124,7 @@ export default function ExtendedSupplierFormModal({
 
   function handleSave() {
     if (!form.name.trim() || !form.phone?.trim() || !form.desc?.trim()) {
-      setFormError('Name, phone, and description are required.');
+      setFormError(tp('suppliers', 'errorSupplierRequired'));
       return;
     }
     onSave({
@@ -134,10 +153,10 @@ export default function ExtendedSupplierFormModal({
         <div className="modal-hd modal-hd-green nc-modal-hd">
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>
-              {mode === 'edit' ? 'Edit Supplier' : 'Add Supplier'}
+              {mode === 'edit' ? tp('suppliers', 'editSupplier') : tp('suppliers', 'addSupplier')}
             </div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 1 }}>
-              Extended partner catalog — logistics, experiences, personnel
+              {tp('suppliers', 'extendedModalSub')}
             </div>
           </div>
           <button className="modal-close-btn" type="button" onClick={() => void requestClose()}>
@@ -146,77 +165,77 @@ export default function ExtendedSupplierFormModal({
         </div>
 
         <div className="nc-modal-body">
-          <div className="nc-section-title">Classification</div>
+          <div className="nc-section-title">{tp('suppliers', 'sectionClassification')}</div>
           <div className="nc-grid-2" style={{ marginBottom: 16 }}>
             <div className="fg">
-              <label className="lbl">Category *</label>
+              <label className="lbl">{tp('suppliers', 'lblCategoryRequired')}</label>
               <select value={form.cat} onChange={(e) => setField('cat', e.target.value)} disabled={mode === 'edit'}>
                 {EXTENDED_CATEGORY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                    {tp('suppliers', CAT_I18N[opt.value] ?? 'catVisa')}
                   </option>
                 ))}
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Sub-category</label>
+              <label className="lbl">{tp('suppliers', 'lblSubCategory')}</label>
               <input
-                placeholder="e.g. FR Specialist Guide"
+                placeholder={tp('suppliers', 'subCategoryPlaceholder')}
                 value={form.subcat || ''}
                 onChange={(e) => setField('subcat', e.target.value)}
               />
             </div>
           </div>
 
-          <div className="nc-section-title">Contact</div>
+          <div className="nc-section-title">{tp('suppliers', 'sectionContact')}</div>
           <div className="nc-grid-2" style={{ marginBottom: 16 }}>
             <div className="fg">
-              <label className="lbl">Supplier Name *</label>
+              <label className="lbl">{tp('suppliers', 'lblSupplierName')}</label>
               <input value={form.name} onChange={(e) => setField('name', e.target.value)} />
             </div>
             <div className="fg">
-              <label className="lbl">English Name</label>
+              <label className="lbl">{tp('suppliers', 'lblEnglishName')}</label>
               <input value={form.ename || ''} onChange={(e) => setField('ename', e.target.value)} />
             </div>
             <div className="fg">
-              <label className="lbl">Contact Person</label>
+              <label className="lbl">{tp('suppliers', 'lblContactPerson')}</label>
               <input value={form.contact || ''} onChange={(e) => setField('contact', e.target.value)} />
             </div>
             <div className="fg">
-              <label className="lbl">Phone *</label>
+              <label className="lbl">{tp('suppliers', 'lblPhone')}</label>
               <input value={form.phone || ''} onChange={(e) => setField('phone', e.target.value)} />
             </div>
             <div className="fg">
-              <label className="lbl">Email</label>
+              <label className="lbl">{tp('suppliers', 'lblEmail')}</label>
               <input value={form.email || ''} onChange={(e) => setField('email', e.target.value)} />
             </div>
             <div className="fg">
-              <label className="lbl">Location</label>
+              <label className="lbl">{tp('suppliers', 'lblLocation')}</label>
               <input value={form.location || ''} onChange={(e) => setField('location', e.target.value)} />
             </div>
             <div className="fg">
-              <label className="lbl">Region</label>
+              <label className="lbl">{tp('suppliers', 'lblRegion')}</label>
               <select value={form.region || 'national'} onChange={(e) => setField('region', e.target.value)}>
-                <option value="national">Nationwide</option>
-                <option value="north">North</option>
-                <option value="central">Central</option>
-                <option value="south">South</option>
+                <option value="national">{tp('suppliers', 'regionNationwide')}</option>
+                <option value="north">{tp('suppliers', 'regionNorth')}</option>
+                <option value="central">{tp('suppliers', 'regionCentral')}</option>
+                <option value="south">{tp('suppliers', 'regionSouth')}</option>
               </select>
             </div>
           </div>
 
-          <div className="nc-section-title">Commercial</div>
+          <div className="nc-section-title">{tp('suppliers', 'sectionCommercial')}</div>
           <div className="nc-grid-2" style={{ marginBottom: 16 }}>
             <div className="fg">
-              <label className="lbl">Rate / Pricing</label>
+              <label className="lbl">{tp('suppliers', 'lblRatePricing')}</label>
               <input
-                placeholder="$45/application · $120 urgent"
+                placeholder={tp('suppliers', 'ratePlaceholder')}
                 value={form.rate || ''}
                 onChange={(e) => setField('rate', e.target.value)}
               />
             </div>
             <div className="fg">
-              <label className="lbl">Currency</label>
+              <label className="lbl">{tp('suppliers', 'lblCurrency')}</label>
               <select value={form.currency || 'USD'} onChange={(e) => setField('currency', e.target.value)}>
                 {['USD', 'EUR', 'VND'].map((c) => (
                   <option key={c} value={c}>
@@ -226,34 +245,34 @@ export default function ExtendedSupplierFormModal({
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Payment Terms</label>
+              <label className="lbl">{tp('suppliers', 'lblPaymentTerms')}</label>
               <input
                 value={form.payment || ''}
                 onChange={(e) => setField('payment', e.target.value)}
-                placeholder="100% upfront"
+                placeholder={tp('suppliers', 'paymentPlaceholder')}
               />
             </div>
             <div className="fg">
-              <label className="lbl">Contract</label>
+              <label className="lbl">{tp('suppliers', 'lblContract')}</label>
               <select value={form.contract || 'verbal'} onChange={(e) => setField('contract', e.target.value)}>
-                <option value="verbal">Verbal agreement</option>
-                <option value="yes">Signed contract</option>
+                <option value="verbal">{tp('suppliers', 'contractVerbal')}</option>
+                <option value="yes">{tp('suppliers', 'contractSigned')}</option>
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Cancellation Policy</label>
+              <label className="lbl">{tp('suppliers', 'lblCancellation')}</label>
               <input value={form.cancel || ''} onChange={(e) => setField('cancel', e.target.value)} />
             </div>
             <div className="fg">
-              <label className="lbl">Insurance / Licence</label>
+              <label className="lbl">{tp('suppliers', 'lblInsurance')}</label>
               <input value={form.insurance || ''} onChange={(e) => setField('insurance', e.target.value)} />
             </div>
             <div className="fg">
-              <label className="lbl">Availability</label>
+              <label className="lbl">{tp('suppliers', 'lblAvailability')}</label>
               <input value={form.avail || ''} onChange={(e) => setField('avail', e.target.value)} />
             </div>
             <div className="fg">
-              <label className="lbl">Rating</label>
+              <label className="lbl">{tp('suppliers', 'lblRating')}</label>
               <select value={form.rating || '★★★★'} onChange={(e) => setField('rating', e.target.value)}>
                 {['★★★', '★★★★', '★★★★★'].map((r) => (
                   <option key={r} value={r}>
@@ -263,22 +282,22 @@ export default function ExtendedSupplierFormModal({
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Status</label>
+              <label className="lbl">{tp('suppliers', 'lblStatus')}</label>
               <select value={form.status || 'Active'} onChange={(e) => setField('status', e.target.value)}>
-                <option value="Active">Active</option>
-                <option value="Standby">Standby</option>
-                <option value="Inactive">Inactive</option>
+                <option value="Active">{tp('suppliers', 'statusActive')}</option>
+                <option value="Standby">{tp('suppliers', 'statusStandby')}</option>
+                <option value="Inactive">{tp('suppliers', 'statusInactive')}</option>
               </select>
             </div>
           </div>
 
-          <div className="nc-section-title">Description</div>
+          <div className="nc-section-title">{tp('suppliers', 'sectionDescription')}</div>
           <div className="fg" style={{ marginBottom: 12 }}>
-            <label className="lbl">Description *</label>
+            <label className="lbl">{tp('suppliers', 'lblDescription')}</label>
             <textarea style={{ minHeight: 80 }} value={form.desc || ''} onChange={(e) => setField('desc', e.target.value)} />
           </div>
 
-          <div className="nc-section-title">Tags</div>
+          <div className="nc-section-title">{tp('suppliers', 'sectionTags')}</div>
           <div className="fg" style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {EXTENDED_TAG_OPTIONS.map((tag) => (
@@ -294,9 +313,9 @@ export default function ExtendedSupplierFormModal({
             </div>
           </div>
 
-          <div className="nc-section-title">Notes</div>
+          <div className="nc-section-title">{tp('suppliers', 'sectionNotesInternal')}</div>
           <div className="fg">
-            <label className="lbl">Internal Notes</label>
+            <label className="lbl">{tp('suppliers', 'lblInternalNotes')}</label>
             <textarea style={{ minHeight: 50 }} value={form.notes || ''} onChange={(e) => setField('notes', e.target.value)} />
           </div>
         </div>
@@ -309,10 +328,10 @@ export default function ExtendedSupplierFormModal({
           ) : null}
           <div className="nc-modal-ft-actions">
             <button className="btn btn-s" type="button" onClick={() => void requestClose()}>
-              Cancel
+              {tc('cancel')}
             </button>
             <button className="btn btn-p" type="button" onClick={handleSave}>
-              Save Supplier
+              {tp('suppliers', 'saveSupplier')}
             </button>
           </div>
         </div>

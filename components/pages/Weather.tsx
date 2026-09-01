@@ -7,6 +7,7 @@ import ProvinceCardGrid from '@/components/weather/destinations/ProvinceCardGrid
 import { useWeatherPageBoot } from '@/components/weather/hooks/useWeatherPageBoot';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { useLanguage } from '@/hooks/useLanguage';
 
 const WeatherDetailModal = dynamic(() => import('@/components/weather/week/WeatherDetailModal'), {
   ssr: false,
@@ -22,6 +23,7 @@ const FeaturedSlotsModal = dynamic(() => import('@/components/weather/destinatio
 });
 
 export default function Weather() {
+  const { tp, tc } = useLanguage();
   const { canWrite } = usePagePermission('weather');
   const {
     destinations,
@@ -61,12 +63,12 @@ export default function Weather() {
         body: JSON.stringify({ force: true }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || 'Refresh failed');
+      if (!res.ok) throw new Error(json?.error || tp('weather', 'refreshFailed'));
       await reload();
       setCacheVersion((n) => n + 1);
-      toast.success('The weather data has been updated.');
+      toast.success(tp('weather', 'toastWeatherUpdated'));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to refresh the weather data.');
+      toast.error(err instanceof Error ? err.message : tp('weather', 'toastRefreshFailed'));
     } finally {
       setRefreshing(false);
     }
@@ -76,10 +78,8 @@ export default function Weather() {
     <div className="wg-page">
       <header className="wg-page-hd">
         <div>
-          <h1 className="wg-page-title">Weather Guide</h1>
-          <p className="wg-page-sub">
-            Best weather for your trip to Vietnam.
-          </p>
+          <h1 className="wg-page-title">{tp('weather', 'pageTitle')}</h1>
+          <p className="wg-page-sub">{tp('weather', 'pageSubtitle')}</p>
         </div>
         <div className="wg-page-actions">
           <button
@@ -87,18 +87,18 @@ export default function Weather() {
             className="btn btn-s btn-sm"
             onClick={() => setFeaturedOpen(true)}
             disabled={!canWrite}
-            title={!canWrite ? 'You need write permission for Weather to manage featured slots' : undefined}
+            title={!canWrite ? tp('weather', 'permFeaturedSlots') : undefined}
           >
-            Edit featured destinations
+            {tp('weather', 'editFeaturedDestinations')}
           </button>
           <button
             type="button"
             className="btn btn-s btn-sm"
             onClick={() => void handleRefreshAll()}
             disabled={refreshing || !canWrite}
-            title={!canWrite ? 'You need write permission for Weather to refresh cache' : undefined}
+            title={!canWrite ? tp('weather', 'permRefreshCache') : undefined}
           >
-            {refreshing ? 'Refreshing…' : 'Refresh cache'}
+            {refreshing ? tp('weather', 'refreshing') : tp('weather', 'refreshCache')}
           </button>
         </div>
       </header>
@@ -107,7 +107,7 @@ export default function Weather() {
         <div className="wg-error">
           {error}{' '}
           <button type="button" className="btn btn-s btn-sm" onClick={() => void reload()}>
-            Try again
+            {tc('retry')}
           </button>
         </div>
       ) : null}
@@ -115,7 +115,7 @@ export default function Weather() {
       <section className="wg-section" aria-labelledby="wg-featured-heading">
         <div className="wg-section-hd">
           <h2 id="wg-featured-heading" className="wg-section-heading">
-            Featured destinations
+            {tp('weather', 'featuredDestinations')}
           </h2>
         </div>
         <FeaturedWeatherRow
@@ -130,9 +130,9 @@ export default function Weather() {
       <section className="wg-section" aria-labelledby="wg-explore-heading">
         <div className="wg-section-hd">
           <h2 id="wg-explore-heading" className="wg-section-heading">
-            Explore other destinations
+            {tp('weather', 'exploreOtherDestinations')}
           </h2>
-          <p className="wg-section-sub">Tap the destination to view the weather (only call API when needed).</p>
+          <p className="wg-section-sub">{tp('weather', 'exploreSub')}</p>
         </div>
         <ProvinceCardGrid
           destinations={explore}
@@ -146,9 +146,9 @@ export default function Weather() {
             className="btn btn-p"
             onClick={() => setAddOpen(true)}
             disabled={!canWrite}
-            title={!canWrite ? 'You need write permission for Weather to add a province' : undefined}
+            title={!canWrite ? tp('weather', 'permAddProvince') : undefined}
           >
-            + Add new province
+            {tp('weather', 'addNewProvince')}
           </button>
         </div>
       </section>

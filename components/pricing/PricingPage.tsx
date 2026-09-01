@@ -23,9 +23,6 @@ import { printPricing } from '@/lib/pricing/pricing-html';
 import {
   ICO_EMOJIS,
   ICO_KEYS,
-  ICO_LABELS,
-  INCL_NO,
-  INCL_YES,
   MULTI_DURATIONS,
   PL_FX_BASE,
   type PlCurrency,
@@ -41,18 +38,54 @@ import type { ProductPricing } from '@/lib/types';
 import PaginationBar from '@/components/PaginationBar';
 import { usePageSize } from '@/hooks/usePageSize';
 import { useProductPage } from '@/hooks/useProductPage';
+import { useLanguage } from '@/hooks/useLanguage';
 import type { ProductPageSize } from '@/lib/products/product-list-input';
 
 type PricingTab = 'pricelist' | 'costbuilder' | 'markup';
 
-function formatPdfDownloadError(message: string): string {
+const TAB_KEYS = [
+  ['pricelist', 'tabPriceList'],
+  ['costbuilder', 'tabCostBuilder'],
+  ['markup', 'tabMarkupCalculator'],
+] as const;
+
+const REGION_OPTIONS = [
+  { value: '', labelKey: 'regionAll' },
+  { value: 'North', labelKey: 'regionNorth' },
+  { value: 'Central', labelKey: 'regionCentral' },
+  { value: 'South', labelKey: 'regionSouth' },
+  { value: 'Services', labelKey: 'regionServices' },
+] as const;
+
+const CATEGORY_OPTIONS = [
+  { value: '', labelKey: 'categoryAll' },
+  { value: 'Cultural', labelKey: 'categoryCultural' },
+  { value: 'Culinary', labelKey: 'categoryCulinary' },
+  { value: 'Transfer', labelKey: 'categoryTransfer' },
+  { value: 'Adventure', labelKey: 'categoryAdventure' },
+  { value: 'Luxury River Cruise', labelKey: 'categoryLuxuryRiverCruise' },
+] as const;
+
+const DURATION_OPTIONS = [
+  { value: '', labelKey: 'durationAll' },
+  { value: 'Half Day', labelKey: 'durationHalfDay' },
+  { value: 'Full Day', labelKey: 'durationFullDay' },
+  { value: 'multi', labelKey: 'durationMultiDay' },
+] as const;
+
+const INCL_LABEL_KEYS = ['inclGuide', 'inclTransport', 'inclTickets', 'inclWater', 'inclMeals'] as const;
+const INCL_YES_KEYS = ['inclGuideYes', 'inclTransportYes', 'inclTicketsYes', 'inclWaterYes', 'inclMealsYes'] as const;
+const INCL_NO_KEYS = ['inclGuideNo', 'inclTransportNo', 'inclTicketsNo', 'inclWaterNo', 'inclMealsNo'] as const;
+
+function formatPdfDownloadError(message: string, tp: (page: 'pricing', key: string) => string): string {
   if (/libnspr4|libnss3|browser process|Code:\s*127|shared libraries|could not start Chromium/i.test(message)) {
-    return `${message}\n\nWSL/Linux: run \`bash scripts/setup-pdf-deps-wsl.sh\`, restart \`npm run dev\`, or use Print / Save PDF.`;
+    return `${message}\n\n${tp('pricing', 'pdfDepsHint')}`;
   }
   return message;
 }
 
 export default function Pricing() {
+  const { tp, tpl } = useLanguage();
   const { canWrite } = usePagePermission('pricing');
   const searchParams = useSearchParams();
   const highlightCode = searchParams.get('product') ?? '';
@@ -115,7 +148,7 @@ export default function Pricing() {
       products.map((product) =>
         getBffData<ProductPricing>(
           `/api/products/pricing?productCode=${encodeURIComponent(product.code)}`,
-          `Không thể tải bảng giá của ${product.code}.`
+          tpl('pricing', 'loadProductPricingFailed', { code: product.code })
         ).catch(() => null)
       )
     )
@@ -125,12 +158,12 @@ export default function Pricing() {
         setLoadError(null);
       })
       .catch((error: unknown) => {
-        if (active) setLoadError(error instanceof Error ? error.message : 'Không thể tải bảng giá.');
+        if (active) setLoadError(error instanceof Error ? error.message : tp('pricing', 'loadPricingFailed'));
       });
     return () => {
       active = false;
     };
-  }, [productPage?.items]);
+  }, [productPage?.items, tp, tpl]);
 
   const selectableProducts = useMemo(
     () => (productPage?.items ?? []).filter(isSelectableProduct),
@@ -177,11 +210,11 @@ export default function Pricing() {
       });
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json.error ?? 'Không thể lưu bảng giá.');
+        throw new Error(json.error ?? tp('pricing', 'savePricingFailed'));
       }
       const json = await res.json();
       if (!json.ok) {
-        throw new Error(json.error ?? 'Không thể lưu bảng giá.');
+        throw new Error(json.error ?? tp('pricing', 'savePricingFailed'));
       }
 
       setPagePricing((current) => {
@@ -192,9 +225,9 @@ export default function Pricing() {
       });
       upsertProductPricing(row);
       setEditRow(null);
-      toast.success('Đã lưu bảng giá thành công.');
+      toast.success(tp('pricing', 'savePricingSuccess'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Lưu bảng giá thất bại.');
+      toast.error(e instanceof Error ? e.message : tp('pricing', 'savePricingError'));
     }
   };
 
@@ -209,25 +242,25 @@ export default function Pricing() {
 
   const handleDownloadExcel = useCallback(() => {
     if (filtered.length === 0) {
-      toast.warning('No products to export — adjust filters or add pricing rows.');
+      toast.warning(tp('pricing', 'exportNoProducts'));
       return;
     }
     setExportError('');
     downloadPricingXlsx(filtered, exportOptions);
-  }, [filtered, exportOptions]);
+  }, [filtered, exportOptions, tp]);
 
   const handlePrintPdf = useCallback(() => {
     if (filtered.length === 0) {
-      toast.warning('No products to export — adjust filters or add pricing rows.');
+      toast.warning(tp('pricing', 'exportNoProducts'));
       return;
     }
     setExportError('');
     printPricing(filtered, { ...exportOptions, logoUrl: '/Logo-3.svg' }, window.location.origin);
-  }, [filtered, exportOptions]);
+  }, [filtered, exportOptions, tp]);
 
   const handleDownloadPdf = useCallback(async () => {
     if (filtered.length === 0) {
-      toast.warning('No products to export — adjust filters or add pricing rows.');
+      toast.warning(tp('pricing', 'exportNoProducts'));
       return;
     }
     setPdfLoading(true);
@@ -245,7 +278,7 @@ export default function Pricing() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Export failed (${res.status})`);
+        throw new Error(data.error || tpl('pricing', 'exportFailed', { status: res.status }));
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -255,11 +288,11 @@ export default function Pricing() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setExportError(formatPdfDownloadError(e instanceof Error ? e.message : 'PDF export failed.'));
+      setExportError(formatPdfDownloadError(e instanceof Error ? e.message : tp('pricing', 'pdfExportFailed'), tp));
     } finally {
       setPdfLoading(false);
     }
-  }, [filtered, exportOptions]);
+  }, [filtered, exportOptions, tp, tpl]);
 
   return (
     <div>
@@ -269,15 +302,9 @@ export default function Pricing() {
         </div>
       )}
       <div className="tabs">
-        {(
-          [
-            ['pricelist', 'Price List 2026'],
-            ['costbuilder', 'Cost Builder'],
-            ['markup', 'Markup Calculator'],
-          ] as const
-        ).map(([id, label]) => (
+        {TAB_KEYS.map(([id, labelKey]) => (
           <div key={id} className={`tab${tab === id ? ' on' : ''}`} onClick={() => setTab(id)} role="button" tabIndex={0}>
-            {label}
+            {tp('pricing', labelKey)}
           </div>
         ))}
       </div>
@@ -289,14 +316,12 @@ export default function Pricing() {
               <div className="card-body" style={{ padding: '10px 16px', fontSize: 12 }}>
                 {missingCount > 0 && (
                   <span style={{ marginRight: 16 }}>
-                    ⚠ {missingCount} product(s) without pricing — open Edit pricing to enter tiers later
-                    (imported Tour Products start empty).
+                    ⚠ {tpl('pricing', 'warnMissingPricing', { count: missingCount })}
                   </span>
                 )}
                 {orphanCount > 0 && (
                   <span>
-                    ⚠ {orphanCount} stale pricing row(s) with no matching Tour Product (hidden from this
-                    list).
+                    ⚠ {tpl('pricing', 'warnOrphanPricing', { count: orphanCount })}
                   </span>
                 )}
               </div>
@@ -307,42 +332,36 @@ export default function Pricing() {
             <div className="card-body" style={{ padding: '14px 18px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 10, alignItems: 'end', marginBottom: 10 }}>
                 <div className="fg">
-                  <label className="lbl">🔍 Search Tour ID or Name</label>
-                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="e.g. Halong, AA-NV-HAN..." />
+                  <label className="lbl">🔍 {tp('pricing', 'searchLabel')}</label>
+                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tp('pricing', 'searchPlaceholder')} />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Region</label>
+                  <label className="lbl">{tp('pricing', 'regionLabel')}</label>
                   <select value={region} onChange={(e) => setRegion(e.target.value)}>
-                    <option value="">All Regions</option>
-                    <option>North</option>
-                    <option>Central</option>
-                    <option>South</option>
-                    <option>Services</option>
+                    {REGION_OPTIONS.map(({ value, labelKey }) => (
+                      <option key={value || 'all'} value={value}>{tp('pricing', labelKey)}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="fg">
-                  <label className="lbl">Category</label>
+                  <label className="lbl">{tp('pricing', 'categoryLabel')}</label>
                   <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                    <option value="">All Categories</option>
-                    <option>Cultural</option>
-                    <option>Culinary</option>
-                    <option>Transfer</option>
-                    <option>Adventure</option>
-                    <option>Luxury River Cruise</option>
+                    {CATEGORY_OPTIONS.map(({ value, labelKey }) => (
+                      <option key={value || 'all'} value={value}>{tp('pricing', labelKey)}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="fg">
-                  <label className="lbl">Duration</label>
+                  <label className="lbl">{tp('pricing', 'durationLabel')}</label>
                   <select value={duration} onChange={(e) => setDuration(e.target.value)}>
-                    <option value="">All Durations</option>
-                    <option>Half Day</option>
-                    <option>Full Day</option>
-                    <option value="multi">Multi-Day</option>
+                    {DURATION_OPTIONS.map(({ value, labelKey }) => (
+                      <option key={value || 'all'} value={value}>{tp('pricing', labelKey)}</option>
+                    ))}
                   </select>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: 'var(--m)', fontWeight: 600 }}>Currency:</span>
+                <span style={{ fontSize: 11, color: 'var(--m)', fontWeight: 600 }}>{tp('pricing', 'currencyLabel')}</span>
                 {(['USD', 'VND', 'AUD', 'EUR'] as PlCurrency[]).map((c) => (
                   <button
                     key={c}
@@ -364,7 +383,7 @@ export default function Pricing() {
                 ))}
                 <div style={{ width: 1, height: 18, background: 'var(--b)', margin: '0 2px' }} />
                 <button type="button" className="btn btn-s btn-sm" onClick={() => setShowCost(!showCost)}>
-                  👁 {showCost ? 'Hide' : 'Show'} Cost
+                  👁 {showCost ? tp('pricing', 'hideCost') : tp('pricing', 'showCost')}
                 </button>
                 <div style={{ flex: 1 }} />
                 <div className="fx-rate-pill">
@@ -374,10 +393,10 @@ export default function Pricing() {
                   </span>
                 </div>
                 <span style={{ fontSize: 12, color: 'var(--m)', fontWeight: 500 }}>
-                  Showing {filtered.length} of {productPage?.totalCount ?? 0} tours
+                  {tpl('pricing', 'showingTours', { shown: filtered.length, total: productPage?.totalCount ?? 0 })}
                 </span>
                 <button className="btn btn-s btn-sm" type="button" onClick={() => { setSearch(''); setRegion(''); setCategory(''); setDuration(''); }}>
-                  Clear Filters
+                  {tp('pricing', 'clearFilters')}
                 </button>
                 <div style={{ width: 1, height: 18, background: 'var(--b)', margin: '0 2px' }} />
                 <button
@@ -385,27 +404,27 @@ export default function Pricing() {
                   type="button"
                   onClick={handleDownloadExcel}
                   disabled={filtered.length === 0 || !canWrite}
-                  title={!canWrite ? 'You need write permission for Pricing to export Excel' : undefined}
+                  title={!canWrite ? tp('pricing', 'permExportExcel') : undefined}
                 >
-                  Download Excel
+                  {tp('pricing', 'downloadExcel')}
                 </button>
                 <button
                   className="btn btn-s btn-sm"
                   type="button"
                   onClick={handleDownloadPdf}
                   disabled={pdfLoading || filtered.length === 0 || !canWrite}
-                  title={!canWrite ? 'You need write permission for Pricing to export PDF' : undefined}
+                  title={!canWrite ? tp('pricing', 'permExportPdf') : undefined}
                 >
-                  {pdfLoading ? 'Generating PDF…' : 'Download PDF'}
+                  {pdfLoading ? tp('pricing', 'generatingPdf') : tp('pricing', 'downloadPdf')}
                 </button>
                 <button
                   className="btn btn-s btn-sm"
                   type="button"
                   onClick={handlePrintPdf}
                   disabled={filtered.length === 0 || !canWrite}
-                  title={!canWrite ? 'You need write permission for Pricing to print PDF' : undefined}
+                  title={!canWrite ? tp('pricing', 'permExportPrint') : undefined}
                 >
-                  Print / Save PDF
+                  {tp('pricing', 'printSavePdf')}
                 </button>
               </div>
               {exportError && (
@@ -431,19 +450,19 @@ export default function Pricing() {
 
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Price List by Pax / Bảng giá theo số khách 2026</span>
+              <span className="card-title">{tp('pricing', 'cardTitlePriceList')}</span>
               <span className="bdg bdg-g">
-                {filtered.length} Products · {currency}
+                {tpl('pricing', 'productsCount', { count: filtered.length, currency })}
               </span>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table className="tbl pricing-tbl">
                 <thead>
                   <tr>
-                    <th className="pl-sticky">TOUR ID</th>
-                    <th>TOUR NAME</th>
-                    <th>DURATION</th>
-                    <th style={{ textAlign: 'center' }}>INCLUDED</th>
+                    <th className="pl-sticky">{tp('pricing', 'colTourId')}</th>
+                    <th>{tp('pricing', 'colTourName')}</th>
+                    <th>{tp('pricing', 'colDuration')}</th>
+                    <th style={{ textAlign: 'center' }}>{tp('pricing', 'colIncluded')}</th>
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
                       <th key={n} style={{ textAlign: 'right', ...(n === 1 ? { background: '#FFF8EC', color: '#D97706' } : n === 10 ? { background: '#EBF7F1', color: '#1a5c38' } : {}) }}>
                         {paxColumnLabel(n)}
@@ -456,7 +475,7 @@ export default function Pricing() {
                   {filtered.map((t, i) => {
                     const durBdg = MULTI_DURATIONS.includes(t.duration) ? 'bdg-g' : 'bdg-w';
                     const inclIcons = ICO_KEYS.map((k, j) => (
-                      <span key={k} style={{ fontSize: 13, opacity: t.pricing.incl[k] ? 1 : 0.2 }} title={ICO_LABELS[j]}>
+                      <span key={k} style={{ fontSize: 13, opacity: t.pricing.incl[k] ? 1 : 0.2 }} title={tp('pricing', INCL_LABEL_KEYS[j])}>
                         {ICO_EMOJIS[j]}
                       </span>
                     ));
@@ -472,8 +491,8 @@ export default function Pricing() {
                         >
                           <td className="pl-sticky">
                             <code className="pl-code">{t.productCode}</code>
-                            {t.missingProduct && <div className="bdg bdg-a" style={{ fontSize: 9, marginTop: 4 }}>no tiers</div>}
-                            {t.orphanPricing && <div className="bdg bdg-r" style={{ fontSize: 9, marginTop: 4 }}>orphan</div>}
+                            {t.missingProduct && <div className="bdg bdg-a" style={{ fontSize: 9, marginTop: 4 }}>{tp('pricing', 'badgeNoTiers')}</div>}
+                            {t.orphanPricing && <div className="bdg bdg-r" style={{ fontSize: 9, marginTop: 4 }}>{tp('pricing', 'badgeOrphan')}</div>}
                           </td>
                           <td style={{ fontWeight: 500, fontSize: 12.5, maxWidth: 220 }}>{t.name}</td>
                           <td>
@@ -497,7 +516,7 @@ export default function Pricing() {
                                 <span style={{ fontWeight: 700, fontSize: 12, color: n === 1 ? '#D97706' : '#2E7D52' }}>{fmtPx(sp, currency)}</span>
                                 {showCost && (
                                   <div style={{ marginTop: 2 }}>
-                                    <span style={{ fontSize: 9.5, color: '#9CA3AF' }}>Cost: {fmtPx(co, currency)}</span>
+                                    <span style={{ fontSize: 9.5, color: '#9CA3AF' }}>{tp('pricing', 'costLabel')} {fmtPx(co, currency)}</span>
                                     <span style={{ fontSize: 9, marginLeft: 3, color: mkC }}>{mk}%</span>
                                   </div>
                                 )}
@@ -510,9 +529,9 @@ export default function Pricing() {
                               className="btn btn-s btn-sm"
                               onClick={() => setEditRow(t)}
                               disabled={!canWrite}
-                              title={!canWrite ? 'You need write permission for Pricing to edit price' : undefined}
+                              title={!canWrite ? tp('pricing', 'permEditPrice') : undefined}
                             >
-                              Edit
+                              {tp('pricing', 'edit')}
                             </button>
                           </td>
                         </tr>
@@ -524,7 +543,7 @@ export default function Pricing() {
                                   const yes = t.pricing.incl[k];
                                   return (
                                     <span key={k} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 10, background: yes ? '#E8F5EE' : '#F5F5F5', color: yes ? '#1a5c38' : '#9CA3AF' }}>
-                                      {ICO_EMOJIS[j]} {yes ? INCL_YES[j] : INCL_NO[j]}
+                                      {ICO_EMOJIS[j]} {yes ? tp('pricing', INCL_YES_KEYS[j]) : tp('pricing', INCL_NO_KEYS[j])}
                                     </span>
                                   );
                                 })}
@@ -532,7 +551,7 @@ export default function Pricing() {
                               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                 {!t.orphanPricing && (
                                   <Link href={`/products`} className="btn btn-s btn-sm">
-                                    View in Tour Products
+                                    {tp('pricing', 'viewInTourProducts')}
                                   </Link>
                                 )}
                               </div>
@@ -552,53 +571,53 @@ export default function Pricing() {
       {tab === 'costbuilder' && (
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">Tour Cost Builder</span>
+            <span className="card-title">{tp('pricing', 'costBuilderTitle')}</span>
           </div>
           <div className="card-body">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, maxWidth: 720 }}>
               <div className="fg">
-                <label className="lbl">Duration (days)</label>
+                <label className="lbl">{tp('pricing', 'cbDurationDays')}</label>
                 <input type="number" value={cbDur} onChange={(e) => setCbDur(Number(e.target.value))} />
               </div>
               <div className="fg">
-                <label className="lbl">Pax</label>
+                <label className="lbl">{tp('pricing', 'cbPax')}</label>
                 <input type="number" value={cbPax} onChange={(e) => setCbPax(Number(e.target.value))} />
               </div>
               <div className="fg">
-                <label className="lbl">Markup %</label>
+                <label className="lbl">{tp('pricing', 'cbMarkupPct')}</label>
                 <input type="number" value={cbMarkup} onChange={(e) => setCbMarkup(Number(e.target.value))} />
               </div>
               <div className="fg">
-                <label className="lbl">Hotel $/night</label>
+                <label className="lbl">{tp('pricing', 'cbHotelPerNight')}</label>
                 <input type="number" value={cbHotel} onChange={(e) => setCbHotel(Number(e.target.value))} />
               </div>
               <div className="fg">
-                <label className="lbl">Guide $/day</label>
+                <label className="lbl">{tp('pricing', 'cbGuidePerDay')}</label>
                 <input type="number" value={cbGuide} onChange={(e) => setCbGuide(Number(e.target.value))} />
               </div>
               <div className="fg">
-                <label className="lbl">Transport $/day</label>
+                <label className="lbl">{tp('pricing', 'cbTransportPerDay')}</label>
                 <input type="number" value={cbCar} onChange={(e) => setCbCar(Number(e.target.value))} />
               </div>
               <div className="fg">
-                <label className="lbl">Meals $/pax/day</label>
+                <label className="lbl">{tp('pricing', 'cbMealsPerPaxDay')}</label>
                 <input type="number" value={cbMeals} onChange={(e) => setCbMeals(Number(e.target.value))} />
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 20 }}>
               <div className="kpi">
                 <div className="kpi-v">${fmt(Math.round(cbTotal))}</div>
-                <div className="kpi-l">Total Cost</div>
+                <div className="kpi-l">{tp('pricing', 'cbTotalCost')}</div>
               </div>
               <div className="kpi">
                 <div className="kpi-v">${fmt(Math.round(cbPerPax))}</div>
-                <div className="kpi-l">Cost / Pax</div>
+                <div className="kpi-l">{tp('pricing', 'cbCostPerPax')}</div>
               </div>
               <div className="kpi">
                 <div className="kpi-v" style={{ color: 'var(--g)' }}>
                   ${fmt(Math.round(cbSell))}
                 </div>
-                <div className="kpi-l">Sell Price / Pax ({cbMarkup}% markup)</div>
+                <div className="kpi-l">{tpl('pricing', 'cbSellPricePerPax', { markup: cbMarkup })}</div>
               </div>
             </div>
           </div>
@@ -608,35 +627,35 @@ export default function Pricing() {
       {tab === 'markup' && (
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">Markup Calculator</span>
+            <span className="card-title">{tp('pricing', 'markupCalcTitle')}</span>
           </div>
           <div className="card-body">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, maxWidth: 480 }}>
               <div className="fg">
-                <label className="lbl">Supplier Cost (USD)</label>
+                <label className="lbl">{tp('pricing', 'mkSupplierCost')}</label>
                 <input type="number" value={mkCost} onChange={(e) => setMkCost(Number(e.target.value))} />
               </div>
               <div className="fg">
-                <label className="lbl">Markup %</label>
+                <label className="lbl">{tp('pricing', 'cbMarkupPct')}</label>
                 <input type="number" value={mkPctVal} onChange={(e) => setMkPctVal(Number(e.target.value))} />
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 20 }}>
               <div className="kpi">
                 <div className="kpi-v">${fmt(mkCost)}</div>
-                <div className="kpi-l">Cost</div>
+                <div className="kpi-l">{tp('pricing', 'mkCost')}</div>
               </div>
               <div className="kpi">
                 <div className="kpi-v" style={{ color: 'var(--g)' }}>
                   ${fmt(Math.round(mkSell))}
                 </div>
-                <div className="kpi-l">Sell Price</div>
+                <div className="kpi-l">{tp('pricing', 'mkSellPrice')}</div>
               </div>
               <div className="kpi">
                 <div className="kpi-v" style={{ color: 'var(--gold)' }}>
                   ${fmt(Math.round(mkProfit))}
                 </div>
-                <div className="kpi-l">Profit / Pax</div>
+                <div className="kpi-l">{tp('pricing', 'mkProfitPerPax')}</div>
               </div>
             </div>
           </div>

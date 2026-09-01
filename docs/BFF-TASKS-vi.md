@@ -1,4 +1,9 @@
-# Phân chia công việc BFF cho 2 Developer
+# Phân chia công việc BFF cho 2 Developer — kế hoạch triển khai lịch sử
+
+> **Trạng thái (2026-08-29):** Tài liệu này lưu kế hoạch phân chia ban đầu và
+> các checkbox lịch sử; không dùng để kết luận tiến độ hiện tại. Xem
+> [`BFF-TASK.md`](BFF-TASK.md) để biết checklist Dev 1/Dev 2, CI và production
+> acceptance đã được đối soát.
 
 ## Mục tiêu
 

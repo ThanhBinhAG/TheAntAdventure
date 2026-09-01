@@ -4,8 +4,12 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { FormEvent, useCallback, useState } from 'react';
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
+import { useLanguage } from '@/hooks/useLanguage';
 
-function authErrorMessage(message: string): string {
+function authErrorMessage(
+  message: string,
+  tp: ReturnType<typeof useLanguage>['tp']
+): string {
   const lower = message.toLowerCase();
   if (
     lower.includes('failed to fetch') ||
@@ -15,21 +19,25 @@ function authErrorMessage(message: string): string {
     lower.includes('ssl') ||
     lower.includes('certificate')
   ) {
-    return 'Không kết nối được máy chủ xác thực — có thể do SSL, mạng, hoặc firewall. Liên hệ quản trị viên.';
+    return tp('auth', 'errorNetwork');
   }
-  if (lower.includes('invalid login credentials') || lower.includes('email hoặc mật khẩu') || lower.includes('tài khoản hoặc mật khẩu')) {
-    return 'Tài khoản hoặc mật khẩu không đúng.';
+  if (
+    lower.includes('invalid login credentials') ||
+    lower.includes('email hoặc mật khẩu') ||
+    lower.includes('tài khoản hoặc mật khẩu')
+  ) {
+    return tp('auth', 'errorInvalidCredentials');
   }
   if (lower.includes('email not confirmed') || lower.includes('chưa được xác nhận')) {
-    return 'Email chưa được xác nhận. Kiểm tra hộp thư hoặc liên hệ quản trị viên.';
+    return tp('auth', 'errorEmailNotConfirmed');
   }
   if (lower.includes('captcha')) {
-    return 'Xác minh CAPTCHA thất bại. Vui lòng thử lại.';
+    return tp('auth', 'errorCaptchaFailed');
   }
   if (lower.includes('quá nhiều')) {
     return message;
   }
-  return message || 'Đăng nhập thất bại. Vui lòng thử lại.';
+  return message || tp('auth', 'errorLoginFailed');
 }
 
 type LoginFormProps = {
@@ -38,6 +46,7 @@ type LoginFormProps = {
 };
 
 export function LoginForm({ showDebugLink = false, captchaSiteKey = '' }: LoginFormProps) {
+  const { tp } = useLanguage();
   const searchParams = useSearchParams();
   const captchaRequired = Boolean(captchaSiteKey);
 
@@ -56,7 +65,7 @@ export function LoginForm({ showDebugLink = false, captchaSiteKey = '' }: LoginF
     setError(null);
 
     if (captchaRequired && !captchaToken) {
-      setError('Please complete the CAPTCHA.');
+      setError(tp('auth', 'captchaRequired'));
       return;
     }
 
@@ -81,7 +90,7 @@ export function LoginForm({ showDebugLink = false, captchaSiteKey = '' }: LoginF
       };
 
       if (!res.ok || !data.ok) {
-        const msg = authErrorMessage(data.error || 'Login failed.');
+        const msg = authErrorMessage(data.error || tp('auth', 'errorLoginFailed'), tp);
         setError(msg);
         setCaptchaToken(null);
         return;
@@ -89,11 +98,10 @@ export function LoginForm({ showDebugLink = false, captchaSiteKey = '' }: LoginF
 
       const next = searchParams.get('next');
       const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
-      // A full navigation avoids a prefetched unauthenticated CRM response after the cookie changes.
       window.location.assign(safeNext);
     } catch (err) {
-      const raw = err instanceof Error ? err.message : 'Login failed.';
-      setError(authErrorMessage(raw));
+      const raw = err instanceof Error ? err.message : tp('auth', 'errorLoginFailed');
+      setError(authErrorMessage(raw, tp));
     } finally {
       setLoading(false);
     }
@@ -103,8 +111,8 @@ export function LoginForm({ showDebugLink = false, captchaSiteKey = '' }: LoginF
     <div className="login-page">
       <div className="login-card">
         <div className="login-brand">
-          <div className="login-title">The Ant Adventures</div>
-          <div className="login-subtitle">CRM — Login</div>
+          <div className="login-title">{tp('auth', 'brandTitle')}</div>
+          <div className="login-subtitle">{tp('auth', 'brandSubtitle')}</div>
         </div>
 
         <form
@@ -113,7 +121,7 @@ export function LoginForm({ showDebugLink = false, captchaSiteKey = '' }: LoginF
           aria-busy={loading}
         >
           <label className="login-label" htmlFor="login-identity">
-            Email
+            {tp('auth', 'labelEmail')}
           </label>
           <input
             id="login-identity"
@@ -124,11 +132,11 @@ export function LoginForm({ showDebugLink = false, captchaSiteKey = '' }: LoginF
             disabled={loading}
             value={identity}
             onChange={(e) => setIdentity(e.target.value)}
-            placeholder="email@example.com"
+            placeholder={tp('auth', 'placeholderEmail')}
           />
 
           <label className="login-label" htmlFor="login-password">
-            Password
+            {tp('auth', 'labelPassword')}
           </label>
           <input
             id="login-password"
@@ -160,20 +168,20 @@ export function LoginForm({ showDebugLink = false, captchaSiteKey = '' }: LoginF
                   <span className="dot" />
                   <span className="dot" />
                 </span>
-                Logging in…
+                {tp('auth', 'submitLoggingIn')}
               </>
             ) : (
-              'Login'
+              tp('auth', 'submitLogin')
             )}
           </button>
         </form>
 
-        <p className="login-hint">Account is assigned by administrator. No public registration.</p>
+        <p className="login-hint">{tp('auth', 'hintNoRegistration')}</p>
 
         {showDebugLink && (
           <p className="login-hint debug-login-link">
-            Admin:{' '}
-            <Link href="/system/debug">System diagnostics</Link>
+            {tp('auth', 'hintAdminDebug')}{' '}
+            <Link href="/system/debug">{tp('auth', 'linkSystemDiagnostics')}</Link>
           </p>
         )}
       </div>

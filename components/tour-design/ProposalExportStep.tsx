@@ -31,6 +31,7 @@ import ProposalExportActionBar from '@/components/tour-design/ProposalExportActi
 import ProposalExportPreview from '@/components/tour-design/ProposalExportPreview';
 import ProposalExportSettings from '@/components/tour-design/ProposalExportSettings';
 import { toast } from '@/lib/toast';
+import { useLanguage } from '@/hooks/useLanguage';
 
 function formatPdfDownloadError(message: string): string {
   if (/libnspr4|libnss3|browser process|Code:\s*127|shared libraries|could not start Chromium/i.test(message)) {
@@ -90,6 +91,7 @@ export default function ProposalExportStep({
   onBack,
   canWrite = true,
 }: Props) {
+  const { tp } = useLanguage();
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState('');
   const hotelRateSeed = useMemo(() => {
@@ -216,7 +218,7 @@ export default function ProposalExportStep({
 
   const downloadPdf = useCallback(async () => {
     if (!hasContent) {
-      toast.warning('Please add tour content before exporting.');
+      toast.warning(tp('tour-design', 'exportNoContentWarning'));
       return;
     }
     setPdfLoading(true);
@@ -239,16 +241,16 @@ export default function ProposalExportStep({
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setError(formatPdfDownloadError(e instanceof Error ? e.message : 'PDF export failed.'));
+      setError(formatPdfDownloadError(e instanceof Error ? e.message : tp('tour-design', 'exportPdfPrintFailed')));
     } finally {
       setPdfLoading(false);
     }
-  }, [hasContent, proposalDoc]);
+  }, [hasContent, proposalDoc, tp]);
 
   /** Open Puppeteer PDF in a new tab for print — avoids browser date/URL/title chrome. */
   const printViaPdf = useCallback(async () => {
     if (!hasContent) {
-      toast.warning('Please add tour content before printing.');
+      toast.warning(tp('tour-design', 'exportNoContentPrintWarning'));
       return;
     }
     setPdfLoading(true);
@@ -268,23 +270,23 @@ export default function ProposalExportStep({
       const w = window.open(url, '_blank');
       if (!w) {
         URL.revokeObjectURL(url);
-        throw new Error('Popup blocked. Allow popups for this site, then print from the generated PDF tab.');
+        throw new Error(tp('tour-design', 'exportPopupBlocked'));
       }
       // Revoke after the viewer has loaded the blob.
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
-      setError(formatPdfDownloadError(e instanceof Error ? e.message : 'PDF print failed.'));
+      setError(formatPdfDownloadError(e instanceof Error ? e.message : tp('tour-design', 'exportPdfPrintFailed')));
     } finally {
       setPdfLoading(false);
     }
-  }, [hasContent, proposalDoc]);
+  }, [hasContent, proposalDoc, tp]);
 
   return (
     <div className="card">
       <div className="card-hd">
-        <span className="card-title">Step 5 — Export Proposal ✦</span>
+        <span className="card-title">{tp('tour-design', 'exportStepTitle')}</span>
         <span style={{ fontSize: 11, color: 'var(--m)' }}>
-          {clientType === 'b2b' ? 'B2B Net Quotation' : 'B2C Client Proposal'} · {proposalDoc.quoteRef}
+          {clientType === 'b2b' ? tp('tour-design', 'exportB2bLabel') : tp('tour-design', 'exportB2cLabel')} · {proposalDoc.quoteRef}
         </span>
       </div>
       <div className="card-body td-export-body">
@@ -296,7 +298,7 @@ export default function ProposalExportStep({
             layoutId={layoutId}
             onLayoutIdChange={onLayoutIdChange}
             specialNotes={specialNotes}
-            specialNotesPlaceholder={brief.specialRequests || 'Dietary, accessibility, pace, occasion…'}
+            specialNotesPlaceholder={brief.specialRequests || tp('tour-design', 'exportSpecialNotesPlaceholder')}
             onSpecialNotesChange={onSpecialNotesChange}
             hotelRatesOptionA={hotelRatesOptionA}
             hotelRatesOptionB={hotelRatesOptionB}

@@ -5,6 +5,7 @@ import type { WeatherDestinationMeta } from '@/lib/weather/types';
 import { toast } from '@/lib/toast';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
 import { useLanguage } from '@/hooks/useLanguage';
+import { regionLabel } from '@/components/weather/weatherLabels';
 
 type Props = {
   open: boolean;
@@ -14,12 +15,6 @@ type Props = {
   onSave: (ids: string[]) => Promise<void>;
 };
 
-const REGION_LABEL: Record<string, string> = {
-  north: 'North',
-  central: 'Central',
-  south: 'South',
-};
-
 export default function FeaturedSlotsModal({
   open,
   destinations,
@@ -27,6 +22,7 @@ export default function FeaturedSlotsModal({
   onClose,
   onSave,
 }: Props) {
+  const { tp, tpl, tc, language } = useLanguage();
   const formKey = `${open}-${featuredIds.join(',')}`;
   const [previousFormKey, setPreviousFormKey] = useState(formKey);
   const [slot1, setSlot1] = useState(featuredIds[0] ?? '');
@@ -40,7 +36,6 @@ export default function FeaturedSlotsModal({
     setSaving(false);
   }
 
-  const { language } = useLanguage();
   const baseline = useMemo(
     () => ({ slot1: featuredIds[0] ?? '', slot2: featuredIds[1] ?? '' }),
     [formKey], // eslint-disable-line react-hooks/exhaustive-deps
@@ -52,21 +47,21 @@ export default function FeaturedSlotsModal({
 
   async function handleSave() {
     if (!slot1) {
-      toast.warning('Select the first featured destination.');
+      toast.warning(tp('weather', 'toastSelectFirstFeatured'));
       return;
     }
     if (slot2 && slot2 === slot1) {
-      toast.warning('Two slots cannot be the same.');
+      toast.warning(tp('weather', 'toastSameSlot'));
       return;
     }
     const ids = slot2 ? [slot1, slot2] : [slot1];
     setSaving(true);
     try {
       await onSave(ids);
-      toast.success('Featured destinations updated.');
+      toast.success(tp('weather', 'toastFeaturedUpdated'));
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Cannot save.');
+      toast.error(err instanceof Error ? err.message : tp('weather', 'toastCannotSave'));
     } finally {
       setSaving(false);
     }
@@ -75,8 +70,10 @@ export default function FeaturedSlotsModal({
   const options = destinations.slice().sort((a, b) => a.name.localeCompare(b.name));
 
   function optionLabel(d: WeatherDestinationMeta) {
-    const region = REGION_LABEL[d.region] ?? d.region;
-    return `${d.name} · ${region}`;
+    return tpl('weather', 'destinationOptionLabel', {
+      name: d.name,
+      region: regionLabel(d.region, language),
+    });
   }
 
   return (
@@ -90,17 +87,15 @@ export default function FeaturedSlotsModal({
       >
         <div className="modal-hd modal-hd-green">
           <div>
-            <h2 id="wg-featured-title">Adjust featured destinations</h2>
-            <p className="wg-featured-modal-sub">Two major destinations at the top of the Weather Guide page</p>
+            <h2 id="wg-featured-title">{tp('weather', 'adjustFeaturedTitle')}</h2>
+            <p className="wg-featured-modal-sub">{tp('weather', 'adjustFeaturedSub')}</p>
           </div>
-          <button type="button" className="gallery-modal-close" onClick={() => void requestClose()} aria-label="Close">
+          <button type="button" className="gallery-modal-close" onClick={() => void requestClose()} aria-label={tc('close')}>
             ×
           </button>
         </div>
 
-        <p className="wg-featured-hint">
-          Slot 1 is required. Slot 2 can be empty if you only want one featured destination.
-        </p>
+        <p className="wg-featured-hint">{tp('weather', 'slotHint')}</p>
 
         <div className="wg-featured-slots">
           <div className="wg-featured-slot">
@@ -109,12 +104,12 @@ export default function FeaturedSlotsModal({
                 1
               </span>
               <span>
-                Main destination
-                <span className="wg-featured-slot-hint"> · required</span>
+                {tp('weather', 'mainDestination')}
+                <span className="wg-featured-slot-hint"> · {tp('weather', 'required')}</span>
               </span>
             </label>
             <select id="wg-feat-1" value={slot1} onChange={(e) => setSlot1(e.target.value)}>
-              <option value="">— Select destination —</option>
+              <option value="">{tp('weather', 'selectDestination')}</option>
               {options.map((d) => (
                 <option key={d.id} value={d.id} disabled={d.id === slot2}>
                   {optionLabel(d)}
@@ -128,12 +123,12 @@ export default function FeaturedSlotsModal({
                 2
               </span>
               <span>
-                Secondary destination
-                <span className="wg-featured-slot-hint"> · optional</span>
+                {tp('weather', 'secondaryDestination')}
+                <span className="wg-featured-slot-hint"> · {tp('weather', 'optional')}</span>
               </span>
             </label>
             <select id="wg-feat-2" value={slot2} onChange={(e) => setSlot2(e.target.value)}>
-              <option value="">— Select destination —</option>
+              <option value="">{tp('weather', 'selectDestination')}</option>
               {options.map((d) => (
                 <option key={d.id} value={d.id} disabled={d.id === slot1}>
                   {optionLabel(d)}
@@ -145,10 +140,10 @@ export default function FeaturedSlotsModal({
 
         <div className="wg-detail-ft">
           <button type="button" className="btn btn-s" onClick={() => void requestClose()} disabled={saving}>
-            Cancel
+            {tc('cancel')}
           </button>
           <button type="button" className="btn btn-p" onClick={() => void handleSave()} disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? tp('weather', 'saving') : tc('save')}
           </button>
         </div>
       </div>

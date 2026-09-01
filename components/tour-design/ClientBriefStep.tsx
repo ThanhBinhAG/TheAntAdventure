@@ -16,16 +16,17 @@ import { DURATION_PRESETS } from '@/lib/tour-design/tour-durations';
 import type { TourBrief } from '@/lib/tour-design/tour-design-types';
 import type { Customer } from '@/lib/types';
 import { toast } from '@/lib/toast';
+import { useLanguage } from '@/hooks/useLanguage';
 
 const CHILD_TAGS = ['Infant 0-2', 'Toddler 3-5', 'Child 6-9', 'Pre-teen 10-12', 'Teen 13-17'];
 const PAX_PRESETS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
 const CUSTOM_PAX_VALUE = 'custom';
 
 const REGIONS = [
-  { id: 'north', label: 'Northern Vietnam' },
-  { id: 'central', label: 'Central Vietnam' },
-  { id: 'south', label: 'Southern Vietnam' },
-  { id: 'multi', label: 'Multi-Region' },
+  { id: 'north', key: 'briefRegionNorth' as const },
+  { id: 'central', key: 'briefRegionCentral' as const },
+  { id: 'south', key: 'briefRegionSouth' as const },
+  { id: 'multi', key: 'briefRegionMulti' as const },
 ];
 
 interface Props {
@@ -59,6 +60,7 @@ export default function ClientBriefStep({
   onNext,
   canWrite = true,
 }: Props) {
+  const { tp, tpl } = useLanguage();
   const custName = customers.find((c) => c.id === custId)?.name;
   const summary = buildBriefSummaryHtml(brief, clientType, custName);
   const showChildren = brief.children > 0;
@@ -98,7 +100,7 @@ export default function ClientBriefStep({
 
   function handleStartDateChange(value: string) {
     if (value && !isTravelDateNotPast(value)) {
-      toast.warning('Travel start date must be today or later.');
+      toast.warning(tp('tour-design', 'briefDatePastWarning'));
       setBrief({ ...brief, startDate: '' });
       return;
     }
@@ -107,11 +109,11 @@ export default function ClientBriefStep({
 
   function handleNext() {
     if (brief.startDate && !isTravelDateNotPast(brief.startDate)) {
-      toast.warning('Travel start date must be today or later.');
+      toast.warning(tp('tour-design', 'briefDatePastWarning'));
       return;
     }
     if (brief.nationality.trim() && !isKnownNationality(brief.nationality)) {
-      toast.warning('Please choose a Nationality from the suggestion list.');
+      toast.warning(tp('tour-design', 'briefNationalityWarning'));
       return;
     }
     if (brief.nationality.trim()) {
@@ -126,23 +128,23 @@ export default function ClientBriefStep({
   return (
     <div className="card">
       <div className="card-hd">
-        <span className="card-title">Step 1 — Client Brief</span>
+        <span className="card-title">{tp('tour-design', 'briefStepTitle')}</span>
       </div>
       <div className="card-body">
         <fieldset disabled={!canWrite} style={{ border: 'none', padding: 0, margin: 0 }}>
           <div className="td-form-grid td-form-grid-3">
             <div className="fg">
-              <label className="lbl">Client Type</label>
+              <label className="lbl">{tp('tour-design', 'briefClientType')}</label>
               <select value={clientType} onChange={(e) => setClientType(e.target.value as 'b2c' | 'b2b')}>
-                <option value="b2c">B2C — Direct Client</option>
-                <option value="b2b">B2B — Travel Agent</option>
+                <option value="b2c">{tp('tour-design', 'briefB2c')}</option>
+                <option value="b2b">{tp('tour-design', 'briefB2b')}</option>
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Customer (CRM)</label>
+              <label className="lbl">{tp('tour-design', 'briefCustomer')}</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <select style={{ flex: 1 }} value={custId} onChange={(e) => (e.target.value ? onSelectCustomer(e.target.value) : onSelectCustomer(''))}>
-                  <option value="">— New Client —</option>
+                  <option value="">{tp('tour-design', 'briefNewClient')}</option>
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -150,20 +152,20 @@ export default function ClientBriefStep({
                   ))}
                 </select>
                 <button className="btn btn-s btn-sm" type="button" onClick={onNewCustomer}>
-                  + New
+                  {tp('tour-design', 'briefNewButton')}
                 </button>
               </div>
             </div>
             {clientType === 'b2b' && (
               <div className="fg">
                 <label className="lbl" style={{ color: 'var(--pur)' }}>
-                  ★ Agent / Operator Name
+                  ★ {tp('tour-design', 'briefAgentName')}
                 </label>
                 <input
                   list="td-agent-list"
                   value={brief.agentRef}
                   onChange={(e) => setBrief({ ...brief, agentRef: e.target.value })}
-                  placeholder="Black Tomato, Virtuoso..."
+                  placeholder={tp('tour-design', 'briefAgentPlaceholder')}
                   style={{ borderColor: 'var(--pur)' }}
                 />
                 <datalist id="td-agent-list">
@@ -174,20 +176,20 @@ export default function ClientBriefStep({
               </div>
             )}
             <div className="fg">
-              <label className="lbl">Number of Guests</label>
+              <label className="lbl">{tp('tour-design', 'briefNumGuests')}</label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <select
                   style={{ flex: 1 }}
                   value={paxMode === 'custom' ? CUSTOM_PAX_VALUE : String(brief.pax)}
                   onChange={(e) => handlePaxSelect(e.target.value)}
-                  aria-label="Number of guests"
+                  aria-label={tp('tour-design', 'briefNumGuests')}
                 >
                   {PAX_PRESETS.map((n) => (
                     <option key={n} value={n}>
                       {n}
                     </option>
                   ))}
-                  <option value={CUSTOM_PAX_VALUE}>Custom (11+)</option>
+                  <option value={CUSTOM_PAX_VALUE}>{tp('tour-design', 'briefCustomPax')}</option>
                 </select>
                 {paxMode === 'custom' && (
                   <input
@@ -203,19 +205,19 @@ export default function ClientBriefStep({
                       setPax(n);
                     }}
                     style={{ width: 88 }}
-                    aria-label="Custom guest count"
-                    title="Groups of 11+ use the catalog 10+ rate per guest"
+                    aria-label={tp('tour-design', 'briefCustomPax')}
+                    title={tp('tour-design', 'briefCustomPaxTitle')}
                   />
                 )}
               </div>
               {paxMode === 'custom' && (
                 <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>
-                  Uses catalog 10+ rate × {brief.pax} guests
+                  {tpl('tour-design', 'briefCustomPaxHint', { pax: brief.pax })}
                 </div>
               )}
             </div>
             <div className="fg">
-              <label className="lbl">Travel Style</label>
+              <label className="lbl">{tp('tour-design', 'briefTravelStyle')}</label>
               <select value={brief.style} onChange={(e) => setBrief({ ...brief, style: e.target.value })}>
                 {['Luxury', 'Premium Cultural', 'Cultural', 'Adventure', 'Family', 'Culinary', 'Photography', 'Honeymoon'].map((s) => (
                   <option key={s}>{s}</option>
@@ -223,7 +225,7 @@ export default function ClientBriefStep({
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Travel Month</label>
+              <label className="lbl">{tp('tour-design', 'briefTravelMonth')}</label>
               <select value={brief.travelMonth} onChange={(e) => setBrief({ ...brief, travelMonth: e.target.value })}>
                 {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m) => (
                   <option key={m}>{m}</option>
@@ -231,7 +233,7 @@ export default function ClientBriefStep({
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Hotel Tier</label>
+              <label className="lbl">{tp('tour-design', 'briefHotelTier')}</label>
               <select value={brief.hotelTier} onChange={(e) => setBrief({ ...brief, hotelTier: e.target.value })}>
                 <option>Boutique 4★</option>
                 <option>Luxury 5★</option>
@@ -239,7 +241,7 @@ export default function ClientBriefStep({
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Guide Language</label>
+              <label className="lbl">{tp('tour-design', 'briefGuideLanguage')}</label>
               <select value={brief.language} onChange={(e) => setBrief({ ...brief, language: e.target.value })}>
                 {['English', 'French', 'German', 'Spanish', 'Italian'].map((l) => (
                   <option key={l}>{l}</option>
@@ -247,31 +249,31 @@ export default function ClientBriefStep({
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Domestic Flights</label>
+              <label className="lbl">{tp('tour-design', 'briefDomesticFlights')}</label>
               <select value={brief.flights} onChange={(e) => setBrief({ ...brief, flights: e.target.value })}>
-                <option value="yes">Yes — include flights</option>
-                <option value="no">No — land only</option>
+                <option value="yes">{tp('tour-design', 'briefFlightsYes')}</option>
+                <option value="no">{tp('tour-design', 'briefFlightsNo')}</option>
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">International Flights</label>
+              <label className="lbl">{tp('tour-design', 'briefIntlFlights')}</label>
               <select value={brief.intlFlights} onChange={(e) => setBrief({ ...brief, intlFlights: e.target.value })}>
-                <option value="not-included">Not included — client arranges</option>
-                <option value="incl-economy">Included — economy class</option>
-                <option value="incl-business">Included — business class</option>
+                <option value="not-included">{tp('tour-design', 'briefIntlNotIncluded')}</option>
+                <option value="incl-economy">{tp('tour-design', 'briefIntlEconomy')}</option>
+                <option value="incl-business">{tp('tour-design', 'briefIntlBusiness')}</option>
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Visa</label>
+              <label className="lbl">{tp('tour-design', 'briefVisa')}</label>
               <select value={brief.visa} onChange={(e) => setBrief({ ...brief, visa: e.target.value })}>
-                <option value="exempt">Visa exemption</option>
-                <option value="evisa-self">E-visa — guest arranges</option>
-                <option value="visa-us">Visa — we arrange</option>
-                <option value="voa">Visa on arrival</option>
+                <option value="exempt">{tp('tour-design', 'briefVisaExempt')}</option>
+                <option value="evisa-self">{tp('tour-design', 'briefVisaEvisaSelf')}</option>
+                <option value="visa-us">{tp('tour-design', 'briefVisaArrange')}</option>
+                <option value="voa">{tp('tour-design', 'briefVisaVoa')}</option>
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Budget Range</label>
+              <label className="lbl">{tp('tour-design', 'briefBudgetRange')}</label>
               <select value={brief.budgetRange} onChange={(e) => setBrief({ ...brief, budgetRange: e.target.value })}>
                 {['Under $1,000/pax', '$1,000–$2,000/pax', '$2,000–$3,500/pax', '$3,500–$6,000/pax', '$6,000+/pax'].map((b) => (
                   <option key={b}>{b}</option>
@@ -280,10 +282,10 @@ export default function ClientBriefStep({
             </div>
             <div className="fg">
               <label className="lbl" style={{ color: 'var(--g)' }}>
-                Our Sales Person
+                {tp('tour-design', 'briefSalesPerson')}
               </label>
               <select value={brief.salesperson} onChange={(e) => setBrief({ ...brief, salesperson: e.target.value })}>
-                <option value="">— Not assigned —</option>
+                <option value="">{tp('tour-design', 'briefNotAssigned')}</option>
                 {SALES_PEOPLE.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -295,11 +297,11 @@ export default function ClientBriefStep({
 
           <div className="td-travel-details-box">
             <div className="td-section-lbl" style={{ marginBottom: 10 }}>
-              📅 Travel Details & Guest Profile
+              📅 {tp('tour-design', 'briefTravelDetails')}
             </div>
             <div className="td-form-grid td-form-grid-3">
               <div className="fg">
-                <label className="lbl">Travel Start Date</label>
+                <label className="lbl">{tp('tour-design', 'briefStartDate')}</label>
                 <input
                   type="date"
                   min={todayIso}
@@ -308,12 +310,12 @@ export default function ClientBriefStep({
                 />
               </div>
               <div className="fg">
-                <label className="lbl">Nationality / Country</label>
+                <label className="lbl">{tp('tour-design', 'briefNationality')}</label>
                 <input
                   list="td-nationality-list"
                   value={brief.nationality}
                   onChange={(e) => setBrief({ ...brief, nationality: e.target.value })}
-                  placeholder="Type to search…"
+                  placeholder={tp('tour-design', 'briefNationalityPlaceholder')}
                   autoComplete="off"
                 />
                 <datalist id="td-nationality-list">
@@ -323,64 +325,64 @@ export default function ClientBriefStep({
                 </datalist>
               </div>
               <div className="fg">
-                <label className="lbl">First Time in Vietnam?</label>
+                <label className="lbl">{tp('tour-design', 'briefFirstTimeVn')}</label>
                 <select value={firstTimeValue} onChange={(e) => setBrief({ ...brief, firstTime: e.target.value })}>
-                  <option value="">— Not specified —</option>
-                  <option value="yes">Yes — first visit</option>
-                  <option value="no">No — returning</option>
+                  <option value="">{tp('tour-design', 'briefNotSpecified')}</option>
+                  <option value="yes">{tp('tour-design', 'briefFirstTimeYes')}</option>
+                  <option value="no">{tp('tour-design', 'briefFirstTimeNo')}</option>
                 </select>
               </div>
             </div>
             <div className="td-form-grid" style={{ gridTemplateColumns: '1fr 1fr', marginTop: 10 }}>
               <div className="fg">
-                <label className="lbl">Interests / Hobbies</label>
+                <label className="lbl">{tp('tour-design', 'briefInterests')}</label>
                 <textarea
                   rows={2}
                   value={brief.interestsText}
                   onChange={(e) => setBrief({ ...brief, interestsText: e.target.value })}
-                  placeholder="Photography, local cuisine, history..."
+                  placeholder={tp('tour-design', 'briefInterestsPlaceholder')}
                 />
               </div>
               <div className="fg">
-                <label className="lbl">Don&apos;ts / Must Avoid</label>
-                <textarea rows={2} value={brief.avoid} onChange={(e) => setBrief({ ...brief, avoid: e.target.value })} placeholder="No seafood, avoid crowds..." />
+                <label className="lbl">{tp('tour-design', 'briefAvoid')}</label>
+                <textarea rows={2} value={brief.avoid} onChange={(e) => setBrief({ ...brief, avoid: e.target.value })} placeholder={tp('tour-design', 'briefAvoidPlaceholder')} />
               </div>
             </div>
           </div>
 
           <div className="td-children-box">
-            <div className="td-section-lbl td-children-title">👧 Children</div>
+            <div className="td-section-lbl td-children-title">👧 {tp('tour-design', 'briefChildren')}</div>
             <div className="td-form-grid td-form-grid-3">
               <div className="fg">
-                <label className="lbl">Number of Children</label>
+                <label className="lbl">{tp('tour-design', 'briefNumChildren')}</label>
                 <select value={brief.children} onChange={(e) => setBrief({ ...brief, children: +e.target.value })}>
-                  <option value={0}>No children</option>
-                  <option value={1}>1 child</option>
-                  <option value={2}>2 children</option>
-                  <option value={3}>3 children</option>
-                  <option value={4}>4+ children</option>
+                  <option value={0}>{tp('tour-design', 'briefNoChildren')}</option>
+                  <option value={1}>{tp('tour-design', 'briefOneChild')}</option>
+                  <option value={2}>{tp('tour-design', 'briefTwoChildren')}</option>
+                  <option value={3}>{tp('tour-design', 'briefThreeChildren')}</option>
+                  <option value={4}>{tp('tour-design', 'briefFourPlusChildren')}</option>
                 </select>
               </div>
               {showChildren && (
                 <>
                   <div className="fg">
-                    <label className="lbl">Children Ages</label>
-                    <input value={brief.childAges} onChange={(e) => setBrief({ ...brief, childAges: e.target.value })} placeholder="e.g. 4, 7, 11 years old" />
+                    <label className="lbl">{tp('tour-design', 'briefChildAges')}</label>
+                    <input value={brief.childAges} onChange={(e) => setBrief({ ...brief, childAges: e.target.value })} placeholder={tp('tour-design', 'briefChildAgesPlaceholder')} />
                   </div>
                   <div className="fg">
-                    <label className="lbl">Dietary / Allergies</label>
-                    <input value={brief.childDiet} onChange={(e) => setBrief({ ...brief, childDiet: e.target.value })} placeholder="Nut allergy, vegetarian..." />
+                    <label className="lbl">{tp('tour-design', 'briefChildDiet')}</label>
+                    <input value={brief.childDiet} onChange={(e) => setBrief({ ...brief, childDiet: e.target.value })} placeholder={tp('tour-design', 'briefChildDietPlaceholder')} />
                   </div>
                   <div className="fg">
-                    <label className="lbl">Child Activity Preferences</label>
-                    <input value={brief.childPrefs} onChange={(e) => setBrief({ ...brief, childPrefs: e.target.value })} placeholder="Swimming, cooking class..." />
+                    <label className="lbl">{tp('tour-design', 'briefChildPrefs')}</label>
+                    <input value={brief.childPrefs} onChange={(e) => setBrief({ ...brief, childPrefs: e.target.value })} placeholder={tp('tour-design', 'briefChildPrefsPlaceholder')} />
                   </div>
                 </>
               )}
             </div>
             {showChildren && (
               <div className="td-child-tags">
-                <span style={{ fontSize: 11, color: 'var(--amb)', fontWeight: 600, marginRight: 6 }}>Quick tags:</span>
+                <span style={{ fontSize: 11, color: 'var(--amb)', fontWeight: 600, marginRight: 6 }}>{tp('tour-design', 'briefQuickTags')}</span>
                 {CHILD_TAGS.map((t) => (
                   <span key={t} className="child-tag" onClick={() => addChildTag(t)} role="button" tabIndex={0}>
                     {t}
@@ -391,21 +393,21 @@ export default function ClientBriefStep({
           </div>
 
           <div className="fg" style={{ marginTop: 12 }}>
-            <label className="lbl">Special Requests</label>
+            <label className="lbl">{tp('tour-design', 'briefSpecialRequests')}</label>
             <textarea
               value={brief.specialRequests}
               onChange={(e) => setBrief({ ...brief, specialRequests: e.target.value })}
-              placeholder="Dietary restrictions, mobility needs, anniversaries, must-see experiences..."
+              placeholder={tp('tour-design', 'briefSpecialRequestsPlaceholder')}
             />
           </div>
 
           <div className="fg" style={{ marginTop: 8 }}>
-            <label className="lbl">Duration</label>
+            <label className="lbl">{tp('tour-design', 'briefDuration')}</label>
             <input
               list="td-duration-list"
               value={brief.duration}
               onChange={(e) => setBrief({ ...brief, duration: e.target.value })}
-              placeholder="e.g. 7 Days 6 Nights — or type custom"
+              placeholder={tp('tour-design', 'briefDurationPlaceholder')}
               autoComplete="off"
             />
             <datalist id="td-duration-list">
@@ -414,29 +416,29 @@ export default function ClientBriefStep({
               ))}
             </datalist>
             <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>
-              Pick a suggestion (2–30 days) or type a custom duration
+              {tp('tour-design', 'briefDurationHint')}
             </div>
           </div>
 
           <div className="fg">
-            <label className="lbl">Primary Region</label>
+            <label className="lbl">{tp('tour-design', 'briefPrimaryRegion')}</label>
             <select value={brief.region} onChange={(e) => setBrief({ ...brief, region: e.target.value })}>
               {REGIONS.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.label}
+                  {tp('tour-design', r.key)}
                 </option>
               ))}
             </select>
           </div>
 
           <div className="info-bar" style={{ marginTop: 14 }}>
-            {summary || 'Fill in the fields above — summary will appear here.'}
+            {summary || tp('tour-design', 'briefSummaryEmpty')}
           </div>
 
           {aiPanel && (
             <div className="td-ai-panel">
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--pur)' }}>✦ AI Tour Style Suggestion</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--pur)' }}>✦ {tp('tour-design', 'briefAiSuggestTitle')}</span>
                 <button type="button" onClick={onCloseAi} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--m)' }}>
                   ✕
                 </button>
@@ -448,10 +450,10 @@ export default function ClientBriefStep({
 
         <div className="td-nav">
           <button className="btn btn-pu btn-sm" type="button" onClick={onAiSuggest} disabled={!canWrite}>
-            ✦ AI Suggest Style
+            ✦ {tp('tour-design', 'briefAiSuggestButton')}
           </button>
           <button className="btn btn-p" type="button" onClick={handleNext}>
-            Next: Outline →
+            {tp('tour-design', 'briefNextOutline')}
           </button>
         </div>
       </div>

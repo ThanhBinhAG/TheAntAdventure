@@ -57,6 +57,7 @@ import { confirmDialog } from '@/lib/confirm';
 import { DraggablePhotoCard } from '@/components/gallery/GalleryDraggablePhotoCard';
 import { getBffArray } from '@/lib/bff/client';
 import type { Attraction } from '@/lib/types';
+import { useLanguage } from '@/hooks/useLanguage';
 
 /** One Sharp/upload at a time to avoid RAM spikes on heavy originals. */
 const GALLERY_UPLOAD_CONCURRENCY = 1;
@@ -91,6 +92,7 @@ function allocatePhotoIds(existing: GalleryPhoto[], count: number): string[] {
 
 
 export default function GalleryWorkspace() {
+  const { tp, tpl, tc } = useLanguage();
   const { canWrite } = usePagePermission('gallery');
   const { loading: libraryLoading, error: libraryError } = useGalleryPage();
   const { patchPhoto } = useUpdatePhoto();
@@ -141,17 +143,17 @@ export default function GalleryWorkspace() {
   useEffect(() => {
     if (!attractionFilter) return;
     let active = true;
-    void getBffArray<Attraction>('/api/attractions/all', 'Không thể tải địa điểm tham quan.')
+    void getBffArray<Attraction>('/api/attractions/all', tp('gallery', 'errorLoadAttractions'))
       .then((rows) => {
         if (active) setAttractions(rows);
       })
       .catch((loadError: unknown) => {
-        if (active) setError(loadError instanceof Error ? loadError.message : 'Không thể tải địa điểm tham quan.');
+        if (active) setError(loadError instanceof Error ? loadError.message : tp('gallery', 'errorLoadAttractions'));
       });
     return () => {
       active = false;
     };
-  }, [attractionFilter, setAttractions]);
+  }, [attractionFilter, setAttractions, tp]);
 
   const filteredPhotoLightbox =
     photoFilter && dismissedPhotoFilter !== photoFilter
@@ -212,8 +214,8 @@ export default function GalleryWorkspace() {
   const infoPathLabel = useMemo(() => {
     if (!infoFolder) return '';
     const trail = folderBreadcrumb(folders, infoFolder.id);
-    return ['Library', ...trail.map((f) => f.name)].join(' / ');
-  }, [folders, infoFolder]);
+    return [tp('gallery', 'libraryBreadcrumb'), ...trail.map((f) => f.name)].join(' / ');
+  }, [folders, infoFolder, tp]);
 
   const { pageSize, setPageSize } = usePageSize();
   const pagination = usePagination(filtered, pageSize, [region, q, attractionFilter, pageSize, currentFolderId]);
@@ -241,15 +243,16 @@ export default function GalleryWorkspace() {
     try {
       if (folderNameModal.mode === 'create') {
         await createFolder({ name, parentId: currentFolderId });
-        toast.success('Folder created.');
+        toast.success(tp('gallery', 'toastFolderCreated'));
       } else {
         await renameFolder(folderNameModal.folder.id, { name });
-        toast.success('Folder renamed.');
+        toast.success(tp('gallery', 'toastFolderRenamed'));
       }
       setFolderNameModal(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save folder');
-      toast.error(e instanceof Error ? e.message : 'Could not save folder');
+      const msg = e instanceof Error ? e.message : tp('gallery', 'errorSaveFolder');
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -264,23 +267,25 @@ export default function GalleryWorkspace() {
   async function handleDeleteFolder(folder: PhotoFolder) {
     const check = canDeleteFolder(folders, folder.id, photos);
     if (!check.ok) {
-      toast.error(check.reason ?? 'Cannot delete folder');
+      toast.error(check.reason ?? tp('gallery', 'errorCannotDeleteFolder'));
       return;
     }
-    const ok = await confirmDialog(`Delete folder “${folder.name}”?`, { title: 'Delete folder' });
+    const ok = await confirmDialog(tpl('gallery', 'confirmDeleteFolder', { name: folder.name }), {
+      title: tp('gallery', 'confirmDeleteFolderTitle'),
+    });
     if (!ok) return;
     try {
       await deleteFolder(folder.id);
       if (currentFolderId === folder.id) goRoot();
-      toast.success('Folder deleted.');
+      toast.success(tp('gallery', 'toastFolderDeleted'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not delete folder');
+      setError(e instanceof Error ? e.message : tp('gallery', 'errorDeleteFolder'));
     }
   }
 
   function openAdd() {
     if (!currentFolderId) {
-      toast.error('Open a folder first, then upload photos into it.');
+      toast.error(tp('gallery', 'errorOpenFolderFirst'));
       return;
     }
     setModalMode('add');
@@ -307,7 +312,7 @@ export default function GalleryWorkspace() {
     try {
       if (modalMode === 'add') {
         const files = data.files?.length ? data.files : data.file ? [data.file] : [];
-        if (!files.length) throw new Error('Add at least one image.');
+        if (!files.length) throw new Error(tp('gallery', 'errorAddAtLeastOneImage'));
         const folderId = currentFolderId || UNSORTED_FOLDER_ID;
         const current = useStore.getState().photos as GalleryPhoto[];
         const photoIds = allocatePhotoIds(current, files.length);
@@ -332,7 +337,7 @@ export default function GalleryWorkspace() {
               onStatus: (status) => {
                 setSaveStatus(
                   files.length > 1
-                    ? `${status} (${finished + 1}/${files.length})…`
+                    ? tpl('gallery', 'uploadStatusMulti', { status, current: finished + 1, total: files.length })
                     : status
                 );
               },
@@ -347,12 +352,12 @@ export default function GalleryWorkspace() {
                 ? err.message
                 : typeof err === 'string' && err.trim()
                   ? err
-                  : 'Upload failed';
+                  : tp('gallery', 'uploadFailed');
             failures.push(`${file.name}: ${msg}`);
           } finally {
             finished += 1;
             setUploadProgress(null);
-            setSaveStatus(`Uploaded ${finished} of ${files.length}…`);
+            setSaveStatus(tpl('gallery', 'uploadProgress', { finished, total: files.length }));
           }
         });
 
@@ -360,13 +365,13 @@ export default function GalleryWorkspace() {
           await withoutAutoSyncAsync(async () => {
             useStore.setState({ photos: [...current, ...completed] });
           });
-          toast.success(`Uploaded ${completed.length}/${files.length} image(s).`);
+          toast.success(tpl('gallery', 'toastUploaded', { completed: completed.length, total: files.length }));
         }
         if (failures.length) {
-          toast.error(`Failed ${failures.length} file(s). First error: ${failures[0]}`);
+          toast.error(tpl('gallery', 'toastUploadFailed', { count: failures.length, error: failures[0] }));
         }
         if (!completed.length) {
-          throw new Error(failures[0] ?? 'Upload failed');
+          throw new Error(failures[0] ?? tp('gallery', 'uploadFailed'));
         }
       } else if (id && editing) {
         let record: GalleryPhoto = {
@@ -376,7 +381,7 @@ export default function GalleryWorkspace() {
           tags: data.tags,
         };
         if (data.replaceImage && data.file) {
-          setSaveStatus('Re-uploading image…');
+          setSaveStatus(tp('gallery', 'statusReuploading'));
           record = await uploadPhotoViaApi(data.file, {
             photoId: id,
             caption: data.caption,
@@ -395,7 +400,7 @@ export default function GalleryWorkspace() {
             useStore.setState({ photos: next });
           });
         } else {
-          setSaveStatus('Saving metadata…');
+          setSaveStatus(tp('gallery', 'statusSavingMetadata'));
           const result = await patchPhoto(id, {
             caption: data.caption,
             region: data.region,
@@ -406,7 +411,7 @@ export default function GalleryWorkspace() {
       }
       setModalOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setError(e instanceof Error ? e.message : tp('gallery', 'errorSaveFailed'));
       setSaveStatus('');
       setUploadProgress(null);
     } finally {
@@ -421,7 +426,7 @@ export default function GalleryWorkspace() {
     setSaving(true);
     setError(null);
     try {
-      setSaveStatus('Deleting…');
+      setSaveStatus(tp('gallery', 'statusDeleting'));
       await deletePhoto(photo);
       setModalOpen(false);
       setDismissedPhotoFilter(photoFilter);
@@ -432,7 +437,7 @@ export default function GalleryWorkspace() {
         return next;
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      setError(e instanceof Error ? e.message : tp('gallery', 'errorDeleteFailed'));
     } finally {
       setSaving(false);
       setSaveStatus('');
@@ -441,8 +446,8 @@ export default function GalleryWorkspace() {
 
   async function handleBulkDelete() {
     if (!selected.size) return;
-    const ok = await confirmDialog(`Delete ${selected.size} photo(s) from the library?`, {
-      title: 'Delete photos',
+    const ok = await confirmDialog(tpl('gallery', 'confirmBulkDeletePhotos', { count: selected.size }), {
+      title: tp('gallery', 'confirmBulkDeletePhotosTitle'),
     });
     if (!ok) return;
     setSaving(true);
@@ -458,10 +463,11 @@ export default function GalleryWorkspace() {
       });
 
       setSelected(new Set());
-      toast.success('Photos deleted.');
+      toast.success(tp('gallery', 'toastPhotosDeleted'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Bulk delete failed');
-      toast.error(e instanceof Error ? e.message : 'Bulk delete failed');
+      const msg = e instanceof Error ? e.message : tp('gallery', 'errorBulkDeleteFailed');
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -478,10 +484,11 @@ export default function GalleryWorkspace() {
       }
       setSelected(new Set());
       setMoveOpen(false);
-      toast.success(`Moved ${photoIds.length} photo(s).`);
+      toast.success(tpl('gallery', 'toastMovedPhotos', { count: photoIds.length }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Move failed');
-      toast.error(e instanceof Error ? e.message : 'Move failed');
+      const msg = e instanceof Error ? e.message : tp('gallery', 'errorMoveFailed');
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -553,11 +560,18 @@ export default function GalleryWorkspace() {
   const dragPhoto = dragPhotoId ? photos.find((p) => p.id === dragPhotoId) : null;
   const dragThumb = dragPhoto ? photoThumbUrl(dragPhoto) || dragPhoto.url : null;
 
+  const GALLERY_REGION_KEY: Record<string, 'regionAll' | 'regionNorth' | 'regionCentral' | 'regionSouth' | 'regionPeople' | 'regionServices'> = {
+    all: 'regionAll',
+    north: 'regionNorth',
+    central: 'regionCentral',
+    south: 'regionSouth',
+    people: 'regionPeople',
+    services: 'regionServices',
+  };
+
   const atRoot = currentFolderId === null;
-  const title = atRoot ? 'Photo Library' : currentFolder?.name || 'Folder';
-  const subtitle = atRoot
-    ? 'Folders for tours & attractions'
-    : 'Upload here, then Move or Delete selected photos';
+  const title = atRoot ? tp('gallery', 'photoLibrary') : currentFolder?.name || tp('gallery', 'folderFallbackTitle');
+  const subtitle = atRoot ? tp('gallery', 'heroSubtitleRoot') : tp('gallery', 'heroSubtitleFolder');
   const totalPhotos = photos.length;
   const totalFolders = folders.length;
   const unsortedCount = photoCounts[UNSORTED_FOLDER_ID] ?? 0;
@@ -566,7 +580,7 @@ export default function GalleryWorkspace() {
     <div className="phlib">
       {libraryLoading && (
         <div className="crm-page-hydrate-error" role="status" style={{ padding: '0.75rem 1rem' }}>
-          Đang tải thư viện ảnh…
+          {tp('gallery', 'loadingLibrary')}
         </div>
       )}
       <div className="phlib-hero">
@@ -574,21 +588,21 @@ export default function GalleryWorkspace() {
           <h1 className="phlib-title">{title}</h1>
           <p className="phlib-sub">{subtitle}</p>
         </div>
-        <div className="phlib-hero-stats" aria-label="Library summary">
+        <div className="phlib-hero-stats" aria-label={tp('gallery', 'librarySummaryAria')}>
           <span className="phlib-stat">
-            <strong>{totalFolders}</strong> folders
+            <strong>{totalFolders}</strong> {tp('gallery', 'statFolders')}
           </span>
           <span className="phlib-stat">
-            <strong>{totalPhotos}</strong> photos
+            <strong>{totalPhotos}</strong> {tp('gallery', 'statPhotos')}
           </span>
           {atRoot && (
             <span className="phlib-stat phlib-stat-muted">
-              <strong>{unsortedCount}</strong> unsorted
+              <strong>{unsortedCount}</strong> {tp('gallery', 'statUnsorted')}
             </span>
           )}
           {!atRoot && (
             <span className="phlib-stat phlib-stat-muted">
-              <strong>{folderPhotos.length}</strong> in this folder
+              <strong>{folderPhotos.length}</strong> {tp('gallery', 'statInThisFolder')}
             </span>
           )}
         </div>
@@ -598,25 +612,25 @@ export default function GalleryWorkspace() {
             className="btn btn-o"
             disabled={saving || !canWrite}
             onClick={handleNewFolder}
-            title={!canWrite ? 'You need write permission for Gallery to create a folder' : undefined}
+            title={!canWrite ? tp('gallery', 'permCreateFolderTitle') : undefined}
           >
-            New folder
+            {tp('gallery', 'newFolder')}
           </button>
           {!atRoot && filtered.length > 0 && (
             <button type="button" className="btn btn-o" disabled={saving} onClick={selectAllFiltered}>
-              Select all ({filtered.length})
+              {tpl('gallery', 'selectAll', { count: filtered.length })}
             </button>
           )}
           {selected.size > 0 && (
             <>
               <button type="button" className="btn btn-o" disabled={saving} onClick={clearSelection}>
-                Clear selection
+                {tp('gallery', 'clearSelection')}
               </button>
               <button type="button" className="btn btn-o" disabled={saving} onClick={() => setMoveOpen(true)}>
-                Move to…
+                {tp('gallery', 'moveTo')}
               </button>
               <button type="button" className="btn btn-s" disabled={saving || !canWrite} onClick={handleBulkDelete}>
-                Delete {selected.size}
+                {tpl('gallery', 'deleteCount', { count: selected.size })}
               </button>
             </>
           )}
@@ -626,9 +640,9 @@ export default function GalleryWorkspace() {
               className="btn btn-g"
               onClick={openAdd}
               disabled={saving || !canWrite}
-              title={!canWrite ? 'You need write permission for Gallery to upload photos' : undefined}
+              title={!canWrite ? tp('gallery', 'permUploadTitle') : undefined}
             >
-              Upload photos
+              {tp('gallery', 'uploadPhotos')}
             </button>
           )}
         </div>
@@ -646,9 +660,7 @@ export default function GalleryWorkspace() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={
-            atRoot
-              ? 'Search folders or photos…'
-              : 'Search tags… e.g. "Can Tho" or CanTho'
+            atRoot ? tp('gallery', 'searchFoldersOrPhotos') : tp('gallery', 'searchTagsPlaceholder')
           }
         />
         {!atRoot && (
@@ -660,22 +672,24 @@ export default function GalleryWorkspace() {
                 className={`phlib-region-tab${region === r.id ? ' on' : ''}`}
                 onClick={() => setRegion(r.id)}
               >
-                {r.label}
+                {tp('gallery', GALLERY_REGION_KEY[r.id] ?? 'regionAll')}
               </button>
             ))}
           </div>
         )}
         <span className="phlib-count">
           {atRoot
-            ? `${visibleFolders.length} folder${visibleFolders.length === 1 ? '' : 's'}`
-            : `${selected.size > 0 ? `${selected.size} selected · ` : ''}${filtered.length} photos`}
+            ? visibleFolders.length === 1
+              ? tpl('gallery', 'countFoldersOne', { count: visibleFolders.length })
+              : tpl('gallery', 'countFoldersMany', { count: visibleFolders.length })
+            : tpl('gallery', 'countSelectedPhotos', { selected: selected.size, count: filtered.length })}
         </span>
       </div>
 
       {displayError && <div className="phlib-error">{displayError}</div>}
       {!atRoot && attractionFilter && (
         <div className="phlib-filter-note">
-          Filtered to attraction <code>{attractionFilter}</code>
+          {tp('gallery', 'filteredToAttraction')} <code>{attractionFilter}</code>
         </div>
       )}
 
@@ -696,17 +710,15 @@ export default function GalleryWorkspace() {
           <EmptyState
             className="crm-empty-state--flush"
             variant="photos"
-            title={q.trim() ? 'No folders match your search' : 'No folders yet'}
+            title={q.trim() ? tp('gallery', 'noFoldersMatchSearch') : tp('gallery', 'noFoldersYet')}
             description={
-              q.trim()
-                ? 'Try another name or clear the search to see all folders.'
-                : 'Create a folder to start organizing your photo library.'
+              q.trim() ? tp('gallery', 'noFoldersMatchSearchDesc') : tp('gallery', 'noFoldersYetDesc')
             }
             action={
               <>
                 {q.trim() && (
                   <button type="button" className="btn btn-s btn-sm" onClick={() => setQ('')}>
-                    Clear search
+                    {tc('clearSearch')}
                   </button>
                 )}
                 {!q.trim() && (
@@ -715,9 +727,9 @@ export default function GalleryWorkspace() {
                     className="btn btn-g btn-sm"
                     onClick={handleNewFolder}
                     disabled={!canWrite}
-                    title={!canWrite ? 'You need write permission for Gallery to create a folder' : undefined}
+                    title={!canWrite ? tp('gallery', 'permCreateFolderTitle') : undefined}
                   >
-                    New folder
+                    {tp('gallery', 'newFolder')}
                   </button>
                 )}
               </>
@@ -749,13 +761,13 @@ export default function GalleryWorkspace() {
                 variant="photos"
                 title={
                   region !== 'all' || q.trim() || attractionFilter
-                    ? 'No photos match your filters'
-                    : 'This folder is empty'
+                    ? tp('gallery', 'noPhotosMatchFilters')
+                    : tp('gallery', 'folderEmpty')
                 }
                 description={
                   region !== 'all' || q.trim() || attractionFilter
-                    ? 'Try another region or search, or clear filters.'
-                    : 'Upload photos here, or move photos from Unsorted with Move to…'
+                    ? tp('gallery', 'noPhotosMatchFiltersDesc')
+                    : tp('gallery', 'folderEmptyDesc')
                 }
                 action={
                   <>
@@ -768,11 +780,11 @@ export default function GalleryWorkspace() {
                           setQ('');
                         }}
                       >
-                        Clear filters
+                        {tc('clearFilters')}
                       </button>
                     )}
                     <button type="button" className="btn btn-g btn-sm" onClick={openAdd}>
-                      Upload photos
+                      {tp('gallery', 'uploadPhotos')}
                     </button>
                   </>
                 }
@@ -816,7 +828,7 @@ export default function GalleryWorkspace() {
 
       <GalleryFolderNameModal
         open={Boolean(folderNameModal)}
-        title={folderNameModal?.mode === 'rename' ? 'Rename folder' : 'New folder'}
+        title={folderNameModal?.mode === 'rename' ? tp('gallery', 'renameFolder') : tp('gallery', 'newFolder')}
         initialName={folderNameModal?.mode === 'rename' ? folderNameModal.folder.name : ''}
         saving={saving}
         onClose={() => !saving && setFolderNameModal(null)}
@@ -853,7 +865,10 @@ export default function GalleryWorkspace() {
                 )}
                 {lightboxIndex >= 0 && (
                   <span className="phlib-viewer-pos">
-                    {lightboxIndex + 1} / {filtered.length}
+                    {tpl('gallery', 'lightboxPosition', {
+                      current: lightboxIndex + 1,
+                      total: filtered.length,
+                    })}
                   </span>
                 )}
               </div>
@@ -867,26 +882,28 @@ export default function GalleryWorkspace() {
                     setLightbox(null);
                   }}
                 >
-                  Edit
+                  {tp('gallery', 'lightboxEdit')}
                 </button>
                 <button
                   type="button"
                   className="btn btn-sm btn-s"
                   onClick={async () => {
                     const ok = await confirmDialog(
-                      `Delete photo “${activeLightbox.caption || activeLightbox.id}”?`,
-                      { title: 'Delete photo' }
+                      tpl('gallery', 'confirmDeletePhoto', {
+                        label: activeLightbox.caption || activeLightbox.id,
+                      }),
+                      { title: tp('gallery', 'confirmDeletePhotoTitle') }
                     );
                     if (!ok) return;
                     await handleDelete(activeLightbox.id);
                   }}
                 >
-                  Delete
+                  {tp('gallery', 'lightboxDelete')}
                 </button>
                 <button
                   type="button"
                   className="phlib-viewer-close"
-                  aria-label="Close"
+                  aria-label={tp('gallery', 'closeAria')}
                   onClick={() => {
                     setDismissedPhotoFilter(photoFilter);
                     setLightbox(null);
@@ -902,7 +919,7 @@ export default function GalleryWorkspace() {
                 <button
                   type="button"
                   className="phlib-viewer-nav phlib-viewer-prev"
-                  aria-label="Previous photo"
+                  aria-label={tp('gallery', 'previousPhotoAria')}
                   onClick={() => showLightboxAt(lightboxIndex - 1)}
                 >
                   ‹
@@ -919,13 +936,13 @@ export default function GalleryWorkspace() {
                   unoptimized
                 />
               ) : (
-                <div className="phlib-viewer-missing">No image URL</div>
+                <div className="phlib-viewer-missing">{tp('gallery', 'noImageUrl')}</div>
               )}
               {lightboxIndex >= 0 && lightboxIndex < filtered.length - 1 && (
                 <button
                   type="button"
                   className="phlib-viewer-nav phlib-viewer-next"
-                  aria-label="Next photo"
+                  aria-label={tp('gallery', 'nextPhotoAria')}
                   onClick={() => showLightboxAt(lightboxIndex + 1)}
                 >
                   ›

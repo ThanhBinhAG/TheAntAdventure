@@ -3,18 +3,19 @@
 import type { Attraction } from '@/lib/types';
 import AttractionRow from './AttractionRow';
 import EmptyState from '@/components/EmptyState';
-
-const REG_GROUPS: Record<string, string> = {
-  north: '🏔 Northern Vietnam',
-  central: '🏯 Central Vietnam',
-  south: '🌿 Southern Vietnam',
-};
+import { useLanguage } from '@/hooks/useLanguage';
 
 const REG_COLORS: Record<string, [string, string]> = {
   north: ['#E8F5EE', '#1a5c38'],
   central: ['#FFF3CD', '#856404'],
   south: ['#E1F0FF', '#0c5464'],
 };
+
+const REGION_KEYS = {
+  north: 'regionNorth',
+  central: 'regionCentral',
+  south: 'regionSouth',
+} as const;
 
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 
@@ -40,22 +41,28 @@ export default function AttractionTable({
   onToggle,
   onEdit,
   onAdd,
-  emptyHint = 'No attractions in this region yet.',
+  emptyHint,
   onPhotoClick,
 }: Props) {
+  const { tp, tpl } = useLanguage();
   const [rbg, rfg] = REG_COLORS[region] || ['#f5f5f5', '#333'];
+  const regionKey = REGION_KEYS[region as keyof typeof REGION_KEYS];
+  const regionLabel = regionKey ? tp('attractions', regionKey) : region;
+  const emptyTitle = emptyHint ?? tp('attractions', 'emptyRegion');
 
   return (
     <div className="att-region-block">
       <div className="att-region-hd">
         <span className="att-region-badge" style={{ background: rbg, color: rfg }}>
-          {REG_GROUPS[region]}
+          {regionLabel}
         </span>
         <div className="att-region-hd-actions">
-          <span className="att-region-count">{attractions.length} attractions</span>
+          <span className="att-region-count">
+            {tpl('attractions', 'attractionsCount', { count: attractions.length })}
+          </span>
           {onAdd && (
             <button type="button" className="btn btn-s btn-sm att-region-add" onClick={onAdd}>
-              + Add
+              {tp('attractions', 'add')}
             </button>
           )}
         </div>
@@ -81,17 +88,17 @@ export default function AttractionTable({
             <thead>
               <tr>
                 <th className="att-col-chevron" />
-                <th className="att-th-name">Name</th>
-                <th className="att-th-dest">Dest.</th>
-                <th className="att-th-type">Type</th>
-                <th className="att-th-hours">Hours</th>
-                <th className="att-th-closed">Closed</th>
-                <th className="att-th-admission">Admission</th>
-                <th className="att-th-phone">Phone</th>
-                <th className="att-th-best">Best Time</th>
-                <th className="att-th-crowd">Crowd Tips</th>
-                <th className="att-th-seasonal">Seasonal</th>
-                <th className="att-th-actions">Actions</th>
+                <th className="att-th-name">{tp('attractions', 'colName')}</th>
+                <th className="att-th-dest">{tp('attractions', 'colDest')}</th>
+                <th className="att-th-type">{tp('attractions', 'colType')}</th>
+                <th className="att-th-hours">{tp('attractions', 'colHours')}</th>
+                <th className="att-th-closed">{tp('attractions', 'colClosed')}</th>
+                <th className="att-th-admission">{tp('attractions', 'colAdmission')}</th>
+                <th className="att-th-phone">{tp('attractions', 'colPhone')}</th>
+                <th className="att-th-best">{tp('attractions', 'colBestTime')}</th>
+                <th className="att-th-crowd">{tp('attractions', 'colCrowdTips')}</th>
+                <th className="att-th-seasonal">{tp('attractions', 'colSeasonal')}</th>
+                <th className="att-th-actions">{tp('attractions', 'colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -117,12 +124,12 @@ export default function AttractionTable({
           className="crm-empty-state--flush att-region-empty-table"
           size="compact"
           variant="attractions"
-          title={emptyHint.replace(/\.$/, '')}
-          description="Add an attraction to this region, or clear filters if you expected matches."
+          title={emptyTitle.replace(/\.$/, '')}
+          description={tp('attractions', 'emptyDesc')}
           action={
             onAdd && (
               <button type="button" className="btn btn-s btn-sm" onClick={onAdd}>
-                + Add Attraction
+                {tp('attractions', 'addAttraction')}
               </button>
             )
           }

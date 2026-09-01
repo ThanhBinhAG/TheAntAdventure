@@ -2,6 +2,31 @@ import type { AppLanguage } from './stages';
 
 export const COMMON = {
   en: {
+    add: 'Add',
+    edit: 'Edit',
+    delete: 'Delete',
+    view: 'View',
+    search: 'Search',
+    filter: 'Filter',
+    all: 'All',
+    retry: 'Retry',
+    loading: 'Loading…',
+    clearFilters: 'Clear filters',
+    clearSearch: 'Clear search',
+    confirmDelete: 'Delete',
+    close: 'Close',
+    previous: 'Previous',
+    next: 'Next',
+    perPage: 'Per page',
+    itemsPerPage: 'Items per page',
+    showingRange: 'Showing {start}–{end} of {total}',
+    pageOf: 'Page {page} of {total}',
+    noResults: 'No results found',
+    required: 'Required',
+    grid: 'Grid',
+    columns: 'Columns',
+    saveChanges: 'Save Changes',
+    permissionWriteRequired: 'You need write permission for this action',
     newClientBtn: '+ New Client',
     pipelineView: 'Pipeline',
     listView: 'List',
@@ -37,6 +62,31 @@ export const COMMON = {
     unsavedChangesLeave: 'Leave',
   },
   vi: {
+    add: 'Thêm',
+    edit: 'Sửa',
+    delete: 'Xóa',
+    view: 'Xem',
+    search: 'Tìm kiếm',
+    filter: 'Lọc',
+    all: 'Tất cả',
+    retry: 'Thử lại',
+    loading: 'Đang tải…',
+    clearFilters: 'Xóa bộ lọc',
+    clearSearch: 'Xóa tìm kiếm',
+    confirmDelete: 'Xóa',
+    close: 'Đóng',
+    previous: 'Trước',
+    next: 'Sau',
+    perPage: 'Mỗi trang',
+    itemsPerPage: 'Số mục mỗi trang',
+    showingRange: 'Hiển thị {start}–{end} / {total}',
+    pageOf: 'Trang {page} / {total}',
+    noResults: 'Không có kết quả',
+    required: 'Bắt buộc',
+    grid: 'Lưới',
+    columns: 'Cột',
+    saveChanges: 'Lưu thay đổi',
+    permissionWriteRequired: 'Bạn cần quyền ghi để thực hiện thao tác này',
     newClientBtn: '+ Khách mới',
     pipelineView: 'Kênh bán',
     listView: 'Danh sách',
@@ -77,4 +127,16 @@ export type CommonKey = keyof typeof COMMON.en;
 
 export function tc(key: CommonKey, language: AppLanguage): string {
   return COMMON[language][key] ?? COMMON.en[key];
+}
+
+/** Replace `{name}` placeholders in translated strings. */
+export function formatI18n(
+  template: string,
+  vars?: Record<string, string | number>
+): string {
+  if (!vars) return template;
+  return Object.entries(vars).reduce(
+    (text, [key, value]) => text.replaceAll(`{${key}}`, String(value)),
+    template
+  );
 }

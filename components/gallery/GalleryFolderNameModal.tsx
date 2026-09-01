@@ -21,17 +21,16 @@ export default function GalleryFolderNameModal({
   onClose,
   onSubmit,
 }: Props) {
+  const { tp, tc, language } = useLanguage();
   const [name, setName] = useState(initialName);
   const [prevOpen, setPrevOpen] = useState(open);
 
-  // Reset draft when the modal opens (adjust state while rendering — no effect).
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) setName(initialName);
   }
 
   const formKey = `${open}-${initialName}`;
-  const { language } = useLanguage();
   const dirty = useFormDirty(open, initialName, name, undefined, formKey);
   const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
 
@@ -48,7 +47,7 @@ export default function GalleryFolderNameModal({
         </div>
         <div className="phlib-modal-bd">
           <label className="phlib-folder-name-label">
-            Name
+            {tp('gallery', 'folderNameLabel')}
             <input
               className="phlib-search"
               value={name}
@@ -65,7 +64,7 @@ export default function GalleryFolderNameModal({
           <div />
           <div className="phlib-modal-ft-right">
             <button type="button" className="btn btn-o" onClick={() => void requestClose()} disabled={saving}>
-              Cancel
+              {tc('cancel')}
             </button>
             <button
               type="button"
@@ -73,7 +72,7 @@ export default function GalleryFolderNameModal({
               disabled={!name.trim() || saving}
               onClick={() => onSubmit(name.trim())}
             >
-              Save
+              {tc('save')}
             </button>
           </div>
         </div>

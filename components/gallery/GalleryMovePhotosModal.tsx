@@ -25,6 +25,7 @@ export default function GalleryMovePhotosModal({
   onClose,
   onConfirm,
 }: Props) {
+  const { tp, tpl, tc, language } = useLanguage();
   const rows = useMemo(() => folderTreeRows(folders), [folders]);
   const [targetId, setTargetId] = useState<string | null>(null);
   const [prevOpen, setPrevOpen] = useState(open);
@@ -34,21 +35,21 @@ export default function GalleryMovePhotosModal({
     if (open) setTargetId(null);
   }
 
-  const { language } = useLanguage();
   const dirty = useFormDirty(open, null, targetId, (v) => String(v), `${open}-${currentFolderId}`);
   const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: saving, language });
 
   if (!open) return null;
 
   const effectiveTarget = targetId ?? rows.find((r) => r.folder.id !== currentFolderId)?.folder.id ?? null;
+  const titleKey = photoCount === 1 ? 'movePhotosTitleOne' : 'movePhotosTitleMany';
 
   return (
     <div className="overlay open" onClick={() => void requestClose()} role="presentation">
       <div className="modal phlib-move-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="modal-hd modal-hd-green phlib-modal-hd">
           <div>
-            <div className="phlib-modal-title">Move {photoCount} photo{photoCount === 1 ? '' : 's'}</div>
-            <div className="phlib-modal-sub">Choose a destination folder</div>
+            <div className="phlib-modal-title">{tpl('gallery', titleKey, { count: photoCount })}</div>
+            <div className="phlib-modal-sub">{tp('gallery', 'movePhotosSubtitle')}</div>
           </div>
           <button type="button" className="modal-close-btn" onClick={() => void requestClose()} disabled={saving}>
             ✕
@@ -69,18 +70,18 @@ export default function GalleryMovePhotosModal({
               >
                 <span className="phlib-move-folder-icon" aria-hidden />
                 <span>{folder.name}</span>
-                {folder.isSystem && <span className="phlib-move-badge">system</span>}
-                {disabled && <span className="phlib-move-badge">current</span>}
+                {folder.isSystem && <span className="phlib-move-badge">{tp('gallery', 'badgeSystem')}</span>}
+                {disabled && <span className="phlib-move-badge">{tp('gallery', 'badgeCurrent')}</span>}
               </button>
             );
           })}
-          {!rows.length && <div className="phlib-move-empty">No folders yet. Create one first.</div>}
+          {!rows.length && <div className="phlib-move-empty">{tp('gallery', 'moveNoFolders')}</div>}
         </div>
         <div className="phlib-modal-ft">
           <div />
           <div className="phlib-modal-ft-right">
             <button type="button" className="btn btn-o" onClick={() => void requestClose()} disabled={saving}>
-              Cancel
+              {tc('cancel')}
             </button>
             <button
               type="button"
@@ -88,7 +89,7 @@ export default function GalleryMovePhotosModal({
               disabled={!effectiveTarget || saving}
               onClick={() => effectiveTarget && onConfirm(effectiveTarget)}
             >
-              {saving ? 'Moving…' : 'Move here'}
+              {saving ? tp('gallery', 'moving') : tp('gallery', 'moveHere')}
             </button>
           </div>
         </div>

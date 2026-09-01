@@ -2,7 +2,6 @@
 
 import type { Attraction } from '@/lib/types';
 import {
-  ATTRACTION_TYPE_LABELS,
   formatHoursCompact,
   galleryUrlForAttraction,
   getAttractionHighlight,
@@ -10,8 +9,17 @@ import {
   photosForAttraction,
 } from '@/lib/attractions/attractions-helpers';
 import AttractionExpandPanel from './AttractionExpandPanel';
+import { useLanguage } from '@/hooks/useLanguage';
 
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
+
+const TYPE_KEYS = {
+  museum: 'typeMuseum',
+  heritage: 'typeHeritage',
+  temple: 'typeTemple',
+  landmark: 'typeLandmark',
+  nature: 'typeNature',
+} as const;
 
 type Props = {
   attraction: Attraction;
@@ -54,6 +62,7 @@ export default function AttractionRow({
   onEdit,
   onPhotoClick,
 }: Props) {
+  const { tp, tc } = useLanguage();
   const highlight = getAttractionHighlight(attraction, todayLabel);
   const alert = getNonDuplicateAlert(attraction.alert, attraction.closed);
   const hoursText = formatHoursCompact(attraction.hours).join(' · ');
@@ -88,7 +97,9 @@ export default function AttractionRow({
         </td>
         <td className="att-col-type">
           <span className={`att-type-pill att-type-${attraction.type}`}>
-            {ATTRACTION_TYPE_LABELS[attraction.type] || attraction.type}
+            {TYPE_KEYS[attraction.type as keyof typeof TYPE_KEYS]
+              ? tp('attractions', TYPE_KEYS[attraction.type as keyof typeof TYPE_KEYS])
+              : attraction.type}
           </span>
         </td>
         <td className="att-col-hours">
@@ -125,7 +136,7 @@ export default function AttractionRow({
         <td className="att-col-actions" onClick={(e) => e.stopPropagation()}>
           {onEdit && (
             <button type="button" className="btn btn-s btn-sm att-row-edit" onClick={onEdit}>
-              Edit
+              {tc('edit')}
             </button>
           )}
         </td>

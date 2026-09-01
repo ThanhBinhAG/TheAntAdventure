@@ -17,26 +17,25 @@ import type {
   DevNotePriority,
   DevNoteStatus,
 } from '@/lib/dev-notes/dev-notes-input';
+import { useLanguage } from '@/hooks/useLanguage';
+import {
+  DEV_NOTES_CAT_KEYS,
+  DEV_NOTES_HOWTO_KEYS,
+  DEV_NOTES_LEGEND_KEYS,
+  DEV_NOTES_PRIORITY_LABEL_KEYS,
+} from '@/lib/i18n/pages/dev-notes';
 
-const PRIORITY_META: Record<string, { dot: string; label: string; bg: string; fg: string }> = {
-  high: { dot: '🔴', label: 'High', bg: '#FDECEA', fg: '#C0392B' },
-  medium: { dot: '🟡', label: 'Medium', bg: '#FEF3C7', fg: '#D97706' },
-  low: { dot: '🟢', label: 'Low', bg: 'var(--gl)', fg: 'var(--gd)' },
-  info: { dot: '💡', label: 'Info', bg: '#E3F2FD', fg: '#1565C0' },
+const PRIORITY_META: Record<string, { dot: string; labelKey: string; bg: string; fg: string }> = {
+  high: { dot: '🔴', labelKey: 'high', bg: '#FDECEA', fg: '#C0392B' },
+  medium: { dot: '🟡', labelKey: 'medium', bg: '#FEF3C7', fg: '#D97706' },
+  low: { dot: '🟢', labelKey: 'low', bg: 'var(--gl)', fg: 'var(--gd)' },
+  info: { dot: '💡', labelKey: 'info', bg: '#E3F2FD', fg: '#1565C0' },
 };
 
-const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  open: { label: 'Open', bg: '#E3F2FD', fg: '#1565C0' },
-  inprogress: { label: 'In Progress', bg: 'var(--amb-l)', fg: 'var(--amb)' },
-  done: { label: 'Done', bg: 'var(--gl)', fg: 'var(--gd)' },
-};
-
-const CAT_LABELS: Record<string, string> = {
-  feature: '✨ New Feature',
-  bug: '🐛 Bug Fix',
-  design: '🎨 Design Change',
-  data: '📊 Data / Content',
-  other: '📌 Other',
+const STATUS_META: Record<string, { labelKey: string; bg: string; fg: string }> = {
+  open: { labelKey: 'open', bg: '#E3F2FD', fg: '#1565C0' },
+  inprogress: { labelKey: 'inprogress', bg: 'var(--amb-l)', fg: 'var(--amb)' },
+  done: { labelKey: 'done', bg: 'var(--gl)', fg: 'var(--gd)' },
 };
 
 function normStatus(s?: string) {
@@ -48,6 +47,7 @@ function normStatus(s?: string) {
 }
 
 export default function DevNotesPage() {
+  const { tp, tpl, tc } = useLanguage();
   const { canWrite } = usePagePermission('devnotes');
   const { items: notes, loading, error, reload } = useDevNotesPage();
   const { createDevNote } = useCreateDevNote();
@@ -87,7 +87,7 @@ export default function DevNotesPage() {
 
   const saveNote = async () => {
     if (!canWrite) {
-      toast.warning('Bạn không có quyền tạo ghi chú.');
+      toast.warning(tp('dev-notes', 'noPermissionCreate'));
       return;
     }
     if (!title.trim() || !body.trim()) return;
@@ -107,7 +107,7 @@ export default function DevNotesPage() {
     setTitle('');
     setBody('');
     setAssignee('');
-    toast.success('Ghi chú đã được lưu.');
+    toast.success(tp('dev-notes', 'noteSaved'));
   };
 
   const onStatusChange = async (note: DevNoteListItem, status: string) => {
@@ -120,7 +120,7 @@ export default function DevNotesPage() {
 
   const onDeleteNote = async (note: DevNoteListItem) => {
     if (!canWrite || !note.id) return;
-    const ok = await confirmDialog(`Delete note "${note.title}"?`, { title: 'Delete note' });
+    const ok = await confirmDialog(tpl('dev-notes', 'deleteConfirm', { title: note.title }), { title: tp('dev-notes', 'deleteTitle') });
     if (!ok) return;
     const result = await deleteDevNote(note.id);
     if (!result.ok) {
@@ -128,7 +128,7 @@ export default function DevNotesPage() {
       return;
     }
     if (editNote?.id === note.id) setEditNote(null);
-    toast.success('Ghi chú đã được xóa.');
+    toast.success(tp('dev-notes', 'noteDeleted'));
   };
 
   const onSaveEdit = async (payload: DevNoteEditPayload) => {
@@ -148,22 +148,22 @@ export default function DevNotesPage() {
       return;
     }
     setEditNote(null);
-    toast.success('Ghi chú đã được cập nhật.');
+    toast.success(tp('dev-notes', 'noteUpdated'));
   };
 
   if (loading && notes.length === 0) {
-    return <div className="crm-loading-hint">Đang tải ghi chú…</div>;
+    return <div className="crm-loading-hint">{tp('dev-notes', 'loading')}</div>;
   }
 
   if (error && notes.length === 0) {
     return (
       <EmptyState
         variant="access"
-        title="Không thể tải Dev Notes"
+        title={tp('dev-notes', 'loadErrorTitle')}
         description={error}
         action={
           <button className="btn btn-p btn-sm" type="button" onClick={() => void reload()}>
-            Thử lại
+            {tc('retry')}
           </button>
         }
       />
@@ -175,7 +175,7 @@ export default function DevNotesPage() {
       <div>
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="card-hd">
-            <span className="card-title">📝 New Requirement / Note</span>
+            <span className="card-title">{tp('dev-notes', 'newNoteTitle')}</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <select
                 value={priority}
@@ -183,10 +183,10 @@ export default function DevNotesPage() {
                 disabled={!canWrite}
                 style={{ fontSize: 12, padding: '4px 8px' }}
               >
-                <option value="high">🔴 High Priority</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="low">🟢 Low</option>
-                <option value="info">💡 Info / Idea</option>
+                <option value="high">{tp('dev-notes', 'priorityHigh')}</option>
+                <option value="medium">{tp('dev-notes', 'priorityMedium')}</option>
+                <option value="low">{tp('dev-notes', 'priorityLow')}</option>
+                <option value="info">{tp('dev-notes', 'priorityInfo')}</option>
               </select>
               <select
                 value={category}
@@ -194,55 +194,55 @@ export default function DevNotesPage() {
                 disabled={!canWrite}
                 style={{ fontSize: 12, padding: '4px 8px' }}
               >
-                <option value="feature">✨ New Feature</option>
-                <option value="bug">🐛 Bug Fix</option>
-                <option value="design">🎨 Design Change</option>
-                <option value="data">📊 Data / Content</option>
-                <option value="other">📌 Other</option>
+                <option value="feature">{tp('dev-notes', 'catFeature')}</option>
+                <option value="bug">{tp('dev-notes', 'catBug')}</option>
+                <option value="design">{tp('dev-notes', 'catDesign')}</option>
+                <option value="data">{tp('dev-notes', 'catData')}</option>
+                <option value="other">{tp('dev-notes', 'catOther')}</option>
               </select>
             </div>
           </div>
           <div className="card-body">
             <div className="dn-form-grid">
               <div className="fg">
-                <label className="lbl">Note Title *</label>
-                <input placeholder="e.g. Add PDF export to Tour Design Studio" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canWrite} />
+                <label className="lbl">{tp('dev-notes', 'lblNoteTitle')}</label>
+                <input placeholder={tp('dev-notes', 'placeholderTitle')} value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canWrite} />
               </div>
               <div className="fg">
-                <label className="lbl">Assign To (technician/engineer)</label>
-                <input placeholder="e.g. Dev Team, John, Claude AI…" value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={!canWrite} />
+                <label className="lbl">{tp('dev-notes', 'lblAssignTo')}</label>
+                <input placeholder={tp('dev-notes', 'placeholderAssignee')} value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={!canWrite} />
               </div>
             </div>
             <div className="fg">
-              <label className="lbl">Detailed Requirements / Description *</label>
-              <textarea style={{ minHeight: 120 }} placeholder="Describe exactly what you need built or changed…" value={body} onChange={(e) => setBody(e.target.value)} disabled={!canWrite} />
+              <label className="lbl">{tp('dev-notes', 'lblDescription')}</label>
+              <textarea style={{ minHeight: 120 }} placeholder={tp('dev-notes', 'placeholderBody')} value={body} onChange={(e) => setBody(e.target.value)} disabled={!canWrite} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="btn btn-s btn-sm" type="button" onClick={() => { setTitle(''); setBody(''); }} disabled={!canWrite}>
-                Clear
+                {tp('dev-notes', 'clear')}
               </button>
               <button className="btn btn-p" type="button" onClick={() => void saveNote()} disabled={!canWrite || saving}>
-                📝 Save Note
+                {tp('dev-notes', 'saveNote')}
               </button>
             </div>
           </div>
         </div>
 
         <div className="dn-filter-row">
-          <span className="dn-filter-label">All Notes</span>
+          <span className="dn-filter-label">{tp('dev-notes', 'allNotes')}</span>
           <div style={{ flex: 1 }} />
           <select value={statusF} onChange={(e) => setStatusF(e.target.value)}>
-            <option value="">All Status</option>
-            <option value="open">Open</option>
-            <option value="inprogress">In Progress</option>
-            <option value="done">Done</option>
+            <option value="">{tp('dev-notes', 'filterAllStatus')}</option>
+            <option value="open">{tp('dev-notes', 'statusOpen')}</option>
+            <option value="inprogress">{tp('dev-notes', 'statusInProgress')}</option>
+            <option value="done">{tp('dev-notes', 'statusDone')}</option>
           </select>
           <select value={catF} onChange={(e) => setCatF(e.target.value)}>
-            <option value="">All Categories</option>
-            <option value="feature">Feature</option>
-            <option value="bug">Bug Fix</option>
-            <option value="design">Design</option>
-            <option value="data">Data</option>
+            <option value="">{tp('dev-notes', 'filterAllCategories')}</option>
+            <option value="feature">{tp('dev-notes', 'filterFeature')}</option>
+            <option value="bug">{tp('dev-notes', 'filterBug')}</option>
+            <option value="design">{tp('dev-notes', 'filterDesign')}</option>
+            <option value="data">{tp('dev-notes', 'filterData')}</option>
           </select>
         </div>
 
@@ -251,15 +251,16 @@ export default function DevNotesPage() {
             className="crm-empty-state--flush"
             size="compact"
             variant="notes"
-            title="No notes found"
-            description="Add your first requirement using the form above."
+            title={tp('dev-notes', 'noNotesTitle')}
+            description={tp('dev-notes', 'noNotesDesc')}
           />
         ) : (
           filtered.map((n) => {
             const pri = PRIORITY_META[n.priority || 'medium'] || PRIORITY_META.medium;
             const stKey = normStatus(n.status);
             const st = STATUS_META[stKey] || STATUS_META.open;
-            const cat = CAT_LABELS[n.category || 'other'] || n.category;
+            const catKey = DEV_NOTES_CAT_KEYS[n.category || 'other'] || 'catOther';
+            const priLabelKey = DEV_NOTES_PRIORITY_LABEL_KEYS[pri.labelKey] || 'priorityMediumLabel';
             return (
               <div key={n.id} className="dn-note-card">
                 <div className="dn-note-hd">
@@ -270,11 +271,11 @@ export default function DevNotesPage() {
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                       <span className="dn-pri-tag" style={{ background: pri.bg, color: pri.fg }}>
-                        {pri.label}
+                        {tp('dev-notes', priLabelKey)}
                       </span>
-                      <span className="dn-cat-tag">{cat}</span>
+                      <span className="dn-cat-tag">{tp('dev-notes', catKey)}</span>
                       <span style={{ fontSize: 11.5, color: 'var(--m)' }}>
-                        → {n.assignee || 'Dev Team'} · {n.author || '—'} · {n.date || '—'}
+                        → {n.assignee || tp('dev-notes', 'defaultAssignee')} · {n.author || '—'} · {n.date || '—'}
                       </span>
                     </div>
                   </div>
@@ -282,10 +283,10 @@ export default function DevNotesPage() {
                     {canWrite && (
                       <>
                         <button className="btn btn-s btn-sm" type="button" onClick={() => setEditNote(n)}>
-                          Edit
+                          {tc('edit')}
                         </button>
                         <button className="btn btn-s btn-sm" type="button" onClick={() => void onDeleteNote(n)}>
-                          Delete
+                          {tc('delete')}
                         </button>
                       </>
                     )}
@@ -295,9 +296,9 @@ export default function DevNotesPage() {
                       disabled={!canWrite}
                       style={{ background: st.bg, color: st.fg, fontWeight: 500, fontSize: 12, padding: '4px 8px', border: '1px solid var(--b)', borderRadius: 7 }}
                     >
-                      <option value="open">Open</option>
-                      <option value="inprogress">In Progress</option>
-                      <option value="done">Done</option>
+                      <option value="open">{tp('dev-notes', 'statusOpen')}</option>
+                      <option value="inprogress">{tp('dev-notes', 'statusInProgress')}</option>
+                      <option value="done">{tp('dev-notes', 'statusDone')}</option>
                     </select>
                   </div>
                 </div>
@@ -320,16 +321,18 @@ export default function DevNotesPage() {
       <div className="dn-sidebar">
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">📊 Summary</span>
+            <span className="card-title">{tp('dev-notes', 'summaryTitle')}</span>
           </div>
           <div className="card-body dn-summary">
-            {[
-              ['Total Notes', summary.total, 'var(--t)'],
-              ['🔴 High Priority', summary.high, 'var(--red)'],
-              ['Open', summary.open, 'var(--blue)'],
-              ['In Progress', summary.inpro, 'var(--amb)'],
-              ['Done', summary.done, 'var(--g)'],
-            ].map(([label, val, col]) => (
+            {(
+              [
+                [tp('dev-notes', 'summaryTotal'), summary.total, 'var(--t)'],
+                [tp('dev-notes', 'summaryHigh'), summary.high, 'var(--red)'],
+                [tp('dev-notes', 'summaryOpen'), summary.open, 'var(--blue)'],
+                [tp('dev-notes', 'summaryInProgress'), summary.inpro, 'var(--amb)'],
+                [tp('dev-notes', 'summaryDone'), summary.done, 'var(--g)'],
+              ] as const
+            ).map(([label, val, col]) => (
               <div key={String(label)} className="dn-summary-row">
                 <span>{label}</span>
                 <span style={{ fontWeight: 700, color: col as string }}>{val as number}</span>
@@ -340,18 +343,13 @@ export default function DevNotesPage() {
 
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">💡 How to Use</span>
+            <span className="card-title">{tp('dev-notes', 'howToUseTitle')}</span>
           </div>
           <div className="card-body ai-steps">
-            {[
-              'Write your requirement in plain language — no technical jargon needed.',
-              'Set priority and category so the dev team can triage efficiently.',
-              'The dev team opens this page, reads your notes, and updates the status as they build.',
-              'No emails, no WhatsApp — everything is tracked here in the CRM.',
-            ].map((text, i) => (
-              <div key={i} className="ai-step">
+            {DEV_NOTES_HOWTO_KEYS.map((key, i) => (
+              <div key={key} className="ai-step">
                 <div className="ai-step-num">{i + 1}</div>
-                <span>{text}</span>
+                <span>{tp('dev-notes', key)}</span>
               </div>
             ))}
           </div>
@@ -359,19 +357,15 @@ export default function DevNotesPage() {
 
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">🏷 Status Legend</span>
+            <span className="card-title">{tp('dev-notes', 'legendTitle')}</span>
           </div>
           <div className="card-body dn-legend">
-            {[
-              ['Open', '#E3F2FD', '#1565C0', 'Just logged, not started'],
-              ['In Progress', 'var(--amb-l)', 'var(--amb)', 'Dev team working on it'],
-              ['Done', 'var(--gl)', 'var(--gd)', 'Built and deployed'],
-            ].map(([label, bg, fg, desc]) => (
-              <div key={String(label)} className="dn-legend-row">
-                <span className="dn-pri-tag" style={{ background: bg as string, color: fg as string }}>
-                  {label}
+            {DEV_NOTES_LEGEND_KEYS.map(({ status, desc }) => (
+              <div key={status} className="dn-legend-row">
+                <span className="dn-pri-tag" style={{ background: status === 'statusOpen' ? '#E3F2FD' : status === 'statusInProgress' ? 'var(--amb-l)' : 'var(--gl)', color: status === 'statusOpen' ? '#1565C0' : status === 'statusInProgress' ? 'var(--amb)' : 'var(--gd)' }}>
+                  {tp('dev-notes', status)}
                 </span>
-                <span style={{ color: 'var(--m)' }}>{desc}</span>
+                <span style={{ color: 'var(--m)' }}>{tp('dev-notes', desc)}</span>
               </div>
             ))}
           </div>

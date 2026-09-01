@@ -9,6 +9,7 @@ import { weatherCardCoverUrl } from '@/lib/weather/resolve-cover';
 import { useInViewport } from '@/hooks/useInViewport';
 import DestinationCoverPlaceholder from '@/components/weather/destinations/DestinationCoverPlaceholder';
 import StorageImage from '@/components/gallery/StorageImage';
+import { useLanguage } from '@/hooks/useLanguage';
 
 const HOVER_PREFETCH_MS = 200;
 
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
+  const { tp, tpl, language } = useLanguage();
   const cardRef = useRef<HTMLDivElement>(null);
   const inView = useInViewport(cardRef);
   const resolved = useResolvedCover(destination);
@@ -49,7 +51,7 @@ export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
         onPointerEnter={scheduleHoverPrefetch}
         onPointerLeave={clearHoverPrefetch}
         onFocus={() => prefetchDestinationWeather(destination.id)}
-        aria-label={`View weather for ${destination.name}`}
+        aria-label={tpl('weather', 'viewWeatherAria', { name: destination.name })}
       >
         {cover && inView ? (
           <StorageImage
@@ -70,13 +72,13 @@ export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
         )}
         <div className="wg-province-card-overlay" aria-hidden />
         <div className="wg-province-card-content">
-          <span className="wg-province-card-region">{regionLabel(destination.region)}</span>
+          <span className="wg-province-card-region">{regionLabel(destination.region, language)}</span>
           <span className="wg-province-card-name">
             {destination.emoji ? `${destination.emoji} ` : ''}
             {destination.name}
           </span>
           <span className="wg-province-card-hint">
-            {cover ? 'Tap to view weather' : 'No image · tap to view weather'}
+            {cover ? tp('weather', 'tapToViewWeather') : tp('weather', 'noImageTapToView')}
           </span>
         </div>
       </button>
@@ -88,8 +90,8 @@ export default function ProvinceCard({ destination, onSelect, onEdit }: Props) {
             e.stopPropagation();
             onEdit(destination.id);
           }}
-          aria-label={`Sửa ${destination.name}`}
-          title="Sửa"
+          aria-label={tpl('weather', 'editAria', { name: destination.name })}
+          title={tp('weather', 'editTitle')}
         >
           ✎
         </button>

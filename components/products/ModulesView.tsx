@@ -16,6 +16,7 @@ import {
   type ModulesGrouped,
 } from '@/lib/products/product-modules';
 import type { Product } from '@/lib/types';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface ModulesViewProps {
   search: string;
@@ -32,6 +33,7 @@ export default function ModulesView({
   onOpenDetail,
   onShownCountChange,
 }: ModulesViewProps) {
+  const { tp, tc } = useLanguage();
   const { pageSize, setPageSize } = usePageSize();
   const [page, setPage] = useState(1);
   const { data: productPage, error, isLoading, retry } = useProductPage({
@@ -52,13 +54,22 @@ export default function ModulesView({
     <div className={`tp-modules${pickMode ? ' prod-pick-mode' : ''}`}>
       {pickMode && <div className="prod-pick-scrim" aria-hidden />}
       <div className="tp-modules-inner">
-        {error ? <button type="button" className="btn btn-s btn-sm" onClick={retry}>Thử lại</button> : isLoading && !productPage ? <p>Đang tải products…</p> : total === 0 ? (
+        {error ? (
+          <div className="crm-empty-state crm-empty-state--flush">
+            <p>{tp('products', 'errorLoadList')}</p>
+            <button type="button" className="btn btn-s btn-sm" onClick={retry}>
+              {tc('retry')}
+            </button>
+          </div>
+        ) : isLoading && !productPage ? (
+          <p>{tp('products', 'loadingProducts')}</p>
+        ) : total === 0 ? (
           <EmptyState
             className="crm-empty-state--flush"
             size="compact"
             variant="products"
-            title="No products match your search"
-            description="Try a different keyword, or clear the search to browse by region."
+            title={tp('products', 'emptyModulesTitle')}
+            description={tp('products', 'emptyModulesDesc')}
           />
         ) : (
           <>

@@ -1,6 +1,7 @@
 'use client';
 
 import type { PhotoFolder } from '@/lib/gallery/photo-folders';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type Props = {
   trail: PhotoFolder[];
@@ -9,12 +10,14 @@ type Props = {
 };
 
 export default function GalleryFolderBreadcrumb({ trail, onGoRoot, onGoFolder }: Props) {
+  const { tp } = useLanguage();
+
   if (!trail.length) return null;
 
   return (
-    <nav className="phlib-breadcrumb" aria-label="Folder path">
+    <nav className="phlib-breadcrumb" aria-label={tp('gallery', 'folderPathAria')}>
       <button type="button" className="phlib-breadcrumb-item" onClick={onGoRoot}>
-        Library
+        {tp('gallery', 'libraryBreadcrumb')}
       </button>
       {trail.map((f) => (
         <span key={f.id} className="phlib-breadcrumb-seg">

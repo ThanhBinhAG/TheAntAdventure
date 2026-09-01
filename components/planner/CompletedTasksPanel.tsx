@@ -1,12 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   COMPLETED_TIME_FILTERS,
   filterCompletedTasksByTime,
   getCompletedTasks,
   getTaskDisplayText,
-  getTaskStatusLabel,
   TASK_STATUSES,
   type CompletedTimeFilter,
   type CustomDateRange,
@@ -15,6 +14,8 @@ import {
 import type { Task } from '@/lib/types';
 import EmptyState from '@/components/EmptyState';
 import { localTodayIso } from '@/lib/core/date-utils';
+import { useLanguage } from '@/hooks/useLanguage';
+import { PLANNER_STATUS_KEYS, PLANNER_TIME_FILTER_KEYS } from '@/lib/i18n/pages/planner';
 
 function TaskStatusSelect({
   value,
@@ -25,26 +26,28 @@ function TaskStatusSelect({
   onChange: (status: TaskStatusValue) => void;
   disabled?: boolean;
 }) {
+  const { tp } = useLanguage();
+
   return (
     <select
       className="planner-status-select planner-status-select-sm"
       value={value || 'todo'}
       onChange={(e) => onChange(e.target.value as TaskStatusValue)}
-      aria-label="Task progress"
+      aria-label={tp('planner', 'taskProgressAria')}
       disabled={disabled}
-      title={disabled ? 'You need write permission for Planner to update a task' : undefined}
+      title={disabled ? tp('planner', 'readOnlyUpdate') : undefined}
     >
       {TASK_STATUSES.map((s) => (
         <option key={s.value} value={s.value}>
-          {s.label}
+          {tp('planner', PLANNER_STATUS_KEYS[s.value] || 'statusTodo')}
         </option>
       ))}
     </select>
   );
 }
 
-function formatGroupDate(dateStr: string): string {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
+function formatGroupDate(dateStr: string, locale: string): string {
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString(locale, {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -52,14 +55,14 @@ function formatGroupDate(dateStr: string): string {
   });
 }
 
-function taskMatchesSearch(task: Task, query: string): boolean {
+function taskMatchesSearch(task: Task, query: string, statusLabel: string): boolean {
   const q = query.toLowerCase();
   const haystack = [
     getTaskDisplayText(task),
     task.assignee,
     task.dept,
     task.title,
-    getTaskStatusLabel(task.status),
+    statusLabel,
   ]
     .filter(Boolean)
     .join(' ')
@@ -67,8 +70,8 @@ function taskMatchesSearch(task: Task, query: string): boolean {
   return haystack.includes(q);
 }
 
-function formatShortDate(dateStr: string): string {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('vi-VN', {
+function formatShortDate(dateStr: string, locale: string): string {
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString(locale, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -82,11 +85,18 @@ interface CompletedTasksPanelProps {
 }
 
 export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }: CompletedTasksPanelProps) {
+  const { tp, tpl, language } = useLanguage();
+  const dateLocale = language === 'vi' ? 'vi-VN' : 'en-US';
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [timeFilter, setTimeFilter] = useState<CompletedTimeFilter>('all');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+
+  const taskStatusLabel = useCallback(
+    (status?: string) => tp('planner', PLANNER_STATUS_KEYS[status || 'done'] || 'statusDone'),
+    [tp],
+  );
 
   const today = localTodayIso();
   const customRange: CustomDateRange | undefined = useMemo(() => {
@@ -103,8 +113,8 @@ export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }:
 
   const filteredTasks = useMemo(() => {
     if (!search.trim()) return timeFilteredTasks;
-    return timeFilteredTasks.filter((t) => taskMatchesSearch(t, search.trim()));
-  }, [timeFilteredTasks, search]);
+    return timeFilteredTasks.filter((t) => taskMatchesSearch(t, search.trim(), taskStatusLabel(t.status)));
+  }, [timeFilteredTasks, search, taskStatusLabel]);
 
   const groupedByDate = useMemo(() => {
     const groups = new Map<string, Task[]>();
@@ -130,7 +140,7 @@ export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }:
         aria-expanded={open}
       >
         <span>
-          📁 Completed tasks ({completedTasks.length})
+          {tpl('planner', 'completedToggle', { count: completedTasks.length })}
         </span>
         <span className="planner-completed-chevron">{open ? '▾' : '▸'}</span>
       </button>
@@ -140,12 +150,12 @@ export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }:
           <input
             type="search"
             className="planner-completed-search"
-            placeholder="🔍 Search tasks, assignees, departments..."
+            placeholder={tp('planner', 'completedSearchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
 
-          <div className="planner-completed-filters" role="group" aria-label="Filter by time">
+          <div className="planner-completed-filters" role="group" aria-label={tp('planner', 'filterByTimeAria')}>
             {COMPLETED_TIME_FILTERS.map((f) => {
               const count =
                 f.value === 'custom'
@@ -153,6 +163,7 @@ export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }:
                     ? filterCompletedTasksByTime(completedTasks, 'custom', today, customRange).length
                     : 0
                   : filterCompletedTasksByTime(completedTasks, f.value, today).length;
+              const labelKey = PLANNER_TIME_FILTER_KEYS[f.value] || 'filterAll';
               return (
                 <button
                   key={f.value}
@@ -166,7 +177,7 @@ export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }:
                     }
                   }}
                 >
-                  {f.label}
+                  {tp('planner', labelKey)}
                   {count > 0 && f.value !== 'custom' && (
                     <span className="planner-completed-filter-count">{count}</span>
                   )}
@@ -181,7 +192,7 @@ export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }:
           {timeFilter === 'custom' && (
             <div className="planner-completed-custom-range">
               <label className="planner-completed-date-field">
-                <span>From date</span>
+                <span>{tp('planner', 'fromDate')}</span>
                 <input
                   type="date"
                   value={customFrom}
@@ -190,7 +201,7 @@ export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }:
                 />
               </label>
               <label className="planner-completed-date-field">
-                <span>To date</span>
+                <span>{tp('planner', 'toDate')}</span>
                 <input
                   type="date"
                   value={customTo}
@@ -205,12 +216,12 @@ export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }:
             <div className="planner-completed-filter-summary">
               {timeFilter === 'custom' && customRange ? (
                 <>
-                  Display {filteredTasks.length} / {completedTasks.length} tasks
+                  {tpl('planner', 'displayCount', { shown: filteredTasks.length, total: completedTasks.length })}
                   {' · '}
-                  {formatShortDate(customRange.from)} – {formatShortDate(customRange.to)}
+                  {formatShortDate(customRange.from, dateLocale)} – {formatShortDate(customRange.to, dateLocale)}
                 </>
               ) : (
-                <>Display {filteredTasks.length} / {completedTasks.length} tasks</>
+                <>{tpl('planner', 'displayCount', { shown: filteredTasks.length, total: completedTasks.length })}</>
               )}
             </div>
           )}
@@ -222,24 +233,24 @@ export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }:
               variant="tasks"
               title={
                 completedTasks.length === 0
-                  ? 'No completed tasks'
+                  ? tp('planner', 'noCompletedTasks')
                   : timeFilter !== 'all' && !search.trim()
                     ? timeFilter === 'custom' && (!customFrom || !customTo)
-                      ? 'Select a date range to view tasks'
-                      : 'No tasks in this range'
-                    : 'No tasks found'
+                      ? tp('planner', 'selectDateRange')
+                      : tp('planner', 'noTasksInRange')
+                    : tp('planner', 'noTasksFound')
               }
               description={
                 completedTasks.length === 0
-                  ? 'Complete tasks on the Daily Planner to appear here.'
-                  : 'Try changing the time filter or search keywords.'
+                  ? tp('planner', 'noCompletedDesc')
+                  : tp('planner', 'tryChangeFilter')
               }
             />
           ) : (
             groupedByDate.map(([date, dateTasks]) => (
               <div key={date} className="planner-completed-group">
                 <div className="planner-completed-group-hd">
-                  {date === 'unknown' ? 'No date' : formatGroupDate(date)}
+                  {date === 'unknown' ? tp('planner', 'noDate') : formatGroupDate(date, dateLocale)}
                 </div>
                 {dateTasks.map((t, i) => (
                   <div
@@ -250,7 +261,7 @@ export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }:
                     <div className="planner-completed-item-footer">
                       <div className="planner-completed-meta">
                         <span className="planner-completed-status-pill">
-                          {getTaskStatusLabel(t.status)}
+                          {taskStatusLabel(t.status)}
                         </span>
                         {t.assignee && <span>{t.assignee}</span>}
                         {t.dept && <span>{t.dept}</span>}

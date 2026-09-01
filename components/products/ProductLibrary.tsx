@@ -10,11 +10,11 @@ import { useProductPage } from '@/hooks/useProductPage';
 import type { ProductPageSize } from '@/lib/products/product-list-input';
 import { PRODUCT_CATEGORIES } from '@/lib/products/product-form';
 import {
-  PRODUCT_PRICING_OPTIONS,
   PRODUCT_REGIONS,
 } from '@/lib/products/product-filter-constants';
 import type { PricingStatusFilter } from '@/lib/products/product-pricing-helpers';
 import type { Product } from '@/lib/types';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface ProductLibraryProps {
   search: string;
@@ -53,6 +53,7 @@ export default function ProductLibrary({
   onPickProduct,
   onShownCountChange,
 }: ProductLibraryProps) {
+  const { tp, tc } = useLanguage();
   const [filterBarOpen, setFilterBarOpen] = useState(false);
   const { pageSize, setPageSize } = usePageSize();
   const [page, setPage] = useState(1);
@@ -101,6 +102,13 @@ export default function ProductLibrary({
     onPricingStatusChange('');
   };
 
+  const pricingFilterLabel = (value: PricingStatusFilter) => {
+    if (value === 'complete') return tp('products', 'pricingFull');
+    if (value === 'incomplete') return tp('products', 'pricingPartialFilter');
+    if (value === 'missing') return tp('products', 'pricingNone');
+    return value;
+  };
+
   const activeChips: { key: string; label: string; clear: () => void }[] = [];
   if (destFilter) activeChips.push({ key: 'dest', label: destFilter, clear: () => onDestFilterChange('') });
   if (region) {
@@ -110,8 +118,7 @@ export default function ProductLibrary({
   if (duration) activeChips.push({ key: 'dur', label: duration, clear: () => onDurationChange('') });
   if (category) activeChips.push({ key: 'cat', label: category, clear: () => onCategoryChange('') });
   if (pricingStatus) {
-    const label = PRODUCT_PRICING_OPTIONS.find((o) => o.value === pricingStatus)?.label || pricingStatus;
-    activeChips.push({ key: 'price', label, clear: () => onPricingStatusChange('') });
+    activeChips.push({ key: 'price', label: pricingFilterLabel(pricingStatus), clear: () => onPricingStatusChange('') });
   }
   if (search) activeChips.push({ key: 'q', label: `“${search}”`, clear: () => onSearchChange('') });
 
@@ -152,7 +159,7 @@ export default function ProductLibrary({
               ))}
               {hasFilters && (
                 <button type="button" className="tp-chip-clear" onClick={clearFilters}>
-                  Clear all
+                  {tp('products', 'clearAll')}
                 </button>
               )}
             </div>
@@ -160,26 +167,26 @@ export default function ProductLibrary({
 
           {productPageError ? (
             <div className="crm-empty-state crm-empty-state--flush">
-              <p>Không thể tải danh sách product.</p>
+              <p>{tp('products', 'errorLoadList')}</p>
               <button type="button" className="btn btn-s btn-sm" onClick={retryProductPage}>
-                Thử lại
+                {tc('retry')}
               </button>
             </div>
           ) : isProductPageLoading && !productPage ? (
             <div className="crm-empty-state crm-empty-state--flush">
-              <p>Đang tải products…</p>
+              <p>{tp('products', 'loadingProducts')}</p>
             </div>
           ) : total === 0 ? (
             <EmptyState
               className="crm-empty-state--flush"
               size="compact"
               variant="products"
-              title="No products match"
-              description="Adjust filters or clear them to see the full catalogue."
+              title={tp('products', 'emptyNoMatchTitle')}
+              description={tp('products', 'emptyNoMatchDesc')}
               action={
                 hasFilters ? (
                   <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
-                    Clear filters
+                    {tp('products', 'clearFilters')}
                   </button>
                 ) : undefined
               }

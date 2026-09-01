@@ -8,10 +8,11 @@ import {
   formatDayLabel,
   formatUpdatedAt,
   regionLabel,
-  weatherLabelVi,
+  weatherLabel,
 } from '@/components/weather/weatherLabels';
 import type { DestinationWeatherDetail } from '@/lib/weather/types';
 import type { WeatherDestinationMeta } from '@/lib/weather/types';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type Props = {
   meta: WeatherDestinationMeta;
@@ -30,6 +31,7 @@ export default function MainWeatherCard({
   onOpenDetail,
   onRetry,
 }: Props) {
+  const { tp, tc, language } = useLanguage();
   const resolved = useResolvedCover(meta);
   const cover = weatherCardCoverUrl(resolved);
   const coverStyle = cover ? toCrmPhotoAssetUrl(cover) : null;
@@ -50,7 +52,7 @@ export default function MainWeatherCard({
       ) : (
         <div className="wg-main-card-bg wg-main-card-bg--ph" aria-hidden>
           <span className="wg-cover-ph-name">{meta.name}</span>
-          <span className="wg-cover-ph-hint">No image — edit to add</span>
+          <span className="wg-cover-ph-hint">{tp('weather', 'coverPlaceholderHint')}</span>
         </div>
       )}
       <div className="wg-main-card-scrim" aria-hidden />
@@ -58,7 +60,7 @@ export default function MainWeatherCard({
       <div className="wg-main-card-body">
         <header className="wg-main-card-hd">
           <div>
-            <p className="wg-main-card-region">{regionLabel(meta.region)}</p>
+            <p className="wg-main-card-region">{regionLabel(meta.region, language)}</p>
             <h2 className="wg-main-card-name">
               {meta.emoji ? <span aria-hidden>{meta.emoji} </span> : null}
               {meta.name}
@@ -66,7 +68,7 @@ export default function MainWeatherCard({
             {meta.description ? <p className="wg-main-card-desc">{meta.description}</p> : null}
           </div>
           {current ? (
-            <WeatherIcon code={current.weatherCode} size={56} title={weatherLabelVi(current.weatherCode)} />
+            <WeatherIcon code={current.weatherCode} size={56} title={weatherLabel(current.weatherCode, language)} />
           ) : (
             <div className="wg-skel wg-skel-icon" aria-hidden />
           )}
@@ -77,7 +79,7 @@ export default function MainWeatherCard({
             <p>{error}</p>
             {onRetry ? (
               <button type="button" className="btn btn-s btn-sm" onClick={onRetry}>
-                Try again
+                {tc('retry')}
               </button>
             ) : null}
           </div>
@@ -91,35 +93,37 @@ export default function MainWeatherCard({
                 <span>°C</span>
               </p>
               <div className="wg-main-card-temp-meta">
-                <p className="wg-main-card-condition">{weatherLabelVi(current.weatherCode)}</p>
+                <p className="wg-main-card-condition">{weatherLabel(current.weatherCode, language)}</p>
                 {detail?.fetchedAt ? (
-                  <p className="wg-main-card-updated">Updated {formatUpdatedAt(detail.fetchedAt)}</p>
+                  <p className="wg-main-card-updated">
+                    {tp('weather', 'updatedPrefix')} {formatUpdatedAt(detail.fetchedAt, language)}
+                  </p>
                 ) : null}
               </div>
             </>
           ) : loading ? (
             <div className="wg-skel wg-skel-temp" aria-hidden />
           ) : (
-            <p className="wg-muted">No weather data</p>
+            <p className="wg-muted">{tp('weather', 'noWeatherData')}</p>
           )}
         </div>
 
         {current ? (
           <dl className="wg-main-stats">
             <div>
-              <dt>Humidity</dt>
+              <dt>{tp('weather', 'humidity')}</dt>
               <dd>{current.humidity != null ? `${Math.round(current.humidity)}%` : '—'}</dd>
             </div>
             <div>
-              <dt>Wind</dt>
+              <dt>{tp('weather', 'wind')}</dt>
               <dd>{current.windKmh != null ? `${Math.round(current.windKmh)} km/h` : '—'}</dd>
             </div>
             <div>
-              <dt>Feels like</dt>
+              <dt>{tp('weather', 'feelsLike')}</dt>
               <dd>{current.feelsLikeC != null ? `${Math.round(current.feelsLikeC)}°` : '—'}</dd>
             </div>
             <div>
-              <dt>UV</dt>
+              <dt>{tp('weather', 'uv')}</dt>
               <dd>
                 {days[0]?.uvIndexMax != null ? Math.round(days[0].uvIndexMax) : '—'}
               </dd>
@@ -128,10 +132,10 @@ export default function MainWeatherCard({
         ) : null}
 
         {days.length > 0 ? (
-          <div className="wg-mini-forecast" aria-label="Short-term forecast">
+          <div className="wg-mini-forecast" aria-label={tp('weather', 'shortTermForecastAria')}>
             {days.map((day) => (
               <div key={day.date} className="wg-mini-day">
-                <span className="wg-mini-day-label">{formatDayLabel(day.date)}</span>
+                <span className="wg-mini-day-label">{formatDayLabel(day.date, language)}</span>
                 <WeatherIcon code={day.weatherCode} size={22} />
                 <span className="wg-mini-day-temps">
                   {Math.round(day.tempMax)}° / {Math.round(day.tempMin)}°
@@ -145,7 +149,7 @@ export default function MainWeatherCard({
 
         <div className="wg-main-card-actions">
           <button type="button" className="btn btn-p" onClick={onOpenDetail} disabled={!detail && !loading}>
-            View details
+            {tp('weather', 'viewDetails')}
           </button>
         </div>
       </div>

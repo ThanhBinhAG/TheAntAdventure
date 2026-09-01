@@ -140,7 +140,7 @@ export default function ProductEditPanel({
   const cleanSaved = saveState === 'saved' && !dirty;
   const saveDisabled = busy || !canWrite;
 
-  const { language } = useLanguage();
+  const { tp, tpl, tc, language } = useLanguage();
   const { requestClose } = useConfirmClose({ open, dirty, onClose, disabled: busy, language });
 
   const rebuildCode = useCallback(
@@ -238,11 +238,11 @@ export default function ProductEditPanel({
     if (!canWrite) return;
     if (saveDisabled) return;
     if (!form.name.trim()) {
-      setSaveError('Please enter a product name.');
+      setSaveError(tp('products', 'errorNameRequired'));
       return;
     }
     if (!form.desc.trim()) {
-      setSaveError('Please enter a description.');
+      setSaveError(tp('products', 'errorDescriptionRequired'));
       return;
     }
     const codeInputError = validateProductCodeInput({
@@ -256,7 +256,7 @@ export default function ProductEditPanel({
       return;
     }
     if (isNew && !form.code.trim()) {
-      setSaveError('Could not generate a product code. Check destination and type segment.');
+      setSaveError(tp('products', 'errorCodeGenerationFailed'));
       return;
     }
 
@@ -275,7 +275,7 @@ export default function ProductEditPanel({
       setSaveState('idle');
       setSaveKind(null);
       if (!externalError) {
-        setSaveError(err instanceof Error ? err.message : 'Save failed');
+        setSaveError(err instanceof Error ? err.message : tp('products', 'errorSaveFailedPanel'));
       }
     }
   };
@@ -285,12 +285,16 @@ export default function ProductEditPanel({
 
   const draftLabel =
     busy && saveKind === 'draft'
-      ? 'Saving…'
+      ? tp('products', 'saving')
       : cleanSaved && saveKind === 'draft'
-        ? '✓ Saved'
-        : 'Save as Draft';
+        ? tp('products', 'saved')
+        : tp('products', 'saveAsDraft');
   const activateLabel =
-    busy && saveKind === 'activate' ? 'Saving…' : cleanSaved ? '✓ Saved' : '✓ Save & Activate';
+    busy && saveKind === 'activate'
+      ? tp('products', 'saving')
+      : cleanSaved
+        ? tp('products', 'saved')
+        : tp('products', 'saveAndActivate');
 
   return (
     <aside
@@ -304,13 +308,13 @@ export default function ProductEditPanel({
       <header className="tp-edit-aside-hd">
         <div>
           <h2 id="tp-edit-aside-title" className="tp-edit-aside-title">
-            {isNew ? 'Add New Product' : 'Edit Product'}
+            {isNew ? tp('products', 'titleAdd') : tp('products', 'titleEdit')}
           </h2>
           <p className="tp-edit-aside-sub">
-            {isNew ? 'Thêm sản phẩm mới' : form.code}
-            {sourceTab === 'modules' && ' · Modules'}
-            {sourceTab === 'library' && ' · Catalog'}
-            {' · preview updates on the right'}
+            {isNew ? tp('products', 'subtitleNew') : form.code}
+            {sourceTab === 'modules' && ` · ${tp('products', 'sourceTabModules')}`}
+            {sourceTab === 'library' && ` · ${tp('products', 'sourceTabCatalog')}`}
+            {` · ${tp('products', 'previewHint')}`}
           </p>
         </div>
         <button
@@ -318,12 +322,12 @@ export default function ProductEditPanel({
           className="tp-edit-aside-close"
           onClick={() => void requestClose()}
           disabled={busy}
-          aria-label="Close editor"
+          aria-label={tp('products', 'closeEditorAria')}
         >
           ✕
         </button>
         {busy && (
-          <div className="tp-save-progress" role="progressbar" aria-label="Saving product">
+          <div className="tp-save-progress" role="progressbar" aria-label={tp('products', 'savingProgressAria')}>
             <span className="tp-save-progress-bar" />
           </div>
         )}
@@ -333,13 +337,13 @@ export default function ProductEditPanel({
         {busy && <div className="tp-save-overlay" aria-hidden="true" />}
         <fieldset className="tp-edit-aside-fields" disabled={busy || !canWrite}>
         <FormSection
-          title="Card tags & classification"
-          hint="Product code: AA-{region}-{dest}-{activity}-{duration}-{seq}."
+          title={tp('products', 'sectionTagsTitle')}
+          hint={tp('products', 'sectionTagsHint')}
         >
           <div className="prod-form-grid prod-form-grid-2">
             <div className="fg">
               <label className="lbl">
-                Region <span className="req">*</span>
+                {tp('products', 'labelRegion')} <span className="req">*</span>
               </label>
               <select value={form.region} onChange={(e) => handleRegionChange(e.target.value)}>
                 <option value="north">Northern Vietnam</option>
@@ -350,7 +354,7 @@ export default function ProductEditPanel({
             </div>
             <div className="fg">
               <label className="lbl">
-                Duration <span className="req">*</span>
+                {tp('products', 'labelDuration')} <span className="req">*</span>
               </label>
               <select value={form.dur} onChange={(e) => handleDurationChange(e.target.value)}>
                 {PRODUCT_DURATIONS.map((d) => (
@@ -361,12 +365,12 @@ export default function ProductEditPanel({
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Category tag</label>
+              <label className="lbl">{tp('products', 'labelCategoryTag')}</label>
               <input
                 list="prod-cat-options-edit"
                 value={form.cat}
                 onChange={(e) => handleCategoryChange(e.target.value)}
-                placeholder="Cultural, Culinary…"
+                placeholder={tp('products', 'placeholderCategory')}
               />
               <datalist id="prod-cat-options-edit">
                 {[...new Set([...PRODUCT_CATEGORIES, ...categories])].map((c) => (
@@ -375,7 +379,7 @@ export default function ProductEditPanel({
               </datalist>
             </div>
             <div className="fg">
-              <label className="lbl">Level tag</label>
+              <label className="lbl">{tp('products', 'labelLevelTag')}</label>
               <select value={form.lvl} onChange={(e) => setForm((f) => ({ ...f, lvl: e.target.value }))}>
                 {PRODUCT_LEVELS.map((l) => (
                   <option key={l} value={l}>
@@ -386,7 +390,7 @@ export default function ProductEditPanel({
             </div>
             <div className="fg">
               <label className="lbl">
-                Destination <span className="req">*</span>
+                {tp('products', 'labelDestination')} <span className="req">*</span>
               </label>
               <DestinationCombobox
                 value={form.dest}
@@ -397,7 +401,7 @@ export default function ProductEditPanel({
               />
             </div>
             <div className="fg">
-              <label className="lbl">Code type {isNew ? '' : ''}</label>
+              <label className="lbl">{tp('products', 'labelCodeType')}</label>
               <div className="prod-form-type-seg-row">
                 <select
                   value={form.typeSegment}
@@ -407,105 +411,108 @@ export default function ProductEditPanel({
                   {typeSegmentOptions.map((t) => (
                     <option key={t} value={t}>
                       {t}
-                      {t === suggestedTypeSegment ? ' (suggested)' : ''}
+                      {t === suggestedTypeSegment ? ` ${tp('products', 'typeSegmentSuggested')}` : ''}
                     </option>
                   ))}
                 </select>
                 {isNew && isTypeSegmentOverridden && (
                   <button type="button" className="btn btn-s prod-form-reset-seg" onClick={resetTypeSegment}>
-                    Reset
+                    {tp('products', 'reset')}
                   </button>
                 )}
               </div>
             </div>
             <div className="fg">
-              <label className="lbl">Status</label>
+              <label className="lbl">{tp('products', 'labelStatus')}</label>
               <select
                 value={form.status}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as ProductFormState['status'] }))}
               >
-                <option value="active">Active</option>
-                <option value="draft">Draft</option>
-                <option value="archived">Archived</option>
+                <option value="active">{tp('products', 'statusActive')}</option>
+                <option value="draft">{tp('products', 'statusDraft')}</option>
+                <option value="archived">{tp('products', 'statusArchived')}</option>
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Product code {isNew ? '(auto)' : ''}</label>
+              <label className="lbl">
+                {tp('products', 'labelProductCode')} {isNew ? tp('products', 'productCodeAuto') : ''}
+              </label>
               <input value={form.code} readOnly className="prod-form-code-readonly" />
             </div>
           </div>
         </FormSection>
 
-        <FormSection title="Product identity">
+        <FormSection title={tp('products', 'sectionIdentityTitle')}>
           <div className="prod-form-grid prod-form-grid-2">
             <div className="fg">
               <label className="lbl">
-                Name (EN) <span className="req">*</span>
+                {tp('products', 'labelNameEn')} <span className="req">*</span>
               </label>
               <input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. Halong Bay Overnight Cruise"
+                placeholder={tp('products', 'placeholderNameEn')}
               />
             </div>
             <div className="fg">
-              <label className="lbl">Base cost / price</label>
+              <label className="lbl">{tp('products', 'labelBasePrice')}</label>
               <input
                 type="text"
                 value={form.price}
                 onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                placeholder="80 or On request"
+                placeholder={tp('products', 'placeholderPrice')}
               />
             </div>
             <div className="fg prod-form-span-2">
-              <label className="lbl">Tên (VN)</label>
+              <label className="lbl">{tp('products', 'labelNameVn')}</label>
               <input
                 value={form.nameVn}
                 onChange={(e) => setForm((f) => ({ ...f, nameVn: e.target.value }))}
-                placeholder="Vịnh Hạ Long 2N1Đ"
+                placeholder={tp('products', 'placeholderNameVn')}
               />
             </div>
           </div>
         </FormSection>
 
-        <FormSection title="Content & itinerary">
+        <FormSection title={tp('products', 'sectionContentTitle')}>
           <div className="fg">
             <label className="lbl">
-              Description (EN) <span className="req">*</span>
+              {tp('products', 'labelDescriptionEn')} <span className="req">*</span>
             </label>
             <textarea
               value={form.desc}
               onChange={(e) => setForm((f) => ({ ...f, desc: e.target.value }))}
-              placeholder="2–3 evocative sentences for client-facing materials…"
+              placeholder={tp('products', 'placeholderDescription')}
               rows={4}
             />
           </div>
           <div className="fg" style={{ marginTop: 12 }}>
-            <label className="lbl">Highlights / USP</label>
+            <label className="lbl">{tp('products', 'labelUsp')}</label>
             <textarea
               value={form.usp}
               onChange={(e) => setForm((f) => ({ ...f, usp: e.target.value }))}
-              placeholder="Bhaya Cruise · Sea kayaking · Cooking class…"
+              placeholder={tp('products', 'placeholderUsp')}
               rows={3}
             />
           </div>
           <div className="fg" style={{ marginTop: 12 }}>
-            <label className="lbl">Logic / itinerary snippet</label>
+            <label className="lbl">{tp('products', 'labelLogic')}</label>
             <textarea
               value={form.logic}
               onChange={(e) => setForm((f) => ({ ...f, logic: e.target.value }))}
-              placeholder="Internal itinerary logic…"
+              placeholder={tp('products', 'placeholderLogic')}
               rows={2}
             />
           </div>
           <div className="fg" style={{ marginTop: 12 }}>
             <label className="lbl">
-              Notes to Sales <span className="prod-form-field-hint">Internal</span>
+              {tp('products', 'labelNotesToSales')}{' '}
+              <span className="prod-form-field-hint">{tp('products', 'notesInternalHint')}</span>
             </label>
             <textarea
               value={form.notesToSales}
               onChange={(e) => setForm((f) => ({ ...f, notesToSales: e.target.value }))}
-              placeholder="Sales bullets…"
+              placeholder={tp('products', 'placeholderNotesToSales')}
               rows={3}
               className="prod-form-notes-sales"
             />
@@ -513,25 +520,32 @@ export default function ProductEditPanel({
         </FormSection>
 
         <FormSection
-          title="Pricing & photos"
-          hint="Search by tag (accents optional). Drag onto featured slots or click to link."
+          title={tp('products', 'sectionPricingPhotosTitle')}
+          hint={tp('products', 'sectionPricingPhotosHint')}
         >
           <div className="tp-edit-pricing-row">
             <span className={`bdg ${pStatus === 'complete' ? 'bdg-g' : pStatus === 'incomplete' ? 'bdg-a' : 'bdg-r'}`}>
-              {pStatus === 'complete' ? 'Pricing complete' : pStatus === 'incomplete' ? 'Pricing partial' : 'No pricing'}
+              {pStatus === 'complete'
+                ? tp('products', 'pricingComplete')
+                : pStatus === 'incomplete'
+                  ? tp('products', 'pricingPartial')
+                  : tp('products', 'pricingMissing')}
             </span>
             <span className={`bdg ${photoStatus.complete ? 'bdg-g' : 'bdg-a'}`}>
-              Photos {photoStatus.linked}/{photoStatus.needed} featured
+              {tpl('products', 'photosFeatured', {
+                linked: photoStatus.linked,
+                needed: photoStatus.needed,
+              })}
             </span>
             {form.code && (
               <Link href={pricingUrlForProduct(form.code)} className="btn btn-s btn-sm">
-                Edit pricing →
+                {tp('products', 'editPricingLink')}
               </Link>
             )}
           </div>
           <PhotoLibraryPicker
             variant="inline"
-            title="Photo library"
+            title={tp('products', 'photoLibraryTitle')}
             photos={photos}
             folders={photoFolders}
             linkedPhotoIds={form.linkedPhotoIds}
@@ -557,28 +571,28 @@ export default function ProductEditPanel({
               if (busy) return;
               void (async () => {
                 const ok = await confirmDialog(
-                  `Delete "${form.name}"? This cannot be undone.`,
-                  { title: 'Delete product' },
+                  tpl('products', 'deleteConfirmBody', { name: form.name }),
+                  { title: tp('products', 'deleteConfirmTitle') },
                 );
                 if (!ok) return;
                 onDelete(form.code);
-                toast.success('Product deleted.');
+                toast.success(tp('products', 'toastDeleted'));
               })();
             }}
           >
-            Delete
+            {tp('products', 'delete')}
           </button>
         )}
         <div className="tp-edit-aside-ft-actions">
           <button className="btn btn-s" type="button" onClick={() => void requestClose()} disabled={busy}>
-            Cancel
+            {tc('cancel')}
           </button>
           <button
             className={`btn btn-s tp-save-btn${busy && saveKind === 'draft' ? ' is-saving' : ''}${cleanSaved && saveKind === 'draft' ? ' is-saved' : ''}`}
             type="button"
             onClick={() => void handleSave(true)}
             disabled={saveDisabled}
-            title={!canWrite ? 'You need write permission for Products to save a product' : undefined}
+            title={!canWrite ? tp('products', 'savePermissionTitle') : undefined}
             aria-busy={busy && saveKind === 'draft'}
           >
             {busy && saveKind === 'draft' && <span className="tp-save-spin" aria-hidden="true" />}
@@ -589,7 +603,7 @@ export default function ProductEditPanel({
             type="button"
             onClick={() => void handleSave(false)}
             disabled={saveDisabled}
-            title={!canWrite ? 'You need write permission for Products to save a product' : undefined}
+            title={!canWrite ? tp('products', 'savePermissionTitle') : undefined}
             aria-busy={busy && saveKind === 'activate'}
           >
             {busy && saveKind === 'activate' && <span className="tp-save-spin" aria-hidden="true" />}

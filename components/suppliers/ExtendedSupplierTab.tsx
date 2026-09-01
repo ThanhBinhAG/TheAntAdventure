@@ -14,6 +14,7 @@ import type { ExtendedSupplier } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
 import { confirmDialog } from '@/lib/confirm';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export type ExtendedSection = 'logistics' | 'water' | 'adventure' | 'experience' | 'personnel';
 
@@ -28,11 +29,17 @@ function ExtGrid({
   onEdit,
   onDelete,
   onAdd,
+  emptyTitle,
+  emptyDesc,
+  addLabel,
 }: {
   items: ExtendedSupplier[];
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   onAdd?: () => void;
+  emptyTitle: string;
+  emptyDesc: string;
+  addLabel: string;
 }) {
   const { pageSize, setPageSize } = usePageSize();
   const itemKey = useMemo(() => items.map((i) => i.id).join('|'), [items]);
@@ -45,12 +52,12 @@ function ExtGrid({
         className="crm-empty-state--flush"
         size="compact"
         variant="suppliers"
-        title="No suppliers found"
-        description="Add a supplier for this category to start building your partner list."
+        title={emptyTitle}
+        description={emptyDesc}
         action={
           onAdd && (
             <button type="button" className="btn btn-p btn-sm" onClick={onAdd}>
-              + Add Supplier
+              {addLabel}
             </button>
           )
         }
@@ -70,6 +77,7 @@ function ExtGrid({
 }
 
 export default function ExtendedSupplierTab({ section, filters, canWrite }: Props) {
+  const { tp } = useLanguage();
   const specialSuppliers = useStore((s) => s.specialSuppliers);
   const { createSupplier, patchSupplier, deleteSupplier } = useExtendedSupplierMutations();
 
@@ -118,7 +126,7 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
         toast.error(result.message);
         return;
       }
-      toast.success('Supplier updated.');
+      toast.success(tp('suppliers', 'toastSupplierUpdated'));
       return;
     }
     const result = await createSupplier(supplier);
@@ -126,30 +134,38 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
       toast.error(result.message);
       return;
     }
-    toast.success('Supplier created.');
+    toast.success(tp('suppliers', 'toastSupplierCreated'));
   };
 
   const deleteExt = async (id: string) => {
-    const ok = await confirmDialog('Remove this supplier?', { title: 'Remove supplier' });
+    const ok = await confirmDialog(tp('suppliers', 'confirmRemoveSupplier'), {
+      title: tp('suppliers', 'confirmRemoveSupplierTitle'),
+    });
     if (!ok) return;
     const result = await deleteSupplier(id);
     if (!result.ok) {
       toast.error(result.message);
       return;
     }
-    toast.success('Supplier removed.');
+    toast.success(tp('suppliers', 'toastSupplierRemoved'));
   };
 
   const addLabel = useMemo(() => {
-    const labels: Record<ExtendedSection, string> = {
-      logistics: '＋ Add Logistics Supplier',
-      water: '＋ Add Water Supplier',
-      adventure: '＋ Add Adventure Supplier',
-      experience: '＋ Add Experience Provider',
-      personnel: '＋ Add Personnel Supplier',
+    const labels: Record<ExtendedSection, keyof typeof import('@/lib/i18n/pages/suppliers').SUPPLIERS.en> = {
+      logistics: 'addLogisticsSupplier',
+      water: 'addWaterSupplier',
+      adventure: 'addAdventureSupplier',
+      experience: 'addExperienceProvider',
+      personnel: 'addPersonnelSupplier',
     };
-    return labels[section];
-  }, [section]);
+    return tp('suppliers', labels[section]);
+  }, [section, tp]);
+
+  const emptyProps = {
+    emptyTitle: tp('suppliers', 'emptySuppliers'),
+    emptyDesc: tp('suppliers', 'emptySuppliersDesc'),
+    addLabel: tp('suppliers', 'addSupplierShort'),
+  };
 
   return (
     <>
@@ -159,9 +175,9 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
             <div className="tabs sup-sub-tabs">
               {(
                 [
-                  ['visa', '🪪 Visa Services'],
-                  ['fasttrack', '⚡ Airport Fast Track'],
-                  ['aviation', '✈️ Aviation'],
+                  ['visa', tp('suppliers', 'subVisa')],
+                  ['fasttrack', tp('suppliers', 'subFasttrack')],
+                  ['aviation', tp('suppliers', 'subAviation')],
                 ] as const
               ).map(([id, label]) => (
                 <div key={id} className={`tab${logSub === id ? ' on' : ''}`} onClick={() => setLogSub(id)} role="button" tabIndex={0}>
@@ -175,29 +191,27 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
               type="button"
               onClick={() => openAdd()}
               disabled={!canWrite}
-              title={!canWrite ? 'You need write permission to add a supplier' : undefined}
+              title={!canWrite ? tp('suppliers', 'permAddSupplier') : undefined}
             >
               {addLabel}
             </button>
           </div>
           {logSub === 'visa' && (
             <>
-              <div className="info-bar">Visa partners handle E-visa applications, urgent processing (24–48hr), and business multi-entry visas for all nationalities.</div>
-              <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['visa'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
+              <div className="info-bar">{tp('suppliers', 'infoVisa')}</div>
+              <ExtGrid {...emptyProps} onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['visa'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
             </>
           )}
           {logSub === 'fasttrack' && (
             <>
-              <div className="info-bar">
-                Airport fast track covers VIP arrival/departure lanes, immigration assistance, and lounge access — sorted by region: <b>North (HAN/HPH)</b> · <b>Central (HUI/DAD)</b> · <b>South (SGN/CXR/PQC)</b>.
-              </div>
-              <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['fasttrack'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
+              <div className="info-bar">{tp('suppliers', 'infoFasttrack')}</div>
+              <ExtGrid {...emptyProps} onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['fasttrack'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
             </>
           )}
           {logSub === 'aviation' && (
             <>
-              <div className="info-bar">Covers domestic scheduled airlines and private charter operators for helicopter, seaplane, and small fixed-wing aircraft.</div>
-              <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['aviation'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
+              <div className="info-bar">{tp('suppliers', 'infoAviation')}</div>
+              <ExtGrid {...emptyProps} onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['aviation'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
             </>
           )}
         </>
@@ -207,19 +221,19 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
         <>
           <div className="sup-sub-bar">
             <div className="info-bar" style={{ margin: 0, flex: 1 }}>
-              Private boat charter suppliers: river sampans, coastal speedboats, and national park boats.
+              {tp('suppliers', 'infoWater')}
             </div>
             <button
               className="btn btn-p btn-sm"
               type="button"
               onClick={() => openAdd()}
               disabled={!canWrite}
-              title={!canWrite ? 'You need write permission to add a supplier' : undefined}
+              title={!canWrite ? tp('suppliers', 'permAddSupplier') : undefined}
             >
               {addLabel}
             </button>
           </div>
-          <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['river', 'coastal', 'park'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
+          <ExtGrid {...emptyProps} onAdd={canWrite ? () => openAdd() : undefined} items={getExt(['river', 'coastal', 'park'])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
         </>
       )}
 
@@ -229,9 +243,9 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
             <div className="tabs sup-sub-tabs">
               {(
                 [
-                  ['cycling', '🚴 Cycling'],
-                  ['trekking', '🥾 Trekking & Camping'],
-                  ['wildlife', '🦅 Wildlife & Nature'],
+                  ['cycling', tp('suppliers', 'subCycling')],
+                  ['trekking', tp('suppliers', 'subTrekking')],
+                  ['wildlife', tp('suppliers', 'subWildlife')],
                 ] as const
               ).map(([id, label]) => (
                 <div key={id} className={`tab${advSub === id ? ' on' : ''}`} onClick={() => setAdvSub(id)} role="button" tabIndex={0}>
@@ -245,17 +259,17 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
               type="button"
               onClick={() => openAdd()}
               disabled={!canWrite}
-              title={!canWrite ? 'You need write permission to add a supplier' : undefined}
+              title={!canWrite ? tp('suppliers', 'permAddSupplier') : undefined}
             >
               {addLabel}
             </button>
           </div>
           <div className="info-bar">
-            {advSub === 'cycling' && 'Cycling suppliers: high-end road and mountain bikes, support vehicles, mobile maintenance crew.'}
-            {advSub === 'trekking' && 'Trekking & camping gear rental: tents, sleeping bags, GPS trackers, portable radios, first-aid kits.'}
-            {advSub === 'wildlife' && 'Wildlife & nature experts: ornithologists, marine biologists, karst geologists, wildlife trackers.'}
+            {advSub === 'cycling' && tp('suppliers', 'infoCycling')}
+            {advSub === 'trekking' && tp('suppliers', 'infoTrekking')}
+            {advSub === 'wildlife' && tp('suppliers', 'infoWildlife')}
           </div>
-          <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt([advSub])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
+          <ExtGrid {...emptyProps} onAdd={canWrite ? () => openAdd() : undefined} items={getExt([advSub])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
         </>
       )}
 
@@ -265,9 +279,9 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
             <div className="tabs sup-sub-tabs">
               {(
                 [
-                  ['artisan', '🎨 Artisans & Cultural'],
-                  ['wellness', '💆 Luxury Wellness'],
-                  ['events', '🎪 Events & Decor'],
+                  ['artisan', tp('suppliers', 'subArtisan')],
+                  ['wellness', tp('suppliers', 'subWellness')],
+                  ['events', tp('suppliers', 'subEvents')],
                 ] as const
               ).map(([id, label]) => (
                 <div key={id} className={`tab${expSub === id ? ' on' : ''}`} onClick={() => setExpSub(id)} role="button" tabIndex={0}>
@@ -281,17 +295,17 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
               type="button"
               onClick={() => openAdd()}
               disabled={!canWrite}
-              title={!canWrite ? 'You need write permission to add a supplier' : undefined}
+              title={!canWrite ? tp('suppliers', 'permAddSupplier') : undefined}
             >
               {addLabel}
             </button>
           </div>
           <div className="info-bar">
-            {expSub === 'artisan' && 'Master artisans, cultural experts, musicians, and performers for private in-depth experiences.'}
-            {expSub === 'wellness' && 'Luxury wellness partners: traditional medicine doctors, spa directors, meditation guides.'}
-            {expSub === 'events' && 'Exclusive event & decor specialists: private beach dinners, floral designers, lantern lighting.'}
+            {expSub === 'artisan' && tp('suppliers', 'infoArtisan')}
+            {expSub === 'wellness' && tp('suppliers', 'infoWellness')}
+            {expSub === 'events' && tp('suppliers', 'infoEvents')}
           </div>
-          <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt([expSub])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
+          <ExtGrid {...emptyProps} onAdd={canWrite ? () => openAdd() : undefined} items={getExt([expSub])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
         </>
       )}
 
@@ -301,9 +315,9 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
             <div className="tabs sup-sub-tabs">
               {(
                 [
-                  ['specguide', '🗣 Specialist Guides'],
-                  ['media', '📷 Media Production'],
-                  ['safety', '🛡 Security & Health'],
+                  ['specguide', tp('suppliers', 'subSpecguide')],
+                  ['media', tp('suppliers', 'subMedia')],
+                  ['safety', tp('suppliers', 'subSafety')],
                 ] as const
               ).map(([id, label]) => (
                 <div key={id} className={`tab${perSub === id ? ' on' : ''}`} onClick={() => setPerSub(id)} role="button" tabIndex={0}>
@@ -317,7 +331,7 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
               type="button"
               onClick={() => openAdd()}
               disabled={!canWrite}
-              title={!canWrite ? 'You need write permission to add a supplier' : undefined}
+              title={!canWrite ? tp('suppliers', 'permAddSupplier') : undefined}
             >
               {addLabel}
             </button>
@@ -325,15 +339,15 @@ export default function ExtendedSupplierTab({ section, filters, canWrite }: Prop
           {perSub === 'specguide' && (
             <div className="search-row" style={{ marginBottom: 10 }}>
               <select value={perLang} onChange={(e) => setPerLang(e.target.value)}>
-                <option value="">All Languages</option>
+                <option value="">{tp('suppliers', 'filterAllLanguages')}</option>
                 <option value="EN">🇬🇧 English</option>
                 <option value="FR">🇫🇷 French</option>
                 <option value="DE">🇩🇪 German</option>
               </select>
             </div>
           )}
-          <div className="info-bar">Specialist guides, media production, and security & health partners — all VNAT-licensed where applicable.</div>
-          <ExtGrid onAdd={canWrite ? () => openAdd() : undefined} items={getExt([perSub])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
+          <div className="info-bar">{tp('suppliers', 'infoPersonnel')}</div>
+          <ExtGrid {...emptyProps} onAdd={canWrite ? () => openAdd() : undefined} items={getExt([perSub])} onEdit={canWrite ? openEdit : undefined} onDelete={canWrite ? deleteExt : undefined} />
         </>
       )}
 

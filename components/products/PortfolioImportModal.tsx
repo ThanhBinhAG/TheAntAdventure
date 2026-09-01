@@ -27,6 +27,7 @@ interface PortfolioImportModalProps {
 }
 
 export default function PortfolioImportModal({ open, onClose, onImported }: PortfolioImportModalProps) {
+  const { tp, tpl, tc, language } = useLanguage();
   const fileRef = useRef<HTMLInputElement>(null);
   const [drafts, setDrafts] = useState<PortfolioDraftProduct[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -50,7 +51,6 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
     if (fileRef.current) fileRef.current.value = '';
   }, []);
 
-  const { language } = useLanguage();
   const dirty = drafts.length > 0 || fileName.length > 0;
   const finishClose = useCallback(() => {
     reset();
@@ -81,7 +81,7 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
       setSheetName(result.sheetName);
       setFileName(file.name);
     } catch (e) {
-      setParseError(e instanceof Error ? e.message : 'Failed to parse Excel file');
+      setParseError(e instanceof Error ? e.message : tp('products', 'errorParseFailed'));
       setDrafts([]);
     } finally {
       setBusy(false);
@@ -116,12 +116,10 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
   const handleImport = async () => {
     if (!drafts.length) return;
     const ok = await confirmDialog(
-      `This replaces ALL tour products (${drafts.length} rows from this file).\n\n` +
-        'Pricing for old product codes will be removed. Gallery photos stay but will not match new codes until re-linked.\n\n' +
-        'Continue?',
+      tpl('products', 'importConfirmBody', { count: drafts.length }),
       {
-        title: 'Replace catalogue',
-        confirmLabel: 'Replace all',
+        title: tp('products', 'importConfirmTitle'),
+        confirmLabel: tp('products', 'importConfirmLabel'),
         danger: true,
       },
     );
@@ -133,7 +131,7 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
     setBusy(false);
 
     if (!result.ok) {
-      setImportError(result.error || 'Import failed');
+      setImportError(result.error || tp('products', 'errorImportFailed'));
       return;
     }
 
@@ -155,14 +153,17 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
         <div className="modal-hd modal-hd-green prod-form-modal-hd">
           <div>
             <div id="portfolio-import-title" className="prod-form-modal-title">
-              Import Portfolio (.xlsx)
+              {tp('products', 'importTitle')}
             </div>
-            <div className="prod-form-modal-sub">
-              Parses Code, Tour Products, Duration, Description, Notes to Sales — replaces the full catalogue on
-              Supabase.
-            </div>
+            <div className="prod-form-modal-sub">{tp('products', 'importSubtitle')}</div>
           </div>
-          <button type="button" className="modal-close-btn" onClick={() => void requestClose()} disabled={busy} aria-label="Close">
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={() => void requestClose()}
+            disabled={busy}
+            aria-label={tp('products', 'importCloseAria')}
+          >
             ✕
           </button>
         </div>
@@ -211,10 +212,7 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
           )}
 
           {drafts.length === 0 && !parseError && (
-            <p className="portfolio-import-empty">
-              Choose a Portfolio Excel file. Section rows (e.g. HO CHI MINH CITY) set destination; product codes
-              auto-tag region, category, and duration. Edit any wrong tags below before importing.
-            </p>
+            <p className="portfolio-import-empty">{tp('products', 'importChooseHint')}</p>
           )}
 
           {visible.length > 0 && (
@@ -222,14 +220,14 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
               <table className="portfolio-import-table">
                 <thead>
                   <tr>
-                    <th>Code</th>
-                    <th>Name</th>
-                    <th>Region</th>
-                    <th>Dest</th>
-                    <th>Cat</th>
-                    <th>Duration</th>
-                    <th>Notes</th>
-                    <th>Flags</th>
+                    <th>{tp('products', 'importColCode')}</th>
+                    <th>{tp('products', 'importColName')}</th>
+                    <th>{tp('products', 'importColRegion')}</th>
+                    <th>{tp('products', 'importColDest')}</th>
+                    <th>{tp('products', 'importColCat')}</th>
+                    <th>{tp('products', 'importColDuration')}</th>
+                    <th>{tp('products', 'importColNotes')}</th>
+                    <th>{tp('products', 'importColFlags')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -307,10 +305,10 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
                       <td>
                         {d.needsReview ? (
                           <span className="bdg bdg-a" title={d.reviewReasons.join('; ')}>
-                            Review
+                            {tp('products', 'flagReview')}
                           </span>
                         ) : (
-                          <span className="bdg bdg-g">OK</span>
+                          <span className="bdg bdg-g">{tp('products', 'flagOk')}</span>
                         )}
                       </td>
                     </tr>
@@ -331,7 +329,7 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
 
         <div className="prod-form-modal-ft">
           <button type="button" className="btn btn-s" onClick={() => void requestClose()} disabled={busy}>
-            Cancel
+            {tc('cancel')}
           </button>
           <button
             type="button"
@@ -339,7 +337,9 @@ export default function PortfolioImportModal({ open, onClose, onImported }: Port
             disabled={busy || drafts.length === 0}
             onClick={() => void handleImport()}
           >
-            {busy ? 'Working…' : `Replace catalogue (${drafts.length})`}
+            {busy
+              ? tp('products', 'importWorking')
+              : tpl('products', 'importReplaceCatalogue', { count: drafts.length })}
           </button>
         </div>
       </div>

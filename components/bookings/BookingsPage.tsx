@@ -18,6 +18,7 @@ import EmptyState from '@/components/EmptyState';
 import type { Booking } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { useLanguage } from '@/hooks/useLanguage';
 import BookingFormModal from '@/components/bookings/BookingFormModal';
 import {
   BookingDetailModal,
@@ -35,6 +36,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function BookingsPage() {
+  const { tp, tpl, tc } = useLanguage();
   const { canWrite } = usePagePermission('bookings');
   const { items, loading, error, reload } = useBookingsPage();
   const { createBooking } = useCreateBooking();
@@ -97,7 +99,7 @@ export default function BookingsPage() {
     setSaving(false);
     if (result.ok) {
       await reload();
-      toast.success('Booking created.');
+      toast.success(tp('bookings', 'toastCreated'));
     }
     return result;
   };
@@ -152,16 +154,16 @@ export default function BookingsPage() {
     <div className="bk-page">
       <div className="pt-banner">
         <span style={{ fontSize: 12.5, color: 'var(--gd)' }}>
-          ⭐ <b>Tour completed?</b> Log post-tour feedback & satisfaction surveys:
+          ⭐ <b>{tp('bookings', 'bannerCompleted')}</b> {tp('bookings', 'bannerCompletedDesc')}
         </span>
         <Link href="/posttour" className="btn btn-p btn-sm">
-          → Client Survey (NPS)
+          {tp('bookings', 'bannerClientSurvey')}
         </Link>
         <Link href="/posttour" className="btn btn-s btn-sm">
-          → Agent Feedback
+          {tp('bookings', 'bannerAgentFeedback')}
         </Link>
         <Link href="/posttour" className="btn btn-s btn-sm">
-          📋 View Feedback Log
+          {tp('bookings', 'bannerViewLog')}
         </Link>
       </div>
 
@@ -169,15 +171,15 @@ export default function BookingsPage() {
         <div className="card" style={{ marginBottom: 12, padding: 12, color: 'var(--red)' }}>
           {error}{' '}
           <button className="btn btn-s btn-sm" type="button" onClick={() => void reload()}>
-            Retry
+            {tc('retry')}
           </button>
         </div>
       )}
 
       <div className="search-row">
-        <input placeholder="Search bookings..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input placeholder={tp('bookings', 'searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
         <select value={statusF} onChange={(e) => setStatusF(e.target.value)}>
-          <option value="">All Status</option>
+          <option value="">{tp('bookings', 'filterAllStatus')}</option>
           <option>Confirmed</option>
           <option>Deposit Paid</option>
           <option>Fully Paid</option>
@@ -186,7 +188,7 @@ export default function BookingsPage() {
           <option>Cancelled</option>
         </select>
         <select value={monthF} onChange={(e) => setMonthF(e.target.value)}>
-          <option value="">All Months</option>
+          <option value="">{tp('bookings', 'filterAllMonths')}</option>
           <option>May 2026</option>
           <option>Jun 2026</option>
           <option>Jul 2026</option>
@@ -200,9 +202,9 @@ export default function BookingsPage() {
           type="button"
           onClick={openNewBooking}
           disabled={!canWrite || loading}
-          title={!canWrite ? 'You need write permission for Bookings to create a booking' : undefined}
+          title={!canWrite ? tp('bookings', 'newBookingDisabledTitle') : undefined}
         >
-          + New Booking
+          {tp('bookings', 'newBooking')}
         </button>
       </div>
 
@@ -211,24 +213,24 @@ export default function BookingsPage() {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Booking ID</th>
-                <th>Customer</th>
-                <th>Tour</th>
-                <th>Pax</th>
-                <th>Travel Date</th>
-                <th>Total Value</th>
-                <th>Deposit</th>
-                <th>Balance</th>
-                <th>Status</th>
-                <th>Guide</th>
-                <th>📋 Forms</th>
+                <th>{tp('bookings', 'colBookingId')}</th>
+                <th>{tp('bookings', 'colCustomer')}</th>
+                <th>{tp('bookings', 'colTour')}</th>
+                <th>{tp('bookings', 'colPax')}</th>
+                <th>{tp('bookings', 'colTravelDate')}</th>
+                <th>{tp('bookings', 'colTotalValue')}</th>
+                <th>{tp('bookings', 'colDeposit')}</th>
+                <th>{tp('bookings', 'colBalance')}</th>
+                <th>{tp('bookings', 'colStatus')}</th>
+                <th>{tp('bookings', 'colGuide')}</th>
+                <th>{tp('bookings', 'colForms')}</th>
               </tr>
             </thead>
             <tbody>
               {loading && items.length === 0 ? (
                 <tr>
                   <td colSpan={11} style={{ padding: 16, color: 'var(--m)' }}>
-                    Loading bookings…
+                    {tp('bookings', 'loading')}
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
@@ -238,17 +240,15 @@ export default function BookingsPage() {
                       className="crm-empty-state--table"
                       size="compact"
                       variant="tasks"
-                      title={hasActiveFilters ? 'No bookings match your filters' : 'No bookings yet'}
+                      title={hasActiveFilters ? tp('bookings', 'emptyNoMatchTitle') : tp('bookings', 'emptyNoBookingsTitle')}
                       description={
-                        hasActiveFilters
-                          ? 'Try a different search term, status, or month — or clear filters to see all bookings.'
-                          : 'Create a booking from a confirmed lead, or add one manually to start tracking deposits and travel dates.'
+                        hasActiveFilters ? tp('bookings', 'emptyNoMatchDesc') : tp('bookings', 'emptyNoBookingsDesc')
                       }
                       action={
                         <>
                           {hasActiveFilters && (
                             <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
-                              Clear filters
+                              {tc('clearFilters')}
                             </button>
                           )}
                           <button
@@ -257,10 +257,10 @@ export default function BookingsPage() {
                             onClick={openNewBooking}
                             disabled={!canWrite || loading}
                             title={
-                              !canWrite ? 'You need write permission for Bookings to create a booking' : undefined
+                              !canWrite ? tp('bookings', 'newBookingDisabledTitle') : undefined
                             }
                           >
-                            + New Booking
+                            {tp('bookings', 'newBooking')}
                           </button>
                         </>
                       }
@@ -282,8 +282,8 @@ export default function BookingsPage() {
                       <td>
                         <code style={{ fontSize: 10.5, color: 'var(--g)' }}>{b.id}</code>
                         {b.guideAlertPending && (
-                          <span className="bk-guide-alert" title="Guide not yet notified">
-                            ⚠ Guide
+                          <span className="bk-guide-alert" title={tp('bookings', 'guideNotNotified')}>
+                            {tp('bookings', 'guideAlert')}
                           </span>
                         )}
                       </td>
@@ -294,7 +294,7 @@ export default function BookingsPage() {
                         {b.tour}
                         {changes.length > 0 && (
                           <span className="bk-changes-badge">
-                            {changes.length} change{changes.length > 1 ? 's' : ''}
+                            {tpl('bookings', changes.length > 1 ? 'changesBadgePlural' : 'changesBadge', { count: changes.length })}
                           </span>
                         )}
                       </td>
@@ -311,7 +311,7 @@ export default function BookingsPage() {
                       <td>{b.guide || '—'}</td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <button className="bk-forms-btn" type="button">
-                          📋 Generate
+                          {tp('bookings', 'generateForms')}
                         </button>
                       </td>
                     </tr>

@@ -25,7 +25,7 @@ export default function PaginationBar({
   rangeEnd,
   onPageSizeChange,
 }: PaginationBarProps) {
-  const { t } = useLanguage();
+  const { tc, fmt } = useLanguage();
 
   const showSizeSelect = typeof onPageSizeChange === 'function';
   if (total === 0) return null;
@@ -40,17 +40,17 @@ export default function PaginationBar({
   return (
     <div className="pagination-bar">
       <span className="pagination-range">
-        {t(`Showing ${rangeStart}–${rangeEnd} of ${total}`, `Hiển thị ${rangeStart}–${rangeEnd} / ${total}`)}
+        {fmt(tc('showingRange'), { start: rangeStart, end: rangeEnd, total })}
       </span>
       <div className="pagination-controls">
         {showSizeSelect && (
           <label className="pagination-size">
-            <span className="pagination-size-label">{t('Per page', 'Mỗi trang')}</span>
+            <span className="pagination-size-label">{tc('perPage')}</span>
             <select
               className="pagination-size-select"
               value={pageSize}
               onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-              aria-label={t('Items per page', 'Số mục mỗi trang')}
+              aria-label={tc('itemsPerPage')}
             >
               {PAGE_SIZE_OPTIONS.map((size) => (
                 <option key={size} value={size}>
@@ -68,10 +68,10 @@ export default function PaginationBar({
               disabled={page <= 1}
               onClick={() => setPage(page - 1)}
             >
-              {t('Previous', 'Trước')}
+              {tc('previous')}
             </button>
             <span className="pagination-page">
-              {t(`Page ${page} of ${totalPages}`, `Trang ${page} / ${totalPages}`)}
+              {fmt(tc('pageOf'), { page, total: totalPages })}
             </span>
             <button
               type="button"
@@ -79,7 +79,7 @@ export default function PaginationBar({
               disabled={page >= totalPages}
               onClick={() => setPage(page + 1)}
             >
-              {t('Next', 'Sau')}
+              {tc('next')}
             </button>
           </>
         )}

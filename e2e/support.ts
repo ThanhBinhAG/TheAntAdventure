@@ -14,6 +14,8 @@ export type E2eState = {
   unassigned: { id: string; email: string; password: string };
   customerId: string;
   leadId: string;
+  legacyScopeRoleCode: string;
+  legacyScopeRoleLabel: string;
 };
 
 type ApiResult = { status: number; body: unknown };

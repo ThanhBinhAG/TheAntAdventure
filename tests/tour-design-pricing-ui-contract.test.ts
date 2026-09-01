@@ -30,7 +30,7 @@ test('Package rows preview while Use This Package performs the permission-gated 
   assert.match(experiencesStep, /onUsePackage=\{usePackage\}/);
   assert.match(experiencesStep, /isSelected=\{selectedPackageId === activePreview\?\.id\}/);
   assert.match(packagePreview, /onClick=\{\(\) => onUsePackage\(pkg\)\} disabled=\{!canWrite\}/);
-  assert.match(packagePreview, /Package Selected ✓/);
+  assert.match(packagePreview, /tp\('tour-design', 'pkgSelected'\)/);
 });
 
 test('Outline navigation and Tour Experiences tab are gated only by Tour Design write permission', () => {

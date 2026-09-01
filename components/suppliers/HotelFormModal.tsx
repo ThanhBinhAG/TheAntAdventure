@@ -21,14 +21,14 @@ const EMPTY_ROOM = (): HotelRoom => ({
 });
 
 const RATE_COLUMNS = [
-  { key: 'lm', label: 'Low MUP', thClass: 'sup-th-low', tdClass: 'sup-td-low' },
-  { key: 'hm', label: 'High MUP', thClass: 'sup-th-high', tdClass: 'sup-td-high' },
-  { key: 'fm', label: 'Fest MUP', thClass: 'sup-th-fest', tdClass: 'sup-td-fest' },
-  { key: 'pm', label: 'Peak MUP', thClass: 'sup-th-peak', tdClass: 'sup-td-peak' },
-  { key: 'ln', label: 'Low NET', thClass: 'sup-th-low sup-th-net', tdClass: 'sup-td-low sup-td-net' },
-  { key: 'hn', label: 'High NET', thClass: 'sup-th-high sup-th-net', tdClass: 'sup-td-high sup-td-net' },
-  { key: 'fn', label: 'Fest NET', thClass: 'sup-th-fest sup-th-net', tdClass: 'sup-td-fest sup-td-net' },
-  { key: 'pn', label: 'Peak NET', thClass: 'sup-th-peak sup-th-net', tdClass: 'sup-td-peak sup-td-net' },
+  { key: 'lm', labelKey: 'rateLowMup' as const, thClass: 'sup-th-low', tdClass: 'sup-td-low' },
+  { key: 'hm', labelKey: 'rateHighMup' as const, thClass: 'sup-th-high', tdClass: 'sup-td-high' },
+  { key: 'fm', labelKey: 'rateFestMup' as const, thClass: 'sup-th-fest', tdClass: 'sup-td-fest' },
+  { key: 'pm', labelKey: 'ratePeakMup' as const, thClass: 'sup-th-peak', tdClass: 'sup-td-peak' },
+  { key: 'ln', labelKey: 'rateLowNet' as const, thClass: 'sup-th-low sup-th-net', tdClass: 'sup-td-low sup-td-net' },
+  { key: 'hn', labelKey: 'rateHighNet' as const, thClass: 'sup-th-high sup-th-net', tdClass: 'sup-td-high sup-td-net' },
+  { key: 'fn', labelKey: 'rateFestNet' as const, thClass: 'sup-th-fest sup-th-net', tdClass: 'sup-td-fest sup-td-net' },
+  { key: 'pn', labelKey: 'ratePeakNet' as const, thClass: 'sup-th-peak sup-th-net', tdClass: 'sup-td-peak sup-td-net' },
 ] as const;
 
 interface Props {
@@ -71,7 +71,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
     setFormError(null);
   }
 
-  const { language } = useLanguage();
+  const { tp, tc, language } = useLanguage();
   const baselineForm = useMemo(() => initialForm(mode, hotel, existing), [formKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = useFormDirty(open, baselineForm, form, undefined, formKey);
   const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
@@ -96,7 +96,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
 
   function handleSave() {
     if (!form.name.trim() || !form.dest.trim()) {
-      setFormError('Hotel name and destination are required.');
+      setFormError(tp('suppliers', 'errorHotelRequired'));
       return;
     }
     const rooms = form.rooms
@@ -107,7 +107,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
         type: room.type.trim(),
       }));
     if (!rooms.length) {
-      setFormError('Add at least one room type with a name.');
+      setFormError(tp('suppliers', 'errorRoomRequired'));
       return;
     }
     onSave({ ...form, name: form.name.trim(), dest: form.dest.trim(), rooms });
@@ -120,10 +120,10 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
         <div className="modal-hd modal-hd-green nc-modal-hd">
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>
-              {mode === 'edit' ? 'Edit Hotel' : 'Add Hotel'}
+              {mode === 'edit' ? tp('suppliers', 'editHotel') : tp('suppliers', 'addHotelModal')}
             </div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 1 }}>
-              Property details and room rates (USD / room / night)
+              {tp('suppliers', 'hotelModalSub')}
             </div>
           </div>
           <button className="modal-close-btn" type="button" onClick={() => void requestClose()}>
@@ -132,22 +132,22 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
         </div>
 
         <div className="nc-modal-body">
-          <div className="nc-section-title">Property</div>
+          <div className="nc-section-title">{tp('suppliers', 'sectionProperty')}</div>
           <div className="nc-grid-2" style={{ marginBottom: 16 }}>
             <div className="fg">
-              <label className="lbl">Hotel Name *</label>
+              <label className="lbl">{tp('suppliers', 'lblHotelName')}</label>
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div className="fg">
-              <label className="lbl">Destination *</label>
+              <label className="lbl">{tp('suppliers', 'lblDestination')}</label>
               <input value={form.dest} onChange={(e) => setForm({ ...form, dest: e.target.value })} />
             </div>
             <div className="fg">
-              <label className="lbl">Category</label>
+              <label className="lbl">{tp('suppliers', 'lblCategory')}</label>
               <input value={form.cat} onChange={(e) => setForm({ ...form, cat: e.target.value })} placeholder="e.g. Boutique" />
             </div>
             <div className="fg">
-              <label className="lbl">Stars</label>
+              <label className="lbl">{tp('suppliers', 'lblStars')}</label>
               <select value={form.stars} onChange={(e) => setForm({ ...form, stars: e.target.value })}>
                 {['★★★', '★★★★', '★★★★★'].map((s) => (
                   <option key={s} value={s}>
@@ -157,39 +157,39 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Region</label>
+              <label className="lbl">{tp('suppliers', 'lblRegion')}</label>
               <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value as Hotel['region'] })}>
-                <option value="north">North</option>
-                <option value="central">Central</option>
-                <option value="south">South</option>
+                <option value="north">{tp('suppliers', 'regionNorth')}</option>
+                <option value="central">{tp('suppliers', 'regionCentral')}</option>
+                <option value="south">{tp('suppliers', 'regionSouth')}</option>
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Status</label>
+              <label className="lbl">{tp('suppliers', 'lblStatus')}</label>
               <select value={form.status || 'Active'} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
+                <option value="Active">{tp('suppliers', 'statusActive')}</option>
+                <option value="Inactive">{tp('suppliers', 'statusInactive')}</option>
               </select>
             </div>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div className="sup-form-section" style={{ margin: 0 }}>
-              Room Types & Rates
+              {tp('suppliers', 'sectionRoomRates')}
             </div>
             <button className="btn btn-s btn-sm" type="button" onClick={addRoom}>
-              + Add Room
+              {tp('suppliers', 'addRoom')}
             </button>
           </div>
-          <p className="nc-form-hint">MUP = client rate · NET = cost · All values USD per room per night</p>
+          <p className="nc-form-hint">{tp('suppliers', 'roomRatesHint')}</p>
 
           {form.rooms.map((room, ri) => (
             <div key={ri} className="nc-form-card" style={{ padding: 14 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px 40px', gap: 8, marginBottom: 10 }}>
-                <input placeholder="Room type *" value={room.type} onChange={(e) => updateRoom(ri, { type: e.target.value })} />
-                <input placeholder="View" value={room.view || ''} onChange={(e) => updateRoom(ri, { view: e.target.value })} />
+                <input placeholder={tp('suppliers', 'roomTypePlaceholder')} value={room.type} onChange={(e) => updateRoom(ri, { type: e.target.value })} />
+                <input placeholder={tp('suppliers', 'viewPlaceholder')} value={room.view || ''} onChange={(e) => updateRoom(ri, { view: e.target.value })} />
                 <input
-                  placeholder="sqm"
+                  placeholder={tp('suppliers', 'sqmPlaceholder')}
                   type="number"
                   value={room.sqm ?? ''}
                   onChange={(e) => updateRoom(ri, { sqm: e.target.value ? +e.target.value : undefined })}
@@ -202,7 +202,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
                 {RATE_COLUMNS.map((col) => (
                   <div key={col.key} className="fg" style={{ margin: 0 }}>
                     <label className={`lbl sup-th ${col.thClass}`} style={{ fontSize: 10, display: 'block', padding: '4px 6px', borderRadius: 4 }}>
-                      {col.label}
+                      {tp('suppliers', col.labelKey)}
                     </label>
                     <input
                       type="number"
@@ -226,10 +226,10 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
           ) : null}
           <div className="nc-modal-ft-actions">
             <button className="btn btn-s" type="button" onClick={() => void requestClose()}>
-              Cancel
+              {tc('cancel')}
             </button>
             <button className="btn btn-p" type="button" onClick={handleSave}>
-              Save Hotel
+              {tp('suppliers', 'saveHotel')}
             </button>
           </div>
         </div>

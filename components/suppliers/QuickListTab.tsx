@@ -13,27 +13,31 @@ import type { CruiseSupplier, RestaurantSupplier, TransportSupplier } from '@/li
 import { toast } from '@/lib/toast';
 
 import { confirmDialog } from '@/lib/confirm';
+import { useLanguage } from '@/hooks/useLanguage';
+import type { SUPPLIERSKey } from '@/lib/i18n/pages/suppliers';
 
 type QuickRow = TransportSupplier | RestaurantSupplier | CruiseSupplier;
 
 const TABLE_CONFIG: Record<
   QuickListKind,
   {
-    title: string;
-    columns: { key: string; label: string; style?: React.CSSProperties }[];
+    titleKey: SUPPLIERSKey;
+    kindKey: SUPPLIERSKey;
+    columns: { key: string; labelKey: SUPPLIERSKey; style?: React.CSSProperties }[];
     searchFields: (row: QuickRow) => (string | number | undefined)[];
     regionField?: (row: QuickRow) => string | undefined;
   }
 > = {
   transport: {
-    title: 'Transport',
+    titleKey: 'titleTransport',
+    kindKey: 'kindTransport',
     columns: [
-      { key: 'id', label: 'ID' },
-      { key: 'name', label: 'Company' },
-      { key: 'region', label: 'Region' },
-      { key: 'vehicles', label: 'Vehicles' },
-      { key: 'rate', label: 'Day Rate', style: { fontWeight: 600, color: 'var(--g)' } },
-      { key: 'notes', label: 'Notes', style: { color: 'var(--m)', fontSize: 12 } },
+      { key: 'id', labelKey: 'colId' },
+      { key: 'name', labelKey: 'colCompany' },
+      { key: 'region', labelKey: 'colRegion' },
+      { key: 'vehicles', labelKey: 'colVehicles' },
+      { key: 'rate', labelKey: 'colDayRate', style: { fontWeight: 600, color: 'var(--g)' } },
+      { key: 'notes', labelKey: 'colNotes', style: { color: 'var(--m)', fontSize: 12 } },
     ],
     searchFields: (r) => [r.name, (r as TransportSupplier).region, (r as TransportSupplier).vehicles, (r as TransportSupplier).notes],
     regionField: (r) => {
@@ -45,15 +49,16 @@ const TABLE_CONFIG: Record<
     },
   },
   restaurant: {
-    title: 'Restaurant',
+    titleKey: 'titleRestaurant',
+    kindKey: 'kindRestaurant',
     columns: [
-      { key: 'id', label: 'ID' },
-      { key: 'name', label: 'Restaurant' },
-      { key: 'city', label: 'City' },
-      { key: 'cuisine', label: 'Cuisine' },
-      { key: 'set', label: 'Set Menu From', style: { fontWeight: 600, color: 'var(--g)' } },
-      { key: 'cap', label: 'Capacity' },
-      { key: 'rating', label: 'Rating', style: { color: 'var(--gold)' } },
+      { key: 'id', labelKey: 'colId' },
+      { key: 'name', labelKey: 'colCompany' },
+      { key: 'city', labelKey: 'colCity' },
+      { key: 'cuisine', labelKey: 'colCuisine' },
+      { key: 'set', labelKey: 'colSetMenu', style: { fontWeight: 600, color: 'var(--g)' } },
+      { key: 'cap', labelKey: 'colCapacity' },
+      { key: 'rating', labelKey: 'colRating', style: { color: 'var(--gold)' } },
     ],
     searchFields: (r) => {
       const row = r as RestaurantSupplier;
@@ -61,15 +66,16 @@ const TABLE_CONFIG: Record<
     },
   },
   cruise: {
-    title: 'Cruise',
+    titleKey: 'titleCruise',
+    kindKey: 'kindCruise',
     columns: [
-      { key: 'id', label: 'ID' },
-      { key: 'name', label: 'Cruise' },
-      { key: 'route', label: 'Route' },
-      { key: 'cabins', label: 'Cabin Types' },
-      { key: 'rate', label: 'Rate', style: { fontWeight: 600, color: 'var(--g)' } },
-      { key: 'valid', label: 'Validity' },
-      { key: 'rating', label: 'Rating', style: { color: 'var(--gold)' } },
+      { key: 'id', labelKey: 'colId' },
+      { key: 'name', labelKey: 'colCompany' },
+      { key: 'route', labelKey: 'colRoute' },
+      { key: 'cabins', labelKey: 'colCabins' },
+      { key: 'rate', labelKey: 'colRate', style: { fontWeight: 600, color: 'var(--g)' } },
+      { key: 'valid', labelKey: 'colValidity' },
+      { key: 'rating', labelKey: 'colRating', style: { color: 'var(--gold)' } },
     ],
     searchFields: (r) => {
       const row = r as CruiseSupplier;
@@ -85,6 +91,7 @@ type Props = {
 };
 
 export default function QuickListTab({ kind, filters, canWrite }: Props) {
+  const { tp, tpl } = useLanguage();
   const transport = useStore((s) => s.transport);
   const restaurants = useStore((s) => s.restaurants);
   const cruises = useStore((s) => s.cruises);
@@ -95,6 +102,8 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
   const [editId, setEditId] = useState<string | null>(null);
 
   const cfg = TABLE_CONFIG[kind];
+  const title = tp('suppliers', cfg.titleKey);
+  const kindLabel = tp('suppliers', cfg.kindKey);
   const rows: QuickRow[] = kind === 'transport' ? transport : kind === 'restaurant' ? restaurants : cruises;
 
   const filtered = useMemo(() => {
@@ -130,14 +139,16 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
   };
 
   const handleDelete = async (id: string) => {
-    const ok = await confirmDialog('Remove this entry?', { title: 'Remove entry' });
+    const ok = await confirmDialog(tp('suppliers', 'confirmRemoveEntry'), {
+      title: tp('suppliers', 'confirmRemoveEntryTitle'),
+    });
     if (!ok) return;
     const result = await deleteRow(id);
     if (!result.ok) {
       toast.error(result.message);
       return;
     }
-    toast.success('Entry removed.');
+    toast.success(tp('suppliers', 'toastEntryRemoved'));
   };
 
   const handleSave = async (row: QuickRow) => {
@@ -147,7 +158,7 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
         toast.error(result.message);
         return;
       }
-      toast.success('Entry updated.');
+      toast.success(tp('suppliers', 'toastEntryUpdated'));
       return;
     }
     const result = await createRow(row);
@@ -155,23 +166,23 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
       toast.error(result.message);
       return;
     }
-    toast.success('Entry created.');
+    toast.success(tp('suppliers', 'toastEntryCreated'));
   };
 
   return (
     <>
       <div className="sup-sub-bar" style={{ marginBottom: 10 }}>
         <div className="info-bar" style={{ margin: 0, flex: 1 }}>
-          Showing <b>{filtered.length}</b> of <b>{rows.length}</b> {cfg.title.toLowerCase()} partners
+          {tpl('suppliers', 'showingPartners', { filtered: filtered.length, total: rows.length, kind: kindLabel })}
         </div>
         <button
           className="btn btn-p btn-sm"
           type="button"
           onClick={openAdd}
           disabled={!canWrite}
-          title={!canWrite ? `You need write permission to add ${cfg.title.toLowerCase()}` : undefined}
+          title={!canWrite ? tpl('suppliers', 'permAddPartner', { kind: kindLabel }) : undefined}
         >
-          ＋ Add {cfg.title}
+          {tpl('suppliers', 'addPartner', { kind: title })}
         </button>
       </div>
       <div className="card">
@@ -180,9 +191,9 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
             <thead>
               <tr>
                 {cfg.columns.map((col) => (
-                  <th key={col.key}>{col.label}</th>
+                  <th key={col.key}>{tp('suppliers', col.labelKey)}</th>
                 ))}
-                <th style={{ width: 100 }}>Actions</th>
+                <th style={{ width: 100 }}>{tp('suppliers', 'colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -205,7 +216,7 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
                       type="button"
                       onClick={() => openEdit(row.id)}
                       disabled={!canWrite}
-                      title={!canWrite ? 'You need write permission to edit' : undefined}
+                      title={!canWrite ? tp('suppliers', 'permEdit') : undefined}
                     >
                       ✏
                     </button>
@@ -215,7 +226,7 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
                       style={{ marginLeft: 4 }}
                       onClick={() => void handleDelete(row.id)}
                       disabled={!canWrite}
-                      title={!canWrite ? 'You need write permission to delete' : undefined}
+                      title={!canWrite ? tp('suppliers', 'permDelete') : undefined}
                     >
                       ✕
                     </button>
@@ -229,17 +240,17 @@ export default function QuickListTab({ kind, filters, canWrite }: Props) {
                       className="crm-empty-state--table"
                       size="compact"
                       variant="suppliers"
-                      title={`No ${cfg.title.toLowerCase()} partners found`}
-                      description="Add a partner, or adjust search/region filters."
+                      title={tpl('suppliers', 'emptyPartners', { kind: kindLabel })}
+                      description={tp('suppliers', 'emptyPartnersDesc')}
                       action={
                         <button
                           type="button"
                           className="btn btn-p btn-sm"
                           onClick={openAdd}
                           disabled={!canWrite}
-                          title={!canWrite ? `You need write permission to add ${cfg.title.toLowerCase()}` : undefined}
+                          title={!canWrite ? tpl('suppliers', 'permAddPartner', { kind: kindLabel }) : undefined}
                         >
-                          ＋ Add {cfg.title}
+                          {tpl('suppliers', 'addPartner', { kind: title })}
                         </button>
                       }
                     />

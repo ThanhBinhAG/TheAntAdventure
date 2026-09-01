@@ -32,9 +32,17 @@ export const EMPTY_BOOKING_FORM: BookingFormData = {
   hotel: '',
 };
 
+export type BookingFormErrorKey =
+  | 'errSelectCustomer'
+  | 'errTourRequired'
+  | 'errPaxMin'
+  | 'errStartDate'
+  | 'errEndDate'
+  | 'errEndBeforeStart';
+
 export type BookingFormValidationResult =
   | { ok: true; total: number; deposit: number; start: string; end: string }
-  | { ok: false; field: BookingFormErrorField | null; message: string };
+  | { ok: false; field: BookingFormErrorField | null; errorKey: BookingFormErrorKey };
 
 export function validateBookingForm(
   form: BookingFormData,
@@ -42,38 +50,26 @@ export function validateBookingForm(
   depositInput: string,
 ): BookingFormValidationResult {
   if (!form.custId.trim()) {
-    return { ok: false, field: 'custId', message: 'Please select a customer.' };
+    return { ok: false, field: 'custId', errorKey: 'errSelectCustomer' };
   }
   if (!form.tour.trim()) {
-    return { ok: false, field: 'tour', message: 'Please enter a tour name.' };
+    return { ok: false, field: 'tour', errorKey: 'errTourRequired' };
   }
   if (!Number.isFinite(form.pax) || form.pax < 1) {
-    return { ok: false, field: 'pax', message: 'Pax must be at least 1.' };
+    return { ok: false, field: 'pax', errorKey: 'errPaxMin' };
   }
 
   const start = normalizeBookingDateInput(form.start);
   const end = normalizeBookingDateInput(form.end);
 
   if (!isValidBookingDate(start)) {
-    return {
-      ok: false,
-      field: 'start',
-      message: 'Start date must be YYYY-MM-DD or left blank.',
-    };
+    return { ok: false, field: 'start', errorKey: 'errStartDate' };
   }
   if (!isValidBookingDate(end)) {
-    return {
-      ok: false,
-      field: 'end',
-      message: 'End date must be YYYY-MM-DD or left blank.',
-    };
+    return { ok: false, field: 'end', errorKey: 'errEndDate' };
   }
   if (start && end && end < start) {
-    return {
-      ok: false,
-      field: 'end',
-      message: 'End date must be on or after the start date.',
-    };
+    return { ok: false, field: 'end', errorKey: 'errEndBeforeStart' };
   }
 
   const total = parseMoneyInput(totalInput, { absolute: true });

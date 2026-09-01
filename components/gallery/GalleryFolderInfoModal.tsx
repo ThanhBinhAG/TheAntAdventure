@@ -1,6 +1,7 @@
 'use client';
 
 import type { PhotoFolder } from '@/lib/gallery/photo-folders';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type Props = {
   open: boolean;
@@ -17,7 +18,14 @@ export default function GalleryFolderInfoModal({
   photoCount,
   onClose,
 }: Props) {
+  const { tp, tpl, tc } = useLanguage();
+
   if (!open || !folder) return null;
+
+  const photoCountLabel =
+    photoCount === 1
+      ? tpl('gallery', 'infoPhotoCountOne', { count: photoCount })
+      : tpl('gallery', 'infoPhotoCountMany', { count: photoCount });
 
   return (
     <div className="overlay open" onClick={onClose} role="presentation">
@@ -31,7 +39,7 @@ export default function GalleryFolderInfoModal({
         <div className="modal-hd modal-hd-green phlib-modal-hd">
           <div>
             <div className="phlib-modal-title" id="phlib-folder-info-title">
-              Folder info
+              {tp('gallery', 'folderInfoTitle')}
             </div>
             <div className="phlib-modal-sub">{folder.name}</div>
           </div>
@@ -42,32 +50,30 @@ export default function GalleryFolderInfoModal({
         <div className="phlib-modal-bd phlib-folder-info-body">
           <dl className="phlib-folder-info-dl">
             <div>
-              <dt>Name</dt>
+              <dt>{tp('gallery', 'infoName')}</dt>
               <dd>{folder.name}</dd>
             </div>
             <div>
-              <dt>Path</dt>
+              <dt>{tp('gallery', 'infoPath')}</dt>
               <dd>{pathLabel}</dd>
             </div>
             <div>
-              <dt>Photos</dt>
-              <dd>
-                {photoCount} photo{photoCount === 1 ? '' : 's'}
-              </dd>
+              <dt>{tp('gallery', 'infoPhotos')}</dt>
+              <dd>{photoCountLabel}</dd>
             </div>
             <div>
-              <dt>ID</dt>
+              <dt>{tp('gallery', 'infoId')}</dt>
               <dd>
                 <code>{folder.id}</code>
               </dd>
             </div>
             <div>
-              <dt>Type</dt>
-              <dd>{folder.isSystem ? 'System folder' : 'User folder'}</dd>
+              <dt>{tp('gallery', 'infoType')}</dt>
+              <dd>{folder.isSystem ? tp('gallery', 'systemFolder') : tp('gallery', 'userFolder')}</dd>
             </div>
             {folder.createdAt && (
               <div>
-                <dt>Created</dt>
+                <dt>{tp('gallery', 'infoCreated')}</dt>
                 <dd>{new Date(folder.createdAt).toLocaleString()}</dd>
               </div>
             )}
@@ -77,7 +83,7 @@ export default function GalleryFolderInfoModal({
           <div />
           <div className="phlib-modal-ft-right">
             <button type="button" className="btn btn-g" onClick={onClose}>
-              Close
+              {tc('close')}
             </button>
           </div>
         </div>

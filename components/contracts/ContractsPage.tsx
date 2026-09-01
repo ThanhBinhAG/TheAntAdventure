@@ -21,6 +21,7 @@ import EmptyState from '@/components/EmptyState';
 import { confirmDialog } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { useLanguage } from '@/hooks/useLanguage';
 import type { CreateContractOutcome } from '@/hooks/useCreateContract';
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }> = {
@@ -44,6 +45,7 @@ function fmtDate(d?: string) {
 }
 
 export default function Contracts() {
+  const { tp, tpl, tc } = useLanguage();
   const { canWrite } = usePagePermission('contracts');
   const { items: contracts, loading, error, reload } = useContractsPage();
   const { createContract } = useCreateContract();
@@ -117,8 +119,8 @@ export default function Contracts() {
   async function handleDeleteContract(contract: ContractListItem) {
     if (!canWrite) return;
     const ok = await confirmDialog(
-      `Delete ${contract.id} (${contract.clientName})? This cannot be undone.`,
-      { title: 'Delete contract', confirmLabel: 'Delete' },
+      tpl('contracts', 'deleteContractConfirm', { id: contract.id, name: contract.clientName }),
+      { title: tp('contracts', 'deleteContractTitle'), confirmLabel: tc('confirmDelete') },
     );
     if (!ok) return;
 
@@ -130,17 +132,17 @@ export default function Contracts() {
 
     if (preview?.id === contract.id) setPreview(null);
     await reload();
-    toast.success('Contract deleted.');
+    toast.success(tp('contracts', 'toastDeleted'));
   }
 
   return (
     <div>
       <div className="ctr-header-bar">
-        <input className="ctr-search" placeholder="🔍  Search contracts…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input className="ctr-search" placeholder={tp('contracts', 'searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
         <div className="ctr-filters">
           {(['all', 'Draft', 'Sent', 'Signed'] as const).map((f) => (
             <button key={f} type="button" className={`ctr-filter-btn${filter === f ? ' on' : ''}`} data-status={f} onClick={() => setFilter(f)}>
-              {f === 'all' ? 'All' : f}
+              {f === 'all' ? tp('contracts', 'filterAll') : f}
             </button>
           ))}
         </div>
@@ -154,9 +156,9 @@ export default function Contracts() {
             setShowNew(true);
           }}
           disabled={!canWrite}
-          title={!canWrite ? 'You need write permission for Contracts to create a contract' : undefined}
+          title={!canWrite ? tp('contracts', 'newContractDisabledTitle') : undefined}
         >
-          ＋ New Contract
+          {tp('contracts', 'newContract')}
         </button>
       </div>
 
@@ -164,18 +166,18 @@ export default function Contracts() {
         <div className="card" style={{ marginBottom: 12, color: 'var(--r)' }}>
           {error}{' '}
           <button type="button" className="btn btn-s btn-sm" onClick={() => void reload()}>
-            Retry
+            {tc('retry')}
           </button>
         </div>
       ) : null}
 
       <div className="ctr-kpi-row">
         {[
-          ['Total Contracts', kpis.total, 'var(--gd)'],
-          ['Draft', kpis.draft, '#D97706'],
-          ['Sent to Client', kpis.sent, 'var(--blue)'],
-          ['Signed', kpis.signed, 'var(--g)'],
-          ['Pipeline Value', `$${kpis.pipeline.toLocaleString('en-US')}`, 'var(--pur)'],
+          [tp('contracts', 'kpiTotal'), kpis.total, 'var(--gd)'],
+          [tp('contracts', 'kpiDraft'), kpis.draft, '#D97706'],
+          [tp('contracts', 'kpiSent'), kpis.sent, 'var(--blue)'],
+          [tp('contracts', 'kpiSigned'), kpis.signed, 'var(--g)'],
+          [tp('contracts', 'kpiPipeline'), `$${kpis.pipeline.toLocaleString('en-US')}`, 'var(--pur)'],
         ].map(([label, value, color]) => (
           <div key={String(label)} className="ctr-kpi-pill">
             <div className="ctr-kpi-val" style={{ color: color as string }}>
@@ -190,22 +192,22 @@ export default function Contracts() {
         <table className="tbl">
           <thead>
             <tr>
-              <th>Contract No.</th>
-              <th>Client</th>
-              <th>Tour</th>
-              <th>Pax</th>
-              <th>Value</th>
-              <th>Departure</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Actions</th>
+              <th>{tp('contracts', 'colContractNo')}</th>
+              <th>{tp('contracts', 'colClient')}</th>
+              <th>{tp('contracts', 'colTour')}</th>
+              <th>{tp('contracts', 'colPax')}</th>
+              <th>{tp('contracts', 'colValue')}</th>
+              <th>{tp('contracts', 'colDeparture')}</th>
+              <th>{tp('contracts', 'colStatus')}</th>
+              <th>{tp('contracts', 'colCreated')}</th>
+              <th>{tp('contracts', 'colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {loading && contracts.length === 0 ? (
               <tr>
                 <td colSpan={9} style={{ padding: 24, textAlign: 'center', color: 'var(--mu)' }}>
-                  Loading contracts…
+                  {tp('contracts', 'loading')}
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
@@ -215,17 +217,17 @@ export default function Contracts() {
                     className="crm-empty-state--table"
                     size="compact"
                     variant="docs"
-                    title="No contracts found"
-                    description="Create a contract from a confirmed booking, or adjust filters if you expected results."
+                    title={tp('contracts', 'emptyTitle')}
+                    description={tp('contracts', 'emptyDesc')}
                     action={
                       <button
                         type="button"
                         className="btn btn-p btn-sm"
                         onClick={() => setShowNew(true)}
                         disabled={!canWrite}
-                        title={!canWrite ? 'You need write permission for Contracts to create a contract' : undefined}
+                        title={!canWrite ? tp('contracts', 'newContractDisabledTitle') : undefined}
                       >
-                        ＋ New Contract
+                        {tp('contracts', 'newContract')}
                       </button>
                     }
                   />
@@ -253,16 +255,16 @@ export default function Contracts() {
                   <td onClick={(e) => e.stopPropagation()}>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <button className="btn btn-s btn-sm" type="button" onClick={() => setPreview(c)}>
-                        👁 View
+                        {tp('contracts', 'viewBtn')}
                       </button>
                       <button
                         className="btn btn-danger btn-sm"
                         type="button"
                         disabled={!canWrite}
-                        title={!canWrite ? 'You need write permission for Contracts to delete' : undefined}
+                        title={!canWrite ? tp('contracts', 'deleteDisabledTitle') : undefined}
                         onClick={() => void handleDeleteContract(c)}
                       >
-                        🗑 Delete
+                        {tp('contracts', 'deleteBtn')}
                       </button>
                     </div>
                   </td>
@@ -294,7 +296,7 @@ export default function Contracts() {
                 <select
                   value={preview.status}
                   disabled={!canWrite}
-                  title={!canWrite ? 'You need write permission for Contracts to change status' : undefined}
+                  title={!canWrite ? tp('contracts', 'statusChangeDisabledTitle') : undefined}
                   onChange={(e) => void changeStatus(e.target.value)}
                   className="ctr-status-select"
                 >
@@ -310,20 +312,20 @@ export default function Contracts() {
             <div className="ctr-preview-body" dangerouslySetInnerHTML={{ __html: buildContractHTML(preview) }} />
             <div style={{ padding: '12px 22px 22px', display: 'flex', gap: 8, borderTop: '1px solid var(--b)', flexWrap: 'wrap' }}>
               <button className="btn btn-p btn-sm" type="button" onClick={() => printContract(preview)}>
-                🖨 Print / PDF
+                {tp('contracts', 'previewPrint')}
               </button>
               <button className="btn btn-s btn-sm" type="button" onClick={() => downloadContractWord(preview)}>
-                📄 Download Word
+                {tp('contracts', 'previewDownloadWord')}
               </button>
               <button
                 className="btn btn-danger btn-sm"
                 type="button"
                 style={{ marginLeft: 'auto' }}
                 disabled={!canWrite}
-                title={!canWrite ? 'You need write permission for Contracts to delete' : undefined}
+                title={!canWrite ? tp('contracts', 'deleteDisabledTitle') : undefined}
                 onClick={() => void handleDeleteContract(preview)}
               >
-                🗑 Delete Contract
+                {tp('contracts', 'previewDelete')}
               </button>
             </div>
           </div>

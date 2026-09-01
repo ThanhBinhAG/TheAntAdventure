@@ -7,10 +7,12 @@ import { usePageSize } from '@/hooks/usePageSize';
 import { useFinancePage } from '@/hooks/useFinancePage';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type FinTab = 'overview' | 'cashflow' | 'pl' | 'ar' | 'ap';
 
 export default function FinancePage() {
+  const { tp, tpl, tc } = useLanguage();
   const { finance, ar, ap, loading, error, reload } = useFinancePage();
   const [tab, setTab] = useState<FinTab>('overview');
   const [arFilter, setArFilter] = useState('');
@@ -53,11 +55,11 @@ export default function FinancePage() {
     <div>
       {error && (
         <EmptyState
-          title="Could not load finance data"
+          title={tp('finance', 'loadErrorTitle')}
           description={error}
           action={
             <button type="button" className="btn btn-s" onClick={() => void reload()}>
-              Retry
+              {tc('retry')}
             </button>
           }
           role="alert"
@@ -65,31 +67,31 @@ export default function FinancePage() {
       )}
       <div className="fin-kpi fin-kpi-5">
         <div className="fin-k">
-          <div className="fin-k-l">Revenue YTD</div>
+          <div className="fin-k-l">{tp('finance', 'kpiRevenueYtd')}</div>
           <div className="fin-k-v" style={{ color: 'var(--g)' }}>
             {loading ? '…' : `$${fmt(totalRev)}`}
           </div>
         </div>
         <div className="fin-k">
-          <div className="fin-k-l">Gross Profit</div>
+          <div className="fin-k-l">{tp('finance', 'kpiGrossProfit')}</div>
           <div className="fin-k-v" style={{ color: 'var(--g)' }}>
             {loading ? '…' : `$${fmt(grossProfit)}`}
           </div>
         </div>
         <div className="fin-k">
-          <div className="fin-k-l">Cash In</div>
+          <div className="fin-k-l">{tp('finance', 'kpiCashIn')}</div>
           <div className="fin-k-v" style={{ color: 'var(--blue)' }}>
             {loading ? '…' : `$${fmt(totalCashIn)}`}
           </div>
         </div>
         <div className="fin-k">
-          <div className="fin-k-l">Outstanding AR</div>
+          <div className="fin-k-l">{tp('finance', 'kpiOutstandingAr')}</div>
           <div className="fin-k-v" style={{ color: 'var(--amb)' }}>
             {loading ? '…' : `$${fmt(totalAR)}`}
           </div>
         </div>
         <div className="fin-k">
-          <div className="fin-k-l">Pending AP</div>
+          <div className="fin-k-l">{tp('finance', 'kpiPendingAp')}</div>
           <div className="fin-k-v" style={{ color: 'var(--red)' }}>
             {loading ? '…' : `$${fmt(totalAP)}`}
           </div>
@@ -99,11 +101,11 @@ export default function FinancePage() {
       <div className="tabs">
         {(
           [
-            ['overview', 'Overview'],
-            ['cashflow', 'Cashflow'],
-            ['pl', 'P&L'],
-            ['ar', 'Accounts Receivable'],
-            ['ap', 'Accounts Payable'],
+            ['overview', tp('finance', 'tabOverview')],
+            ['cashflow', tp('finance', 'tabCashflow')],
+            ['pl', tp('finance', 'tabPl')],
+            ['ar', tp('finance', 'tabAr')],
+            ['ap', tp('finance', 'tabAp')],
           ] as const
         ).map(([id, label]) => (
           <div key={id} className={`tab${tab === id ? ' on' : ''}`} onClick={() => setTab(id)} role="button" tabIndex={0}>
@@ -116,24 +118,24 @@ export default function FinancePage() {
         <div className="card">
           <div className="card-body" style={{ padding: 0 }}>
             {loading ? (
-              <EmptyState title="Loading finance records…" size="compact" />
+              <EmptyState title={tp('finance', 'loadingRecords')} size="compact" />
             ) : financePage.length === 0 ? (
-              <EmptyState title="No finance records" size="compact" />
+              <EmptyState title={tp('finance', 'noRecords')} size="compact" />
             ) : (
               <>
                 <table className="tbl">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Booking</th>
-                  <th>Client</th>
-                  <th>Type</th>
-                  <th>Month</th>
-                  <th>Revenue</th>
-                  <th>Cost</th>
-                  <th>Cash In</th>
-                  <th>Cash Out</th>
-                  <th>Status</th>
+                  <th>{tp('finance', 'colId')}</th>
+                  <th>{tp('finance', 'colBooking')}</th>
+                  <th>{tp('finance', 'colClient')}</th>
+                  <th>{tp('finance', 'colType')}</th>
+                  <th>{tp('finance', 'colMonth')}</th>
+                  <th>{tp('finance', 'colRevenue')}</th>
+                  <th>{tp('finance', 'colCost')}</th>
+                  <th>{tp('finance', 'colCashIn')}</th>
+                  <th>{tp('finance', 'colCashOut')}</th>
+                  <th>{tp('finance', 'colStatus')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -169,27 +171,27 @@ export default function FinancePage() {
       {tab === 'cashflow' && (
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">Monthly Cashflow</span>
+            <span className="card-title">{tp('finance', 'monthlyCashflow')}</span>
             <span style={{ fontSize: 12, color: 'var(--m)' }}>
-              Cash Out: {loading ? '…' : `$${fmt(totalCashOut)}`} total
+              {tpl('finance', 'cashOutTotal', { amount: `$${loading ? '…' : fmt(totalCashOut)}` })}
             </span>
           </div>
           <div className="card-body">
             {loading ? (
-              <EmptyState title="Loading cashflow…" size="compact" />
+              <EmptyState title={tp('finance', 'loadingCashflow')} size="compact" />
             ) : monthlyCash.length === 0 ? (
-              <EmptyState title="No cashflow data" size="compact" />
+              <EmptyState title={tp('finance', 'noCashflow')} size="compact" />
             ) : (
               monthlyCash.map(([month, { in: cin, out: cout }]) => (
               <div key={month} className="fin-cf-row">
                 <div className="fin-cf-label">{month}</div>
                 <div className="fin-cf-bars">
                   <div className="fin-cf-bar-wrap">
-                    <div className="fin-cf-bar fin-cf-in" style={{ width: `${(cin / maxCash) * 100}%` }} title={`In: $${fmt(cin)}`} />
+                    <div className="fin-cf-bar fin-cf-in" style={{ width: `${(cin / maxCash) * 100}%` }} title={tpl('finance', 'cashInTooltip', { amount: fmt(cin) })} />
                     <span className="fin-cf-val">${fmt(cin)}</span>
                   </div>
                   <div className="fin-cf-bar-wrap">
-                    <div className="fin-cf-bar fin-cf-out" style={{ width: `${(cout / maxCash) * 100}%` }} title={`Out: $${fmt(cout)}`} />
+                    <div className="fin-cf-bar fin-cf-out" style={{ width: `${(cout / maxCash) * 100}%` }} title={tpl('finance', 'cashOutTooltip', { amount: fmt(cout) })} />
                     <span className="fin-cf-val">${fmt(cout)}</span>
                   </div>
                 </div>
@@ -201,10 +203,10 @@ export default function FinancePage() {
             )}
             <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 11.5 }}>
               <span>
-                <span className="fin-cf-legend fin-cf-in" /> Cash In
+                <span className="fin-cf-legend fin-cf-in" /> {tp('finance', 'cashInLegend')}
               </span>
               <span>
-                <span className="fin-cf-legend fin-cf-out" /> Cash Out
+                <span className="fin-cf-legend fin-cf-out" /> {tp('finance', 'cashOutLegend')}
               </span>
             </div>
           </div>
@@ -214,32 +216,32 @@ export default function FinancePage() {
       {tab === 'pl' && (
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">Profit & Loss Summary</span>
+            <span className="card-title">{tp('finance', 'plSummary')}</span>
           </div>
           <div className="card-body">
             <table className="tbl" style={{ maxWidth: 480 }}>
               <tbody>
                 <tr>
-                  <td>Tour Revenue</td>
+                  <td>{tp('finance', 'plTourRevenue')}</td>
                   <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--g)' }}>${fmt(totalRev)}</td>
                 </tr>
                 <tr>
-                  <td>Tour Costs</td>
+                  <td>{tp('finance', 'plTourCosts')}</td>
                   <td style={{ textAlign: 'right', color: 'var(--red)' }}>(${fmt(totalCost)})</td>
                 </tr>
                 <tr style={{ borderTop: '2px solid var(--b)' }}>
                   <td>
-                    <b>Gross Profit</b>
+                    <b>{tp('finance', 'plGrossProfit')}</b>
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--g)' }}>${fmt(grossProfit)}</td>
                 </tr>
                 <tr>
-                  <td>Operating Expenses (Salaries)</td>
+                  <td>{tp('finance', 'plOperatingExpenses')}</td>
                   <td style={{ textAlign: 'right', color: 'var(--red)' }}>(${fmt(totalCashOut)})</td>
                 </tr>
                 <tr style={{ borderTop: '2px solid var(--g)' }}>
                   <td>
-                    <b>Net Position (approx.)</b>
+                    <b>{tp('finance', 'plNetPosition')}</b>
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>${fmt(grossProfit - totalCashOut)}</td>
                 </tr>
@@ -253,40 +255,40 @@ export default function FinancePage() {
         <>
           <div className="search-row">
             <select value={arFilter} onChange={(e) => setArFilter(e.target.value)}>
-              <option value="">All Statuses</option>
+              <option value="">{tp('finance', 'allStatuses')}</option>
               <option>Outstanding</option>
               <option>Overdue</option>
               <option>Paid</option>
             </select>
-            <span className="bdg bdg-a">${fmt(totalAR)} outstanding</span>
+            <span className="bdg bdg-a">{tpl('finance', 'outstandingBadge', { amount: fmt(totalAR) })}</span>
           </div>
           <div className="card">
             <div className="card-body" style={{ padding: 0 }}>
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Client</th>
-                    <th>Tour</th>
-                    <th>Invoice</th>
-                    <th>Deposit</th>
-                    <th>Balance</th>
-                    <th>Due</th>
-                    <th>Status</th>
+                    <th>{tp('finance', 'colId')}</th>
+                    <th>{tp('finance', 'colClient')}</th>
+                    <th>{tp('finance', 'colTour')}</th>
+                    <th>{tp('finance', 'colInvoice')}</th>
+                    <th>{tp('finance', 'colDeposit')}</th>
+                    <th>{tp('finance', 'colBalance')}</th>
+                    <th>{tp('finance', 'colDue')}</th>
+                    <th>{tp('finance', 'colStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
                       <td colSpan={8}>
-                        <EmptyState title="Loading receivables…" size="compact" />
+                        <EmptyState title={tp('finance', 'loadingReceivables')} size="compact" />
                       </td>
                     </tr>
                   ) : arPage.length === 0 ? (
                     <tr>
                       <td colSpan={8}>
                         <EmptyState
-                          title="No receivables match filter"
+                          title={tp('finance', 'noReceivablesMatch')}
                           size="compact"
                         />
                       </td>
@@ -327,38 +329,38 @@ export default function FinancePage() {
         <>
           <div className="search-row">
             <select value={apFilter} onChange={(e) => setApFilter(e.target.value)}>
-              <option value="">All Statuses</option>
+              <option value="">{tp('finance', 'allStatuses')}</option>
               <option>Pending</option>
               <option>Overdue</option>
               <option>Paid</option>
             </select>
-            <span className="bdg bdg-r">${fmt(totalAP)} pending</span>
+            <span className="bdg bdg-r">{tpl('finance', 'pendingBadge', { amount: fmt(totalAP) })}</span>
           </div>
           <div className="card">
             <div className="card-body" style={{ padding: 0 }}>
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Supplier</th>
-                    <th>Description</th>
-                    <th>Category</th>
-                    <th>Amount</th>
-                    <th>Due</th>
-                    <th>Status</th>
+                    <th>{tp('finance', 'colId')}</th>
+                    <th>{tp('finance', 'colSupplier')}</th>
+                    <th>{tp('finance', 'colDescription')}</th>
+                    <th>{tp('finance', 'colCategory')}</th>
+                    <th>{tp('finance', 'colAmount')}</th>
+                    <th>{tp('finance', 'colDue')}</th>
+                    <th>{tp('finance', 'colStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
                       <td colSpan={7}>
-                        <EmptyState title="Loading payables…" size="compact" />
+                        <EmptyState title={tp('finance', 'loadingPayables')} size="compact" />
                       </td>
                     </tr>
                   ) : apPage.length === 0 ? (
                     <tr>
                       <td colSpan={7}>
-                        <EmptyState title="No payables match filter" size="compact" />
+                        <EmptyState title={tp('finance', 'noPayablesMatch')} size="compact" />
                       </td>
                     </tr>
                   ) : (

@@ -2,6 +2,7 @@
 
 import ProposalHotelRatesPanel from '@/components/tour-design/ProposalHotelRatesPanel';
 import ProposalLayoutPicker from '@/components/tour-design/ProposalLayoutPicker';
+import { useLanguage } from '@/hooks/useLanguage';
 import type { ProposalLayoutId } from '@/lib/proposals/proposal-layouts';
 import type { ProposalHotelRate } from '@/lib/proposals/proposal-types';
 
@@ -40,16 +41,18 @@ export default function ProposalExportSettings({
   onEditTemplate,
   canWrite = true,
 }: Props) {
+  const { tp } = useLanguage();
+
   return (
     <div className="td-export-rail">
       {!hasContent && (
         <div className="td-export-settings-banner">
-          Add experiences (Step 3), a package, or outline days before exporting a proposal.
+          {tp('tour-design', 'exportSettingsBanner')}
         </div>
       )}
 
       <section className="td-export-group">
-        <div className="td-export-group-hd">Layout</div>
+        <div className="td-export-group-hd">{tp('tour-design', 'exportLayoutGroup')}</div>
         <ProposalLayoutPicker
           value={layoutId}
           onChange={onLayoutIdChange}
@@ -58,9 +61,9 @@ export default function ProposalExportSettings({
       </section>
 
       <section className="td-export-group">
-        <div className="td-export-group-hd">Content</div>
+        <div className="td-export-group-hd">{tp('tour-design', 'exportContentGroup')}</div>
         <label className="lbl" style={{ display: 'block', marginBottom: 4 }}>
-          Special Notes (shown on proposal)
+          {tp('tour-design', 'exportSpecialNotes')}
         </label>
         <textarea
           rows={3}
@@ -75,20 +78,20 @@ export default function ProposalExportSettings({
       {clientType === 'b2b' && (
         <section className="td-export-group">
           <details className="td-export-details" open>
-            <summary className="td-export-group-hd td-export-details-sum">Hotel rates</summary>
+            <summary className="td-export-group-hd td-export-details-sum">{tp('tour-design', 'exportHotelRates')}</summary>
             <div className="td-export-details-body">
               <ProposalHotelRatesPanel
-                title="C. HOTELS — OPTION A (4★) — enter net rate per night"
+                title={tp('tour-design', 'exportHotelOptionA')}
                 rates={hotelRatesOptionA}
                 onChange={onHotelRatesAChange}
                 disabled={!canWrite}
               />
               <ProposalHotelRatesPanel
-                title="C. HOTELS — OPTION B (5★ Luxury) — enter hotel names & net rates"
+                title={tp('tour-design', 'exportHotelOptionB')}
                 rates={hotelRatesOptionB}
                 onChange={onHotelRatesBChange}
                 editableHotelName
-                emptyHint="Option B rows appear once Outline hotels are detected (same stays as Option A)."
+                emptyHint={tp('tour-design', 'exportHotelOptionBHint')}
                 disabled={!canWrite}
               />
             </div>
@@ -97,10 +100,10 @@ export default function ProposalExportSettings({
       )}
 
       <section className="td-export-group">
-        <div className="td-export-group-hd">Template</div>
+        <div className="td-export-group-hd">{tp('tour-design', 'exportTemplateGroup')}</div>
         <div className="td-export-template-row">
           <span className={`td-export-pill${companyTemplateActive ? ' is-ready' : ''}`}>
-            {companyTemplateActive ? 'Company template' : 'System defaults'}
+            {companyTemplateActive ? tp('tour-design', 'exportCompanyTemplate') : tp('tour-design', 'exportSystemDefaults')}
           </span>
           <button
             type="button"
@@ -108,13 +111,13 @@ export default function ProposalExportSettings({
             onClick={onEditTemplate}
             disabled={!hasContent || !canWrite}
           >
-            Edit Template{hasEdits ? ' •' : ''}
+            {tp('tour-design', 'exportEditTemplate')}{hasEdits ? ' •' : ''}
           </button>
         </div>
         <p className="td-export-template-note">
           {companyTemplateActive
-            ? 'A saved company template is active for this client type.'
-            : 'Using built-in system defaults. Customise copy and colours in Edit Template.'}
+            ? tp('tour-design', 'exportTemplateActiveNote')
+            : tp('tour-design', 'exportTemplateDefaultNote')}
         </p>
       </section>
     </div>

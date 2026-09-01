@@ -6,8 +6,10 @@ import { usePagePermission } from '@/hooks/usePagePermission';
 import { useTaxPage } from '@/hooks/useTaxPage';
 import EmptyState from '@/components/EmptyState';
 import { toast } from '@/lib/toast';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export default function TaxPage() {
+  const { tp, tpl, tc } = useLanguage();
   const { canWrite } = usePagePermission('tax');
   const [period, setPeriod] = useState('all');
   const { rows, allPeriods, loading, error, reload } = useTaxPage(period);
@@ -20,7 +22,7 @@ export default function TaxPage() {
   const calculateQuarter = () => {
     const q = sourceRows;
     if (!q.length) {
-      toast.warning('No tax data for selected period.');
+      toast.warning(tp('tax', 'noDataToast'));
       return;
     }
     const sum = q.reduce(
@@ -32,11 +34,11 @@ export default function TaxPage() {
       { rev: 0, vat_pay: 0, corp_tax: 0 },
     );
     toast.info(
-      `Tax Summary — ${period === 'all' ? 'All Periods' : period}\n\n` +
-        `Revenue: $${fmt(sum.rev)}\n` +
-        `VAT Payable: $${fmt(sum.vat_pay)}\n` +
-        `Corp Tax Est.: $${fmt(sum.corp_tax)}\n\n` +
-        `Total Tax Liability: $${fmt(sum.vat_pay + sum.corp_tax)}`,
+      `${tpl('tax', 'toastSummaryTitle', { period: period === 'all' ? tp('tax', 'allPeriods') : period })}\n\n` +
+        `${tpl('tax', 'toastRevenue', { amount: fmt(sum.rev) })}\n` +
+        `${tpl('tax', 'toastVatPayable', { amount: fmt(sum.vat_pay) })}\n` +
+        `${tpl('tax', 'toastCorpTax', { amount: fmt(sum.corp_tax) })}\n\n` +
+        `${tpl('tax', 'toastTotalLiability', { amount: fmt(sum.vat_pay + sum.corp_tax) })}`,
       6000,
     );
   };
@@ -47,7 +49,7 @@ export default function TaxPage() {
       credentials: 'same-origin',
     });
     if (!res.ok) {
-      toast.error('Could not export tax report.');
+      toast.error(tp('tax', 'exportError'));
       return;
     }
     const blob = await res.blob();
@@ -63,16 +65,16 @@ export default function TaxPage() {
     <div className="tax-page">
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-hd">
-          <span className="card-title">Tax Summary / Tổng hợp thuế 2026</span>
+          <span className="card-title">{tp('tax', 'summaryTitle')}</span>
         </div>
         <div className="card-body">
           {error && (
             <EmptyState
-              title="Could not load tax reports"
+              title={tp('tax', 'loadErrorTitle')}
               description={error}
               action={
                 <button type="button" className="btn btn-s" onClick={() => void reload()}>
-                  Retry
+                  {tc('retry')}
                 </button>
               }
               role="alert"
@@ -80,9 +82,9 @@ export default function TaxPage() {
           )}
           <div className="tax-controls">
             <div className="fg">
-              <label className="lbl">Period</label>
+              <label className="lbl">{tp('tax', 'period')}</label>
               <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-                <option value="all">All Periods</option>
+                <option value="all">{tp('tax', 'allPeriods')}</option>
                 {allPeriods.map((t) => (
                   <option key={t.id} value={t.period}>
                     {t.period}
@@ -91,11 +93,11 @@ export default function TaxPage() {
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">VAT Rate</label>
+              <label className="lbl">{tp('tax', 'vatRate')}</label>
               <input value="10%" readOnly />
             </div>
             <div className="fg">
-              <label className="lbl">Corporate Tax Rate</label>
+              <label className="lbl">{tp('tax', 'corpTaxRate')}</label>
               <input value="20%" readOnly />
             </div>
           </div>
@@ -105,39 +107,39 @@ export default function TaxPage() {
               type="button"
               onClick={calculateQuarter}
               disabled={!canWrite || loading}
-              title={!canWrite ? 'Read-only mode: calculation disabled' : undefined}
+              title={!canWrite ? tp('tax', 'readOnlyCalc') : undefined}
             >
-              📊 Calculate Quarter
+              {tp('tax', 'calculateQuarter')}
             </button>
             <button
               className="btn btn-s btn-sm"
               type="button"
               onClick={exportReport}
               disabled={!canWrite || loading}
-              title={!canWrite ? 'Read-only mode: export disabled' : undefined}
+              title={!canWrite ? tp('tax', 'readOnlyExport') : undefined}
             >
-              ⬇ Export Tax Report
+              {tp('tax', 'exportReport')}
             </button>
           </div>
           <div className="card" style={{ marginTop: 0 }}>
             <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
               {loading ? (
-                <EmptyState title="Loading tax reports…" size="compact" />
+                <EmptyState title={tp('tax', 'loadingReports')} size="compact" />
               ) : rows.length === 0 ? (
-                <EmptyState title="No tax data for this period" size="compact" />
+                <EmptyState title={tp('tax', 'noDataPeriod')} size="compact" />
               ) : (
                 <table className="tbl tax-tbl">
                   <thead>
                     <tr>
-                      <th>Tax ID</th>
-                      <th>Period</th>
-                      <th>Revenue before Tax</th>
-                      <th>Output VAT (10%)</th>
-                      <th>Total Expenses</th>
-                      <th>Input VAT</th>
-                      <th>VAT Payable</th>
-                      <th>Profit before Tax</th>
-                      <th>Corp Tax Est.</th>
+                      <th>{tp('tax', 'colTaxId')}</th>
+                      <th>{tp('tax', 'colPeriod')}</th>
+                      <th>{tp('tax', 'colRevenueBeforeTax')}</th>
+                      <th>{tp('tax', 'colOutputVat')}</th>
+                      <th>{tp('tax', 'colTotalExpenses')}</th>
+                      <th>{tp('tax', 'colInputVat')}</th>
+                      <th>{tp('tax', 'colVatPayable')}</th>
+                      <th>{tp('tax', 'colProfitBeforeTax')}</th>
+                      <th>{tp('tax', 'colCorpTaxEst')}</th>
                     </tr>
                   </thead>
                   <tbody>

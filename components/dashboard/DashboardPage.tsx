@@ -17,10 +17,12 @@ import { TIER_BG, TIER_COLORS } from '@/lib/core/page-helpers';
 import EmptyState from '@/components/EmptyState';
 import { ForecastBreakdown } from '@/components/dashboard/DashboardForecast';
 import { useDashboardPage } from '@/hooks/useDashboardPage';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 export default function DashboardPage() {
+  const { tp, tpl } = useLanguage();
   const [typeF, setTypeF] = useState<'' | 'b2b' | 'b2c'>('');
   const [marketF, setMarketF] = useState('');
   const [currency, setCurrency] = useState<'USD' | 'EUR' | 'VND'>('USD');
@@ -34,7 +36,10 @@ export default function DashboardPage() {
   const rate = FX[currency];
   const metrics = data?.metrics;
 
-  const filterLabel = [typeF && (typeF === 'b2b' ? 'B2B Agents' : 'B2C Direct'), marketF]
+  const filterLabel = [
+    typeF && (typeF === 'b2b' ? tp('dashboard', 'filterB2bLabel') : tp('dashboard', 'filterB2cLabel')),
+    marketF,
+  ]
     .filter(Boolean)
     .join(' · ');
 
@@ -51,12 +56,12 @@ export default function DashboardPage() {
     <div>
       <div className="dash-filter-bar">
         <select value={typeF} onChange={(e) => setTypeF(e.target.value as '' | 'b2b' | 'b2c')}>
-          <option value="">All Clients (B2B + B2C)</option>
-          <option value="b2b">B2B — Agents Only</option>
-          <option value="b2c">B2C — Direct Only</option>
+          <option value="">{tp('dashboard', 'filterAllClients')}</option>
+          <option value="b2b">{tp('dashboard', 'filterB2bAgents')}</option>
+          <option value="b2c">{tp('dashboard', 'filterB2cDirect')}</option>
         </select>
         <select value={marketF} onChange={(e) => setMarketF(e.target.value)}>
-          <option value="">All Markets</option>
+          <option value="">{tp('dashboard', 'filterAllMarkets')}</option>
           <option>USA</option>
           <option>Australia</option>
           <option>France</option>
@@ -70,7 +75,7 @@ export default function DashboardPage() {
         </select>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11.5, color: 'var(--m)' }}>
-          {filterLabel ? `Filtering: ${filterLabel}` : 'Showing all data'}
+          {filterLabel ? tpl('dashboard', 'filtering', { label: filterLabel }) : tp('dashboard', 'showingAllData')}
         </span>
       </div>
 
@@ -78,14 +83,14 @@ export default function DashboardPage() {
         <div className="card" style={{ marginBottom: 14, padding: 18 }}>
           <p style={{ color: 'var(--m)', margin: 0 }}>{error}</p>
           <button type="button" className="btn btn-s btn-sm" style={{ marginTop: 10 }} onClick={() => void reload()}>
-            Try again
+            {tp('dashboard', 'tryAgain')}
           </button>
         </div>
       ) : null}
 
       {loading && !metrics ? (
         <div className="card" style={{ marginBottom: 14, padding: 24, textAlign: 'center', color: 'var(--m)' }}>
-          Loading dashboard…
+          {tp('dashboard', 'loadingDashboard')}
         </div>
       ) : null}
 
@@ -95,7 +100,7 @@ export default function DashboardPage() {
         <div className="dash-kpi-card">
           <div className="dash-kpi-hd" style={{ background: 'var(--blue-l)' }}>
             <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--blue)' }}>
-              Active Quotes
+              {tp('dashboard', 'activeQuotes')}
             </span>
           </div>
           <div className="dash-kpi-body">
@@ -104,19 +109,19 @@ export default function DashboardPage() {
                 <div className="dash-kpi-val" style={{ fontSize: 22, color: 'var(--blue)' }}>
                   {metrics.drafted}
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--m)', marginTop: 2 }}>Drafted</div>
+                <div style={{ fontSize: 10, color: 'var(--m)', marginTop: 2 }}>{tp('dashboard', 'drafted')}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div className="dash-kpi-val" style={{ fontSize: 22, color: 'var(--amb)' }}>
                   {metrics.sent}
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--m)', marginTop: 2 }}>Sent</div>
+                <div style={{ fontSize: 10, color: 'var(--m)', marginTop: 2 }}>{tp('dashboard', 'sent')}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div className="dash-kpi-val" style={{ fontSize: 22, color: 'var(--pur)' }}>
                   {metrics.pending}
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--m)', marginTop: 2 }}>Negotiation</div>
+                <div style={{ fontSize: 10, color: 'var(--m)', marginTop: 2 }}>{tp('dashboard', 'negotiation')}</div>
               </div>
             </div>
           </div>
@@ -125,7 +130,7 @@ export default function DashboardPage() {
         <div className="dash-kpi-card">
           <div className="dash-kpi-hd" style={{ background: 'var(--gl)' }}>
             <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--gd)' }}>
-              Confirmed Bookings
+              {tp('dashboard', 'confirmedBookings')}
             </span>
           </div>
           <div className="dash-kpi-body" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -133,10 +138,10 @@ export default function DashboardPage() {
               {metrics.confirmedCount}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11.5, color: 'var(--m)' }}>{metrics.totalPax} pax secured</div>
+              <div style={{ fontSize: 11.5, color: 'var(--m)' }}>{tpl('dashboard', 'paxSecured', { count: metrics.totalPax })}</div>
               <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 3 }}>
                 {sym}
-                {fmt(Math.round(metrics.totalVal * rate))} confirmed value
+                {fmt(Math.round(metrics.totalVal * rate))} {tp('dashboard', 'confirmedValue')}
               </div>
             </div>
           </div>
@@ -145,7 +150,7 @@ export default function DashboardPage() {
         <div className="dash-kpi-card">
           <div className="dash-kpi-hd" style={{ background: 'var(--gold-l)' }}>
             <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#92711d' }}>
-              Realized Revenue
+              {tp('dashboard', 'realizedRevenue')}
             </span>
           </div>
           <div className="dash-kpi-body">
@@ -154,8 +159,7 @@ export default function DashboardPage() {
               {fmt(Math.round(metrics.realized * rate))}
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--m)', marginTop: 3 }}>
-              {metrics.completedCount} completed tours ·{' '}
-              {metrics.fullyPaidBookingCount} fully paid
+              {tpl('dashboard', 'completedToursLine', { count: metrics.completedCount, paid: metrics.fullyPaidBookingCount })}
             </div>
           </div>
         </div>
@@ -163,7 +167,7 @@ export default function DashboardPage() {
         <div className="dash-kpi-card">
           <div className="dash-kpi-hd" style={{ background: '#F3E8FF' }}>
             <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--pur)' }}>
-              Weighted Forecast
+              {tp('dashboard', 'weightedForecast')}
             </span>
           </div>
           <div className="dash-kpi-body">
@@ -171,7 +175,7 @@ export default function DashboardPage() {
               {sym}
               {fmt(Math.round(metrics.weightedForecast * rate))}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 3 }}>Probability-weighted pipeline</div>
+            <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 3 }}>{tp('dashboard', 'probabilityWeighted')}</div>
           </div>
         </div>
       </div>
@@ -185,10 +189,10 @@ export default function DashboardPage() {
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="card-body" style={{ padding: '14px 18px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>YTD Revenue vs. Annual Target</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>{tp('dashboard', 'ytdRevenueTarget')}</span>
             <span style={{ fontSize: 11, color: 'var(--m)' }}>
               {sym}
-              {fmt(Math.round(metrics.YTD_TARGET * rate))} target
+              {fmt(Math.round(metrics.YTD_TARGET * rate))} {tp('dashboard', 'target')}
             </span>
           </div>
           <div style={{ background: 'var(--bg)', borderRadius: 6, height: 22, overflow: 'hidden', marginBottom: 7, border: '1px solid var(--b)' }}>
@@ -216,14 +220,14 @@ export default function DashboardPage() {
                 {sym}
                 {fmt(Math.round(metrics.realized * rate))}
               </b>{' '}
-              realized
+              {tp('dashboard', 'realized')}
             </span>
             <span style={{ color: 'var(--m)' }}>
               <b>
                 {sym}
                 {fmt(Math.round(Math.max(0, metrics.YTD_TARGET - metrics.realized) * rate))}
               </b>{' '}
-              remaining
+              {tp('dashboard', 'remaining')}
             </span>
           </div>
         </div>
@@ -233,7 +237,7 @@ export default function DashboardPage() {
         <div className="dash-grid-left">
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Revenue by Market</span>
+              <span className="card-title">{tp('dashboard', 'revenueByMarket')}</span>
             </div>
             <div className="card-body">
               {metrics.hasMarketData ? (
@@ -243,7 +247,7 @@ export default function DashboardPage() {
                   labels: mktLabels,
                   datasets: [
                     {
-                      label: `Revenue ${sym}`,
+                      label: tpl('dashboard', 'chartRevenue', { sym }),
                       data: mktVals,
                       backgroundColor: ['#2E7D52', '#5AA87A', '#C9A84C', '#1565C0', '#6B21A8', '#C0392B'],
                       borderRadius: 5,
@@ -271,7 +275,7 @@ export default function DashboardPage() {
               </div>
               ) : (
                 <div style={{ padding: 24, textAlign: 'center', color: 'var(--m)', fontSize: 13 }}>
-                  Not enough market data — add leads with customer countries to see revenue by market.
+                  {tp('dashboard', 'notEnoughMarketData')}
                 </div>
               )}
             </div>
@@ -279,9 +283,9 @@ export default function DashboardPage() {
 
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Monthly Revenue Trend</span>
+              <span className="card-title">{tp('dashboard', 'monthlyRevenueTrend')}</span>
               <span className="bdg bdg-g" style={{ fontSize: 10 }}>
-                All time · Realized vs Forecast
+                {tp('dashboard', 'allTimeRealizedVsForecast')}
               </span>
             </div>
             <div className="card-body">
@@ -291,13 +295,13 @@ export default function DashboardPage() {
                   labels: [...metrics.MONTHS],
                   datasets: [
                     {
-                      label: 'Realized Revenue',
+                      label: tp('dashboard', 'chartRealizedRevenue'),
                       data: metrics.realizedByMonth.map((v) => Math.round(v * rate)),
                       backgroundColor: '#2E7D52',
                       borderRadius: 4,
                     },
                     {
-                      label: 'Pipeline Forecast',
+                      label: tp('dashboard', 'chartPipelineForecast'),
                       data: metrics.forecastByMonth.map((v) => Math.round(v * rate)),
                       backgroundColor: '#FDE68A',
                       borderColor: '#D97706',
@@ -327,9 +331,9 @@ export default function DashboardPage() {
 
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Tours per Month</span>
+              <span className="card-title">{tp('dashboard', 'toursPerMonth')}</span>
               <span className="bdg bdg-b" style={{ fontSize: 10 }}>
-                All time · Confirmed · On Tour · Completed
+                {tp('dashboard', 'allTimeToursBadge')}
               </span>
             </div>
             <div className="card-body">
@@ -340,7 +344,7 @@ export default function DashboardPage() {
                       labels: [...metrics.MONTHS],
                       datasets: [
                         {
-                          label: 'Tours',
+                          label: tp('dashboard', 'chartTours'),
                           data: metrics.toursByMonth,
                           backgroundColor: '#1565C0',
                           borderRadius: 4,
@@ -354,7 +358,10 @@ export default function DashboardPage() {
                         legend: { display: false },
                         tooltip: {
                           callbacks: {
-                            label: (ctx) => ` ${ctx.parsed.y ?? 0} tour${(ctx.parsed.y ?? 0) !== 1 ? 's' : ''}`,
+                            label: (ctx) => {
+                              const count = ctx.parsed.y ?? 0;
+                              return ` ${tpl('dashboard', count !== 1 ? 'tourCountPlural' : 'tourCount', { count })}`;
+                            },
                           },
                         },
                       },
@@ -374,8 +381,8 @@ export default function DashboardPage() {
                   className="crm-empty-state--flush"
                   size="compact"
                   variant="leads"
-                  title="No scheduled tours yet"
-                  description="Confirm leads with travel months to see tours per month."
+                  title={tp('dashboard', 'noScheduledTours')}
+                  description={tp('dashboard', 'noScheduledToursDesc')}
                 />
               )}
             </div>
@@ -383,7 +390,7 @@ export default function DashboardPage() {
 
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Pipeline Conversion Funnel</span>
+              <span className="card-title">{tp('dashboard', 'pipelineConversionFunnel')}</span>
             </div>
             <div className="card-body">
               <div className="chart-wrap">
@@ -392,7 +399,7 @@ export default function DashboardPage() {
                   labels: metrics.stageNames,
                   datasets: [
                     {
-                      label: 'Leads',
+                      label: tp('dashboard', 'chartLeads'),
                       data: metrics.stageCounts,
                       backgroundColor: '#2E7D52',
                       borderRadius: 6,
@@ -411,9 +418,9 @@ export default function DashboardPage() {
                           const count = ctx.parsed.x ?? 0;
                           const idx = ctx.dataIndex;
                           const pct = metrics.conversionPct[idx];
-                          const base = `${count} lead${count !== 1 ? 's' : ''}`;
+                          const base = tpl('dashboard', count !== 1 ? 'leadCountPlural' : 'leadCount', { count });
                           if (pct === null) return ` ${base}`;
-                          return ` ${base} · ${pct}% from previous stage`;
+                          return ` ${tpl('dashboard', 'fromPreviousStage', { base, pct })}`;
                         },
                       },
                     },
@@ -423,7 +430,7 @@ export default function DashboardPage() {
               />
               </div>
               <p style={{ fontSize: 11, color: 'var(--m)', marginTop: 10, marginBottom: 0 }}>
-                Conversion % = current stage count ÷ previous stage count
+                {tp('dashboard', 'conversionNote')}
               </p>
             </div>
           </div>
@@ -432,7 +439,7 @@ export default function DashboardPage() {
         <div className="dash-grid-right">
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Pipeline by Stage</span>
+              <span className="card-title">{tp('dashboard', 'pipelineByStage')}</span>
             </div>
             <div className="card-body" style={{ padding: 12 }}>
               {metrics.stageNames.map((s, i) => (
@@ -461,12 +468,12 @@ export default function DashboardPage() {
 
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Top Tours YTD</span>
+              <span className="card-title">{tp('dashboard', 'topToursYtd')}</span>
             </div>
             <div className="card-body" style={{ padding: 12 }}>
-              <div style={{ fontSize: 10, color: 'var(--m)', marginBottom: 8 }}>By revenue</div>
+              <div style={{ fontSize: 10, color: 'var(--m)', marginBottom: 8 }}>{tp('dashboard', 'byRevenue')}</div>
               {metrics.topTours.length === 0 ? (
-                <div style={{ color: 'var(--m)', fontSize: 12 }}>No tour data yet</div>
+                <div style={{ color: 'var(--m)', fontSize: 12 }}>{tp('dashboard', 'noTourData')}</div>
               ) : (
                 metrics.topTours.map(([tour, val]) => (
                   <div key={tour} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
@@ -483,17 +490,17 @@ export default function DashboardPage() {
 
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">B2B vs B2C Split</span>
+              <span className="card-title">{tp('dashboard', 'b2bVsB2cSplit')}</span>
             </div>
             <div className="card-body" style={{ padding: 12 }}>
               <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
                 <div style={{ flex: 1, textAlign: 'center', padding: 12, background: 'var(--pur-l)', borderRadius: 8 }}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--pur)' }}>{metrics.b2b}</div>
-                  <div style={{ color: 'var(--m)' }}>B2B leads</div>
+                  <div style={{ color: 'var(--m)' }}>{tp('dashboard', 'b2bLeads')}</div>
                 </div>
                 <div style={{ flex: 1, textAlign: 'center', padding: 12, background: 'var(--blue-l)', borderRadius: 8 }}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--blue)' }}>{metrics.b2c}</div>
-                  <div style={{ color: 'var(--m)' }}>B2C leads</div>
+                  <div style={{ color: 'var(--m)' }}>{tp('dashboard', 'b2cLeads')}</div>
                 </div>
               </div>
             </div>
@@ -501,14 +508,14 @@ export default function DashboardPage() {
 
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">🤝 B2B Agent Pipeline</span>
+              <span className="card-title">{tp('dashboard', 'b2bAgentPipeline')}</span>
               <Link href="/agents" style={{ fontSize: 11, color: 'var(--g)', textDecoration: 'none' }}>
-                View all →
+                {tp('dashboard', 'viewAll')}
               </Link>
             </div>
             <div className="card-body" style={{ padding: 12 }}>
               {!(data?.agentPipeline.length) ? (
-                <div style={{ color: 'var(--m)', fontSize: 13 }}>No agent pipeline data.</div>
+                <div style={{ color: 'var(--m)', fontSize: 13 }}>{tp('dashboard', 'noAgentPipeline')}</div>
               ) : (
                 <>
                   {data.agentPipeline.map((r) => {
@@ -524,7 +531,7 @@ export default function DashboardPage() {
                             {r.name}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--m)' }}>
-                            {r.leadCount} lead{r.leadCount !== 1 ? 's' : ''} · {r.commissionPct}% comm
+                            {tpl('dashboard', r.leadCount !== 1 ? 'agentLeadsCommPlural' : 'agentLeadsComm', { count: r.leadCount, pct: r.commissionPct })}
                           </div>
                         </div>
                         <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -536,7 +543,7 @@ export default function DashboardPage() {
                   })}
                   {(data.totalEstCommission ?? 0) > 0 && (
                     <div className="dash-agent-total">
-                      <span style={{ color: 'var(--m)' }}>Total Est. Commission</span>
+                      <span style={{ color: 'var(--m)' }}>{tp('dashboard', 'totalEstCommission')}</span>
                       <span style={{ fontWeight: 700, color: 'var(--gold)' }}>
                         ${fmt(data.totalEstCommission)}
                       </span>
@@ -549,9 +556,9 @@ export default function DashboardPage() {
 
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">⭐ NPS & Satisfaction</span>
+              <span className="card-title">{tp('dashboard', 'npsSatisfaction')}</span>
               <Link href="/posttour" style={{ fontSize: 11, color: 'var(--g)', textDecoration: 'none' }}>
-                View all feedback →
+                {tp('dashboard', 'viewAllFeedback')}
               </Link>
             </div>
             <div className="card-body" style={{ padding: 12 }}>
@@ -560,10 +567,10 @@ export default function DashboardPage() {
                   <div style={{ fontSize: 32, fontWeight: 700, fontFamily: "'DM Serif Display',Georgia,serif", color: 'var(--g)' }}>
                     {metrics.avgNps}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--m)' }}>{metrics.npsScores.length} surveys</div>
+                  <div style={{ fontSize: 11, color: 'var(--m)' }}>{tpl('dashboard', 'surveys', { count: metrics.npsScores.length })}</div>
                 </div>
               ) : (
-                <div style={{ color: 'var(--m)', fontSize: 12 }}>No feedback surveys yet</div>
+                <div style={{ color: 'var(--m)', fontSize: 12 }}>{tp('dashboard', 'noFeedbackSurveys')}</div>
               )}
             </div>
           </div>

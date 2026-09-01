@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { STAGE_COLORS, fmt } from '@/lib/constants';
 import type { DashboardForecastDeal } from '@/lib/dashboard/dashboard-types';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type Props = {
   deals: DashboardForecastDeal[];
@@ -15,17 +16,19 @@ export function ForecastBreakdown({
   allActiveValue,
   allActiveWeighted,
 }: Props) {
+  const { tp } = useLanguage();
+
   if (deals.length < 2) {
     return (
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="card-hd">
-          <span className="card-title">💼 Pipeline Forecast Breakdown</span>
+          <span className="card-title">{tp('dashboard', 'forecastTitle')}</span>
         </div>
         <div className="card-body" style={{ padding: 18, textAlign: 'center', color: 'var(--m)', fontSize: 13 }}>
-          Add pipeline deals in the Sales section to see the forecast breakdown.
+          {tp('dashboard', 'forecastEmpty')}
           <br />
           <Link href="/sales" className="btn btn-s btn-sm" style={{ marginTop: 10, display: 'inline-block' }}>
-            → Go to Pipeline
+            {tp('dashboard', 'goToPipeline')}
           </Link>
         </div>
       </div>
@@ -39,8 +42,8 @@ export function ForecastBreakdown({
     <div className="card" style={{ marginBottom: 14 }}>
       <div className="card-hd" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <span className="card-title">💼 Pipeline Forecast Breakdown</span>
-          <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 2 }}>Top active deals · Sorted by probability-weighted value</div>
+          <span className="card-title">{tp('dashboard', 'forecastTitle')}</span>
+          <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 2 }}>{tp('dashboard', 'forecastSubtitle')}</div>
         </div>
       </div>
       <div className="card-body" style={{ padding: 0 }}>
@@ -48,13 +51,13 @@ export function ForecastBreakdown({
           <table className="forecast-tbl">
             <thead>
               <tr>
-                <th>Client</th>
-                <th>Tour</th>
-                <th style={{ textAlign: 'right' }}>Tour Value</th>
-                <th>Probability</th>
-                <th style={{ textAlign: 'right' }}>Weighted Value</th>
-                <th>Stage</th>
-                <th>Travel Month</th>
+                <th>{tp('dashboard', 'colClient')}</th>
+                <th>{tp('dashboard', 'colTour')}</th>
+                <th style={{ textAlign: 'right' }}>{tp('dashboard', 'colTourValue')}</th>
+                <th>{tp('dashboard', 'colProbability')}</th>
+                <th style={{ textAlign: 'right' }}>{tp('dashboard', 'colWeightedValue')}</th>
+                <th>{tp('dashboard', 'colStage')}</th>
+                <th>{tp('dashboard', 'colTravelMonth')}</th>
               </tr>
             </thead>
             <tbody>
@@ -86,7 +89,7 @@ export function ForecastBreakdown({
             <tfoot>
               <tr>
                 <td colSpan={2} style={{ fontWeight: 700 }}>
-                  Top 12 subtotal
+                  {tp('dashboard', 'top12Subtotal')}
                 </td>
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>${fmt(Math.round(totalValue))}</td>
                 <td>—</td>
@@ -97,7 +100,7 @@ export function ForecastBreakdown({
               </tr>
               <tr>
                 <td colSpan={2} style={{ fontWeight: 600, color: 'var(--m)', fontSize: 12 }}>
-                  All active pipeline
+                  {tp('dashboard', 'allActivePipeline')}
                 </td>
                 <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--m)', fontSize: 12 }}>
                   ${fmt(Math.round(allActiveValue))}

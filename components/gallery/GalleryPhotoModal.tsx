@@ -120,7 +120,15 @@ export default function GalleryPhotoModal({
     setCustomTag('');
   }, [customTag, tags]);
 
-  const { language } = useLanguage();
+  const { tp, tpl, tc, language } = useLanguage();
+
+  const REGION_I18N: Record<string, 'regionNorth' | 'regionCentral' | 'regionSouth' | 'regionPeople' | 'regionServices'> = {
+    north: 'regionNorth',
+    central: 'regionCentral',
+    south: 'regionSouth',
+    people: 'regionPeople',
+    services: 'regionServices',
+  };
   const baseline = useMemo(() => initialForm(mode, initial, defaultRegion), [formKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = useFormDirty(
     open,
@@ -166,9 +174,11 @@ export default function GalleryPhotoModal({
       <div className="modal phlib-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green phlib-modal-hd">
           <div>
-            <div className="phlib-modal-title">{mode === 'edit' ? 'Edit photo' : 'Upload to library'}</div>
+            <div className="phlib-modal-title">
+              {mode === 'edit' ? tp('gallery', 'editPhoto') : tp('gallery', 'uploadToLibrary')}
+            </div>
             <div className="phlib-modal-sub">
-              {mode === 'edit' ? initial?.id : 'Server Sharp resizes & compresses to WebP (any file size)'}
+              {mode === 'edit' ? initial?.id : tp('gallery', 'uploadSubtitle')}
             </div>
           </div>
           <button type="button" className="modal-close-btn" onClick={() => void requestClose()} disabled={saving}>
@@ -179,7 +189,10 @@ export default function GalleryPhotoModal({
         <form className="phlib-modal-bd" onSubmit={handleSubmit}>
           <div className="phlib-modal-layout">
             <div className="phlib-modal-col-media">
-              <ModalSection title="Image" hint={mode === 'add' ? 'JPEG, PNG, or WebP · large files upload in chunks; Sharp compresses in an isolated worker' : undefined}>
+              <ModalSection
+                title={tp('gallery', 'sectionImage')}
+                hint={mode === 'add' ? tp('gallery', 'sectionImageHintAdd') : undefined}
+              >
                 {mode === 'edit' && (
                   <label className="phlib-check-row">
                     <input
@@ -190,13 +203,13 @@ export default function GalleryPhotoModal({
                         if (!e.target.checked) setFile(null);
                       }}
                     />
-                    Replace image file
+                    {tp('gallery', 'replaceImageFile')}
                   </label>
                 )}
                 {(mode === 'add' || replaceImage) && (
                   <GalleryUploadZone
-                    label={mode === 'add' ? 'Drop photo here' : 'New image'}
-                    sublabel="or click to browse"
+                    label={mode === 'add' ? tp('gallery', 'dropPhotoHere') : tp('gallery', 'newImage')}
+                    sublabel={tp('gallery', 'orClickToBrowse')}
                     previewUrl={previewUrl || undefined}
                     file={file}
                     disabled={saving}
@@ -214,7 +227,7 @@ export default function GalleryPhotoModal({
                       disabled={saving}
                       onClick={() => multiRef.current?.click()}
                     >
-                      Add more files
+                      {tp('gallery', 'addMoreFiles')}
                     </button>
                     <input
                       ref={multiRef}
@@ -231,43 +244,48 @@ export default function GalleryPhotoModal({
                       }}
                     />
                     {extraFiles.length > 0 && (
-                      <span className="phlib-multi-count">+{extraFiles.length} more</span>
+                      <span className="phlib-multi-count">
+                        {tpl('gallery', 'moreFilesCount', { count: extraFiles.length })}
+                      </span>
                     )}
                   </div>
                 )}
                 {mode === 'edit' && initial?.displayBytes != null && (
                   <p className="phlib-size-hint">
-                    Stored size: {photoSizeLabel(initial)} ({formatBytes(initial.displayBytes)})
+                    {tpl('gallery', 'storedSize', {
+                      label: photoSizeLabel(initial),
+                      size: formatBytes(initial.displayBytes),
+                    })}
                   </p>
                 )}
               </ModalSection>
             </div>
 
             <div className="phlib-modal-col-meta">
-              <ModalSection title="Details">
+              <ModalSection title={tp('gallery', 'sectionDetails')}>
                 <div className="fg">
-                  <label className="lbl">Caption</label>
+                  <label className="lbl">{tp('gallery', 'captionLabel')}</label>
                   <input
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
-                    placeholder="Short description"
+                    placeholder={tp('gallery', 'captionPlaceholder')}
                     disabled={saving}
                     required={mode === 'edit' || Boolean(file)}
                   />
                 </div>
                 <div className="fg">
-                  <label className="lbl">Region</label>
+                  <label className="lbl">{tp('gallery', 'regionLabel')}</label>
                   <select value={region} onChange={(e) => setRegion(e.target.value)} disabled={saving}>
                     {REGION_OPTIONS.map((r) => (
                       <option key={r.id} value={r.id}>
-                        {r.label}
+                        {tp('gallery', REGION_I18N[r.id] ?? 'regionNorth')}
                       </option>
                     ))}
                   </select>
                 </div>
               </ModalSection>
 
-              <ModalSection title="Tags">
+              <ModalSection title={tp('gallery', 'sectionTags')}>
                 <GalleryTagSelector
                   selected={tags}
                   onChange={setTags}
@@ -302,10 +320,10 @@ export default function GalleryPhotoModal({
             )}
             <div className="phlib-modal-ft-right">
               <button type="button" className="btn btn-o" onClick={() => void requestClose()} disabled={saving}>
-                Cancel
+                {tc('cancel')}
               </button>
               <button type="submit" className="btn btn-g" disabled={saving}>
-                {saving ? 'Saving…' : mode === 'edit' ? 'Save' : 'Upload'}
+                {saving ? tp('gallery', 'saving') : mode === 'edit' ? tc('save') : tp('gallery', 'upload')}
               </button>
             </div>
           </div>

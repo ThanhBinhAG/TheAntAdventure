@@ -10,6 +10,7 @@ import StorageImage from '@/components/gallery/StorageImage';
 import { useStore } from '@/hooks/useStore';
 import type { GalleryPhoto } from '@/lib/tour-design/tour-design-types';
 import type { Product } from '@/lib/types';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface ProductCardProps {
   product: Product;
@@ -26,6 +27,7 @@ export default function ProductCard({
   onOpenDetail,
   onPick,
 }: ProductCardProps) {
+  const { tp } = useLanguage();
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
   const storeProduct = useStore((s) => s.products.find((x) => x.code === p.code));
   const product = useMemo(() => (storeProduct ? { ...p, ...storeProduct } : p), [p, storeProduct]);
@@ -96,13 +98,13 @@ export default function ProductCard({
           {REG_LABELS[p.region as keyof typeof REG_LABELS] || p.region}
         </span>
         {!photoStatus.complete && (
-          <span className="tp-card-photo-badge" title="Featured photos (need 2 for catalog)">
+          <span className="tp-card-photo-badge" title={tp('products', 'photosBadgeTitle')}>
             {photoStatus.linked}/{photoStatus.needed}
           </span>
         )}
         {pStatus && pStatus !== 'complete' && (
-          <span className={`tp-card-pricing-badge tp-card-pricing-badge--${pStatus}`} title="Pricing status">
-            {pStatus === 'missing' ? 'No $' : 'Partial'}
+          <span className={`tp-card-pricing-badge tp-card-pricing-badge--${pStatus}`} title={tp('products', 'pricingStatusTitle')}>
+            {pStatus === 'missing' ? tp('products', 'pricingNoPrice') : tp('products', 'pricingPartialBadge')}
           </span>
         )}
       </div>

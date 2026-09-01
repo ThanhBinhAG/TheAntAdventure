@@ -18,6 +18,7 @@ import {
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useLanguage } from '@/hooks/useLanguage';
 import { fmt } from '@/lib/constants';
 import {
   buildItinerary,
@@ -70,6 +71,7 @@ export default function SelectedExperiencesPanel({
   onPatchOverride,
   canWrite = true,
 }: Props) {
+  const { tp, tpl } = useLanguage();
   const [aiOpen, setAiOpen] = useState(false);
   const [aiResult, setAiResult] = useState('');
 
@@ -137,17 +139,19 @@ export default function SelectedExperiencesPanel({
     return (
       <div className="card td-exp-right-card">
         <div className="card-hd">
-          <span className="card-title">✓ Tour Selected (0) — 0D</span>
+          <span className="card-title">
+            ✓ {tpl('tour-design', 'expSelectedTitle', { count: 0, days: 0 })}
+          </span>
           <button className="btn btn-pu btn-sm" type="button" onClick={aiRecommend} disabled={!canWrite}>
-            ✦ AI Recommend
+            ✦ {tp('tour-design', 'expAiRecommend')}
           </button>
         </div>
         <EmptyState
           className="crm-empty-state--flush"
           size="compact"
           variant="products"
-          title="No experiences selected"
-          description="Click experiences on the left to build your tailor-made tour. A day-by-day draft will appear here."
+          title={tp('tour-design', 'expSelectedEmptyTitle')}
+          description={tp('tour-design', 'expSelectedEmptyDesc')}
         />
       </div>
     );
@@ -158,21 +162,21 @@ export default function SelectedExperiencesPanel({
       <div className="card-hd">
         <div>
           <span className="card-title">
-            ✓ Tour Selected ({selectedProducts.length}) — {totalD}D
+            ✓ {tpl('tour-design', 'expSelectedTitle', { count: selectedProducts.length, days: totalD })}
           </span>
           <div className="td-sel-meta">
-            {selectedProducts.length} exp · {totalD}D · ${fmt(totalSell)}/pax
+            {tpl('tour-design', 'expSelectedMeta', { count: selectedProducts.length, days: totalD, price: fmt(totalSell) })}
           </div>
         </div>
         <button className="btn btn-pu btn-sm" type="button" onClick={aiRecommend} disabled={!canWrite}>
-          ✦ AI Recommend
+          ✦ {tp('tour-design', 'expAiRecommend')}
         </button>
       </div>
 
       {aiOpen && (
         <div className="td-ai-panel" style={{ borderRadius: 0, borderTop: '1.5px solid #d8b4fe', margin: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--pur)' }}>✦ AI Experience Recommendations</span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--pur)' }}>✦ {tp('tour-design', 'expAiRecommendTitle')}</span>
             <button type="button" onClick={() => setAiOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--m)' }}>
               ×
             </button>
@@ -182,7 +186,7 @@ export default function SelectedExperiencesPanel({
       )}
 
       <div className="td-sel-body">
-        <div className="td-section-lbl">Selected Experiences</div>
+        <div className="td-section-lbl">{tp('tour-design', 'expSelectedExperiences')}</div>
         {selectedProducts.map((p, i) => (
           <div key={p.code} className="td-sel-chip">
             <div className="td-sel-chip-num">{i + 1}</div>
@@ -199,7 +203,7 @@ export default function SelectedExperiencesPanel({
 
         {addons.length > 0 && (
           <>
-            <div className="td-section-lbl td-section-divider">Tour Services / Add-ons</div>
+            <div className="td-section-lbl td-section-divider">{tp('tour-design', 'expAddons')}</div>
             {addons.map((item) => (
               <AddonCard
                 key={item.code}
@@ -216,7 +220,7 @@ export default function SelectedExperiencesPanel({
           <div className="td-section-lbl td-section-divider">
             {formatTravelStartTitle(brief.startDate, brief.travelMonth)}
             <span style={{ fontSize: 9.5, fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4, color: 'var(--m)' }}>
-              (drag · edit day / pace)
+              {tp('tour-design', 'expDragHint')}
             </span>
           </div>
         )}
@@ -265,6 +269,7 @@ function SortableTourCard({
   onPatchOverride: (code: string, patch: OverridePatch) => void;
   disabled?: boolean;
 }) {
+  const { tp } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.code,
   });
@@ -279,7 +284,7 @@ function SortableTourCard({
     <div ref={setNodeRef} style={style} className={`td-sortable-card${isDragging ? ' dragging' : ''}`}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
         {!disabled ? (
-          <button type="button" className="td-drag-handle" aria-label="Drag to reorder" {...attributes} {...listeners}>
+          <button type="button" className="td-drag-handle" aria-label={tp('tour-design', 'expDragAria')} {...attributes} {...listeners}>
             ⋮⋮
           </button>
         ) : (
@@ -410,6 +415,7 @@ function DayScheduleEditor({
   onPatchOverride: (code: string, patch: OverridePatch) => void;
   disabled?: boolean;
 }) {
+  const { tp, tpl } = useLanguage();
   const [editing, setEditing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -458,7 +464,7 @@ function DayScheduleEditor({
       <div className="td-day-edit-panel" ref={panelRef}>
         <div className="td-day-edit-row">
           <label className="td-day-edit-lbl" htmlFor={`day-sel-${code}`}>
-            Day
+            {tp('tour-design', 'expDayLabel')}
           </label>
           <select
             id={`day-sel-${code}`}
@@ -468,34 +474,34 @@ function DayScheduleEditor({
           >
             {Array.from({ length: maxDayOptions }, (_, i) => i + 1).map((n) => (
               <option key={n} value={n}>
-                Day {n}
-                {n === packedDay && !override?.dayIndex ? ' (auto)' : ''}
+                {tpl('tour-design', 'outlineDayLabel', { n })}
+                {n === packedDay && !override?.dayIndex ? tp('tour-design', 'expDayAuto') : ''}
               </option>
             ))}
           </select>
         </div>
         <div className="td-day-edit-row">
-          <span className="td-day-edit-lbl">Pace</span>
-          <div className="td-day-seg" role="group" aria-label="Pace">
+          <span className="td-day-edit-lbl">{tp('tour-design', 'expPace')}</span>
+          <div className="td-day-seg" role="group" aria-label={tp('tour-design', 'expPace')}>
             <button
               type="button"
               className={pace === 'full' ? 'on' : ''}
               onClick={() => setPace('full')}
             >
-              Full Day
+              {tp('tour-design', 'expPaceFull')}
             </button>
             <button
               type="button"
               className={pace === 'half' ? 'on' : ''}
               onClick={() => setPace('half')}
             >
-              Half Day
+              {tp('tour-design', 'expPaceHalf')}
             </button>
           </div>
         </div>
         <div className="td-day-edit-row">
           <label className="td-day-edit-lbl" htmlFor={`day-date-${code}`}>
-            Date
+            {tp('tour-design', 'expDate')}
           </label>
           <input
             id={`day-date-${code}`}
@@ -507,11 +513,11 @@ function DayScheduleEditor({
         </div>
         <div className="td-day-edit-actions">
           <button type="button" onClick={() => setEditing(false)}>
-            Done
+            {tp('tour-design', 'expDone')}
           </button>
           {hasOverrides && (
             <button type="button" className="muted" onClick={resetAll}>
-              Reset
+              {tp('tour-design', 'expReset')}
             </button>
           )}
         </div>
@@ -523,7 +529,7 @@ function DayScheduleEditor({
     <button
       type="button"
       className="td-day-badge td-day-badge-btn"
-      title="Edit day, pace, and date"
+      title={tp('tour-design', 'expEditDayTitle')}
       onClick={() => setEditing(true)}
       disabled={disabled}
     >
@@ -545,6 +551,7 @@ function DescEditor({
   onPatchOverride: (code: string, patch: OverridePatch) => void;
   disabled?: boolean;
 }) {
+  const { tp } = useLanguage();
   const displaySource = overrideDesc !== undefined && overrideDesc !== '' ? overrideDesc : catalogDesc;
   const plain = stripMarkdown(displaySource);
   const [editing, setEditing] = useState(false);
@@ -583,7 +590,7 @@ function DescEditor({
         />
         <div className="td-draft-desc-actions">
           <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={commit}>
-            Done
+            {tp('tour-design', 'expDone')}
           </button>
         </div>
       </div>
@@ -604,7 +611,7 @@ function DescEditor({
             setEditing(true);
           }
         }}
-        title={disabled ? undefined : "Click to edit description"}
+        title={disabled ? undefined : tp('tour-design', 'expEditDescTitle')}
         style={{ cursor: disabled ? 'default' : 'text' }}
       >
         {shown}
@@ -618,12 +625,12 @@ function DescEditor({
               setExpanded((v) => !v);
             }}
           >
-            {expanded ? 'Show less' : 'Show more'}
+            {expanded ? tp('tour-design', 'expShowLess') : tp('tour-design', 'expShowMore')}
           </button>
         )}
         {!disabled && (
           <button type="button" onClick={() => setEditing(true)}>
-            Edit
+            {tp('tour-design', 'expEdit')}
           </button>
         )}
       </div>
@@ -642,6 +649,7 @@ function ClientNotesField({
   onPatchOverride: (code: string, patch: OverridePatch) => void;
   disabled?: boolean;
 }) {
+  const { tp } = useLanguage();
   const [draft, setDraft] = useState(value);
   const [previousValue, setPreviousValue] = useState(value);
 
@@ -652,11 +660,11 @@ function ClientNotesField({
 
   return (
     <div className="td-client-notes">
-      <label htmlFor={`client-note-${code}`}>Customer notes</label>
+      <label htmlFor={`client-note-${code}`}>{tp('tour-design', 'expCustomerNotes')}</label>
       <textarea
         id={`client-note-${code}`}
         value={draft}
-        placeholder="Notes for the client (included in export)…"
+        placeholder={tp('tour-design', 'expCustomerNotesPlaceholder')}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           if (draft !== value) onPatchOverride(code, { clientNote: draft });

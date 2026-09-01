@@ -17,31 +17,32 @@ import type { CustomerListItem } from '@/lib/customers/customer-list-input';
 import type { CustomerPipelineStageFilter } from '@/lib/customers/customer-list-input';
 import { toast } from '@/lib/toast';
 import { confirmDialog } from '@/lib/confirm';
+import { useLanguage } from '@/hooks/useLanguage';
 
-const TYPE_FILTERS: { value: string; label: string; style?: React.CSSProperties }[] = [
-  { value: '', label: 'All (B2B + B2C)' },
-  { value: 'b2b', label: 'B2B', style: { borderColor: '#6B21A8', color: '#6B21A8' } },
-  { value: 'b2c', label: 'B2C', style: { borderColor: '#1565C0', color: '#1565C0' } },
-];
+const TYPE_FILTER_VALUES = [
+  { value: '', style: undefined },
+  { value: 'b2b', style: { borderColor: '#6B21A8', color: '#6B21A8' } },
+  { value: 'b2c', style: { borderColor: '#1565C0', color: '#1565C0' } },
+] as const;
 
-const STAGE_FILTERS: {
+const STAGE_FILTER_VALUES: {
   value: '' | CustomerPipelineStageFilter;
-  label: string;
   style?: React.CSSProperties;
 }[] = [
-  { value: '', label: 'All Clients' },
-  { value: 'Inquiry', label: 'Inquiry', style: { borderColor: '#1565C0', color: '#1565C0' } },
-  { value: 'Designing', label: 'Designing', style: { borderColor: '#D97706', color: '#D97706' } },
-  { value: 'Quoted', label: 'Quoted', style: { borderColor: '#D97706', color: '#D97706' } },
-  { value: 'Negotiation', label: 'Negotiation', style: { borderColor: '#D97706', color: '#D97706' } },
-  { value: 'Pending', label: 'Pending', style: { borderColor: '#D97706', color: '#D97706' } },
-  { value: 'Confirmed', label: 'Confirmed', style: { borderColor: '#2E7D52', color: '#2E7D52' } },
-  { value: 'On Tour', label: 'On Tour', style: { borderColor: '#6B21A8', color: '#6B21A8' } },
-  { value: 'Completed', label: 'Completed', style: { borderColor: '#6B7F74', color: '#6B7F74' } },
-  { value: 'none', label: 'No Activity', style: { borderColor: '#C0392B', color: '#C0392B' } },
+  { value: '' },
+  { value: 'Inquiry', style: { borderColor: '#1565C0', color: '#1565C0' } },
+  { value: 'Designing', style: { borderColor: '#D97706', color: '#D97706' } },
+  { value: 'Quoted', style: { borderColor: '#D97706', color: '#D97706' } },
+  { value: 'Negotiation', style: { borderColor: '#D97706', color: '#D97706' } },
+  { value: 'Pending', style: { borderColor: '#D97706', color: '#D97706' } },
+  { value: 'Confirmed', style: { borderColor: '#2E7D52', color: '#2E7D52' } },
+  { value: 'On Tour', style: { borderColor: '#6B21A8', color: '#6B21A8' } },
+  { value: 'Completed', style: { borderColor: '#6B7F74', color: '#6B7F74' } },
+  { value: 'none', style: { borderColor: '#C0392B', color: '#C0392B' } },
 ];
 
 export default function Customers() {
+  const { tp, tpl, tc, tStage } = useLanguage();
   const { canWrite } = usePagePermission('customers');
   const { saveFromForm } = useRegisterCustomer();
   const { deleteCustomer } = useDeleteCustomer();
@@ -135,14 +136,14 @@ export default function Customers() {
       return {
         ok: false as const,
         error: 'save_failed' as const,
-        message: err instanceof Error ? err.message : 'Không thể lưu khách hàng.',
+        message: err instanceof Error ? err.message : tp('customers', 'toastSaveFailed'),
       };
     }
   }
 
   async function handleDeleteCustomer(id: string, name: string, onSuccess?: () => void) {
-    const ok = await confirmDialog(`Delete ${name}?`, {
-      title: 'Delete customer',
+    const ok = await confirmDialog(tpl('customers', 'deleteCustomerConfirm', { name }), {
+      title: tp('customers', 'deleteCustomerTitle'),
     });
     if (!ok) return;
 
@@ -154,7 +155,7 @@ export default function Customers() {
         return;
       }
       onSuccess?.();
-      toast.success('Customer deleted.');
+      toast.success(tp('customers', 'toastCustomerDeleted'));
       refresh();
     } finally {
       setDeletingId(null);
@@ -170,7 +171,7 @@ export default function Customers() {
       <div className="search-row">
         <input
           type="text"
-          placeholder="Search name, email, phone, ID, agent…"
+          placeholder={tp('customers', 'searchPlaceholder')}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -184,7 +185,7 @@ export default function Customers() {
             goToFirstPage();
           }}
         >
-          <option value="">All Sources</option>
+          <option value="">{tp('customers', 'filterAllSources')}</option>
           <option>Referral</option>
           <option>Website</option>
           <option>Agent</option>
@@ -199,7 +200,7 @@ export default function Customers() {
             goToFirstPage();
           }}
         >
-          <option value="">All Countries</option>
+          <option value="">{tp('customers', 'filterAllCountries')}</option>
           <option>USA</option>
           <option>Australia</option>
           <option>France</option>
@@ -214,7 +215,7 @@ export default function Customers() {
             goToFirstPage();
           }}
         >
-          <option value="">All Sales People</option>
+          <option value="">{tp('customers', 'filterAllSalesPeople')}</option>
           {SALES_PEOPLE.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -227,15 +228,15 @@ export default function Customers() {
           type="button"
           onClick={() => setFormMode('add')}
           disabled={!canWrite}
-          title={!canWrite ? 'You need write permission for Customers to add a customer' : undefined}
+          title={!canWrite ? tp('customers', 'addCustomerDisabledTitle') : undefined}
         >
-          + Add Customer
+          {tp('customers', 'addCustomer')}
         </button>
       </div>
 
       <div className="csf-bar">
-        <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--m)', marginRight: 2 }}>Filter by type:</span>
-        {TYPE_FILTERS.map((t) => (
+        <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--m)', marginRight: 2 }}>{tp('customers', 'filterByType')}</span>
+        {TYPE_FILTER_VALUES.map((t) => (
           <button
             key={t.value || 'all-type'}
             className={`csf-btn${typeF === t.value ? ' csf-active' : ''}`}
@@ -246,14 +247,14 @@ export default function Customers() {
             }}
             type="button"
           >
-            {t.label}
+            {t.value === '' ? tp('customers', 'filterAllTypes') : t.value.toUpperCase()}
           </button>
         ))}
       </div>
 
       <div className="csf-bar">
-        <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--m)', marginRight: 2 }}>Filter by stage:</span>
-        {STAGE_FILTERS.map((s) => (
+        <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--m)', marginRight: 2 }}>{tp('customers', 'filterByStage')}</span>
+        {STAGE_FILTER_VALUES.map((s) => (
           <button
             key={s.value || 'all'}
             className={`csf-btn${stageF === s.value ? ' csf-active' : ''}`}
@@ -264,15 +265,21 @@ export default function Customers() {
             }}
             type="button"
           >
-            {s.label}
+            {s.value === ''
+              ? tp('customers', 'filterAllClients')
+              : s.value === 'none'
+                ? tp('customers', 'filterNoActivity')
+                : tStage(s.value)}
           </button>
         ))}
         <span style={{ marginLeft: 4, fontSize: 11, color: 'var(--m)' }}>
-          {isLoading ? '…' : `${totalCount} client${totalCount !== 1 ? 's' : ''}`}
+          {isLoading
+            ? '…'
+            : tpl('customers', totalCount === 1 ? 'clientCount' : 'clientsCount', { count: totalCount })}
         </span>
         {error && (
           <button type="button" className="btn btn-s btn-sm" style={{ marginLeft: 8 }} onClick={retry}>
-            Retry
+            {tc('retry')}
           </button>
         )}
       </div>
@@ -283,11 +290,11 @@ export default function Customers() {
             <EmptyState
               className="crm-empty-state--table"
               variant="clients"
-              title="Could not load clients"
+              title={tp('customers', 'emptyLoadErrorTitle')}
               description={error}
               action={
                 <button type="button" className="btn btn-p btn-sm" onClick={retry}>
-                  Retry
+                  {tc('retry')}
                 </button>
               }
             />
@@ -295,17 +302,17 @@ export default function Customers() {
             <EmptyState
               className="crm-empty-state--table"
               variant="clients"
-              title={filtersActive ? 'No clients match your filters' : 'No clients yet'}
+              title={filtersActive ? tp('customers', 'emptyNoMatchTitle') : tp('customers', 'emptyNoClientsTitle')}
               description={
                 filtersActive
-                  ? 'Try adjusting search or filters, or clear them to see the full client list.'
-                  : 'Add your first customer to start tracking inquiries and pipeline activity.'
+                  ? tp('customers', 'emptyNoMatchDesc')
+                  : tp('customers', 'emptyNoClientsDesc')
               }
               action={
                 <>
                   {filtersActive && (
                     <button type="button" className="btn btn-s btn-sm" onClick={clearFilters}>
-                      Clear filters
+                      {tc('clearFilters')}
                     </button>
                   )}
                   <button
@@ -313,9 +320,9 @@ export default function Customers() {
                     className="btn btn-p btn-sm"
                     onClick={() => setFormMode('add')}
                     disabled={!canWrite}
-                    title={!canWrite ? 'You need write permission for Customers to add a customer' : undefined}
+                    title={!canWrite ? tp('customers', 'addCustomerDisabledTitle') : undefined}
                   >
-                    + Add Customer
+                    {tp('customers', 'addCustomer')}
                   </button>
                 </>
               }
@@ -325,17 +332,17 @@ export default function Customers() {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Name / Tên</th>
-                    <th>Email</th>
-                    <th>Country</th>
-                    <th>Type</th>
-                    <th>Source</th>
-                    <th>Pipeline Status</th>
-                    <th>Active Value</th>
-                    <th>Leads</th>
-                    <th>NPS</th>
-                    <th>Actions</th>
+                    <th>{tp('customers', 'colId')}</th>
+                    <th>{tp('customers', 'colName')}</th>
+                    <th>{tp('customers', 'colEmail')}</th>
+                    <th>{tp('customers', 'colCountry')}</th>
+                    <th>{tp('customers', 'colType')}</th>
+                    <th>{tp('customers', 'colSource')}</th>
+                    <th>{tp('customers', 'colPipelineStatus')}</th>
+                    <th>{tp('customers', 'colActiveValue')}</th>
+                    <th>{tp('customers', 'colLeads')}</th>
+                    <th>{tp('customers', 'colNps')}</th>
+                    <th>{tp('customers', 'colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -372,7 +379,7 @@ export default function Customers() {
                               style={{ fontSize: 10, border: 'none', cursor: 'pointer' }}
                               onClick={() => openProfile(c.id, 'pipeline')}
                             >
-                              {c.pipelineStage}
+                              {tStage(c.pipelineStage)}
                             </button>
                           ) : (
                             <button
@@ -381,7 +388,7 @@ export default function Customers() {
                               style={{ fontSize: 10, border: 'none', cursor: 'pointer' }}
                               onClick={() => openProfile(c.id, 'pipeline')}
                             >
-                              No Activity
+                              {tp('customers', 'noActivity')}
                             </button>
                           )}
                         </td>
@@ -413,7 +420,7 @@ export default function Customers() {
                         </td>
                         <td style={{ whiteSpace: 'nowrap' }}>
                           <button className="btn btn-s btn-sm" type="button" style={{ marginRight: 4 }} onClick={() => openProfile(c.id)}>
-                            View
+                            {tc('view')}
                           </button>
                           <button
                             className="btn btn-s btn-sm"
@@ -425,7 +432,7 @@ export default function Customers() {
                               setFormMode('edit');
                             }}
                           >
-                            Edit
+                            {tc('edit')}
                           </button>
                           <button
                             className="btn btn-danger btn-sm"
@@ -445,7 +452,7 @@ export default function Customers() {
               </table>
               {isLoading && items.length === 0 && (
                 <div style={{ padding: 24, textAlign: 'center', color: 'var(--m)', fontSize: 13 }}>
-                  Loading clients…
+                  {tp('customers', 'loadingClients')}
                 </div>
               )}
               <PaginationBar

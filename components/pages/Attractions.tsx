@@ -12,6 +12,7 @@ import type { AttractionFormData } from '@/components/attractions/AttractionEdit
 import AttractionRegionColumn from '@/components/attractions/AttractionRegionColumn';
 import AttractionTable from '@/components/attractions/AttractionTable';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { useLanguage } from '@/hooks/useLanguage';
 import { toast } from '@/lib/toast';
 import { getBffArray } from '@/lib/bff/client';
 
@@ -28,6 +29,7 @@ const AttractionPhotoLightbox = dynamic(
 type ViewMode = 'grid' | 'columns';
 
 export default function Attractions() {
+  const { tp, tpl } = useLanguage();
   const { canWrite } = usePagePermission('attractions');
   const attractions = useStore((s) => s.attractions);
   const photos = useStore((s) => s.photos) as GalleryPhoto[];
@@ -50,7 +52,7 @@ export default function Attractions() {
   useEffect(() => {
     let active = true;
     const query = region ? `?region=${encodeURIComponent(region)}` : '';
-    void getBffArray<Attraction>(`/api/attractions/all${query}`, 'Không thể tải địa điểm tham quan.')
+    void getBffArray<Attraction>(`/api/attractions/all${query}`, tp('attractions', 'loadError'))
       .then((rows) => {
         if (active) {
           setAttractions(rows);
@@ -58,12 +60,12 @@ export default function Attractions() {
         }
       })
       .catch((error: unknown) => {
-        if (active) setLoadError(error instanceof Error ? error.message : 'Không thể tải địa điểm tham quan.');
+        if (active) setLoadError(error instanceof Error ? error.message : tp('attractions', 'loadError'));
       });
     return () => {
       active = false;
     };
-  }, [region, setAttractions]);
+  }, [region, setAttractions, tp]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -131,19 +133,19 @@ export default function Attractions() {
       });
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json.error ?? 'Không thể xóa địa điểm.');
+        throw new Error(json.error ?? tp('attractions', 'toastDeleteFail'));
       }
       const json = await res.json();
       if (!json.ok) {
-        throw new Error(json.error ?? 'Không thể xóa địa điểm.');
+        throw new Error(json.error ?? tp('attractions', 'toastDeleteFail'));
       }
 
       deleteAttraction(id);
       if (expandedId === id) setExpandedId(null);
       closeForm();
-      toast.success('Đã xóa địa điểm.');
+      toast.success(tp('attractions', 'toastDeleted'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Xóa địa điểm thất bại.');
+      toast.error(e instanceof Error ? e.message : tp('attractions', 'toastDeleteFail'));
     }
   }
 
@@ -178,26 +180,26 @@ export default function Attractions() {
       });
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json.error ?? 'Không thể lưu địa điểm.');
+        throw new Error(json.error ?? tp('attractions', 'toastSaveFail'));
       }
       const json = await res.json();
       if (!json.ok) {
-        throw new Error(json.error ?? 'Không thể lưu địa điểm.');
+        throw new Error(json.error ?? tp('attractions', 'toastSaveFail'));
       }
 
       if (isEdit) {
         updateAttraction(payload.id, payload);
-        toast.success('Đã cập nhật địa điểm.');
+        toast.success(tp('attractions', 'toastUpdated'));
       } else {
         addAttraction(payload);
         setRegion('');
         setSearch('');
         setExpandedId(payload.id);
-        toast.success('Đã tạo địa điểm mới.');
+        toast.success(tp('attractions', 'toastCreated'));
       }
       closeForm();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Lưu địa điểm thất bại.');
+      toast.error(e instanceof Error ? e.message : tp('attractions', 'toastSaveFail'));
     }
   }
 
@@ -206,22 +208,22 @@ export default function Attractions() {
       {loadError && <div className="crm-page-hydrate-error" role="alert">{loadError}</div>}
       <div className="att-toolbar">
         <select value={region} onChange={(e) => setRegion(e.target.value)}>
-          <option value="">All Regions</option>
-          <option value="north">🏔 Northern Vietnam</option>
-          <option value="central">🏯 Central Vietnam</option>
-          <option value="south">🌿 Southern Vietnam</option>
+          <option value="">{tp('attractions', 'filterAllRegions')}</option>
+          <option value="north">{tp('attractions', 'regionNorth')}</option>
+          <option value="central">{tp('attractions', 'regionCentral')}</option>
+          <option value="south">{tp('attractions', 'regionSouth')}</option>
         </select>
         <select value={typeF} onChange={(e) => setTypeF(e.target.value)}>
-          <option value="">All Types</option>
-          <option value="museum">🏛 Museum</option>
-          <option value="heritage">🏯 Heritage Site</option>
-          <option value="temple">🛕 Temple / Pagoda</option>
-          <option value="landmark">📍 Landmark</option>
-          <option value="nature">🌿 Nature Site</option>
+          <option value="">{tp('attractions', 'filterAllTypes')}</option>
+          <option value="museum">{tp('attractions', 'typeMuseum')}</option>
+          <option value="heritage">{tp('attractions', 'typeHeritage')}</option>
+          <option value="temple">{tp('attractions', 'typeTemple')}</option>
+          <option value="landmark">{tp('attractions', 'typeLandmark')}</option>
+          <option value="nature">{tp('attractions', 'typeNature')}</option>
         </select>
         <input
           className="att-search"
-          placeholder="Search attractions..."
+          placeholder={tp('attractions', 'searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -230,9 +232,9 @@ export default function Attractions() {
           className="btn btn-p btn-sm"
           onClick={() => openAdd()}
           disabled={!canWrite}
-          title={!canWrite ? 'You need write permission for Attractions to add an attraction' : undefined}
+          title={!canWrite ? tp('attractions', 'addAttractionDisabledTitle') : undefined}
         >
-          + Add Attraction
+          {tp('attractions', 'addAttraction')}
         </button>
         <div className="att-view-toggle">
           <button
@@ -240,20 +242,23 @@ export default function Attractions() {
             className={`att-view-btn${viewMode === 'grid' ? ' on' : ''}`}
             onClick={() => setViewMode('grid')}
           >
-            ⊞ Grid
+            {tp('attractions', 'viewGrid')}
           </button>
           <button
             type="button"
             className={`att-view-btn${viewMode === 'columns' ? ' on' : ''}`}
             onClick={() => setViewMode('columns')}
           >
-            ☰ Columns
+            {tp('attractions', 'viewColumns')}
           </button>
         </div>
         <div style={{ flex: 1 }} />
         {closedToday.length > 0 && (
           <div className="att-alert-bar">
-            ⚠ Today is {today}. Closed: {closedToday.map((a) => a.name).join(', ')}
+            {tpl('attractions', 'closedTodayAlert', {
+              day: today,
+              names: closedToday.map((a) => a.name).join(', '),
+            })}
           </div>
         )}
       </div>
@@ -276,8 +281,8 @@ export default function Attractions() {
             expandedId,
             todayLabel: today,
             emptyHint: hasActiveFilters
-              ? 'No attractions match your filters in this region.'
-              : 'No attractions in this region yet.',
+              ? tp('attractions', 'emptyFiltered')
+              : tp('attractions', 'emptyRegion'),
             onToggle: toggleExpand,
             onEdit: canWrite ? openEdit : undefined,
             onAdd: canWrite ? () => openAdd(r as Attraction['region']) : undefined,

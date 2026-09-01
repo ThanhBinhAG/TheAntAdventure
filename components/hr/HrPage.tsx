@@ -6,31 +6,14 @@ import { usePageSize } from '@/hooks/usePageSize';
 import { useHrPage } from '@/hooks/useHrPage';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
+import { useLanguage } from '@/hooks/useLanguage';
+import { HR_ONBOARD_M1_KEYS, HR_ONBOARD_W1_KEYS } from '@/lib/i18n/pages/hr';
 import type { HrStaffListItem } from '@/lib/hr/hr-input';
 
 type HRTab = 'staff' | 'onboarding' | 'performance' | 'leave';
 
-const ONBOARD_W1 = [
-  'Sign employment contract',
-  'ID & tax registration',
-  'Company email setup',
-  'CRM system access & training',
-  'Meet all team members',
-  'Review company handbook',
-  'Tour product orientation',
-  'Shadow senior sales/ops for 3 days',
-];
-
-const ONBOARD_M1 = [
-  'Complete product knowledge test',
-  'First independent client inquiry',
-  'Set 90-day personal targets',
-  'Introduction to key suppliers',
-  'Complete first tour operation',
-  '30-day check-in with manager',
-  'CRM data entry proficiency',
-  'Language & communication training',
-];
+const ONBOARD_W1 = HR_ONBOARD_W1_KEYS;
+const ONBOARD_M1 = HR_ONBOARD_M1_KEYS;
 
 const LEAVE_DATA = [
   [12, 3, 9, 1],
@@ -51,6 +34,7 @@ function deptBadge(dept: string) {
 }
 
 export default function HrPage() {
+  const { tp, tpl, tc } = useLanguage();
   const { staff, loading, error, reload } = useHrPage();
   const [tab, setTab] = useState<HRTab>('staff');
   const [search, setSearch] = useState('');
@@ -84,18 +68,18 @@ export default function HrPage() {
   const { paginatedItems: leavePage } = leavePagination;
 
   if (loading && staff.length === 0) {
-    return <div className="crm-loading-hint">Đang tải danh sách nhân sự…</div>;
+    return <div className="crm-loading-hint">{tp('hr', 'loading')}</div>;
   }
 
   if (error && staff.length === 0) {
     return (
       <EmptyState
         variant="access"
-        title="Không thể tải HR"
+        title={tp('hr', 'loadErrorTitle')}
         description={error}
         action={
           <button className="btn btn-p btn-sm" type="button" onClick={() => void reload()}>
-            Thử lại
+            {tc('retry')}
           </button>
         }
       />
@@ -107,10 +91,10 @@ export default function HrPage() {
       <div className="tabs">
         {(
           [
-            ['staff', 'Staff Directory'],
-            ['onboarding', 'Onboarding'],
-            ['performance', 'Performance'],
-            ['leave', 'Leave Tracker'],
+            ['staff', tp('hr', 'tabStaff')],
+            ['onboarding', tp('hr', 'tabOnboarding')],
+            ['performance', tp('hr', 'tabPerformance')],
+            ['leave', tp('hr', 'tabLeave')],
           ] as const
         ).map(([id, label]) => (
           <div key={id} className={`tab${tab === id ? ' on' : ''}`} onClick={() => setTab(id)} role="button" tabIndex={0}>
@@ -122,9 +106,9 @@ export default function HrPage() {
       {tab === 'staff' && (
         <>
           <div className="search-row" style={{ marginBottom: 14 }}>
-            <input placeholder="Search staff…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 240 }} />
+            <input placeholder={tp('hr', 'searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 240 }} />
             <select value={deptF} onChange={(e) => setDeptF(e.target.value)}>
-              <option value="">All Departments</option>
+              <option value="">{tp('hr', 'allDepartments')}</option>
               <option>Sales & Product</option>
               <option>Operations</option>
               <option>Finance</option>
@@ -133,7 +117,7 @@ export default function HrPage() {
             </select>
             <div style={{ flex: 1 }} />
             <button className="btn btn-p btn-sm" type="button">
-              + Add Staff
+              {tp('hr', 'addStaff')}
             </button>
           </div>
           <div className="card">
@@ -141,17 +125,17 @@ export default function HrPage() {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>English Name</th>
-                    <th>Department</th>
-                    <th>Position</th>
-                    <th>Phone</th>
-                    <th>Email</th>
-                    <th>Start Date</th>
-                    <th>Contract</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th>{tp('hr', 'colId')}</th>
+                    <th>{tp('hr', 'colName')}</th>
+                    <th>{tp('hr', 'colEnglishName')}</th>
+                    <th>{tp('hr', 'colDepartment')}</th>
+                    <th>{tp('hr', 'colPosition')}</th>
+                    <th>{tp('hr', 'colPhone')}</th>
+                    <th>{tp('hr', 'colEmail')}</th>
+                    <th>{tp('hr', 'colStartDate')}</th>
+                    <th>{tp('hr', 'colContract')}</th>
+                    <th>{tp('hr', 'colStatus')}</th>
+                    <th>{tp('hr', 'colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -179,7 +163,7 @@ export default function HrPage() {
                       </td>
                       <td>
                         <button className="btn btn-s btn-sm" type="button">
-                          Edit
+                          {tc('edit')}
                         </button>
                       </td>
                     </tr>
@@ -195,28 +179,28 @@ export default function HrPage() {
       {tab === 'onboarding' && (
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">Onboarding Checklist</span>
+            <span className="card-title">{tp('hr', 'onboardingTitle')}</span>
           </div>
           <div className="card-body">
             <div className="hr-onboard-grid">
               <div>
-                <div className="hr-onboard-label">Week 1 — Orientation</div>
+                <div className="hr-onboard-label">{tp('hr', 'onboardWeek1')}</div>
                 <div className="hr-onboard-list">
                   {ONBOARD_W1.map((item) => (
                     <label key={item} className="hr-onboard-item">
                       <input type="checkbox" />
-                      <span>{item}</span>
+                      <span>{tp('hr', item)}</span>
                     </label>
                   ))}
                 </div>
               </div>
               <div>
-                <div className="hr-onboard-label">Month 1 — Integration</div>
+                <div className="hr-onboard-label">{tp('hr', 'onboardMonth1')}</div>
                 <div className="hr-onboard-list">
                   {ONBOARD_M1.map((item) => (
                     <label key={item} className="hr-onboard-item">
                       <input type="checkbox" />
-                      <span>{item}</span>
+                      <span>{tp('hr', item)}</span>
                     </label>
                   ))}
                 </div>
@@ -229,25 +213,25 @@ export default function HrPage() {
       {tab === 'performance' && (
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">Performance Reviews 2026</span>
+            <span className="card-title">{tp('hr', 'performanceTitle')}</span>
             <select defaultValue="Mid-Year" style={{ padding: '5px 9px', border: '1px solid var(--b)', borderRadius: 6, fontSize: 12 }}>
-              <option>Q1 2026</option>
-              <option>Q2 2026</option>
-              <option>Mid-Year</option>
-              <option>Annual</option>
+              <option>{tp('hr', 'perfQ1')}</option>
+              <option>{tp('hr', 'perfQ2')}</option>
+              <option>{tp('hr', 'perfMidYear')}</option>
+              <option>{tp('hr', 'perfAnnual')}</option>
             </select>
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Staff</th>
-                  <th>Department</th>
-                  <th>KPI Score</th>
-                  <th>Target Met?</th>
-                  <th>Manager Notes</th>
-                  <th>Next Review</th>
-                  <th>Action</th>
+                  <th>{tp('hr', 'colStaff')}</th>
+                  <th>{tp('hr', 'colDepartment')}</th>
+                  <th>{tp('hr', 'colKpiScore')}</th>
+                  <th>{tp('hr', 'colTargetMet')}</th>
+                  <th>{tp('hr', 'colManagerNotes')}</th>
+                  <th>{tp('hr', 'colNextReview')}</th>
+                  <th>{tp('hr', 'colAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -278,12 +262,12 @@ export default function HrPage() {
                           </span>
                         </div>
                       </td>
-                      <td>{met ? <span style={{ color: 'var(--g)', fontWeight: 600 }}>✓ Yes</span> : <span style={{ color: 'var(--red)' }}>✗ No</span>}</td>
-                      <td style={{ color: 'var(--m)', fontSize: 12 }}>{met ? 'Strong performance, keep it up' : 'Needs improvement in client follow-up'}</td>
+                      <td>{met ? <span style={{ color: 'var(--g)', fontWeight: 600 }}>{tp('hr', 'targetYes')}</span> : <span style={{ color: 'var(--red)' }}>{tp('hr', 'targetNo')}</span>}</td>
+                      <td style={{ color: 'var(--m)', fontSize: 12 }}>{met ? tp('hr', 'notesStrong') : tp('hr', 'notesImprove')}</td>
                       <td>Sep 2026</td>
                       <td>
                         <button className="btn btn-s btn-sm" type="button">
-                          Review
+                          {tp('hr', 'review')}
                         </button>
                       </td>
                     </tr>
@@ -300,17 +284,17 @@ export default function HrPage() {
         <div className="hr-leave-grid">
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Leave Balance Summary</span>
+              <span className="card-title">{tp('hr', 'leaveSummaryTitle')}</span>
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>Staff</th>
-                    <th>Annual Leave</th>
-                    <th>Used</th>
-                    <th>Remaining</th>
-                    <th>Sick Leave</th>
+                    <th>{tp('hr', 'colStaff')}</th>
+                    <th>{tp('hr', 'colAnnualLeave')}</th>
+                    <th>{tp('hr', 'colUsed')}</th>
+                    <th>{tp('hr', 'colRemaining')}</th>
+                    <th>{tp('hr', 'colSickLeave')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -321,13 +305,13 @@ export default function HrPage() {
                         <td>
                           <b>{s.name}</b>
                         </td>
-                        <td style={{ textAlign: 'center' }}>{total} days</td>
-                        <td style={{ textAlign: 'center', color: 'var(--amb)' }}>{used} days</td>
+                        <td style={{ textAlign: 'center' }}>{tpl('hr', 'days', { count: total })}</td>
+                        <td style={{ textAlign: 'center', color: 'var(--amb)' }}>{tpl('hr', 'days', { count: used })}</td>
                         <td style={{ textAlign: 'center', color: 'var(--g)', fontWeight: 600 }}>
-                          {rem} days
+                          {tpl('hr', 'days', { count: rem })}
                         </td>
                         <td style={{ textAlign: 'center', color: 'var(--blue)' }}>
-                          {sick} day{sick !== 1 ? 's' : ''}
+                          {tpl('hr', sick !== 1 ? 'days' : 'day', { count: sick })}
                         </td>
                       </tr>
                     );
@@ -339,20 +323,20 @@ export default function HrPage() {
           </div>
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">Leave Policy</span>
+              <span className="card-title">{tp('hr', 'leavePolicyTitle')}</span>
             </div>
             <div className="card-body hr-leave-policy">
               <div className="sal-bonus-pill">
-                <b>Annual Leave:</b> 12 days/year (1 day/month). Carry-over max 5 days.
+                <b>{tp('hr', 'leaveAnnual')}</b> {tp('hr', 'leaveAnnualDesc')}
               </div>
               <div className="sal-bonus-pill">
-                <b>Sick Leave:</b> Up to 5 days/year with medical certificate.
+                <b>{tp('hr', 'leaveSick')}</b> {tp('hr', 'leaveSickDesc')}
               </div>
               <div className="sal-bonus-pill">
-                <b>Public Holidays:</b> All Vietnamese national holidays + Tet (7 days).
+                <b>{tp('hr', 'leavePublic')}</b> {tp('hr', 'leavePublicDesc')}
               </div>
               <div className="sal-bonus-pill">
-                <b>Probation:</b> No paid leave during 2-month probation period.
+                <b>{tp('hr', 'leaveProbation')}</b> {tp('hr', 'leaveProbationDesc')}
               </div>
             </div>
           </div>

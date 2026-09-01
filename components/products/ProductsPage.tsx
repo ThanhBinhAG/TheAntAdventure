@@ -14,11 +14,13 @@ import { useStore } from '@/hooks/useStore';
 import type { Product } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { usePagePermission } from '@/hooks/usePagePermission';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type ViewTab = 'library' | 'modules';
 type ShellMode = 'catalog' | 'modules' | 'manage';
 
 export default function Products() {
+  const { tp, tpl } = useLanguage();
   const { canWrite } = usePagePermission('products');
   const addProduct = useStore((s) => s.addProduct);
   const updateProduct = useStore((s) => s.updateProduct);
@@ -110,7 +112,7 @@ export default function Products() {
 
   const handleSave = async (product: Product, asDraft: boolean) => {
     if (!canWrite) {
-      const message = 'You need write permission for Products to save a product.';
+      const message = tp('products', 'errorNoWritePermissionSave');
       setSaveError(message);
       throw new Error(message);
     }
@@ -144,14 +146,14 @@ export default function Products() {
       });
       if (!res.ok) {
         const json = await res.json();
-        const msg = json.error ?? 'Lỗi không thể lưu sản phẩm.';
+        const msg = json.error ?? tp('products', 'errorSaveFailed');
         setSaveError(msg);
         throw new Error(msg);
       }
 
       const json = await res.json();
       if (!json.ok) {
-        const msg = json.error ?? 'Lỗi không thể lưu sản phẩm.';
+        const msg = json.error ?? tp('products', 'errorSaveFailed');
         setSaveError(msg);
         throw new Error(msg);
       }
@@ -189,11 +191,11 @@ export default function Products() {
       });
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json.error ?? 'Không thể xóa sản phẩm.');
+        throw new Error(json.error ?? tp('products', 'errorDeleteFailed'));
       }
       const json = await res.json();
       if (!json.ok) {
-        throw new Error(json.error ?? 'Không thể xóa sản phẩm.');
+        throw new Error(json.error ?? tp('products', 'errorDeleteFailed'));
       }
 
       deleteProduct(code);
@@ -205,7 +207,7 @@ export default function Products() {
       setDetailProduct(null);
       setViewTab(returnTab);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Xóa sản phẩm thất bại.');
+      toast.error(e instanceof Error ? e.message : tp('products', 'toastDeleteFailed'));
     }
   };
 
@@ -215,12 +217,12 @@ export default function Products() {
       try {
         const product = await getBffData<Product>(
           `/api/products?code=${encodeURIComponent(code)}`,
-          'Không thể tải Product.'
+          tp('products', 'errorLoadProduct')
         );
         setDetailProduct(product);
         setDetailProductCode(code);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Không thể tải Product.');
+        toast.error(error instanceof Error ? error.message : tp('products', 'errorLoadProduct'));
       }
     })();
   };
@@ -244,7 +246,7 @@ export default function Products() {
   return (
     <div className={`tp-shell${formOpen ? ' tp-shell--editing' : ''}`}>
       <header className={`tp-shell-toolbar${pickMode && !formOpen ? ' tp-shell-toolbar--manage' : ''}`}>
-        <div className="tp-seg" role="tablist" aria-label="Tour products views">
+        <div className="tp-seg" role="tablist" aria-label={tp('products', 'viewsAriaLabel')}>
           <button
             type="button"
             role="tab"
@@ -252,7 +254,7 @@ export default function Products() {
             className={`tp-seg-btn${shellMode === 'catalog' ? ' on' : ''}`}
             onClick={() => setShellMode('catalog')}
           >
-            Catalog
+            {tp('products', 'tabCatalog')}
           </button>
           <button
             type="button"
@@ -261,7 +263,7 @@ export default function Products() {
             className={`tp-seg-btn${shellMode === 'modules' ? ' on' : ''}`}
             onClick={() => setShellMode('modules')}
           >
-            Modules
+            {tp('products', 'tabModules')}
           </button>
           <button
             type="button"
@@ -270,7 +272,7 @@ export default function Products() {
             className={`tp-seg-btn${shellMode === 'manage' ? ' on' : ''}`}
             onClick={() => setShellMode('manage')}
           >
-            Manage
+            {tp('products', 'tabManage')}
           </button>
         </div>
 
@@ -279,21 +281,21 @@ export default function Products() {
             type="search"
             placeholder={
               pickMode
-                ? 'Find product to edit…'
+                ? tp('products', 'searchFindToEdit')
                 : shellMode === 'modules'
-                  ? 'Search modules…'
-                  : 'Search name, code, destination…'
+                  ? tp('products', 'searchModules')
+                  : tp('products', 'searchCatalog')
             }
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
-            aria-label="Search products"
+            aria-label={tp('products', 'searchAriaLabel')}
             disabled={formOpen}
           />
         </div>
 
         <div className="tp-shell-actions">
           <span className="tp-shell-stat">
-            <strong>{shownCount}</strong> shown
+            {tpl('products', 'shownCount', { count: shownCount })}
           </span>
 
           <div className="tp-shell-shortcuts">
@@ -303,15 +305,15 @@ export default function Products() {
               aria-expanded={shortcutsOpen}
               onClick={() => setShortcutsOpen((o) => !o)}
             >
-              Shortcuts
+              {tp('products', 'shortcuts')}
             </button>
             {shortcutsOpen && (
               <div className="tp-shell-shortcuts-menu">
                 <Link href="/attractions" className="tp-shell-shortcuts-item" onClick={() => setShortcutsOpen(false)}>
-                  Museum Hours & Closures
+                  {tp('products', 'shortcutMuseumHours')}
                 </Link>
                 <Link href="/posttour" className="tp-shell-shortcuts-item" onClick={() => setShortcutsOpen(false)}>
-                  Post-Tour Feedback
+                  {tp('products', 'shortcutPostTourFeedback')}
                 </Link>
               </div>
             )}
@@ -323,9 +325,9 @@ export default function Products() {
               className="btn btn-s btn-sm"
               onClick={() => setImportOpen(true)}
               disabled={!canWrite}
-              title={!canWrite ? 'You need write permission for Products to import products' : undefined}
+              title={!canWrite ? tp('products', 'importPermissionTitle') : undefined}
             >
-              Import
+              {tp('products', 'import')}
             </button>
           )}
 
@@ -336,9 +338,9 @@ export default function Products() {
                 className="btn btn-p btn-sm"
                 onClick={openFormForNew}
                 disabled={!canWrite}
-                title={!canWrite ? 'You need write permission for Products to add a product' : undefined}
+                title={!canWrite ? tp('products', 'addProductPermissionTitle') : undefined}
               >
-                + New Product
+                {tp('products', 'newProduct')}
               </button>
               <button
                 type="button"
@@ -348,7 +350,7 @@ export default function Products() {
                   setViewTab(returnTab);
                 }}
               >
-                Done
+                {tp('products', 'done')}
               </button>
             </>
           )}
@@ -357,9 +359,7 @@ export default function Products() {
 
       {pickMode && !formOpen && (
         <div className="tp-manage-bar">
-          <span>
-            <strong>Manage mode</strong> — click a product to edit. Filters stay as you left them.
-          </span>
+          <span>{tp('products', 'manageModeBanner')}</span>
         </div>
       )}
 
@@ -421,11 +421,7 @@ export default function Products() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={(count) => {
-          toast.success(
-            `Imported ${count} products to Supabase.\n` +
-              'Empty pricing rows were created for each product (linked by code). Open Pricing to enter tiers later.',
-            5000
-          );
+          toast.success(tpl('products', 'toastImportSuccess', { count }), 5000);
         }}
       />
     </div>

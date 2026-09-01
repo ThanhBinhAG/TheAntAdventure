@@ -85,7 +85,7 @@ export default function BookingFormModal({
   const balance = Math.max(0, total - deposit);
   const nights = useMemo(() => computeNights(form.start, form.end), [form.start, form.end]);
 
-  const { language } = useLanguage();
+  const { language, tp, tpl, tc } = useLanguage();
   const dirty = useFormDirty(
     open,
     { form: { ...EMPTY_BOOKING_FORM }, totalInput: '', depositInput: '' },
@@ -127,7 +127,7 @@ export default function BookingFormModal({
 
     const validated = validateBookingForm(form, totalInput, depositInput);
     if (!validated.ok) {
-      fail(validated.field, validated.message);
+      fail(validated.field, tp('bookings', validated.errorKey));
       return;
     }
 
@@ -159,9 +159,9 @@ export default function BookingFormModal({
       <div className="modal nc-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-hd modal-hd-green nc-modal-hd">
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>New Booking</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>{tp('bookings', 'formTitle')}</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 1 }}>
-              Create a confirmed trip record for operations and finance
+              {tp('bookings', 'formSubtitle')}
             </div>
           </div>
           <button type="button" className="modal-close-btn" onClick={() => void requestClose()}>
@@ -170,11 +170,11 @@ export default function BookingFormModal({
         </div>
 
         <div className="nc-modal-body">
-          <div className="nc-section-title">Trip</div>
+          <div className="nc-section-title">{tp('bookings', 'formSectionTrip')}</div>
           <div className="nc-grid-2" style={{ marginBottom: 16 }}>
             <div className="fg">
               <label className={`lbl${fieldInvalid('custId') ? ' nc-field-invalid-label' : ''}`}>
-                Customer <span className="req">*</span>
+                {tp('bookings', 'formCustomer')} <span className="req">*</span>
               </label>
               <select
                 id={fieldDomId('custId')}
@@ -183,7 +183,7 @@ export default function BookingFormModal({
                 aria-invalid={fieldInvalid('custId')}
                 onChange={(e) => set('custId', e.target.value)}
               >
-                <option value="">— Select customer —</option>
+                <option value="">{tp('bookings', 'formSelectCustomer')}</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} · {c.id}
@@ -193,7 +193,7 @@ export default function BookingFormModal({
             </div>
             <div className="fg">
               <label className={`lbl${fieldInvalid('tour') ? ' nc-field-invalid-label' : ''}`}>
-                Tour Name <span className="req">*</span>
+                {tp('bookings', 'formTourName')} <span className="req">*</span>
               </label>
               <input
                 id={fieldDomId('tour')}
@@ -201,11 +201,11 @@ export default function BookingFormModal({
                 value={form.tour}
                 aria-invalid={fieldInvalid('tour')}
                 onChange={(e) => set('tour', e.target.value)}
-                placeholder="North Vietnam Classic 12D"
+                placeholder={tp('bookings', 'formTourPlaceholder')}
               />
             </div>
             <div className="fg">
-              <label className={`lbl${fieldInvalid('pax') ? ' nc-field-invalid-label' : ''}`}>Pax</label>
+              <label className={`lbl${fieldInvalid('pax') ? ' nc-field-invalid-label' : ''}`}>{tp('bookings', 'formPax')}</label>
               <input
                 id={fieldDomId('pax')}
                 type="number"
@@ -217,7 +217,7 @@ export default function BookingFormModal({
               />
             </div>
             <div className="fg">
-              <label className="lbl">Status</label>
+              <label className="lbl">{tp('bookings', 'formStatus')}</label>
               <select value={form.status} onChange={(e) => set('status', e.target.value)}>
                 {BOOKING_STATUSES.map((status) => (
                   <option key={status} value={status}>
@@ -228,14 +228,16 @@ export default function BookingFormModal({
             </div>
           </div>
 
-          <div className="nc-section-title">Travel Dates</div>
+          <div className="nc-section-title">{tp('bookings', 'formSectionDates')}</div>
           <p className="nc-form-hint">
-            Optional — leave blank if dates are not confirmed yet (shown as TBD in the list).
-            {nights != null ? ` · ${nights} night${nights === 1 ? '' : 's'}` : ''}
+            {tp('bookings', 'formDatesHint')}
+            {nights != null
+              ? tpl('bookings', nights === 1 ? 'formNights' : 'formNightsPlural', { count: nights })
+              : ''}
           </p>
           <div className="nc-grid-2" style={{ marginBottom: 16 }}>
             <div className="fg">
-              <label className={`lbl${fieldInvalid('start') ? ' nc-field-invalid-label' : ''}`}>Start Date</label>
+              <label className={`lbl${fieldInvalid('start') ? ' nc-field-invalid-label' : ''}`}>{tp('bookings', 'formStartDate')}</label>
               <input
                 id={fieldDomId('start')}
                 type="date"
@@ -246,7 +248,7 @@ export default function BookingFormModal({
               />
             </div>
             <div className="fg">
-              <label className={`lbl${fieldInvalid('end') ? ' nc-field-invalid-label' : ''}`}>End Date</label>
+              <label className={`lbl${fieldInvalid('end') ? ' nc-field-invalid-label' : ''}`}>{tp('bookings', 'formEndDate')}</label>
               <input
                 id={fieldDomId('end')}
                 type="date"
@@ -258,17 +260,17 @@ export default function BookingFormModal({
             </div>
           </div>
 
-          <div className="nc-section-title">Commercial</div>
+          <div className="nc-section-title">{tp('bookings', 'formSectionCommercial')}</div>
           <div className="nc-grid-2" style={{ marginBottom: 12 }}>
             <div className="fg">
-              <label className={`lbl${fieldInvalid('total') ? ' nc-field-invalid-label' : ''}`}>Total (USD)</label>
+              <label className={`lbl${fieldInvalid('total') ? ' nc-field-invalid-label' : ''}`}>{tp('bookings', 'formTotalUsd')}</label>
               <input
                 id={fieldDomId('total')}
                 type="text"
                 className={fieldInvalid('total') ? 'nc-field-invalid' : undefined}
                 value={totalInput}
                 aria-invalid={fieldInvalid('total')}
-                placeholder="e.g. 22,000 or $22000"
+                placeholder={tp('bookings', 'formTotalPlaceholder')}
                 onChange={(e) => {
                   clearErrors();
                   setTotalInput(e.target.value);
@@ -277,14 +279,14 @@ export default function BookingFormModal({
               />
             </div>
             <div className="fg">
-              <label className={`lbl${fieldInvalid('deposit') ? ' nc-field-invalid-label' : ''}`}>Deposit (USD)</label>
+              <label className={`lbl${fieldInvalid('deposit') ? ' nc-field-invalid-label' : ''}`}>{tp('bookings', 'formDepositUsd')}</label>
               <input
                 id={fieldDomId('deposit')}
                 type="text"
                 className={fieldInvalid('deposit') ? 'nc-field-invalid' : undefined}
                 value={depositInput}
                 aria-invalid={fieldInvalid('deposit')}
-                placeholder="e.g. 6,600"
+                placeholder={tp('bookings', 'formDepositPlaceholder')}
                 onChange={(e) => {
                   clearErrors();
                   setDepositInput(e.target.value);
@@ -295,39 +297,39 @@ export default function BookingFormModal({
           </div>
           <div className="nc-form-summary">
             <div className="nc-form-summary-item">
-              <div className="nc-form-summary-lbl">Total</div>
+              <div className="nc-form-summary-lbl">{tp('bookings', 'formSummaryTotal')}</div>
               <div className="nc-form-summary-val">${fmt(total)}</div>
             </div>
             <div className="nc-form-summary-item">
-              <div className="nc-form-summary-lbl">Deposit</div>
+              <div className="nc-form-summary-lbl">{tp('bookings', 'formSummaryDeposit')}</div>
               <div className="nc-form-summary-val" style={{ color: 'var(--blue)' }}>
                 ${fmt(deposit)}
               </div>
             </div>
             <div className="nc-form-summary-item">
-              <div className="nc-form-summary-lbl">Balance Due</div>
+              <div className="nc-form-summary-lbl">{tp('bookings', 'formSummaryBalance')}</div>
               <div className="nc-form-summary-val" style={{ color: balance > 0 ? 'var(--amb)' : 'var(--g)' }}>
                 ${fmt(balance)}
               </div>
             </div>
           </div>
 
-          <div className="nc-section-title">Operations</div>
+          <div className="nc-section-title">{tp('bookings', 'formSectionOps')}</div>
           <div className="nc-grid-2">
             <div className="fg">
-              <label className="lbl">Assigned Guide</label>
+              <label className="lbl">{tp('bookings', 'formAssignedGuide')}</label>
               <input
                 value={form.guide}
                 onChange={(e) => set('guide', e.target.value)}
-                placeholder="e.g. Minh N."
+                placeholder={tp('bookings', 'formGuidePlaceholder')}
               />
             </div>
             <div className="fg">
-              <label className="lbl">Primary Hotel</label>
+              <label className="lbl">{tp('bookings', 'formPrimaryHotel')}</label>
               <input
                 value={form.hotel}
                 onChange={(e) => set('hotel', e.target.value)}
-                placeholder="e.g. La Siesta Premium Hanoi"
+                placeholder={tp('bookings', 'formHotelPlaceholder')}
               />
             </div>
           </div>
@@ -341,10 +343,10 @@ export default function BookingFormModal({
           ) : null}
           <div className="nc-modal-ft-actions">
             <button className="btn btn-s" type="button" onClick={() => void requestClose()} disabled={saving}>
-              Cancel
+              {tc('cancel')}
             </button>
             <button className="btn btn-p" type="button" onClick={() => void handleCreate()} disabled={saving}>
-              {saving ? 'Creating…' : 'Create Booking'}
+              {saving ? tp('bookings', 'formCreating') : tp('bookings', 'formCreateBooking')}
             </button>
           </div>
         </div>

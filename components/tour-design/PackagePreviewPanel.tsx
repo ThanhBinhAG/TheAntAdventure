@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useLanguage } from '@/hooks/useLanguage';
 import { resolvePackageDayPhotos } from '@/lib/gallery/tour-photos';
 import { formatDayDateLabel } from '@/lib/tour-design/tour-itinerary';
 import type { TourBrief, GalleryPhoto } from '@/lib/tour-design/tour-design-types';
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, isSelected = false, canWrite = true }: Props) {
+  const { tp } = useLanguage();
   const heroPhoto = useMemo(() => {
     if (!pkg?.days?.length) return null;
     const day = pkg.days[0];
@@ -29,7 +31,7 @@ export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, 
       <div className="card td-pkg-preview-card">
         <div className="td-pkg-preview-empty">
           <div style={{ fontSize: 28, marginBottom: 10 }}>📋</div>
-          Select a tour package on the left to preview the full itinerary here.
+          {tp('tour-design', 'pkgEmpty')}
         </div>
       </div>
     );
@@ -50,7 +52,7 @@ export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, 
 
         <div className="td-pkg-tagline">{pkg.tagline}</div>
 
-        <div className="td-section-lbl">📅 Detailed Programme</div>
+        <div className="td-section-lbl">📅 {tp('tour-design', 'pkgDetailedProgramme')}</div>
         {pkg.days.map((d) => {
           const dayPhotos = resolvePackageDayPhotos(d.title, pkg.tag, d.hotel, photos, d.n, 2);
           const dayLabel = formatDayDateLabel(brief.startDate, brief.travelMonth, d.n);
@@ -65,7 +67,7 @@ export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, 
                 <div>
                   <div style={{ fontSize: 12, lineHeight: 1.65, marginBottom: 7 }}>{d.body}</div>
                   <div style={{ fontSize: 11, color: 'var(--m)' }}>
-                    🏨 {d.hotel} | Meals: {d.meals}
+                    🏨 {d.hotel} | {tp('tour-design', 'pkgMeals')} {d.meals}
                   </div>
                 </div>
                 <PhotoStack photos={dayPhotos} height={108} />
@@ -76,7 +78,7 @@ export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, 
 
         <div className="td-incl-excl-grid">
           <div className="td-incl-box">
-            <div className="td-incl-title">✓ Included</div>
+            <div className="td-incl-title">✓ {tp('tour-design', 'pkgIncluded')}</div>
             {pkg.incl.map((i) => (
               <div key={i} style={{ fontSize: 11, marginBottom: 4 }}>
                 • {i}
@@ -84,7 +86,7 @@ export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, 
             ))}
           </div>
           <div className="td-excl-box">
-            <div className="td-excl-title">✗ Excluded</div>
+            <div className="td-excl-title">✗ {tp('tour-design', 'pkgExcluded')}</div>
             {pkg.excl.map((i) => (
               <div key={i} style={{ fontSize: 11, marginBottom: 4 }}>
                 • {i}
@@ -93,20 +95,20 @@ export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, 
           </div>
         </div>
 
-        <div className="td-section-lbl">💵 Sample Quotation — Premium Boutique 4★</div>
+        <div className="td-section-lbl">💵 {tp('tour-design', 'pkgSampleQuotation')}</div>
         <table className="tbl" style={{ fontSize: 11.5 }}>
           <thead>
             <tr>
-              <th>Pax</th>
-              <th style={{ textAlign: 'right' }}>Peak (Oct–Mar)</th>
-              <th style={{ textAlign: 'right' }}>Off-Season (Apr–Sep)</th>
+              <th>{tp('tour-design', 'pkgColPax')}</th>
+              <th style={{ textAlign: 'right' }}>{tp('tour-design', 'pkgColPeak')}</th>
+              <th style={{ textAlign: 'right' }}>{tp('tour-design', 'pkgColOffSeason')}</th>
             </tr>
           </thead>
           <tbody>
             {pkg.pricing.map((r) => (
               <tr key={r.pax} style={r.pax === 4 ? { background: 'var(--gl)', fontWeight: 700 } : undefined}>
                 <td>
-                  {r.pax} pax{r.pax === 4 ? ' ⭐' : ''}
+                  {r.pax}{tp('tour-design', 'pkgPaxSuffix')}{r.pax === 4 ? ' ⭐' : ''}
                 </td>
                 <td style={{ textAlign: 'right', color: 'var(--g)' }}>${r.peak.toLocaleString()}/pp</td>
                 <td style={{ textAlign: 'right' }}>${r.off.toLocaleString()}/pp</td>
@@ -117,11 +119,11 @@ export default function PackagePreviewPanel({ pkg, brief, photos, onUsePackage, 
 
         <div className="td-pkg-price-row">
           <div>
-            <div style={{ fontSize: 11, color: 'var(--m)' }}>Indicative price (4 pax, peak)</div>
+            <div style={{ fontSize: 11, color: 'var(--m)' }}>{tp('tour-design', 'pkgIndicativePrice')}</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--g)' }}>{pkg.price4pax}</div>
           </div>
           <button className="btn btn-p" type="button" onClick={() => onUsePackage(pkg)} disabled={!canWrite}>
-            {isSelected ? 'Package Selected ✓' : 'Use This Package →'}
+            {isSelected ? tp('tour-design', 'pkgSelected') : tp('tour-design', 'pkgUse')}
           </button>
         </div>
       </div>

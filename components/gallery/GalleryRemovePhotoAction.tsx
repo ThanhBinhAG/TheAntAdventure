@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type Props = {
   onConfirm: () => void;
@@ -23,12 +24,13 @@ function GalleryRemovePhotoActionBody({
   disabled = false,
   buttonClassName = 'gallery-viewer-del',
 }: Omit<Props, 'resetKey'>) {
+  const { tp, tc } = useLanguage();
   const [pending, setPending] = useState(false);
 
   if (pending) {
     return (
       <div className="gallery-remove-wrap">
-        <span className="gallery-remove-prompt-text">Remove this photo from the gallery?</span>
+        <span className="gallery-remove-prompt-text">{tp('gallery', 'removePhotoConfirm')}</span>
         <button
           type="button"
           className="btn btn-s btn-sm gallery-remove-confirm-btn"
@@ -38,7 +40,7 @@ function GalleryRemovePhotoActionBody({
             onConfirm();
           }}
         >
-          Yes, remove
+          {tp('gallery', 'yesRemove')}
         </button>
         <button
           type="button"
@@ -46,7 +48,7 @@ function GalleryRemovePhotoActionBody({
           disabled={disabled}
           onClick={() => setPending(false)}
         >
-          Cancel
+          {tc('cancel')}
         </button>
       </div>
     );
@@ -59,7 +61,7 @@ function GalleryRemovePhotoActionBody({
       disabled={disabled}
       onClick={() => setPending(true)}
     >
-      Remove photo
+      {tp('gallery', 'removePhoto')}
     </button>
   );
 }

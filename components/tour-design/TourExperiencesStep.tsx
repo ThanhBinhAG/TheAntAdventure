@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import PaginationBar from '@/components/PaginationBar';
+import { useLanguage } from '@/hooks/useLanguage';
 import { usePageSize } from '@/hooks/usePageSize';
 import { useProductPage } from '@/hooks/useProductPage';
 import type { ProductPageSize } from '@/lib/products/product-list-input';
@@ -28,10 +29,10 @@ const PKG_TAG_COLORS: Record<string, [string, string]> = {
 };
 
 const DUR_FILTERS = [
-  { value: '', label: 'All Durations' },
-  { value: '0.5', label: 'Half Day' },
-  { value: '1', label: 'Full Day' },
-  { value: 'service', label: 'Service' },
+  { value: '', key: 'expDurAll' as const },
+  { value: '0.5', key: 'expDurHalfDay' as const },
+  { value: '1', key: 'expDurFullDay' as const },
+  { value: 'service', key: 'expDurService' as const },
   { value: '2', label: '2D1N' },
   { value: '3', label: '3D2N' },
   { value: '4', label: '4D3N' },
@@ -90,6 +91,7 @@ export default function TourExperiencesStep({
   onEditBrief,
   canWrite = true,
 }: Props) {
+  const { tp, tpl } = useLanguage();
   const [libTab, setLibTab] = useState<'pkg' | 'exp'>('pkg');
   const [previewPkgId, setPreviewPkgId] = useState<string | null>(null);
   const [libSearch, setLibSearch] = useState('');
@@ -194,16 +196,16 @@ export default function TourExperiencesStep({
         <div className="card td-exp-left">
           <div className="td-lib-tabs">
             <button type="button" className={libTab === 'pkg' ? 'on' : ''} onClick={() => switchTab('pkg')}>
-              📦 Tour Packages
+              📦 {tp('tour-design', 'expTabPackages')}
             </button>
             <button type="button" className={libTab === 'exp' ? 'on' : ''} onClick={() => switchTab('exp')}>
-              🗺 Individual Experiences
+              🗺 {tp('tour-design', 'expTabExperiences')}
             </button>
           </div>
 
           {libTab === 'pkg' ? (
             <div className="td-lib-list" style={{ paddingTop: 10 }}>
-              <div style={{ fontSize: 11, color: 'var(--m)', marginBottom: 10 }}>Click a package to preview the full itinerary →</div>
+              <div style={{ fontSize: 11, color: 'var(--m)', marginBottom: 10 }}>{tp('tour-design', 'expPkgHint')}</div>
               {TOUR_PACKAGES.map((p) => {
                 const [bg, fg] = PKG_TAG_COLORS[p.tag] || ['#f0f0ee', '#555'];
                 const active = (previewPkgId || selectedPackageId) === p.id;
@@ -222,7 +224,7 @@ export default function TourExperiencesStep({
                       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 2 }}>{p.name}</div>
                       <div style={{ fontSize: 11, color: 'var(--m)', marginBottom: 3 }}>{p.subtitle}</div>
                       <div style={{ fontSize: 11, color: 'var(--g)', fontWeight: 600 }}>📍 {p.route}</div>
-                      {p.flights.length > 0 && <div style={{ fontSize: 10.5, color: 'var(--pur)', marginTop: 3 }}>✈ Domestic flights included</div>}
+                      {p.flights.length > 0 && <div style={{ fontSize: 10.5, color: 'var(--pur)', marginTop: 3 }}>✈ {tp('tour-design', 'expDomesticFlightsIncluded')}</div>}
                     </div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--g)', whiteSpace: 'nowrap' }}>{p.price4pax}</div>
                   </div>
@@ -232,23 +234,23 @@ export default function TourExperiencesStep({
           ) : (
             <>
               <div className="td-lib-filters">
-                <input placeholder="Search experiences..." value={libSearch} onChange={(e) => setLibSearch(e.target.value)} />
+                <input placeholder={tp('tour-design', 'expSearchPlaceholder')} value={libSearch} onChange={(e) => setLibSearch(e.target.value)} />
                 <select value={libRegion} onChange={(e) => setLibRegion(e.target.value)}>
-                  <option value="">All Regions</option>
-                  <option value="north">🌿 North Vietnam</option>
-                  <option value="central">🏛 Central Vietnam</option>
-                  <option value="south">🛶 South Vietnam</option>
-                  <option value="services">🛂 Services & Visa</option>
+                  <option value="">{tp('tour-design', 'expRegionAll')}</option>
+                  <option value="north">🌿 {tp('tour-design', 'expRegionNorth')}</option>
+                  <option value="central">🏛 {tp('tour-design', 'expRegionCentral')}</option>
+                  <option value="south">🛶 {tp('tour-design', 'expRegionSouth')}</option>
+                  <option value="services">🛂 {tp('tour-design', 'expRegionServices')}</option>
                 </select>
                 <select value={libDur} onChange={(e) => setLibDur(e.target.value)}>
                   {DUR_FILTERS.map((f) => (
                     <option key={f.value} value={f.value}>
-                      {f.label}
+                      {'label' in f ? f.label : tp('tour-design', f.key)}
                     </option>
                   ))}
                 </select>
                 <select value={libCat} onChange={(e) => setLibCat(e.target.value)}>
-                  <option value="">All Categories</option>
+                  <option value="">{tp('tour-design', 'expCatAll')}</option>
                   {CAT_FILTERS.filter(Boolean).map((c) => (
                     <option key={c} value={c}>
                       {c.charAt(0).toUpperCase() + c.slice(1)}
@@ -256,7 +258,9 @@ export default function TourExperiencesStep({
                   ))}
                 </select>
                 <div style={{ fontSize: 11, color: 'var(--m)', width: '100%' }}>
-                  {productPage?.totalCount ?? 0} experience{(productPage?.totalCount ?? 0) !== 1 ? 's' : ''} found
+                  {(productPage?.totalCount ?? 0) === 1
+                    ? tpl('tour-design', 'expFound', { count: productPage?.totalCount ?? 0 })
+                    : tpl('tour-design', 'expFoundPlural', { count: productPage?.totalCount ?? 0 })}
                 </div>
               </div>
               <div className="td-lib-list">
@@ -265,19 +269,19 @@ export default function TourExperiencesStep({
                     className="crm-empty-state--flush"
                     size="compact"
                     variant="products"
-                    title="Cannot load experiences"
-                    description="Please retry loading the product catalogue."
-                    action={<button type="button" className="btn btn-s btn-sm" onClick={retryProductPage}>Try again</button>}
+                    title={tp('tour-design', 'expLoadFailedTitle')}
+                    description={tp('tour-design', 'expLoadFailedDesc')}
+                    action={<button type="button" className="btn btn-s btn-sm" onClick={retryProductPage}>{tp('tour-design', 'expTryAgain')}</button>}
                   />
                 ) : productPageLoading && !productPage ? (
-                  <p style={{ padding: 16, color: 'var(--m)' }}>Loading experiences…</p>
+                  <p style={{ padding: 16, color: 'var(--m)' }}>{tp('tour-design', 'expLoading')}</p>
                 ) : libFiltered.length === 0 ? (
                   <EmptyState
                     className="crm-empty-state--flush"
                     size="compact"
                     variant="products"
-                    title="No experiences found"
-                    description="Try adjusting region, duration, or category filters."
+                    title={tp('tour-design', 'expEmptyTitle')}
+                    description={tp('tour-design', 'expEmptyDesc')}
                   />
                 ) : (
                   libFiltered.map((p) => (
@@ -305,13 +309,13 @@ export default function TourExperiencesStep({
         <div className="td-exp-right-wrap">
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
             <button className="btn btn-s btn-sm" type="button" onClick={() => setPreviewOpen((v) => !v)}>
-              {previewOpen ? 'Hide Preview' : '👁 Preview Proposal'}
+              {previewOpen ? tp('tour-design', 'expHidePreview') : `👁 ${tp('tour-design', 'expShowPreview')}`}
             </button>
           </div>
           {previewOpen && (
             <div style={{ marginBottom: 12, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
               <iframe
-                title="Tour Experiences proposal preview"
+                title={tp('tour-design', 'expPreviewIframeTitle')}
                 srcDoc={proposalPreviewHtml}
                 style={{ width: '100%', height: 520, border: 'none', background: '#fff' }}
               />

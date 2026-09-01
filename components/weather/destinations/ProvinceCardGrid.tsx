@@ -3,6 +3,7 @@
 import ProvinceCard from '@/components/weather/destinations/ProvinceCard';
 import ProvinceGridSkeleton from '@/components/weather/destinations/ProvinceGridSkeleton';
 import type { WeatherDestinationMeta } from '@/lib/weather/types';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type Props = {
   destinations: WeatherDestinationMeta[];
@@ -17,6 +18,8 @@ export default function ProvinceCardGrid({
   onSelect,
   onEdit,
 }: Props) {
+  const { tp } = useLanguage();
+
   if (loading && !destinations.length) {
     return <ProvinceGridSkeleton count={8} />;
   }
@@ -24,7 +27,7 @@ export default function ProvinceCardGrid({
   if (!destinations.length) {
     return (
       <div className="wg-empty-state">
-        <p>Chưa có điểm đến khác. Thêm tỉnh thành mới bên dưới.</p>
+        <p>{tp('weather', 'emptyExplore')}</p>
       </div>
     );
   }

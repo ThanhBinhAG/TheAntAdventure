@@ -2,27 +2,52 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useLanguage } from '@/hooks/useLanguage';
 
 type RegTab = 'tour' | 'team';
 
+const CANCEL_ROWS = [
+  ['regCancel60plus', 'regCancelDepositForfeited'],
+  ['regCancel45to59', 'regCancel30pct'],
+  ['regCancel30to44', 'regCancel50pct'],
+  ['regCancel15to29', 'regCancel75pct'],
+  ['regCancel0to14', 'regCancel100pct'],
+] as const;
+
+const CHECKLIST = [
+  {
+    titleKey: 'regStageSales',
+    items: ['regDocProposal', 'regDocPricingTable', 'regDocIntake', 'regDocTerms'] as const,
+  },
+  {
+    titleKey: 'regStageBooking',
+    items: ['regDocConfirmation', 'regDocDepositInvoice', 'regDocPaymentReceipt', 'regDocInsurance'] as const,
+  },
+  {
+    titleKey: 'regStageOperations',
+    items: ['regDocGuideBrief', 'regDocHotelVouchers', 'regDocTransportSchedule', 'regDocEmergencyContact'] as const,
+  },
+] as const;
+
 export default function Regulations() {
+  const { tp } = useLanguage();
   const [tab, setTab] = useState<RegTab>('tour');
 
   return (
     <div>
       <div className="info-bar" style={{ marginBottom: 14 }}>
-        Internal regulations and operational guidelines. See also{' '}
+        {tp('portal', 'regIntro')}{' '}
         <Link href="/sales" style={{ color: 'var(--g)', fontWeight: 600 }}>
-          Sales Pipeline → Tour Policy tab
+          {tp('portal', 'regSalesLink')}
         </Link>
         .
       </div>
       <div className="tabs">
         <div className={`tab${tab === 'tour' ? ' on' : ''}`} onClick={() => setTab('tour')} role="button" tabIndex={0}>
-          Tour Regulations
+          {tp('portal', 'regTabTour')}
         </div>
         <div className={`tab${tab === 'team' ? ' on' : ''}`} onClick={() => setTab('team')} role="button" tabIndex={0}>
-          Team Regulations
+          {tp('portal', 'regTabTeam')}
         </div>
       </div>
 
@@ -31,81 +56,65 @@ export default function Regulations() {
           <div className="reg-grid-2">
             <div className="card">
               <div className="card-hd">
-                <span className="card-title">📋 Booking & Payment Policy</span>
+                <span className="card-title">📋 {tp('portal', 'regBookingPayment')}</span>
               </div>
               <div className="card-body reg-policy-list">
                 <div className="reg-policy-item">
                   <span className="reg-pill reg-pill-g">30%</span>
-                  <span>Non-refundable deposit to confirm. Payable within 7 days of confirmation.</span>
+                  <span>{tp('portal', 'regDeposit30')}</span>
                 </div>
                 <div className="reg-policy-item">
                   <span className="reg-pill reg-pill-g">70%</span>
-                  <span>Balance due 45 days before departure. Bookings within 45 days: full payment at confirmation.</span>
+                  <span>{tp('portal', 'regBalance70')}</span>
                 </div>
                 <div className="reg-policy-item">
                   <span className="reg-pill reg-pill-b">FX</span>
-                  <span>All prices in USD. Payment via bank transfer or credit card (+2.5% fee).</span>
+                  <span>{tp('portal', 'regFx')}</span>
                 </div>
                 <div className="reg-policy-item">
                   <span className="reg-pill reg-pill-p">B2B</span>
-                  <span>Agent commission paid within 14 days after tour completion. Bronze 8% / Silver 12% / Gold 15% / Platinum 20%.</span>
+                  <span>{tp('portal', 'regB2b')}</span>
                 </div>
               </div>
             </div>
             <div className="card">
               <div className="card-hd">
-                <span className="card-title">🚫 Cancellation Policy</span>
+                <span className="card-title">🚫 {tp('portal', 'regCancellation')}</span>
               </div>
               <div className="card-body" style={{ padding: 0 }}>
                 <table className="tbl">
                   <thead>
                     <tr>
-                      <th>Notice Period</th>
-                      <th>Penalty</th>
+                      <th>{tp('portal', 'regNoticePeriod')}</th>
+                      <th>{tp('portal', 'regPenalty')}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>60+ days before</td>
-                      <td>Deposit forfeited</td>
-                    </tr>
-                    <tr>
-                      <td>45–59 days</td>
-                      <td>30% of total</td>
-                    </tr>
-                    <tr>
-                      <td>30–44 days</td>
-                      <td>50% of total</td>
-                    </tr>
-                    <tr>
-                      <td>15–29 days</td>
-                      <td>75% of total</td>
-                    </tr>
-                    <tr>
-                      <td>0–14 days / no-show</td>
-                      <td style={{ color: 'var(--red)', fontWeight: 600 }}>100% of total</td>
-                    </tr>
+                    {CANCEL_ROWS.map(([periodKey, penaltyKey]) => (
+                      <tr key={periodKey}>
+                        <td>{tp('portal', periodKey)}</td>
+                        <td style={periodKey === 'regCancel0to14' ? { color: 'var(--red)', fontWeight: 600 } : undefined}>
+                          {tp('portal', penaltyKey)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
-                <div className="reg-force-majeure">⚠ Force majeure handled case-by-case. Credit or rescheduling where possible.</div>
+                <div className="reg-force-majeure">⚠ {tp('portal', 'regForceMajeure')}</div>
               </div>
             </div>
           </div>
           <div className="card" style={{ marginTop: 14 }}>
             <div className="card-hd">
-              <span className="card-title">📁 Document Checklist</span>
+              <span className="card-title">📁 {tp('portal', 'regDocChecklist')}</span>
             </div>
             <div className="card-body">
               <div className="reg-checklist-grid">
-                {[
-                  ['Sales Stage', ['Tour Proposal (PDF)', 'Pricing Table', 'Client intake form', 'Terms & Conditions']],
-                  ['Booking Stage', ['Booking Confirmation', 'Deposit Invoice', 'Full payment receipt', 'Travel insurance proof']],
-                  ['Operations Stage', ['Guide Brief', 'Hotel vouchers', 'Transport schedule', 'Emergency contact sheet']],
-                ].map(([title, items]) => (
-                  <div key={String(title)} className="reg-checklist-col">
-                    <div className="reg-checklist-title">{title}</div>
-                    {(items as string[]).map((item) => (
-                      <div key={item}>☐ {item}</div>
+                {CHECKLIST.map(({ titleKey, items }) => (
+                  <div key={titleKey} className="reg-checklist-col">
+                    <div className="reg-checklist-title">{tp('portal', titleKey)}</div>
+                    {items.map((itemKey) => (
+                      <div key={itemKey}>☐ {tp('portal', itemKey)}</div>
                     ))}
                   </div>
                 ))}
@@ -119,37 +128,31 @@ export default function Regulations() {
         <div className="reg-grid-2">
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">⏰ Working Hours & Attendance</span>
+              <span className="card-title">⏰ {tp('portal', 'regWorkingHours')}</span>
             </div>
             <div className="card-body reg-policy-list">
               <div className="reg-policy-item">
                 <span className="reg-pill reg-pill-g">HOURS</span>
-                <span>Monday–Saturday, 8:30 AM – 5:30 PM (GMT+7). Lunch 12:00–1:00 PM.</span>
+                <span>{tp('portal', 'regHours')}</span>
               </div>
               <div className="reg-policy-item">
                 <span className="reg-pill reg-pill-a">LATE</span>
-                <span>3 late arrivals in a month = formal warning.</span>
+                <span>{tp('portal', 'regLate')}</span>
               </div>
               <div className="reg-policy-item">
                 <span className="reg-pill reg-pill-r">ABS</span>
-                <span>Absences must be reported by 8 AM. No-call-no-show is a serious disciplinary matter.</span>
+                <span>{tp('portal', 'regAbsence')}</span>
               </div>
             </div>
           </div>
           <div className="card">
             <div className="card-hd">
-              <span className="card-title">📱 Communication Standards</span>
+              <span className="card-title">📱 {tp('portal', 'regCommunication')}</span>
             </div>
             <div className="card-body" style={{ fontSize: 12.5, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div className="sal-bonus-pill">
-                <b>Client response time:</b> All enquiries acknowledged within 2 hours during office hours.
-              </div>
-              <div className="sal-bonus-pill">
-                <b>CRM compliance:</b> All interactions MUST be logged in the CRM same day.
-              </div>
-              <div className="sal-bonus-pill sal-bonus-tet">
-                <b>Zero tolerance:</b> Discrimination, harassment, or kickbacks without disclosure — immediate dismissal.
-              </div>
+              <div className="sal-bonus-pill">{tp('portal', 'regClientResponse')}</div>
+              <div className="sal-bonus-pill">{tp('portal', 'regCrmCompliance')}</div>
+              <div className="sal-bonus-pill sal-bonus-tet">{tp('portal', 'regZeroTolerance')}</div>
             </div>
           </div>
         </div>

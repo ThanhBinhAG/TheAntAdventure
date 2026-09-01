@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useLanguage } from '@/hooks/useLanguage';
 import type { TourBrief } from '@/lib/tour-design/tour-design-types';
 import { getGuestPanelData, hasGuestBriefData } from '@/lib/tour-design/tour-brief-summary';
 
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export default function GuestProfileCard({ brief, clientType, custName, onEditBrief }: Props) {
+  const { tp } = useLanguage();
   const { displayName, summaryLine, rows } = getGuestPanelData(brief, clientType, custName);
   const hasData = hasGuestBriefData(brief, clientType, custName);
   const [open, setOpen] = useState(() => {
@@ -40,11 +42,11 @@ export default function GuestProfileCard({ brief, clientType, custName, onEditBr
   return (
     <div className={`guest-info-panel${open ? ' is-open' : ' is-collapsed'}`}>
       <div className="guest-info-panel-hd">
-        <div className="guest-info-panel-title">👤 Guest Profile</div>
+        <div className="guest-info-panel-title">👤 {tp('tour-design', 'expGuestProfile')}</div>
         <div className="guest-info-hd-actions">
           {hasData && (
             <button type="button" className="guest-info-toggle" onClick={toggle} aria-expanded={open}>
-              {open ? 'Hide details' : 'Details'}
+              {open ? tp('tour-design', 'expHideDetails') : tp('tour-design', 'expDetails')}
               <span className="guest-info-chevron" aria-hidden>
                 {open ? '▴' : '▾'}
               </span>
@@ -52,13 +54,13 @@ export default function GuestProfileCard({ brief, clientType, custName, onEditBr
           )}
           {onEditBrief && (
             <button type="button" className="guest-info-edit" onClick={onEditBrief}>
-              ✏ Edit Brief
+              ✏ {tp('tour-design', 'expEditBrief')}
             </button>
           )}
         </div>
       </div>
       {!hasData ? (
-        <div style={{ fontSize: 11.5, color: 'var(--m)' }}>Fill in Client Brief (Step 1) to see guest details here.</div>
+        <div style={{ fontSize: 11.5, color: 'var(--m)' }}>{tp('tour-design', 'expGuestEmpty')}</div>
       ) : (
         <>
           <div className="guest-info-compact">

@@ -143,7 +143,7 @@ export default function AttractionEditModal({
     setForm(initialForm(mode, attraction, attractions, defaultRegion, nextId));
   }
 
-  const { language } = useLanguage();
+  const { tp, tpl, language } = useLanguage();
   const baselineForm = useMemo(
     () => initialForm(mode, attraction, attractions, defaultRegion, nextId),
     [formKey], // eslint-disable-line react-hooks/exhaustive-deps
@@ -231,7 +231,7 @@ export default function AttractionEditModal({
       setQuickAddOpen(false);
       setQuickAddStatus('');
     } catch (err) {
-      setQuickAddStatus(err instanceof Error ? err.message : 'Upload failed');
+      setQuickAddStatus(err instanceof Error ? err.message : tp('attractions', 'toastUploadFail'));
     } finally {
       setQuickAddSaving(false);
     }
@@ -271,7 +271,7 @@ export default function AttractionEditModal({
       setQuickRemoveMode(false);
 
     } catch (err) {
-      setQuickAddStatus(err instanceof Error ? err.message : 'Failed to sync photo removal');
+      setQuickAddStatus(err instanceof Error ? err.message : tp('attractions', 'toastRemoveSyncFail'));
     } finally {
       setRemovingPhotoId('');
     }
@@ -279,20 +279,20 @@ export default function AttractionEditModal({
 
   function handleSave() {
     if (!form.name.trim()) {
-      toast.warning('Attraction name is required.');
+      toast.warning(tp('attractions', 'toastNameRequired'));
       return;
     }
     if (!form.dest.trim()) {
-      toast.warning('Destination is required.');
+      toast.warning(tp('attractions', 'toastDestRequired'));
       return;
     }
     if (!form.id.trim()) {
-      toast.warning('ID is missing — pick a region and try again.');
+      toast.warning(tp('attractions', 'toastIdMissing'));
       return;
     }
     const duplicate = attractions.some((a) => a.id === form.id && a.id !== attraction?.id);
     if (duplicate) {
-      toast.warning(`ID ${form.id} already exists. Change region to get a new ID.`);
+      toast.warning(tpl('attractions', 'toastDuplicateId', { id: form.id }));
       return;
     }
     const linked = form.linkedPhotoIds ?? [];
@@ -303,13 +303,13 @@ export default function AttractionEditModal({
   async function handleDelete() {
     if (!attraction || !onDelete) return;
     const ok = await confirmDialog(
-      `Delete "${attraction.name}"? This cannot be undone.`,
-      { title: 'Delete attraction' },
+      tpl('attractions', 'deleteConfirm', { name: attraction.name }),
+      { title: tp('attractions', 'deleteTitle') },
     );
     if (!ok) return;
     onDelete(attraction.id);
     onClose();
-    toast.success('Attraction deleted.');
+    toast.success(tp('attractions', 'toastDeleted'));
   }
 
   return (
@@ -317,96 +317,107 @@ export default function AttractionEditModal({
       <div className="overlay open prod-form-overlay" onClick={() => void requestClose()}>
         <div className="modal att-edit-modal" onClick={(e) => e.stopPropagation()}>
           <div className="modal-hd">
-            <span className="modal-title">{mode === 'edit' ? 'Edit Attraction' : 'Add Attraction'}</span>
-            <button type="button" className="modal-x att-edit-close-btn" onClick={() => void requestClose()} aria-label="Close modal">
+            <span className="modal-title">
+              {mode === 'edit' ? tp('attractions', 'modalEditTitle') : tp('attractions', 'modalAddTitle')}
+            </span>
+            <button
+              type="button"
+              className="modal-x att-edit-close-btn"
+              onClick={() => void requestClose()}
+              aria-label={tp('attractions', 'closeModal')}
+            >
               ✕
             </button>
           </div>
           <div className="modal-body att-edit-body">
             <div className="att-edit-grid">
               <div className="fg">
-                <label className="lbl">ID</label>
+                <label className="lbl">{tp('attractions', 'lblId')}</label>
                 <input value={form.id} readOnly className="att-id-readonly" />
               </div>
               <div className="fg">
-                <label className="lbl">Region</label>
+                <label className="lbl">{tp('attractions', 'lblRegion')}</label>
                 <select
                   value={form.region}
                   onChange={(e) => setRegion(e.target.value as Attraction['region'])}
                 >
-                  <option value="north">Northern Vietnam</option>
-                  <option value="central">Central Vietnam</option>
-                  <option value="south">Southern Vietnam</option>
+                  <option value="north">{tp('attractions', 'regionNorth')}</option>
+                  <option value="central">{tp('attractions', 'regionCentral')}</option>
+                  <option value="south">{tp('attractions', 'regionSouth')}</option>
                 </select>
               </div>
               <div className="fg">
-                <label className="lbl">Type</label>
+                <label className="lbl">{tp('attractions', 'lblType')}</label>
                 <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                  <option value="museum">Museum</option>
-                  <option value="heritage">Heritage Site</option>
-                  <option value="temple">Temple / Pagoda</option>
-                  <option value="landmark">Landmark</option>
-                  <option value="nature">Nature Site</option>
+                  <option value="museum">{tp('attractions', 'typeMuseum')}</option>
+                  <option value="heritage">{tp('attractions', 'typeHeritage')}</option>
+                  <option value="temple">{tp('attractions', 'typeTemple')}</option>
+                  <option value="landmark">{tp('attractions', 'typeLandmark')}</option>
+                  <option value="nature">{tp('attractions', 'typeNature')}</option>
                 </select>
               </div>
               <div className="fg">
-                <label className="lbl">Destination *</label>
+                <label className="lbl">{tp('attractions', 'lblDestination')}</label>
                 <input
                   value={form.dest}
-                  placeholder="e.g. Hanoi"
+                  placeholder={tp('attractions', 'placeholderDest')}
                   onChange={(e) => setForm({ ...form, dest: e.target.value })}
                 />
               </div>
               <div className="fg att-edit-span2">
-                <label className="lbl">Name *</label>
+                <label className="lbl">{tp('attractions', 'lblName')}</label>
                 <input
                   value={form.name}
-                  placeholder="Attraction name"
+                  placeholder={tp('attractions', 'placeholderName')}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                 />
               </div>
               <div className="fg">
-                <label className="lbl">Phone</label>
-                <input value={form.phone} placeholder="+84 …" onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <label className="lbl">{tp('attractions', 'lblPhone')}</label>
+                <input
+                  value={form.phone}
+                  placeholder={tp('attractions', 'placeholderPhone')}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
               </div>
               <div className="fg">
-                <label className="lbl">Admission</label>
+                <label className="lbl">{tp('attractions', 'lblAdmission')}</label>
                 <input value={form.admission} onChange={(e) => setForm({ ...form, admission: e.target.value })} />
               </div>
               <div className="fg att-edit-span2">
-                <label className="lbl">Hours</label>
+                <label className="lbl">{tp('attractions', 'lblHours')}</label>
                 <input
                   value={form.hours}
-                  placeholder="Tue–Sun 08:30–17:30"
+                  placeholder={tp('attractions', 'placeholderHours')}
                   onChange={(e) => setForm({ ...form, hours: e.target.value })}
                 />
               </div>
               <div className="fg att-edit-span2">
-                <label className="lbl">Closed</label>
+                <label className="lbl">{tp('attractions', 'lblClosed')}</label>
                 <input
                   value={form.closed}
-                  placeholder="Monday, None, …"
+                  placeholder={tp('attractions', 'placeholderClosed')}
                   onChange={(e) => setForm({ ...form, closed: e.target.value })}
                 />
               </div>
               <div className="fg">
-                <label className="lbl">Visit duration (min)</label>
+                <label className="lbl">{tp('attractions', 'lblDuration')}</label>
                 <input type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })} />
               </div>
               <div className="fg">
-                <label className="lbl">Best time</label>
+                <label className="lbl">{tp('attractions', 'lblBestTime')}</label>
                 <input value={form.best_time} onChange={(e) => setForm({ ...form, best_time: e.target.value })} />
               </div>
               <div className="fg att-edit-span2">
-                <label className="lbl">Crowd tips</label>
+                <label className="lbl">{tp('attractions', 'lblCrowdTips')}</label>
                 <input value={form.crowd} onChange={(e) => setForm({ ...form, crowd: e.target.value })} />
               </div>
               <div className="fg att-edit-span2">
-                <label className="lbl">Seasonal notes</label>
+                <label className="lbl">{tp('attractions', 'lblSeasonal')}</label>
                 <input value={form.seasonal} onChange={(e) => setForm({ ...form, seasonal: e.target.value })} />
               </div>
               <div className="fg att-edit-span2">
-                <label className="lbl">Alert badge (non-closure info)</label>
+                <label className="lbl">{tp('attractions', 'lblAlert')}</label>
                 <input value={form.alert} onChange={(e) => setForm({ ...form, alert: e.target.value })} />
               </div>
               <div className="fg att-edit-span2">
@@ -417,22 +428,25 @@ export default function AttractionEditModal({
                     checked={form.book_req}
                     onChange={(e) => setForm({ ...form, book_req: e.target.checked })}
                   />
-                  <span>Booking required</span>
+                  <span>{tp('attractions', 'lblBookingRequired')}</span>
                 </label>
               </div>
               <div className="fg att-edit-span2">
-                <label className="lbl">Description</label>
+                <label className="lbl">{tp('attractions', 'lblDescription')}</label>
                 <textarea rows={4} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
             </div>
 
             <div className={`att-edit-photos${quickRemoveMode ? ' remove-mode' : ''}`}>
               <div className="att-edit-photos-hd">
-                <div className="att-expand-label">Gallery photos (max 4 featured)</div>
+                <div className="att-expand-label">{tp('attractions', 'photosTitle')}</div>
                 <div className="att-edit-photos-actions">
                   {pickablePhotos.length > 0 && (
                     <span className="att-edit-photos-count">
-                      {form.linkedPhotoIds.length} linked · {form.photoIds.length}/4 featured
+                      {tpl('attractions', 'photosLinkedFeatured', {
+                        linked: form.linkedPhotoIds.length,
+                        featured: form.photoIds.length,
+                      })}
                     </span>
                   )}
                   {mode === 'edit' && (
@@ -442,7 +456,7 @@ export default function AttractionEditModal({
                       onClick={() => setQuickAddOpen(true)}
                       disabled={Boolean(removingPhotoId)}
                     >
-                      + Quick Add Photo
+                      {tp('attractions', 'quickAddPhoto')}
                     </button>
                   )}
                   {mode === 'edit' && pickablePhotos.length > 0 && (
@@ -455,7 +469,7 @@ export default function AttractionEditModal({
                         setSelectedRemoveIds([]);
                       }}
                     >
-                      {quickRemoveMode ? 'Cancel Remove' : 'Quick Remove'}
+                      {quickRemoveMode ? tp('attractions', 'cancelRemove') : tp('attractions', 'quickRemove')}
                     </button>
                   )}
                   {quickRemoveMode && (
@@ -465,7 +479,7 @@ export default function AttractionEditModal({
                       disabled={!selectedRemoveIds.length || Boolean(removingPhotoId)}
                       onClick={() => void handleQuickRemoveMany(selectedRemoveIds)}
                     >
-                      Delete Selected ({selectedRemoveIds.length})
+                      {tpl('attractions', 'deleteSelected', { count: selectedRemoveIds.length })}
                     </button>
                   )}
                 </div>
@@ -475,18 +489,18 @@ export default function AttractionEditModal({
                   <div className="att-photo-empty-icon">🖼</div>
                   <p>
                     {mode === 'add'
-                      ? 'Save this attraction first, then add photos via Quick Add or Photo Gallery.'
-                      : 'No photos linked yet. Quick add a photo here or open Photo Gallery.'}
+                      ? tp('attractions', 'photosEmptyAdd')
+                      : tp('attractions', 'photosEmptyNoLinked')}
                   </p>
                   <div className="att-edit-empty-actions">
                     {mode === 'edit' && (
                       <button type="button" className="btn btn-p btn-sm" onClick={() => setQuickAddOpen(true)}>
-                        + Quick Add Photo
+                        {tp('attractions', 'quickAddPhoto')}
                       </button>
                     )}
                     {galleryHref && (
                       <a href={galleryHref} className="btn btn-s btn-sm">
-                        Open Gallery
+                        {tp('attractions', 'openGallery')}
                       </a>
                     )}
                   </div>
@@ -495,8 +509,8 @@ export default function AttractionEditModal({
                 <>
                   <p className={`att-edit-photos-hint${quickRemoveMode ? ' remove-mode' : ''}`}>
                     {quickRemoveMode
-                      ? 'Remove mode: click photos to select, then click Delete Selected.'
-                      : 'Click a photo to toggle featured on the schedule.'}
+                      ? tp('attractions', 'photosHintRemove')
+                      : tp('attractions', 'photosHintFeatured')}
                   </p>
                   <div className="att-edit-photo-picks">
                     {pickablePhotos.map((p) => {
@@ -528,8 +542,12 @@ export default function AttractionEditModal({
                             <span className="att-edit-photo-cap">{p.caption || p.id}</span>
                             <span className="att-edit-photo-status">
                               {quickRemoveMode
-                                ? (selectedForRemove ? 'Selected to delete' : 'Click to select')
-                                : (featured ? 'Featured' : 'Not shown')}
+                                ? (selectedForRemove
+                                    ? tp('attractions', 'photoSelectedDelete')
+                                    : tp('attractions', 'photoClickSelect'))
+                                : (featured
+                                    ? tp('attractions', 'photoFeatured')
+                                    : tp('attractions', 'photoNotShown'))}
                             </span>
                           </button>
                         </div>
@@ -539,7 +557,7 @@ export default function AttractionEditModal({
                   <div className="att-edit-gallery-links">
                     {galleryHref && (
                       <a href={galleryHref} className="att-edit-gallery-link">
-                        Manage all photos in Gallery →
+                        {tp('attractions', 'manageGalleryLink')}
                       </a>
                     )}
                   </div>
@@ -550,12 +568,12 @@ export default function AttractionEditModal({
           <div className="modal-ft att-edit-ft">
             {mode === 'edit' && onDelete && (
               <button type="button" className="btn btn-danger btn-sm att-edit-delete" onClick={handleDelete}>
-                Delete
+                {tp('attractions', 'delete')}
               </button>
             )}
             <div className="att-edit-ft-actions">
               <button type="button" className="btn btn-s" onClick={() => void requestClose()}>
-                Cancel
+                {tp('attractions', 'cancel')}
               </button>
               <button
                 type="button"
@@ -563,7 +581,7 @@ export default function AttractionEditModal({
                 disabled={!form.id || !form.name.trim() || !form.dest.trim()}
                 onClick={handleSave}
               >
-                {mode === 'edit' ? 'Save Changes' : 'Add Attraction'}
+                {mode === 'edit' ? tp('attractions', 'saveChanges') : tp('attractions', 'addAttraction')}
               </button>
             </div>
           </div>

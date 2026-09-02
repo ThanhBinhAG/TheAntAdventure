@@ -14,7 +14,7 @@ import {
 } from '@/lib/customers/nationalities';
 import { isIsoTravelMonth, travelMonthInputValue } from '@/lib/core/travel-month';
 import { buildBriefSummaryHtml } from '@/lib/tour-design/tour-brief-summary';
-import { DURATION_PRESETS } from '@/lib/tour-design/tour-durations';
+import { calculateTourDuration } from '@/lib/tour-design/tour-durations';
 import type { TourBrief } from '@/lib/tour-design/tour-design-types';
 import type { Customer } from '@/lib/types';
 import { toast } from '@/lib/toast';
@@ -83,6 +83,7 @@ export default function ClientBriefStep({
   const travelStyles = clientPreferences?.travelStyles ?? DEFAULT_TRAVEL_STYLES;
   const hotelTiers = clientPreferences?.hotelTiers ?? [];
   const clientPreferencesLoading = clientPreferences === null && clientPreferencesError === null;
+  const calculatedDuration = calculateTourDuration(brief.startDate, brief.endDate);
 
   useEffect(() => {
     let active = true;
@@ -187,10 +188,33 @@ export default function ClientBriefStep({
   function handleStartDateChange(value: string) {
     if (value && !isTravelDateNotPast(value)) {
       toast.warning(tp('tour-design', 'briefDatePastWarning'));
-      setBrief({ ...brief, startDate: '' });
+      setBrief((current) => ({ ...current, startDate: '', endDate: '', duration: '' }));
       return;
     }
-    setBrief({ ...brief, startDate: value });
+    setBrief((current) => {
+      const endDate = value && current.endDate && current.endDate < value ? '' : current.endDate;
+      if (value && current.endDate && !endDate) toast.warning(tp('tour-design', 'briefEndDateReset'));
+      const duration = calculateTourDuration(value, endDate)?.label ?? '';
+      return {
+        ...current,
+        startDate: value,
+        endDate,
+        travelMonth: value ? value.slice(0, 7) : current.travelMonth,
+        duration,
+      };
+    });
+  }
+
+  function handleEndDateChange(value: string) {
+    if (value && brief.startDate && value < brief.startDate) {
+      toast.warning(tp('tour-design', 'briefEndDateBeforeStart'));
+      return;
+    }
+    setBrief((current) => ({
+      ...current,
+      endDate: value,
+      duration: calculateTourDuration(current.startDate, value)?.label ?? '',
+    }));
   }
 
   function handleNext() {
@@ -319,6 +343,7 @@ export default function ClientBriefStep({
                 type="month"
                 value={travelMonthInputValue(brief.travelMonth)}
                 onChange={(e) => setBrief({ ...brief, travelMonth: e.target.value })}
+                disabled={Boolean(brief.startDate)}
               />
               {brief.travelMonth && !isIsoTravelMonth(brief.travelMonth) && (
                 <div className="nc-form-hint">Legacy value kept: {brief.travelMonth}</div>
@@ -394,15 +419,6 @@ export default function ClientBriefStep({
               📅 {tp('tour-design', 'briefTravelDetails')}
             </div>
             <div className="td-form-grid td-form-grid-3">
-              <div className="fg">
-                <label className="lbl">{tp('tour-design', 'briefStartDate')}</label>
-                <input
-                  type="date"
-                  min={todayIso}
-                  value={brief.startDate}
-                  onChange={(e) => handleStartDateChange(e.target.value)}
-                />
-              </div>
               <div className="fg">
                 <label className="lbl">{tp('tour-design', 'briefNationality')}</label>
                 <input
@@ -495,22 +511,32 @@ export default function ClientBriefStep({
             />
           </div>
 
-          <div className="fg" style={{ marginTop: 8 }}>
-            <label className="lbl">{tp('tour-design', 'briefDuration')}</label>
-            <input
-              list="td-duration-list"
-              value={brief.duration}
-              onChange={(e) => setBrief({ ...brief, duration: e.target.value })}
-              placeholder={tp('tour-design', 'briefDurationPlaceholder')}
-              autoComplete="off"
-            />
-            <datalist id="td-duration-list">
-              {DURATION_PRESETS.map((d) => (
-                <option key={d} value={d} />
-              ))}
-            </datalist>
-            <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>
-              {tp('tour-design', 'briefDurationHint')}
+          <div className="td-travel-dates" style={{ marginTop: 8 }}>
+            <label className="lbl">{tp('tour-design', 'briefTravelDates')}</label>
+            <div className="td-travel-dates-fields">
+              <div className="fg">
+                <label className="lbl">{tp('tour-design', 'briefStartDate')}</label>
+                <input
+                  type="date"
+                  min={todayIso}
+                  value={brief.startDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                />
+              </div>
+              <div className="fg">
+                <label className="lbl">{tp('tour-design', 'briefEndDate')}</label>
+                <input
+                  type="date"
+                  min={brief.startDate || todayIso}
+                  value={brief.endDate}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  disabled={!brief.startDate}
+                />
+              </div>
+              <output className={`td-travel-duration${calculatedDuration ? '' : ' is-pending'}`} aria-live="polite">
+                <span>{tp('tour-design', 'briefDuration')}</span>
+                <strong>{calculatedDuration?.label ?? tp('tour-design', 'briefDurationPending')}</strong>
+              </output>
             </div>
           </div>
 

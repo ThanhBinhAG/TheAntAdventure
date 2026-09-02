@@ -911,6 +911,11 @@ kbd{font-family:inherit}
 .proposal-rich-editor-content h3{font-size:13px;font-weight:700;margin:0 0 6px;color:var(--gd)}
 .proposal-rich-editor-content .is-empty:first-child::before{content:attr(data-placeholder);color:#9aa3ab;float:left;height:0;pointer-events:none}
 .td-form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.td-travel-dates-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(180px,.8fr);gap:12px;align-items:end}
+.td-travel-duration{min-height:33px;display:flex;flex-direction:column;justify-content:center;padding:5px 10px;border:1px solid var(--g);border-radius:7px;background:var(--gl);color:var(--gd)}
+.td-travel-duration span{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.td-travel-duration strong{font-size:12.5px;line-height:1.25}
+.td-travel-duration.is-pending{border-color:var(--b);background:var(--bg);color:var(--m)}
 .td-chips{display:flex;flex-wrap:wrap;gap:6px}
 .td-chip{padding:4px 12px;border-radius:20px;font-size:11.5px;border:1.5px solid var(--b);cursor:pointer;background:#fff;transition:all .12s;user-select:none}
 .td-chip.on{background:var(--g);color:#fff;border-color:var(--g)}
@@ -2367,6 +2372,7 @@ kbd{font-family:inherit}
   .sal-bonus-grid,.tax-controls,.bkd-detail-grid,.bkd-finance,.pt-form-grid{grid-template-columns:1fr 1fr!important}
   .sup-ext-grid{grid-template-columns:1fr!important}
   .td-form-grid,.td-review-grid{grid-template-columns:1fr 1fr!important}
+  .td-travel-dates-fields{grid-template-columns:1fr!important}
   .bk-layout{grid-template-columns:1fr!important}
   .fin-kpi-5,.fin-kpi-4,.guides-kpi{grid-template-columns:1fr 1fr!important}
   .chat-layout{flex-direction:column;height:auto;min-height:400px}

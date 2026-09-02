@@ -48,7 +48,7 @@ export const DEFAULT_TOUR_BRIEF: TourBrief = {
   childAges: '',
   childDiet: '',
   childPrefs: '',
-  duration: '7 Days 6 Nights',
+  duration: '',
   region: 'north',
   startDate: '',
   endDate: '',

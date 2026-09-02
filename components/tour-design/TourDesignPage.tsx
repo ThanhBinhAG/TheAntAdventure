@@ -51,6 +51,7 @@ import { usePagePermission } from '@/hooks/usePagePermission';
 import { useTourDesignCrmContext } from '@/hooks/useTourDesignCrmContext';
 import { useTourDesignReferenceData } from '@/hooks/useTourDesignReferenceData';
 import { TourDesignQueueCards } from '@/components/tour-design/TourDesignQueueCards';
+import { calculateTourDuration } from '@/lib/tour-design/tour-durations';
 
 const STEP_KEYS = [
   'stepClientBrief',
@@ -594,7 +595,7 @@ export default function TourDesignPage() {
     setSelectedPackageId(pkg.id);
     setBrief((b) => ({
       ...b,
-      duration: pkg.format,
+      duration: calculateTourDuration(b.startDate, b.endDate)?.label ?? pkg.format,
       mustSee: pkg.route,
       region: pkg.tag === 'full' ? 'multi' : pkg.tag,
       notes: pkg.tagline,

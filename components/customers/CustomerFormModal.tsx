@@ -196,7 +196,6 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setHotelTiersLoading(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHotelTiersError(null);
     void fetch('/api/customers/hotel-tiers', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
       .then(async (response) => {

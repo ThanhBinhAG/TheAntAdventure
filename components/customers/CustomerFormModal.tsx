@@ -26,6 +26,7 @@ import type { Customer } from '@/lib/types';
 import type { CustomerSaveOutcome } from '@/hooks/useRegisterCustomer';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
 import { useLanguage } from '@/hooks/useLanguage';
+import SearchableSelect from '@/components/SearchableSelect';
 import TravelStyleManagerModal from '@/components/customers/TravelStyleManagerModal';
 import { DEFAULT_TRAVEL_STYLES, type TravelStyle } from '@/lib/customers/travel-styles';
 
@@ -462,22 +463,15 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
               />
             </div>
             <div className="fg">
-              <label className={`lbl${fieldInvalid('country') ? ' nc-field-invalid-label' : ''}`}>{tp('customers', 'formCountry')}</label>
-              <input
+              <label htmlFor={fieldDomId('country')} className={`lbl${fieldInvalid('country') ? ' nc-field-invalid-label' : ''}`}>{tp('customers', 'formCountry')}</label>
+              <SearchableSelect
                 id={fieldDomId('country')}
-                className={fieldInvalid('country') ? 'nc-field-invalid' : undefined}
-                list="nc-country-list"
                 value={form.country}
-                onChange={(e) => set('country', e.target.value)}
+                options={COUNTRIES}
+                onChange={(value) => set('country', value)}
                 placeholder={tp('customers', 'formTypeToSearch')}
-                autoComplete="off"
-                aria-invalid={fieldInvalid('country')}
+                invalid={fieldInvalid('country')}
               />
-              <datalist id="nc-country-list">
-                {COUNTRIES.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
             </div>
             <div className="fg">
               <label className={`lbl${emailInvalid ? ' nc-field-invalid-label' : ''}`}>
@@ -531,22 +525,15 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
               />
             </div>
             <div className="fg">
-              <label className={`lbl${fieldInvalid('nat') ? ' nc-field-invalid-label' : ''}`}>{tp('customers', 'formNationality')}</label>
-              <input
+              <label htmlFor={fieldDomId('nat')} className={`lbl${fieldInvalid('nat') ? ' nc-field-invalid-label' : ''}`}>{tp('customers', 'formNationality')}</label>
+              <SearchableSelect
                 id={fieldDomId('nat')}
-                className={fieldInvalid('nat') ? 'nc-field-invalid' : undefined}
-                list="nc-nationality-list"
                 value={form.nat}
-                onChange={(e) => set('nat', e.target.value)}
+                options={NATIONALITIES}
+                onChange={(value) => set('nat', value)}
                 placeholder={tp('customers', 'formTypeToSearch')}
-                autoComplete="off"
-                aria-invalid={fieldInvalid('nat')}
+                invalid={fieldInvalid('nat')}
               />
-              <datalist id="nc-nationality-list">
-                {NATIONALITIES.map((n) => (
-                  <option key={n} value={n} />
-                ))}
-              </datalist>
             </div>
             <div className="fg">
               <label className="lbl">{tp('customers', 'formSource')}</label>

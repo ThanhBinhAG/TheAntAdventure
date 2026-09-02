@@ -16,6 +16,9 @@ export default async function globalTeardown(): Promise<void> {
   await admin.from('tasks').delete().like('id', `${state.prefix}%`);
   await admin.from('attractions').delete().like('id', `${state.prefix}%`);
   await admin.from('products').delete().like('code', `${state.prefix}%`);
+  await admin.from('role_resource_scopes').delete().eq('role_code', state.legacyScopeRoleCode);
+  await admin.from('role_permissions').delete().eq('role_code', state.legacyScopeRoleCode);
+  await admin.from('roles').delete().eq('code', state.legacyScopeRoleCode);
   await admin.auth.admin.deleteUser(state.admin.id);
   await admin.auth.admin.deleteUser(state.unassigned.id);
   await removeE2eState();

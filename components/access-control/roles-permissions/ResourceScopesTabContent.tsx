@@ -19,14 +19,13 @@ const RESOURCE_SCOPE_RESOURCES: Array<{
     code: AccessControlResourceScope['resource_code'];
     vi: string;
     en: string;
-    supportsAssigned: boolean;
 }> = [
-        { code: 'customers', vi: 'Khách hàng', en: 'Customers', supportsAssigned: false },
-        { code: 'leads', vi: 'Lead', en: 'Leads', supportsAssigned: false },
-        { code: 'tour_drafts', vi: 'Bản nháp tour', en: 'Tour drafts', supportsAssigned: false },
-        { code: 'bookings', vi: 'Booking', en: 'Bookings', supportsAssigned: true },
-        { code: 'tasks', vi: 'Công việc', en: 'Tasks', supportsAssigned: true },
-        { code: 'comms', vi: 'Trao đổi khách hàng', en: 'Customer communications', supportsAssigned: false },
+        { code: 'customers', vi: 'Khách hàng', en: 'Customers' },
+        { code: 'leads', vi: 'Lead', en: 'Leads' },
+        { code: 'tour_drafts', vi: 'Bản nháp tour', en: 'Tour drafts' },
+        { code: 'bookings', vi: 'Booking', en: 'Bookings' },
+        { code: 'tasks', vi: 'Công việc', en: 'Tasks' },
+        { code: 'comms', vi: 'Trao đổi khách hàng', en: 'Customer communications' },
     ];
 
 const RESOURCE_SCOPE_ACTIONS: AccessControlResourceScope['action'][] = [
@@ -120,7 +119,6 @@ export const ResourceScopesTabContent = React.memo(function ResourceScopesTabCon
                                 const allowedScopes: ResourceScopeChoice[] = [
                                     'none',
                                     'own',
-                                    ...(resource.supportsAssigned ? ['assigned'] as const : []),
                                     'all',
                                 ];
                                 const actionLabel = tac(action, language);
@@ -163,9 +161,7 @@ export const ResourceScopesTabContent = React.memo(function ResourceScopesTabCon
                                                                 ? tac('scopeNone', language)
                                                                 : scope === 'own'
                                                                     ? tac('scopeOwn', language)
-                                                                    : scope === 'assigned'
-                                                                        ? tac('scopeAssigned', language)
-                                                                        : tac('scopeAll', language)}
+                                                                    : tac('scopeAll', language)}
                                                         </Radio.Button>
                                                     ))}
                                                 </Radio.Group>

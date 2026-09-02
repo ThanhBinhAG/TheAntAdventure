@@ -7,6 +7,7 @@ const EMAIL_RE =
 
 /** Digits with optional leading +, spaces, dashes, parentheses. */
 const PHONE_RE = /^\+?[\d\s().-]{6,30}$/;
+const GUEST_COUNT_RE = /^[1-9]\d{0,3}$/;
 
 export function isValidEmail(email: string): boolean {
   const t = email.trim();
@@ -20,6 +21,11 @@ export function isValidPhone(phone: string): boolean {
   if (!PHONE_RE.test(t)) return false;
   const digits = t.replace(/\D/g, '');
   return digits.length >= 6 && digits.length <= 15;
+}
+
+/** Whole number of adult guests accepted by Customer, Lead, and quote workflows. */
+export function isValidGuestCount(value: string): boolean {
+  return GUEST_COUNT_RE.test(value.trim()) && Number(value) <= 9999;
 }
 
 /** Strip letters / invalid chars from phone input while typing. */

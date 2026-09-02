@@ -11,6 +11,7 @@ import {
 } from '@/lib/customers/customer-form';
 import {
   isValidEmail,
+  isValidGuestCount,
   isValidPhone,
   sanitizePhoneInput,
 } from '@/lib/customers/customer-validation';
@@ -31,7 +32,7 @@ import { DEFAULT_TRAVEL_STYLES, type TravelStyle } from '@/lib/customers/travel-
 const CHILD_TAGS = ['Infant 0–2', 'Toddler 3–5', 'Child 6–9', 'Pre-teen 10–12', 'Teen 13–17'];
 const EMAIL_CHECK_DEBOUNCE_MS = 400;
 
-type FormErrorField = 'name' | 'email' | 'phone' | 'whatsapp' | 'country' | 'nat';
+type FormErrorField = 'name' | 'email' | 'phone' | 'whatsapp' | 'country' | 'nat' | 'adults';
 
 export type CustomerFormSavePayload = {
   form: CustomerFormData;
@@ -321,6 +322,10 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
       fail('nat', tp('customers', 'errNatRequired'));
       return;
     }
+    if (!isValidGuestCount(form.adults)) {
+      fail('adults', tp('customers', 'errGuestCountInvalid'));
+      return;
+    }
 
     const excludeId = mode === 'edit' && customer ? customer.id : undefined;
     const dup = findDuplicateCustomerByEmail(customers, form.email, excludeId);
@@ -604,14 +609,19 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
               )}
             </div>
             <div className="fg">
-              <label className="lbl">{tp('customers', 'formNumGuests')}</label>
-              <select value={form.adults} onChange={(e) => set('adults', e.target.value)}>
-                {['1', '2', '3', '4', '5', '6', '8', '10', '12'].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+              <label className={`lbl${fieldInvalid('adults') ? ' nc-field-invalid-label' : ''}`}>{tp('customers', 'formNumGuests')}</label>
+              <input
+                id={fieldDomId('adults')}
+                className={fieldInvalid('adults') ? 'nc-field-invalid' : undefined}
+                type="number"
+                min="1"
+                max="9999"
+                step="1"
+                inputMode="numeric"
+                value={form.adults}
+                onChange={(e) => set('adults', e.target.value)}
+                aria-invalid={fieldInvalid('adults')}
+              />
             </div>
             <div className="fg">
               <label className="lbl">{tp('customers', 'formFirstTimeVn')}</label>

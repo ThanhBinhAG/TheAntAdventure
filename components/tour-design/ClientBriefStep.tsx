@@ -22,6 +22,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { getBffData } from '@/lib/bff/client';
 import type { TourDesignClientPreferences } from '@/lib/tour-design/tour-design-types';
 import TravelStyleManagerModal from '@/components/customers/TravelStyleManagerModal';
+import SearchableSelect from '@/components/SearchableSelect';
 
 const CHILD_TAGS = ['Infant 0-2', 'Toddler 3-5', 'Child 6-9', 'Pre-teen 10-12', 'Teen 13-17'];
 const PAX_PRESETS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
@@ -421,18 +422,13 @@ export default function ClientBriefStep({
             <div className="td-form-grid td-form-grid-3">
               <div className="fg">
                 <label className="lbl">{tp('tour-design', 'briefNationality')}</label>
-                <input
-                  list="td-nationality-list"
+                <SearchableSelect
+                  id="td-nationality"
                   value={brief.nationality}
-                  onChange={(e) => setBrief({ ...brief, nationality: e.target.value })}
+                  options={NATIONALITIES}
+                  onChange={(value) => setBrief({ ...brief, nationality: value })}
                   placeholder={tp('tour-design', 'briefNationalityPlaceholder')}
-                  autoComplete="off"
                 />
-                <datalist id="td-nationality-list">
-                  {NATIONALITIES.map((n) => (
-                    <option key={n} value={n} />
-                  ))}
-                </datalist>
               </div>
               <div className="fg">
                 <label className="lbl">{tp('tour-design', 'briefFirstTimeVn')}</label>

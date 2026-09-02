@@ -88,6 +88,9 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
   const [travelStyles, setTravelStyles] = useState<TravelStyle[]>(DEFAULT_TRAVEL_STYLES);
   const [travelStyleManagerOpen, setTravelStyleManagerOpen] = useState(false);
   const [travelStylesSaving, setTravelStylesSaving] = useState(false);
+  const [hotelTiers, setHotelTiers] = useState<string[]>([]);
+  const [hotelTiersLoading, setHotelTiersLoading] = useState(false);
+  const [hotelTiersError, setHotelTiersError] = useState<string | null>(null);
 
   if (formKey !== previousFormKey) {
     setPreviousFormKey(formKey);
@@ -185,9 +188,35 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     return () => controller.abort();
   }, [canManageTravelStyles, open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    setHotelTiersLoading(true);
+    setHotelTiersError(null);
+    void fetch('/api/customers/hotel-tiers', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: string[]; error?: string };
+        if (!response.ok || !body.ok || !Array.isArray(body.data)) throw new Error(body.error ?? 'Không thể tải Hotel Tier.');
+        setHotelTiers(body.data);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setHotelTiers([]);
+        setHotelTiersError(error instanceof Error ? error.message : 'Không thể tải Hotel Tier.');
+      })
+      .finally(() => setHotelTiersLoading(false));
+    return () => controller.abort();
+  }, [open]);
+
   const selectableTravelStyles = useMemo(() => {
     return travelStyles.filter((style) => style.isActive);
   }, [travelStyles]);
+  const selectableHotelTiers = useMemo(() => {
+    if (mode === 'edit' && form.hotelTier && !hotelTiers.includes(form.hotelTier)) {
+      return [form.hotelTier, ...hotelTiers];
+    }
+    return hotelTiers;
+  }, [form.hotelTier, hotelTiers, mode]);
 
   if (!open) return null;
 
@@ -546,11 +575,13 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             </div>
             <div className="fg">
               <label className="lbl">{tp('customers', 'formHotelTier')}</label>
-              <select value={form.hotelTier} onChange={(e) => set('hotelTier', e.target.value)}>
-                <option>Boutique 4★</option>
-                <option>Luxury 5★</option>
-                <option>Standard 3-4★</option>
+              <select value={form.hotelTier} onChange={(e) => set('hotelTier', e.target.value)} disabled={hotelTiersLoading}>
+                <option value="">{hotelTiersLoading ? 'Loading Hotel Tiers…' : '— Select Hotel Tier —'}</option>
+                {selectableHotelTiers.map((tier) => (
+                  <option key={tier} value={tier}>{tier}</option>
+                ))}
               </select>
+              {hotelTiersError && <div className="nc-form-hint" style={{ color: 'var(--red)' }}>{hotelTiersError}</div>}
             </div>
             <div className="fg">
               <label className="lbl">{tp('customers', 'formBudgetRange')}</label>

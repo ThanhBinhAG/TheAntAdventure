@@ -1,4 +1,5 @@
 import type { Customer, Hotel, Lead } from '@/lib/types';
+import type { TravelStyle } from '@/lib/customers/travel-styles';
 
 export interface TourBrief {
   clientName: string;
@@ -99,4 +100,10 @@ export type TourDesignCrmContext = {
 /** Hotel catalog needed by the Tour Design export and pricing steps. */
 export type TourDesignReferenceData = {
   hotels: Hotel[];
+};
+
+/** Shared Client Brief catalog choices, loaded separately from the heavy Hotel reference catalog. */
+export type TourDesignClientPreferences = {
+  travelStyles: TravelStyle[];
+  hotelTiers: string[];
 };

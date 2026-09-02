@@ -3415,7 +3415,7 @@ drop policy if exists rls_travel_styles_select on public.travel_styles;
 drop policy if exists rls_travel_styles_insert on public.travel_styles;
 drop policy if exists rls_travel_styles_update on public.travel_styles;
 drop policy if exists rls_travel_styles_delete on public.travel_styles;
-create policy rls_travel_styles_select on public.travel_styles for select to authenticated using (public.has_permission('customers.write'));
+create policy rls_travel_styles_select on public.travel_styles for select to authenticated using (public.has_permission('customers.write') or public.has_permission('tour_design.read'));
 create policy rls_travel_styles_insert on public.travel_styles for insert to authenticated with check (public.has_permission('customers.write'));
 create policy rls_travel_styles_update on public.travel_styles for update to authenticated using (public.has_permission('customers.write')) with check (public.has_permission('customers.write'));
 create policy rls_travel_styles_delete on public.travel_styles for delete to authenticated using (public.has_permission('customers.write'));

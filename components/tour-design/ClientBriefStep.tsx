@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { AGENT_DATALIST, SALES_PEOPLE } from '@/lib/customers/customer-form';
+import { DEFAULT_TRAVEL_STYLES, type TravelStyle } from '@/lib/customers/travel-styles';
 import {
   isTravelDateNotPast,
   todayIsoLocal,
@@ -11,12 +12,17 @@ import {
   isKnownNationality,
   normalizeNationality,
 } from '@/lib/customers/nationalities';
+import { isIsoTravelMonth, travelMonthInputValue } from '@/lib/core/travel-month';
 import { buildBriefSummaryHtml } from '@/lib/tour-design/tour-brief-summary';
-import { DURATION_PRESETS } from '@/lib/tour-design/tour-durations';
+import { calculateTourDuration } from '@/lib/tour-design/tour-durations';
 import type { TourBrief } from '@/lib/tour-design/tour-design-types';
 import type { Customer } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { useLanguage } from '@/hooks/useLanguage';
+import { getBffData } from '@/lib/bff/client';
+import type { TourDesignClientPreferences } from '@/lib/tour-design/tour-design-types';
+import TravelStyleManagerModal from '@/components/customers/TravelStyleManagerModal';
+import SearchableSelect from '@/components/SearchableSelect';
 
 const CHILD_TAGS = ['Infant 0-2', 'Toddler 3-5', 'Child 6-9', 'Pre-teen 10-12', 'Teen 13-17'];
 const PAX_PRESETS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
@@ -43,6 +49,7 @@ interface Props {
   onCloseAi: () => void;
   onNext: () => void;
   canWrite?: boolean;
+  canManageTravelStyles?: boolean;
 }
 
 export default function ClientBriefStep({
@@ -59,6 +66,7 @@ export default function ClientBriefStep({
   onCloseAi,
   onNext,
   canWrite = true,
+  canManageTravelStyles = false,
 }: Props) {
   const { tp, tpl } = useLanguage();
   const custName = customers.find((c) => c.id === custId)?.name;
@@ -67,8 +75,46 @@ export default function ClientBriefStep({
   const isCustomPax = brief.pax > 10;
   const paxMode = isCustomPax ? 'custom' : 'preset';
   const [customPaxInput, setCustomPaxInput] = useState(String(isCustomPax ? brief.pax : 12));
+  const [clientPreferences, setClientPreferences] = useState<TourDesignClientPreferences | null>(null);
+  const [clientPreferencesError, setClientPreferencesError] = useState<string | null>(null);
+  const [travelStyleManagerOpen, setTravelStyleManagerOpen] = useState(false);
+  const [travelStylesSaving, setTravelStylesSaving] = useState(false);
   const todayIso = todayIsoLocal();
   const firstTimeValue = brief.firstTime === 'unknown' ? '' : brief.firstTime;
+  const travelStyles = clientPreferences?.travelStyles ?? DEFAULT_TRAVEL_STYLES;
+  const clientPreferencesLoading = clientPreferences === null && clientPreferencesError === null;
+  const calculatedDuration = calculateTourDuration(brief.startDate, brief.endDate);
+
+  useEffect(() => {
+    let active = true;
+    void getBffData<TourDesignClientPreferences>(
+      '/api/tour-design/client-preferences',
+      'Không thể tải Travel Style và Hotel Tier.',
+    ).then((preferences) => {
+      if (!active) return;
+      setClientPreferences(preferences);
+      setClientPreferencesError(null);
+    }).catch((error: unknown) => {
+      if (active) setClientPreferencesError(error instanceof Error ? error.message : 'Không thể tải Travel Style và Hotel Tier.');
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectableTravelStyles = useMemo(() => {
+    const activeStyles = travelStyles.filter((style) => style.isActive);
+    if (brief.style && !activeStyles.some((style) => style.label === brief.style)) {
+      return [{ code: 'current-style', label: brief.style, sortOrder: -1, isActive: false } satisfies TravelStyle, ...activeStyles];
+    }
+    return activeStyles;
+  }, [brief.style, travelStyles]);
+
+  const selectableHotelTiers = useMemo(() => {
+    const tiers = clientPreferences?.hotelTiers ?? [];
+    if (brief.hotelTier && !tiers.includes(brief.hotelTier)) return [brief.hotelTier, ...tiers];
+    return tiers;
+  }, [brief.hotelTier, clientPreferences?.hotelTiers]);
 
   function setPax(n: number) {
     setBrief((b) => ({ ...b, pax: n, adults: n }));
@@ -91,6 +137,48 @@ export default function ClientBriefStep({
     setPax(Math.floor(n));
   }
 
+  function applyTravelStyles(styles: TravelStyle[]) {
+    setClientPreferences((current) => ({
+      travelStyles: styles,
+      hotelTiers: current?.hotelTiers ?? [],
+    }));
+    setBrief((current) => current.style && styles.some((style) => style.isActive && style.label === current.style)
+      ? current
+      : { ...current, style: styles.find((style) => style.isActive)?.label ?? current.style });
+  }
+
+  async function saveTravelStyles(styles: TravelStyle[]) {
+    setTravelStylesSaving(true);
+    try {
+      const response = await fetch('/api/customers/travel-styles', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ styles }),
+      });
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: TravelStyle[]; error?: string };
+      if (!response.ok || !body.ok || !Array.isArray(body.data)) throw new Error(body.error ?? 'Không thể lưu Travel Style.');
+      applyTravelStyles(body.data);
+    } finally {
+      setTravelStylesSaving(false);
+    }
+  }
+
+  async function deleteTravelStyle(style: TravelStyle) {
+    setTravelStylesSaving(true);
+    try {
+      const response = await fetch(`/api/customers/travel-styles?${new URLSearchParams({ code: style.code }).toString()}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: TravelStyle[]; error?: string };
+      if (!response.ok || !body.ok || !Array.isArray(body.data)) throw new Error(body.error ?? 'Không thể xóa Travel Style.');
+      applyTravelStyles(body.data);
+    } finally {
+      setTravelStylesSaving(false);
+    }
+  }
+
   function addChildTag(tag: string) {
     setBrief((b) => ({
       ...b,
@@ -101,10 +189,33 @@ export default function ClientBriefStep({
   function handleStartDateChange(value: string) {
     if (value && !isTravelDateNotPast(value)) {
       toast.warning(tp('tour-design', 'briefDatePastWarning'));
-      setBrief({ ...brief, startDate: '' });
+      setBrief((current) => ({ ...current, startDate: '', endDate: '', duration: '' }));
       return;
     }
-    setBrief({ ...brief, startDate: value });
+    setBrief((current) => {
+      const endDate = value && current.endDate && current.endDate < value ? '' : current.endDate;
+      if (value && current.endDate && !endDate) toast.warning(tp('tour-design', 'briefEndDateReset'));
+      const duration = calculateTourDuration(value, endDate)?.label ?? '';
+      return {
+        ...current,
+        startDate: value,
+        endDate,
+        travelMonth: value ? value.slice(0, 7) : current.travelMonth,
+        duration,
+      };
+    });
+  }
+
+  function handleEndDateChange(value: string) {
+    if (value && brief.startDate && value < brief.startDate) {
+      toast.warning(tp('tour-design', 'briefEndDateBeforeStart'));
+      return;
+    }
+    setBrief((current) => ({
+      ...current,
+      endDate: value,
+      duration: calculateTourDuration(current.startDate, value)?.label ?? '',
+    }));
   }
 
   function handleNext() {
@@ -217,28 +328,37 @@ export default function ClientBriefStep({
               )}
             </div>
             <div className="fg">
-              <label className="lbl">{tp('tour-design', 'briefTravelStyle')}</label>
+              <label className="lbl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                {tp('tour-design', 'briefTravelStyle')}
+                {canManageTravelStyles && <button type="button" className="btn btn-sm" style={{ minWidth: 30, padding: '1px 6px' }} onClick={() => setTravelStyleManagerOpen(true)} disabled={clientPreferencesLoading || Boolean(clientPreferencesError) || travelStylesSaving} aria-label="Manage Travel Styles" title="Manage Travel Styles">✎</button>}
+              </label>
               <select value={brief.style} onChange={(e) => setBrief({ ...brief, style: e.target.value })}>
-                {['Luxury', 'Premium Cultural', 'Cultural', 'Adventure', 'Family', 'Culinary', 'Photography', 'Honeymoon'].map((s) => (
-                  <option key={s}>{s}</option>
+                {selectableTravelStyles.map((style) => (
+                  <option key={style.code} value={style.label}>{style.label}</option>
                 ))}
               </select>
             </div>
             <div className="fg">
               <label className="lbl">{tp('tour-design', 'briefTravelMonth')}</label>
-              <select value={brief.travelMonth} onChange={(e) => setBrief({ ...brief, travelMonth: e.target.value })}>
-                {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
-              </select>
+              <input
+                type="month"
+                value={travelMonthInputValue(brief.travelMonth)}
+                onChange={(e) => setBrief({ ...brief, travelMonth: e.target.value })}
+                disabled={Boolean(brief.startDate)}
+              />
+              {brief.travelMonth && !isIsoTravelMonth(brief.travelMonth) && (
+                <div className="nc-form-hint">Legacy value kept: {brief.travelMonth}</div>
+              )}
             </div>
             <div className="fg">
               <label className="lbl">{tp('tour-design', 'briefHotelTier')}</label>
-              <select value={brief.hotelTier} onChange={(e) => setBrief({ ...brief, hotelTier: e.target.value })}>
-                <option>Boutique 4★</option>
-                <option>Luxury 5★</option>
-                <option>Standard 3-4★</option>
+              <select value={brief.hotelTier} onChange={(e) => setBrief({ ...brief, hotelTier: e.target.value })} disabled={clientPreferencesLoading}>
+                <option value="">{clientPreferencesLoading ? 'Loading Hotel Tiers…' : '— Select Hotel Tier —'}</option>
+                {selectableHotelTiers.map((tier) => (
+                  <option key={tier} value={tier}>{tier}</option>
+                ))}
               </select>
+              {clientPreferencesError && <div className="nc-form-hint" style={{ color: 'var(--red)' }}>{clientPreferencesError}</div>}
             </div>
             <div className="fg">
               <label className="lbl">{tp('tour-design', 'briefGuideLanguage')}</label>
@@ -301,28 +421,14 @@ export default function ClientBriefStep({
             </div>
             <div className="td-form-grid td-form-grid-3">
               <div className="fg">
-                <label className="lbl">{tp('tour-design', 'briefStartDate')}</label>
-                <input
-                  type="date"
-                  min={todayIso}
-                  value={brief.startDate}
-                  onChange={(e) => handleStartDateChange(e.target.value)}
-                />
-              </div>
-              <div className="fg">
                 <label className="lbl">{tp('tour-design', 'briefNationality')}</label>
-                <input
-                  list="td-nationality-list"
+                <SearchableSelect
+                  id="td-nationality"
                   value={brief.nationality}
-                  onChange={(e) => setBrief({ ...brief, nationality: e.target.value })}
+                  options={NATIONALITIES}
+                  onChange={(value) => setBrief({ ...brief, nationality: value })}
                   placeholder={tp('tour-design', 'briefNationalityPlaceholder')}
-                  autoComplete="off"
                 />
-                <datalist id="td-nationality-list">
-                  {NATIONALITIES.map((n) => (
-                    <option key={n} value={n} />
-                  ))}
-                </datalist>
               </div>
               <div className="fg">
                 <label className="lbl">{tp('tour-design', 'briefFirstTimeVn')}</label>
@@ -401,22 +507,32 @@ export default function ClientBriefStep({
             />
           </div>
 
-          <div className="fg" style={{ marginTop: 8 }}>
-            <label className="lbl">{tp('tour-design', 'briefDuration')}</label>
-            <input
-              list="td-duration-list"
-              value={brief.duration}
-              onChange={(e) => setBrief({ ...brief, duration: e.target.value })}
-              placeholder={tp('tour-design', 'briefDurationPlaceholder')}
-              autoComplete="off"
-            />
-            <datalist id="td-duration-list">
-              {DURATION_PRESETS.map((d) => (
-                <option key={d} value={d} />
-              ))}
-            </datalist>
-            <div style={{ fontSize: 11, color: 'var(--m)', marginTop: 4 }}>
-              {tp('tour-design', 'briefDurationHint')}
+          <div className="td-travel-dates" style={{ marginTop: 8 }}>
+            <label className="lbl">{tp('tour-design', 'briefTravelDates')}</label>
+            <div className="td-travel-dates-fields">
+              <div className="fg">
+                <label className="lbl">{tp('tour-design', 'briefStartDate')}</label>
+                <input
+                  type="date"
+                  min={todayIso}
+                  value={brief.startDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                />
+              </div>
+              <div className="fg">
+                <label className="lbl">{tp('tour-design', 'briefEndDate')}</label>
+                <input
+                  type="date"
+                  min={brief.startDate || todayIso}
+                  value={brief.endDate}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  disabled={!brief.startDate}
+                />
+              </div>
+              <output className={`td-travel-duration${calculatedDuration ? '' : ' is-pending'}`} aria-live="polite">
+                <span>{tp('tour-design', 'briefDuration')}</span>
+                <strong>{calculatedDuration?.label ?? tp('tour-design', 'briefDurationPending')}</strong>
+              </output>
             </div>
           </div>
 
@@ -457,6 +573,14 @@ export default function ClientBriefStep({
           </button>
         </div>
       </div>
+      <TravelStyleManagerModal
+        open={travelStyleManagerOpen}
+        styles={travelStyles}
+        saving={travelStylesSaving}
+        onClose={() => setTravelStyleManagerOpen(false)}
+        onSave={saveTravelStyles}
+        onDelete={deleteTravelStyle}
+      />
     </div>
   );
 }

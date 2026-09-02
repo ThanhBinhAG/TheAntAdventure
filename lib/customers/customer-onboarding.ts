@@ -1,5 +1,6 @@
 import type { Agent, Comm, Customer, Lead } from '../types';
 import { localTodayIso } from '../core/date-utils';
+import { formatTravelMonth } from '../core/travel-month';
 import { formatLeadTravelMonth } from '../sales/sales-lead-utils';
 import { AGENT_DATALIST, customerToForm, type CustomerFormData, formToCustomer } from './customer-form';
 
@@ -111,8 +112,7 @@ export function buildInquiryLead(
   leadId: string,
   options?: { flagTourDesign?: boolean }
 ): Lead {
-  const year = new Date().getFullYear();
-  const month = formatLeadTravelMonth(form.travelMonth, undefined, year);
+  const month = formatLeadTravelMonth(form.travelMonth);
   const tour = `${form.style || 'General'} inquiry — ${form.adults} pax`;
   const flagTourDesign = options?.flagTourDesign ?? false;
 
@@ -151,7 +151,7 @@ export function buildInquiryComm(customer: Customer, form: CustomerFormData): Co
       `Source: ${form.source}`,
       `Style: ${form.style}`,
       `Budget: ${form.budget}`,
-      form.travelMonth ? `Travel month: ${form.travelMonth}` : null,
+      form.travelMonth ? `Travel month: ${formatTravelMonth(form.travelMonth)}` : null,
     ]
       .filter(Boolean)
       .join('\n'),

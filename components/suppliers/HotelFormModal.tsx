@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { nextSupplierId } from '@/lib/suppliers/supplier-utils';
+import { normalizeHotelTier, SUGGESTED_HOTEL_TIERS } from '@/lib/suppliers/hotel-tiers';
 import type { Hotel, HotelRoom } from '@/lib/types';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -37,7 +38,7 @@ interface Props {
   hotel?: Hotel | null;
   existing: Hotel[];
   onClose: () => void;
-  onSave: (hotel: Hotel) => void;
+  onSave: (hotel: Hotel) => boolean | Promise<boolean>;
 }
 
 function initialForm(mode: Props['mode'], hotel: Props['hotel'], existing: Hotel[]): Hotel {
@@ -52,7 +53,7 @@ function initialForm(mode: Props['mode'], hotel: Props['hotel'], existing: Hotel
     name: '',
     dest: '',
     cat: '',
-    stars: '★★★★',
+    stars: '4★',
     region: 'north',
     rooms: [EMPTY_ROOM()],
     status: 'Active',
@@ -75,6 +76,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
   const baselineForm = useMemo(() => initialForm(mode, hotel, existing), [formKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = useFormDirty(open, baselineForm, form, undefined, formKey);
   const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
+  const hotelTierChoice = SUGGESTED_HOTEL_TIERS.includes(form.stars) ? form.stars : '__custom';
 
   if (!open) return null;
 
@@ -94,7 +96,7 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
     setForm((f) => ({ ...f, rooms: f.rooms.filter((_, i) => i !== index) }));
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form.name.trim() || !form.dest.trim()) {
       setFormError(tp('suppliers', 'errorHotelRequired'));
       return;
@@ -110,8 +112,8 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
       setFormError(tp('suppliers', 'errorRoomRequired'));
       return;
     }
-    onSave({ ...form, name: form.name.trim(), dest: form.dest.trim(), rooms });
-    onClose();
+    const saved = await onSave({ ...form, name: form.name.trim(), dest: form.dest.trim(), stars: normalizeHotelTier(form.stars), rooms });
+    if (saved) onClose();
   }
 
   return (
@@ -148,13 +150,24 @@ export default function HotelFormModal({ open, mode, hotel, existing, onClose, o
             </div>
             <div className="fg">
               <label className="lbl">{tp('suppliers', 'lblStars')}</label>
-              <select value={form.stars} onChange={(e) => setForm({ ...form, stars: e.target.value })}>
-                {['★★★', '★★★★', '★★★★★'].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
+              <select
+                value={hotelTierChoice}
+                onChange={(event) => setForm((current) => ({
+                  ...current,
+                  stars: event.target.value === '__custom' ? '' : event.target.value,
+                }))}
+              >
+                {SUGGESTED_HOTEL_TIERS.map((tier) => <option key={tier} value={tier}>{tier}</option>)}
+                <option value="__custom">Custom tier…</option>
               </select>
+              {hotelTierChoice === '__custom' && (
+                <input
+                  value={form.stars}
+                  onChange={(event) => setForm({ ...form, stars: event.target.value })}
+                  placeholder="e.g. Eco Lodge 3★"
+                  style={{ marginTop: 7 }}
+                />
+              )}
             </div>
             <div className="fg">
               <label className="lbl">{tp('suppliers', 'lblRegion')}</label>

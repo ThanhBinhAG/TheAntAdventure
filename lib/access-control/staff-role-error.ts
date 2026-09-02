@@ -9,7 +9,7 @@ export function getStaffRoleRpcErrorResponse(
     if (code === '23505') {
         return {
             status: 409,
-            error: 'Mã role đã tồn tại. Hãy dùng mã khác.',
+            error: 'This role code already exists. Choose a different code.',
         };
     }
 

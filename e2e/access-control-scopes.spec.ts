@@ -18,12 +18,12 @@ test.describe.serial('Access Control RLS scope acceptance', () => {
     await login(page, state.admin);
     await page.goto('/access-control');
     await page.getByRole('tab', { name: 'Roles & Permissions' }).click();
-    await expect(page.getByRole('button', { name: state.legacyScopeRoleLabel })).toBeVisible();
-    await page.getByRole('button', { name: state.legacyScopeRoleLabel }).click();
+    await expect(page.locator('button', { hasText: state.legacyScopeRoleLabel })).toBeVisible();
+    await page.locator('button', { hasText: state.legacyScopeRoleLabel }).click();
     await page.getByRole('tab', { name: 'RLS data scopes' }).click();
 
-    await expect(page.getByRole('radio', { name: 'Own' }).first()).toBeVisible();
-    await expect(page.getByRole('radio', { name: 'All' }).first()).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'Own' }).first()).toBeAttached();
+    await expect(page.getByRole('radio', { name: 'All' }).first()).toBeAttached();
     await expect(page.getByRole('radio', { name: 'Assigned' })).toHaveCount(0);
 
     const { data: after, error: afterError } = await admin

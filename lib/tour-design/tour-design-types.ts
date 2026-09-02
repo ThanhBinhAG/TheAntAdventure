@@ -1,4 +1,5 @@
 import type { Customer, Hotel, Lead } from '@/lib/types';
+import type { TravelStyle } from '@/lib/customers/travel-styles';
 
 export interface TourBrief {
   clientName: string;
@@ -47,7 +48,7 @@ export const DEFAULT_TOUR_BRIEF: TourBrief = {
   childAges: '',
   childDiet: '',
   childPrefs: '',
-  duration: '7 Days 6 Nights',
+  duration: '',
   region: 'north',
   startDate: '',
   endDate: '',
@@ -65,7 +66,7 @@ export const DEFAULT_TOUR_BRIEF: TourBrief = {
   specialRequests: '',
   agentRef: '',
   language: 'English',
-  travelMonth: 'Oct',
+  travelMonth: '',
   hotelTier: 'Boutique 4★',
   budgetRange: '$2,000–$3,500/pax',
   flights: 'yes',
@@ -99,4 +100,10 @@ export type TourDesignCrmContext = {
 /** Hotel catalog needed by the Tour Design export and pricing steps. */
 export type TourDesignReferenceData = {
   hotels: Hotel[];
+};
+
+/** Shared Client Brief catalog choices, loaded separately from the heavy Hotel reference catalog. */
+export type TourDesignClientPreferences = {
+  travelStyles: TravelStyle[];
+  hotelTiers: string[];
 };

@@ -3391,6 +3391,49 @@ begin
 end;
 $retire_assigned_scope_policies$;
 
+-- Travel Style catalog for the Customer form. Records are retained (deactivated
+-- instead of deleted) so existing customer preferences remain meaningful.
+create table if not exists public.travel_styles (
+  code text primary key check (code ~ '^[a-z0-9][a-z0-9-]{0,79}$'),
+  label text not null check (length(trim(label)) between 1 and 100),
+  sort_order integer not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists travel_styles_label_unique on public.travel_styles (lower(label));
+insert into public.travel_styles (code, label, sort_order, is_active) values
+  ('luxury', 'Luxury', 10, true), ('premium-cultural', 'Premium Cultural', 20, true),
+  ('cultural', 'Cultural', 30, true), ('adventure', 'Adventure', 40, true),
+  ('family', 'Family', 50, true), ('culinary', 'Culinary', 60, true),
+  ('photography', 'Photography', 70, true), ('honeymoon', 'Honeymoon', 80, true)
+on conflict (code) do nothing;
+alter table public.travel_styles enable row level security;
+revoke all on table public.travel_styles from anon, authenticated;
+grant select, insert, update, delete on table public.travel_styles to authenticated;
+drop policy if exists rls_travel_styles_select on public.travel_styles;
+drop policy if exists rls_travel_styles_insert on public.travel_styles;
+drop policy if exists rls_travel_styles_update on public.travel_styles;
+drop policy if exists rls_travel_styles_delete on public.travel_styles;
+create policy rls_travel_styles_select on public.travel_styles for select to authenticated using (public.has_permission('customers.write') or public.has_permission('tour_design.read'));
+create policy rls_travel_styles_insert on public.travel_styles for insert to authenticated with check (public.has_permission('customers.write'));
+create policy rls_travel_styles_update on public.travel_styles for update to authenticated using (public.has_permission('customers.write')) with check (public.has_permission('customers.write'));
+create policy rls_travel_styles_delete on public.travel_styles for delete to authenticated using (public.has_permission('customers.write'));
+create or replace function private.prevent_used_travel_style_delete()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public
+as $function$
+begin
+  if exists (select 1 from public.customers where travel_style = old.label) then
+    raise exception 'Không thể xóa Travel Style "%" vì đang được khách hàng sử dụng.', old.label using errcode = '23503';
+  end if;
+  return old;
+end;
+$function$;
+drop trigger if exists prevent_used_travel_style_delete on public.travel_styles;
+create trigger prevent_used_travel_style_delete before delete on public.travel_styles
+  for each row execute function private.prevent_used_travel_style_delete();
+
 -- ============================================================
 --  END OF SCHEMA v5.0
 -- ============================================================

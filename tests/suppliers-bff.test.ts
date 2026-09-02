@@ -35,6 +35,7 @@ test('Suppliers page uses CRM BFF instead of Zustand auto-sync writes', () => {
 
   assert.match(page, /useSuppliersPage/);
   assert.match(hotelTab, /useHotelMutations/);
+  assert.match(hotelTab, /onSave={handleSave}/);
   assert.match(quickTab, /useQuickListMutations/);
   assert.match(extTab, /useExtendedSupplierMutations/);
   assert.doesNotMatch(hotelTab, /\baddHotel\s*=\s*useStore/);

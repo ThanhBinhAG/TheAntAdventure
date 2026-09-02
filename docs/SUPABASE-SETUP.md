@@ -33,7 +33,7 @@ If a previous import failed or you need a fresh start:
 ### 1b. Create schema
 
 1. Paste and run the full `supabase/schema.sql` (one run, do not split)
-2. Confirm in Table Editor: `customers`, `bookings`, `products`, etc.
+2. Confirm in Table Editor: `customers`, `bookings`, `products`, `travel_styles`, etc.
 
 ### 1c. Import data
 
@@ -100,6 +100,7 @@ Expected: **0 rows** for your CRM schemas.
 - **Recommended:** edit through the CRM UI/API; the BFF performs the server-side Supabase access.
 - **Bulk:** re-run `import-v5-data.sql` (UPSERT) only with a backup and the expected environment selected.
 - **Boundary:** do not introduce a browser Supabase client, browser Storage URL, generic hydrate, or auto-sync path.
+- **Travel Styles:** users with `customers.write` manage the alphabetical catalogue through the pencil beside the Customer-form field. A style can be deleted only when no Customer uses it; the BFF and RLS enforce this permission and safeguard.
 
 ## 5b. Môi trường DEV (local) vs PROD (khách / remote)
 
@@ -461,6 +462,9 @@ Checklist per migration:
 3. Update app types/mappers in `lib/` if columns changed
 4. `npm run typecheck`
 5. PROD: backup → `npm run db:push` on production `SUPABASE_DB_URL`
+
+The `20260902034328_add_travel_styles_catalog.sql` migration adds the Customer Travel Style catalogue. Apply and verify it locally before any remote environment.
+`20260902041500_allow_travel_style_deletion.sql` and `20260902041926_guard_used_travel_style_deletion.sql` add guarded deletion for unused styles, including a database-level check against all Customers.
 
 ### 9d. npm scripts
 

@@ -1,14 +1,14 @@
 /**
- * Module server-only tạo Supabase Auth user cho Access Control.
+ * Server-only module for creating Supabase Auth users for Access Control.
  *
- * Chức năng:
- * - Dùng SUPABASE_SERVICE_ROLE_KEY để tạo Auth user.
- * - Không bao giờ trả service-role key ra trình duyệt.
- * - Có hàm rollback xóa Auth user mới tạo nếu bước gán profile/role thất bại.
+ * Features:
+ * - Uses SUPABASE_SERVICE_ROLE_KEY to create Auth users.
+ * - Never exposes the service-role key to the browser.
+ * - Includes rollback to delete newly created Auth users if profile/role assignment fails.
  *
- * Lưu ý:
- * - Chỉ API Access Control phía server được import file này.
- * - Việc kiểm tra users.manage vẫn làm tại API và RPC database.
+ * Notes:
+ * - Only server-side Access Control API should import this file.
+ * - users.manage permission check is done at the API and database RPC level.
  */
 
 import 'server-only';
@@ -27,7 +27,7 @@ import {
 import { getSupabaseGlobalFetchOptions } from '@/lib/supabase/insecure-fetch';
 import { getCrmSessionRepository } from '@/lib/auth/crm-session-repository';
 
-/** Lỗi riêng để API trả HTTP status phù hợp. */
+/** Dedicated error class so API can return appropriate HTTP status. */
 export class AccessControlAuthAdminError extends Error {
     constructor(
         message: string,
@@ -38,7 +38,7 @@ export class AccessControlAuthAdminError extends Error {
     }
 }
 
-/** Tạo Supabase Admin client chỉ ở server. */
+/** Create a Supabase Admin client (server-only). */
 function getAccessControlAdminClient(): SupabaseClient | null {
     const url = getSupabaseUrl();
     const serviceRoleKey = getSupabaseServiceRoleKey();
@@ -56,17 +56,17 @@ function getAccessControlAdminClient(): SupabaseClient | null {
     });
 }
 
-/** Tạo Auth user bằng email/password do Super Admin nhập. */
+/** Create an Auth user with the email/password provided by the Super Admin. */
 export async function createAccessControlAuthUser(input: {
     email: string;
     password: string;
 }): Promise<string> {
     const normalizedEmail = input.email.trim().toLowerCase();
 
-    // Không được tạo hoặc ghi đè user shadow dành cho break-glass.
+    // Must not create or overwrite the shadow user reserved for break-glass.
     if (normalizedEmail === BREAK_GLASS_SHADOW_EMAIL) {
         throw new AccessControlAuthAdminError(
-            'Email này không được sử dụng.',
+            'This email cannot be used.',
             403,
         );
     }
@@ -75,7 +75,7 @@ export async function createAccessControlAuthUser(input: {
 
     if (!admin) {
         throw new AccessControlAuthAdminError(
-            'Máy chủ chưa cấu hình SUPABASE_SERVICE_ROLE_KEY.',
+            'Server has not configured SUPABASE_SERVICE_ROLE_KEY.',
             503,
         );
     }
@@ -87,9 +87,9 @@ export async function createAccessControlAuthUser(input: {
     });
 
     if (error || !data.user) {
-        // Không trả lỗi Supabase chi tiết để tránh lộ thông tin email.
+        // Do not expose detailed Supabase error to avoid leaking email information.
         throw new AccessControlAuthAdminError(
-            'Không thể tạo tài khoản. Email có thể đã tồn tại.',
+            'Unable to create account. The email may already exist.',
             400,
         );
     }
@@ -105,7 +105,7 @@ export async function setAccessControlAuthUserActive(
     const admin = getAccessControlAdminClient();
     if (!admin) {
         throw new AccessControlAuthAdminError(
-            'Máy chủ chưa cấu hình SUPABASE_SERVICE_ROLE_KEY.',
+            'Server has not configured SUPABASE_SERVICE_ROLE_KEY.',
             503,
         );
     }
@@ -116,8 +116,8 @@ export async function setAccessControlAuthUserActive(
     if (error) {
         throw new AccessControlAuthAdminError(
             isActive
-                ? 'Không thể kích hoạt tài khoản Supabase Auth.'
-                : 'Không thể khóa tài khoản Supabase Auth.',
+                ? 'Unable to activate the Supabase Auth account.'
+                : 'Unable to lock the Supabase Auth account.',
             503,
         );
     }
@@ -127,14 +127,14 @@ export async function setAccessControlAuthUserActive(
             await getCrmSessionRepository().revokeAllForUser(userId);
         } catch {
             throw new AccessControlAuthAdminError(
-                'Không thể thu hồi CRM session đang hoạt động.',
+                'Unable to revoke active CRM sessions.',
                 503,
             );
         }
     }
 }
 
-/** Cập nhật mật khẩu mới cho Auth user bằng Supabase Admin SDK. */
+/** Update user password using the Supabase Admin SDK. */
 export async function updateAccessControlUserPassword(
     userId: string,
     newPassword: string,
@@ -142,7 +142,7 @@ export async function updateAccessControlUserPassword(
     const admin = getAccessControlAdminClient();
     if (!admin) {
         throw new AccessControlAuthAdminError(
-            'Máy chủ chưa cấu hình SUPABASE_SERVICE_ROLE_KEY.',
+            'Server has not configured SUPABASE_SERVICE_ROLE_KEY.',
             503,
         );
     }
@@ -153,17 +153,17 @@ export async function updateAccessControlUserPassword(
 
     if (error) {
         throw new AccessControlAuthAdminError(
-            'Không thể đổi mật khẩu người dùng.',
+            'Unable to change user password.',
             503,
         );
     }
 }
 
 /**
- * Xóa Auth user mới tạo khi gán profile/role thất bại.
+ * Delete a newly created Auth user when profile/role assignment fails.
  *
- * Chỉ dùng rollback ngay sau createUser thất bại một phần.
- * Không dùng hàm này cho thao tác “xóa user” thông thường.
+ * Only use for rollback immediately after a partially failed createUser.
+ * Do not use this function for normal "delete user" operations.
  */
 export async function rollbackNewAccessControlAuthUser(
     userId: string,

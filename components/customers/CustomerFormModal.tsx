@@ -11,6 +11,7 @@ import {
 } from '@/lib/customers/customer-form';
 import {
   isValidEmail,
+  isValidGuestCount,
   isValidPhone,
   sanitizePhoneInput,
 } from '@/lib/customers/customer-validation';
@@ -20,15 +21,19 @@ import {
   isKnownNationality,
   normalizeNationality,
 } from '@/lib/customers/nationalities';
+import { isIsoTravelMonth, travelMonthInputValue } from '@/lib/core/travel-month';
 import type { Customer } from '@/lib/types';
 import type { CustomerSaveOutcome } from '@/hooks/useRegisterCustomer';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
 import { useLanguage } from '@/hooks/useLanguage';
+import SearchableSelect from '@/components/SearchableSelect';
+import TravelStyleManagerModal from '@/components/customers/TravelStyleManagerModal';
+import { DEFAULT_TRAVEL_STYLES, type TravelStyle } from '@/lib/customers/travel-styles';
 
 const CHILD_TAGS = ['Infant 0–2', 'Toddler 3–5', 'Child 6–9', 'Pre-teen 10–12', 'Teen 13–17'];
 const EMAIL_CHECK_DEBOUNCE_MS = 400;
 
-type FormErrorField = 'name' | 'email' | 'phone' | 'whatsapp' | 'country' | 'nat';
+type FormErrorField = 'name' | 'email' | 'phone' | 'whatsapp' | 'country' | 'nat' | 'adults';
 
 export type CustomerFormSavePayload = {
   form: CustomerFormData;
@@ -51,6 +56,7 @@ interface CustomerFormModalProps {
   onSave: (
     payload: CustomerFormSavePayload,
   ) => CustomerFormSaveResult | Promise<CustomerFormSaveResult>;
+  canManageTravelStyles?: boolean;
 }
 
 function initialForm(mode: CustomerFormModalProps['mode'], customer: CustomerFormModalProps['customer']) {
@@ -72,7 +78,7 @@ function revealField(field: FormErrorField) {
   });
 }
 
-export default function CustomerFormModal({ open, mode, customer, customers, onClose, onSave }: CustomerFormModalProps) {
+export default function CustomerFormModal({ open, mode, customer, customers, onClose, onSave, canManageTravelStyles = false }: CustomerFormModalProps) {
   const formKey = `${open}-${mode}-${customer ? JSON.stringify(customer) : ''}`;
   const [previousFormKey, setPreviousFormKey] = useState(formKey);
   const [form, setForm] = useState<CustomerFormData>(() => initialForm(mode, customer));
@@ -82,6 +88,12 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
   const [formError, setFormError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<FormErrorField | null>(null);
   const [previousEmail, setPreviousEmail] = useState(form.email);
+  const [travelStyles, setTravelStyles] = useState<TravelStyle[]>(DEFAULT_TRAVEL_STYLES);
+  const [travelStyleManagerOpen, setTravelStyleManagerOpen] = useState(false);
+  const [travelStylesSaving, setTravelStylesSaving] = useState(false);
+  const [hotelTiers, setHotelTiers] = useState<string[]>([]);
+  const [hotelTiersLoading, setHotelTiersLoading] = useState(false);
+  const [hotelTiersError, setHotelTiersError] = useState<string | null>(null);
 
   if (formKey !== previousFormKey) {
     setPreviousFormKey(formKey);
@@ -165,6 +177,51 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     };
   }, [emailTrimmed, excludeId, localDuplicate, open]);
 
+  useEffect(() => {
+    if (!open || !canManageTravelStyles) return;
+    const controller = new AbortController();
+    void fetch('/api/customers/travel-styles', { credentials: 'same-origin', signal: controller.signal })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: TravelStyle[] };
+        if (response.ok && body.ok && Array.isArray(body.data) && body.data.length) setTravelStyles(body.data);
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) setTravelStyles(DEFAULT_TRAVEL_STYLES);
+      });
+    return () => controller.abort();
+  }, [canManageTravelStyles, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHotelTiersLoading(true);
+    setHotelTiersError(null);
+    void fetch('/api/customers/hotel-tiers', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: string[]; error?: string };
+        if (!response.ok || !body.ok || !Array.isArray(body.data)) throw new Error(body.error ?? 'Không thể tải Hotel Tier.');
+        setHotelTiers(body.data);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setHotelTiers([]);
+        setHotelTiersError(error instanceof Error ? error.message : 'Không thể tải Hotel Tier.');
+      })
+      .finally(() => setHotelTiersLoading(false));
+    return () => controller.abort();
+  }, [open]);
+
+  const selectableTravelStyles = useMemo(() => {
+    return travelStyles.filter((style) => style.isActive);
+  }, [travelStyles]);
+  const selectableHotelTiers = useMemo(() => {
+    if (mode === 'edit' && form.hotelTier && !hotelTiers.includes(form.hotelTier)) {
+      return [form.hotelTier, ...hotelTiers];
+    }
+    return hotelTiers;
+  }, [form.hotelTier, hotelTiers, mode]);
+
   if (!open) return null;
 
   const showChildren = Number(form.numChildren) > 0;
@@ -173,6 +230,44 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
   const emailBlocked = emailStatus === 'duplicate';
   const saveDisabled = emailBlocked || emailStatus === 'checking';
   const emailInvalid = emailBlocked || errorField === 'email';
+  async function saveTravelStyles(styles: TravelStyle[]) {
+    setTravelStylesSaving(true);
+    try {
+      const response = await fetch('/api/customers/travel-styles', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ styles }),
+      });
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: TravelStyle[]; error?: string };
+      if (!response.ok || !body.ok || !Array.isArray(body.data)) throw new Error(body.error ?? 'Không thể lưu Travel Style.');
+      applyTravelStyles(body.data);
+    } finally {
+      setTravelStylesSaving(false);
+    }
+  }
+
+  function applyTravelStyles(styles: TravelStyle[]) {
+    setTravelStyles(styles);
+    setForm((current) => current.style && styles.some((style) => style.isActive && style.label === current.style)
+      ? current
+      : { ...current, style: styles.find((style) => style.isActive)?.label ?? current.style });
+  }
+
+  async function deleteTravelStyle(style: TravelStyle) {
+    setTravelStylesSaving(true);
+    try {
+      const response = await fetch(`/api/customers/travel-styles?${new URLSearchParams({ code: style.code }).toString()}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: TravelStyle[]; error?: string };
+      if (!response.ok || !body.ok || !Array.isArray(body.data)) throw new Error(body.error ?? 'Không thể xóa Travel Style.');
+      applyTravelStyles(body.data);
+    } finally {
+      setTravelStylesSaving(false);
+    }
+  }
 
   function clearErrors() {
     setFormError(null);
@@ -227,6 +322,10 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     }
     if (form.nat.trim() && !isKnownNationality(form.nat)) {
       fail('nat', tp('customers', 'errNatRequired'));
+      return;
+    }
+    if (!isValidGuestCount(form.adults)) {
+      fail('adults', tp('customers', 'errGuestCountInvalid'));
       return;
     }
 
@@ -365,22 +464,15 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
               />
             </div>
             <div className="fg">
-              <label className={`lbl${fieldInvalid('country') ? ' nc-field-invalid-label' : ''}`}>{tp('customers', 'formCountry')}</label>
-              <input
+              <label htmlFor={fieldDomId('country')} className={`lbl${fieldInvalid('country') ? ' nc-field-invalid-label' : ''}`}>{tp('customers', 'formCountry')}</label>
+              <SearchableSelect
                 id={fieldDomId('country')}
-                className={fieldInvalid('country') ? 'nc-field-invalid' : undefined}
-                list="nc-country-list"
                 value={form.country}
-                onChange={(e) => set('country', e.target.value)}
+                options={COUNTRIES}
+                onChange={(value) => set('country', value)}
                 placeholder={tp('customers', 'formTypeToSearch')}
-                autoComplete="off"
-                aria-invalid={fieldInvalid('country')}
+                invalid={fieldInvalid('country')}
               />
-              <datalist id="nc-country-list">
-                {COUNTRIES.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
             </div>
             <div className="fg">
               <label className={`lbl${emailInvalid ? ' nc-field-invalid-label' : ''}`}>
@@ -434,22 +526,15 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
               />
             </div>
             <div className="fg">
-              <label className={`lbl${fieldInvalid('nat') ? ' nc-field-invalid-label' : ''}`}>{tp('customers', 'formNationality')}</label>
-              <input
+              <label htmlFor={fieldDomId('nat')} className={`lbl${fieldInvalid('nat') ? ' nc-field-invalid-label' : ''}`}>{tp('customers', 'formNationality')}</label>
+              <SearchableSelect
                 id={fieldDomId('nat')}
-                className={fieldInvalid('nat') ? 'nc-field-invalid' : undefined}
-                list="nc-nationality-list"
                 value={form.nat}
-                onChange={(e) => set('nat', e.target.value)}
+                options={NATIONALITIES}
+                onChange={(value) => set('nat', value)}
                 placeholder={tp('customers', 'formTypeToSearch')}
-                autoComplete="off"
-                aria-invalid={fieldInvalid('nat')}
+                invalid={fieldInvalid('nat')}
               />
-              <datalist id="nc-nationality-list">
-                {NATIONALITIES.map((n) => (
-                  <option key={n} value={n} />
-                ))}
-              </datalist>
             </div>
             <div className="fg">
               <label className="lbl">{tp('customers', 'formSource')}</label>
@@ -472,20 +557,25 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
           <div className="nc-section-title">{tp('customers', 'formSectionTravelProfile')}</div>
           <div className="nc-grid-3" style={{ marginBottom: 16 }}>
             <div className="fg">
-              <label className="lbl">{tp('customers', 'formTravelStyle')}</label>
+              <label className="lbl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                {tp('customers', 'formTravelStyle')}
+                {canManageTravelStyles && <button type="button" className="btn btn-sm" style={{ minWidth: 30, padding: '1px 6px' }} onClick={() => setTravelStyleManagerOpen(true)} aria-label="Manage Travel Styles" title="Manage Travel Styles">✎</button>}
+              </label>
               <select value={form.style} onChange={(e) => set('style', e.target.value)}>
-                {['Luxury', 'Premium Cultural', 'Cultural', 'Adventure', 'Family', 'Culinary', 'Photography', 'Honeymoon'].map((s) => (
-                  <option key={s}>{s}</option>
+                {selectableTravelStyles.map((style) => (
+                  <option key={style.code} value={style.label}>{style.label}</option>
                 ))}
               </select>
             </div>
             <div className="fg">
               <label className="lbl">{tp('customers', 'formHotelTier')}</label>
-              <select value={form.hotelTier} onChange={(e) => set('hotelTier', e.target.value)}>
-                <option>Boutique 4★</option>
-                <option>Luxury 5★</option>
-                <option>Standard 3-4★</option>
+              <select value={form.hotelTier} onChange={(e) => set('hotelTier', e.target.value)} disabled={hotelTiersLoading}>
+                <option value="">{hotelTiersLoading ? 'Loading Hotel Tiers…' : '— Select Hotel Tier —'}</option>
+                {selectableHotelTiers.map((tier) => (
+                  <option key={tier} value={tier}>{tier}</option>
+                ))}
               </select>
+              {hotelTiersError && <div className="nc-form-hint" style={{ color: 'var(--red)' }}>{hotelTiersError}</div>}
             </div>
             <div className="fg">
               <label className="lbl">{tp('customers', 'formBudgetRange')}</label>
@@ -497,24 +587,29 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             </div>
             <div className="fg">
               <label className="lbl">{tp('customers', 'formTravelMonth')}</label>
-              <select value={form.travelMonth} onChange={(e) => set('travelMonth', e.target.value)}>
-                <option value="">{tp('customers', 'formNotDecided')}</option>
-                {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+              <input
+                type="month"
+                value={travelMonthInputValue(form.travelMonth)}
+                onChange={(e) => set('travelMonth', e.target.value)}
+              />
+              {form.travelMonth && !isIsoTravelMonth(form.travelMonth) && (
+                <div className="nc-form-hint">Legacy value kept: {form.travelMonth}</div>
+              )}
             </div>
             <div className="fg">
-              <label className="lbl">{tp('customers', 'formNumGuests')}</label>
-              <select value={form.adults} onChange={(e) => set('adults', e.target.value)}>
-                {['1', '2', '3', '4', '5', '6', '8', '10', '12'].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+              <label className={`lbl${fieldInvalid('adults') ? ' nc-field-invalid-label' : ''}`}>{tp('customers', 'formNumGuests')}</label>
+              <input
+                id={fieldDomId('adults')}
+                className={fieldInvalid('adults') ? 'nc-field-invalid' : undefined}
+                type="number"
+                min="1"
+                max="9999"
+                step="1"
+                inputMode="numeric"
+                value={form.adults}
+                onChange={(e) => set('adults', e.target.value)}
+                aria-invalid={fieldInvalid('adults')}
+              />
             </div>
             <div className="fg">
               <label className="lbl">{tp('customers', 'formFirstTimeVn')}</label>
@@ -643,6 +738,14 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
           </div>
         </div>
       </div>
+      <TravelStyleManagerModal
+        open={travelStyleManagerOpen}
+        styles={travelStyles}
+        saving={travelStylesSaving}
+        onClose={() => setTravelStyleManagerOpen(false)}
+        onSave={saveTravelStyles}
+        onDelete={deleteTravelStyle}
+      />
     </div>
   );
 }

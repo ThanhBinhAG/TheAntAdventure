@@ -23,7 +23,7 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
   async (request, _context, { logger }) => {
   if (!hasTrustedRequestOrigin(request)) {
     logger.warn({ event: 'auth.logout.origin_rejected', statusCode: 403 }, 'Logout origin rejected');
-    return NextResponse.json({ ok: false, error: 'Origin không hợp lệ.' }, { status: 403 });
+    return NextResponse.json({ ok: false, error: 'Invalid origin.' }, { status: 403 });
   }
 
   const cookieHeader = request.headers.get('cookie');
@@ -38,7 +38,7 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
       logger.error({ event: 'auth.logout.failed', err: error }, 'Logout failed');
       clearBrowserCredentials(response, cookieHeader);
       const failure = NextResponse.json(
-        { ok: false, error: 'Dịch vụ session tạm thời không khả dụng. Vui lòng thử lại.' },
+        { ok: false, error: 'Session service temporarily unavailable. Please try again.' },
         { status: 503 },
       );
       copyCookies(response, failure);

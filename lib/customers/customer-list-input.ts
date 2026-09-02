@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidGuestCount } from './customer-validation';
 import type { Customer } from '@/lib/types';
 
 export const CUSTOMER_PAGE_SIZES = [12, 24, 48, 96] as const;
@@ -89,7 +90,7 @@ export const customerFormFieldsSchema = z.object({
   hotelTier: z.string().max(100).default(''),
   budget: z.string().max(100).default(''),
   travelMonth: z.string().max(50).default(''),
-  adults: z.string().max(10).default('2'),
+  adults: z.string().refine(isValidGuestCount, 'Guest count must be a whole number from 1 to 9999.').default('2'),
   firstTime: z.string().max(50).default(''),
   flights: z.string().max(50).default('yes'),
   intlFlights: z.string().max(50).default(''),

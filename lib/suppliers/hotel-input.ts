@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Hotel, HotelRoom } from '@/lib/types';
+import { normalizeHotelTier } from '@/lib/suppliers/hotel-tiers';
 
 const idSchema = z
   .string()
@@ -71,7 +72,7 @@ export function inputToHotel(input: HotelInput, id: string): Hotel {
     name: input.name,
     dest: input.dest,
     cat: input.cat,
-    stars: input.stars,
+    stars: normalizeHotelTier(input.stars),
     region: input.region,
     rooms,
     status: input.status || 'Active',

@@ -1,5 +1,6 @@
 import { addDays, localTodayIso } from '../core/date-utils';
 import { REG_LABELS } from '../core/page-helpers';
+import { formatTravelMonth, travelMonthAbbr } from '../core/travel-month';
 import { ICO_KEYS, INCL_YES } from '../pricing/pricing-utils';
 import { findProductPricing, paxToTierN, sumSellForProducts } from '../tour-design/tour-pricing';
 import { TOUR_PACKAGES } from '../seeds/tourPackages';
@@ -94,7 +95,7 @@ function formatDateRange(startIso: string | undefined, endIso: string | undefine
       return s.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
     }
   }
-  if (travelMonth) return `${travelMonth} (dates TBC)`;
+  if (travelMonth) return `${formatTravelMonth(travelMonth)} (dates TBC)`;
   return 'To be confirmed';
 }
 
@@ -119,7 +120,7 @@ function resolveConsultant(salesperson: string): { name: string; email: string }
 }
 
 function inferSeason(travelMonth: string): string {
-  return PEAK_MONTHS.has(travelMonth) ? 'Peak Season (Oct – Mar)' : 'Off-Peak Season (Apr – Sep)';
+  return PEAK_MONTHS.has(travelMonthAbbr(travelMonth) || '') ? 'Peak Season (Oct – Mar)' : 'Off-Peak Season (Apr – Sep)';
 }
 
 function inferRooming(pax: number): string {
@@ -142,7 +143,7 @@ function isHotelProduct(p: Product): boolean {
 export function getPackageSellPerPax(packageId: string, pax: number, travelMonth: string): number {
   const pkg = TOUR_PACKAGES.find((p) => p.id === packageId);
   if (!pkg?.pricing?.length) return 0;
-  const peak = PEAK_MONTHS.has(travelMonth);
+  const peak = PEAK_MONTHS.has(travelMonthAbbr(travelMonth) || '');
   const sorted = [...pkg.pricing].sort((a, b) => a.pax - b.pax);
   let row = sorted[0];
   for (const r of sorted) {
@@ -753,7 +754,7 @@ function buildB2CPricing(
     groupTotal: perPerson * brief.pax,
     pax: brief.pax,
     currency: 'USD',
-    seasonNote: `${brief.pax} Guests · ${brief.travelMonth || 'Travel dates TBC'} · ${inferSeason(brief.travelMonth)} · Private Tour`,
+    seasonNote: `${brief.pax} Guests · ${formatTravelMonth(brief.travelMonth) || 'Travel dates TBC'} · ${inferSeason(brief.travelMonth)} · Private Tour`,
   };
 }
 
@@ -792,7 +793,7 @@ function buildB2BPricing(
     kind: 'b2b',
     pax: brief.pax,
     currency: 'USD',
-    seasonNote: `${brief.pax} Passengers · ${brief.travelMonth || 'TBC'} · ${inferSeason(brief.travelMonth)} · Private Tour`,
+    seasonNote: `${brief.pax} Passengers · ${formatTravelMonth(brief.travelMonth) || 'TBC'} · ${inferSeason(brief.travelMonth)} · Private Tour`,
     touringsPerPax,
     touringsTotal: touringsPerPax * brief.pax,
     flightsPerPax,

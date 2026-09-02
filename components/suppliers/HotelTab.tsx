@@ -79,17 +79,18 @@ export default function HotelTab({ filters, canWrite }: Props) {
       const result = await patchHotel(editId, hotel);
       if (!result.ok) {
         toast.error(result.message);
-        return;
+        return false;
       }
       toast.success(tp('suppliers', 'toastHotelUpdated'));
-      return;
+      return true;
     }
     const result = await createHotel(hotel);
     if (!result.ok) {
       toast.error(result.message);
-      return;
+      return false;
     }
     toast.success(tp('suppliers', 'toastHotelCreated'));
+    return true;
   };
 
   return (
@@ -243,9 +244,7 @@ export default function HotelTab({ filters, canWrite }: Props) {
         hotel={editHotel}
         existing={hotels}
         onClose={() => setFormOpen(false)}
-        onSave={(hotel) => {
-          void handleSave(hotel);
-        }}
+        onSave={handleSave}
       />
     </>
   );

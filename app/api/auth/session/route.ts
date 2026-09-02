@@ -9,12 +9,12 @@ export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never
     if (auth.authenticationUnavailable) {
       logger.warn({ event: 'auth.session.unavailable', statusCode: 503 }, 'CRM session unavailable');
       return NextResponse.json(
-        { ok: false, error: 'Dịch vụ xác thực tạm thời không khả dụng.' },
+        { ok: false, error: 'Authentication service temporarily unavailable.' },
         { status: 503, headers: { 'Retry-After': '30' } },
       );
     }
     if (!auth.authenticated) {
-      return NextResponse.json({ ok: false, error: 'Phiên đăng nhập đã hết hạn.' }, { status: 401 });
+      return NextResponse.json({ ok: false, error: 'Session has expired.' }, { status: 401 });
     }
     return NextResponse.json({ ok: true });
   },

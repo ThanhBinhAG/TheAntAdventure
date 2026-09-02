@@ -475,6 +475,7 @@ export default function Customers() {
         mode={formMode === 'edit' ? 'edit' : 'add'}
         customer={editCustomer}
         customers={[]}
+        canManageTravelStyles={canWrite}
         onClose={() => {
           setFormMode(null);
           setEditId(null);

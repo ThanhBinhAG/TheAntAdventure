@@ -60,7 +60,7 @@ function errorResponse(error: unknown) {
             return NextResponse.json(
                 accessControlError(
                     'PERMISSION_CODE_EXISTS',
-                    'Mã quyền này đã tồn tại.',
+                    'This permission code already exists.',
                 ),
                 { status: 409 },
             );
@@ -70,7 +70,7 @@ function errorResponse(error: unknown) {
     return NextResponse.json(
         accessControlError(
             'ACCESS_CONTROL_REQUEST_FAILED',
-            'Không thể xử lý yêu cầu phân quyền.',
+            'Unable to process the access-control request.',
         ),
         { status: 500 },
     );
@@ -129,7 +129,7 @@ export const PATCH = withHttpRequestLogging<{ params: Promise<Record<string, nev
         return NextResponse.json(
             accessControlError(
                 'INVALID_ACCESS_CONTROL_REQUEST',
-                'Dữ liệu cập nhật không hợp lệ.',
+                'Invalid update data.',
             ),
             { status: 400 },
         );
@@ -178,7 +178,7 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
         return NextResponse.json(
             accessControlError(
                 'INVALID_ACCESS_CONTROL_REQUEST',
-                'Dữ liệu chức năng không hợp lệ.',
+                'Invalid permission data.',
             ),
             { status: 400 },
         );

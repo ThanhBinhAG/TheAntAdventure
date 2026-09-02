@@ -102,7 +102,7 @@ feature/bff-cutover-domains
 - [x] BFF user-scoped client chỉ nhận verified CRM auth context; disable account ban Auth và revoke all durable sessions.
 - [x] Ops schedule host job `npm run session:cleanup`; code/script is ready but the repository cannot prove a real crontab exists. Run daily; it retains expired/revoked rows for 30 days by default, or 7 days only when `CRM_SESSION_RETENTION_DAYS=7` is explicitly set.
 - [x] Production main deploy applies `20260827104813_durable_crm_sessions_v2.sql` through `supabase db push` before replacing CRM; deployment and durable-session login succeeded on 2026-08-29.
-- [ ] Apply the migration and run the same lifecycle E2E on staging.
+- [x] Apply the migration and run the same lifecycle E2E on staging (owner confirmed).
 - [x] Đã kiểm tra login/refresh/logout/revoke/disable trên Supabase Auth và Postgres test thật.
 
 
@@ -137,9 +137,9 @@ feature/bff-cutover-domains
 - [x] Deploy verifier kiểm tra DNS/reachability gateway, Redis và `/api/health` từ CRM container.
 - [x] Browser/máy người dùng không resolve được Supabase internal hostname.
 - [x] Browser/máy người dùng không kết nối được Supabase internal service.
-- [ ] Rotate anon key sau khi browser leakage đã được loại bỏ.
-- [ ] Rotate service-role key nếu từng xuất hiện trong deploy/build history.
-- [ ] Kiểm tra firewall.
+- [x] Rotate anon key sau khi browser leakage đã được loại bỏ (owner confirmed).
+- [x] Rotate service-role key nếu từng xuất hiện trong deploy/build history (exposure-history audit completed; owner confirmed).
+- [x] Kiểm tra firewall (owner confirmed).
 - [x] Docker healthcheck and CI post-deploy verifier cover CRM readiness and private dependencies.
 - [x] Runbook covers deploy, rollback, backup/restore, Redis flush recovery and key rotation.
 
@@ -149,7 +149,7 @@ feature/bff-cutover-domains
 
 - [x] `docker compose ps` xác nhận CRM bind đúng `${APP_PORT:-3006}:3006` và ingress hiện có hoạt động.
 - [x] CRM → Supabase private gateway: PASS through the successful deploy-time verifier.
-- [ ] Browser/host external → Supabase internal services: BLOCKED.
+- [x] Browser/host external → Supabase internal services: BLOCKED (owner confirmed).
 - [x] Redis không public port.
 - [x] Postgres không public port (covered by the confirmed Supabase Postgres host-port check).
 
@@ -186,9 +186,9 @@ feature/bff-cutover-domains
 - [x] `npm run final:acceptance` runs lint → typecheck → unit tests → build → hard browser-leakage check in one cross-platform command.
 - [x] Real session E2E is explicitly opt-in with `FINAL_ACCEPTANCE_E2E=1`, preventing an accidental mutation of a shared database.
 - [x] Dev 2 confirms domain routes follow the handoff contract and no browser Supabase client/API path remains.
-- [ ] Staging applies durable-session migration and passes real login/refresh/logout/revoke/disable E2E.
+- [x] Staging applies durable-session migration and passes real login/refresh/logout/revoke/disable E2E (owner confirmed).
 - [x] Production verifier confirms private Supabase/Redis dependencies and the existing ingress remains unchanged.
-- [ ] Ops completes planned anon-key rotation; service-role rotation remains conditional on an exposure-history audit.
+- [x] Ops completes planned anon-key rotation; service-role rotation remains conditional on an exposure-history audit (owner confirmed).
 
 ---
 
@@ -787,10 +787,10 @@ Sau đó Dev 2:
 
 ### Dev 1
 
-- [ ] Apply private network isolation.
-- [ ] Remove public service ports.
-- [ ] Rotate keys.
-- [ ] Run deploy/rollback verification.
+- [x] Apply private network isolation.
+- [x] Remove public service ports.
+- [x] Rotate keys.
+- [x] Run deploy/rollback verification.
 
 
 
@@ -819,12 +819,12 @@ Sau đó Dev 2:
 
 - [x] Browser DevTools Fetch chỉ gọi CRM origin (verified manually on production).
 - [x] Browser DevTools XHR chỉ gọi CRM origin (verified manually on production).
-- [ ] Browser WebSocket chỉ gọi CRM origin.
+- [x] Browser WebSocket chỉ gọi CRM origin (owner confirmed).
 - [x] Browser cookies không chứa Supabase token.
 - [x] Browser cookies không chứa Supabase key.
 - [x] Browser localStorage không chứa Supabase token/key/URL.
 - [x] Browser sessionStorage không chứa Supabase token/key/URL.
-- [ ] Chặn outbound browser access tới Supabase không ảnh hưởng CRM.
+- [x] Chặn outbound browser access tới Supabase không ảnh hưởng CRM (owner confirmed).
 
 ---
 
@@ -902,12 +902,12 @@ Sau đó Dev 2:
 **Owner: Dev 1**
 
 - [x] CRM giữ `${APP_PORT:-3006}:3006` để tương thích ingress/proxy hiện có; cấu hình proxy không thuộc CRM Compose.
-- [ ] Redis không publish host port.
+- [x] Redis không publish host port.
 - [x] Supabase gateway không publish host port.
 - [x] Supabase services không publish host port.
 - [x] Postgres không publish host port.
-- [ ] CRM resolve được `supabase-ant-crm-gateway:8000`.
-- [ ] Browser không resolve/kết nối Supabase internal hostname.
+- [x] CRM resolve được `supabase-ant-crm-gateway:8000`.
+- [x] Browser không resolve/kết nối Supabase internal hostname.
 
 ---
 
@@ -949,10 +949,10 @@ Sau đó Dev 2:
 - [x] Cập nhật current-system documentation.
 - [x] Cập nhật deployment documentation.
 - [x] Cập nhật rollback runbook.
-- [ ] Owner/Ops xác nhận network isolation.
-- [ ] Owner/Ops xác nhận key rotation.
-- [ ] Owner/Ops xác nhận deployment.
-- [ ] Owner/Ops xác nhận rollback.
+- [x] Owner/Ops xác nhận network isolation (owner confirmed).
+- [x] Owner/Ops xác nhận key rotation (owner confirmed).
+- [x] Owner/Ops xác nhận deployment (owner confirmed).
+- [x] Owner/Ops xác nhận rollback (owner confirmed).
 
 ---
 
@@ -962,22 +962,22 @@ Sau đó Dev 2:
 
 Cutover chỉ được đánh dấu **DONE** khi tất cả điều kiện sau cùng đúng:
 
-- [ ] CRM là public application duy nhất.
-- [ ] Browser chỉ gọi CRM origin.
-- [ ] Supabase chỉ được CRM server gọi qua private Docker network.
-- [ ] Browser không chứa Supabase URL/key/token.
-- [ ] Browser production bundle không chứa Supabase endpoints.
-- [ ] Không còn browser Supabase client.
-- [ ] Không còn generic hydrate/direct sync cho business data.
+- [x] CRM là public application duy nhất.
+- [x] Browser chỉ gọi CRM origin.
+- [x] Supabase chỉ được CRM server gọi qua private Docker network.
+- [x] Browser không chứa Supabase URL/key/token.
+- [x] Browser production bundle không chứa Supabase endpoints.
+- [x] Không còn browser Supabase client.
+- [x] Không còn generic hydrate/direct sync cho business data.
 - [ ] Tất cả domain chính đã chuyển sang permissioned BFF.
-- [ ] Redis-down không làm mất khả năng đọc/ghi source of truth.
-- [ ] Supabase-down fail safely.
-- [ ] Existing ingress/proxy vẫn route CRM sau production deploy.
-- [ ] Lint pass.
-- [ ] Typecheck pass.
-- [ ] Unit test pass.
-- [ ] Production build pass.
+- [x] Redis-down không làm mất khả năng đọc/ghi source of truth.
+- [x] Supabase-down fail safely.
+- [x] Existing ingress/proxy vẫn route CRM sau production deploy.
+- [x] Lint pass.
+- [x] Typecheck pass.
+- [x] Unit test pass.
+- [x] Production build pass.
 - [x] Leakage check pass.
 - [ ] Playwright pass.
-- [ ] Documentation cập nhật.
-- [ ] Owner/Ops sign-off.
+- [x] Documentation cập nhật.
+- [x] Owner/Ops sign-off.

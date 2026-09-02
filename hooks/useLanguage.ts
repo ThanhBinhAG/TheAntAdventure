@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { pageTitleForSlug } from '@/lib/i18n/page-titles';
 import { tc as tcFn, formatI18n, type CommonKey } from '@/lib/i18n/common';
@@ -13,36 +14,44 @@ export function useLanguage() {
   const language = useStore((s) => s.language);
   const setLanguage = useStore((s) => s.setLanguage);
 
-  const t = (en: string, vi?: string) => {
+  const t = useCallback((en: string, vi?: string) => {
     if (language === 'vi') return vi ?? en;
     return en;
-  };
+  }, [language]);
 
-  const pageTitle = (slug: PageSlug) => pageTitleForSlug(slug, language);
+  const pageTitle = useCallback((slug: PageSlug) => pageTitleForSlug(slug, language), [language]);
 
-  const tc = (key: CommonKey) => tcFn(key, language);
-  const tsf = (key: SalesKey) => tsfFn(key, language);
-  const tac = (key: Parameters<typeof tacFn>[0]) => tacFn(key, language);
-  const tStage = (stage: string) => tStageFn(stage, language);
-  const tLostReason = (reason: string) => tLostReasonFn(reason, language);
-  const tp = (page: I18nPageKey, key: string) => tpFn(page, key, language);
-  const tpl = (page: I18nPageKey, key: string, vars?: Record<string, string | number>) =>
-    tplFn(page, key, language, vars);
-  const fmt = (template: string, vars?: Record<string, string | number>) =>
-    formatI18n(template, vars);
+  const tc = useCallback((key: CommonKey) => tcFn(key, language), [language]);
+  const tsf = useCallback((key: SalesKey) => tsfFn(key, language), [language]);
+  const tac = useCallback((key: Parameters<typeof tacFn>[0]) => tacFn(key, language), [language]);
+  const tStage = useCallback((stage: string) => tStageFn(stage, language), [language]);
+  const tLostReason = useCallback((reason: string) => tLostReasonFn(reason, language), [language]);
+  const tp = useCallback((page: I18nPageKey, key: string) => tpFn(page, key, language), [language]);
+  const tpl = useCallback(
+    (page: I18nPageKey, key: string, vars?: Record<string, string | number>) =>
+      tplFn(page, key, language, vars),
+    [language]
+  );
+  const fmt = useCallback(
+    (template: string, vars?: Record<string, string | number>) => formatI18n(template, vars),
+    []
+  );
 
-  return {
-    language,
-    setLanguage,
-    t,
-    pageTitle,
-    tc,
-    tsf,
-    tac,
-    tStage,
-    tLostReason,
-    tp,
-    tpl,
-    fmt,
-  };
+  return useMemo(
+    () => ({
+      language,
+      setLanguage,
+      t,
+      pageTitle,
+      tc,
+      tsf,
+      tac,
+      tStage,
+      tLostReason,
+      tp,
+      tpl,
+      fmt,
+    }),
+    [language, setLanguage, t, pageTitle, tc, tsf, tac, tStage, tLostReason, tp, tpl, fmt]
+  );
 }

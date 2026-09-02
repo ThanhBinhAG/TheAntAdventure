@@ -1,5 +1,6 @@
 import type { TourBrief } from '@/lib/tour-design/tour-design-types';
 import { REG_LABELS } from '@/lib/core/page-helpers';
+import { formatTravelMonth } from '@/lib/core/travel-month';
 
 function labelIntlFlights(v: string) {
   if (v === 'incl-economy') return 'Included — Economy';
@@ -64,7 +65,7 @@ export function buildBriefSummaryHtml(brief: TourBrief, clientType: 'b2c' | 'b2b
       ? ` · B2B${brief.agentRef ? '' : ' ← enter agent name'}`
       : '';
 
-  return `${displayName}${b2bStr}${childStr} · ${brief.pax} pax · ${brief.style} · ${brief.travelMonth} 2026 · ${brief.hotelTier} · ${brief.language} guide · ${intlLabel} · ${visaLabel}`;
+  return `${displayName}${b2bStr}${childStr} · ${brief.pax} pax · ${brief.style} · ${formatTravelMonth(brief.travelMonth) || 'Travel dates TBC'} · ${brief.hotelTier} · ${brief.language} guide · ${intlLabel} · ${visaLabel}`;
 }
 
 export function getGuestDisplayName(brief: TourBrief, clientType: 'b2c' | 'b2b', custName?: string): string {
@@ -85,7 +86,7 @@ export function getGuestPanelData(brief: TourBrief, clientType: 'b2c' | 'b2b', c
       travelStr = `${DOW[d.getDay()]}, ${d.getDate()} ${MN[d.getMonth()]} ${d.getFullYear()}`;
     }
   } else if (brief.travelMonth) {
-    travelStr = `${brief.travelMonth} 2026 (est.)`;
+    travelStr = `${formatTravelMonth(brief.travelMonth)} (dates TBC)`;
   }
 
   const paxLine =

@@ -48,9 +48,9 @@ function isNetworkOrTlsAuthError(message: string): boolean {
 function authConnectivityMessage(raw: string): string {
   const lower = raw.toLowerCase();
   if (lower.includes('econnrefused') || lower.includes('127.0.0.1') || lower.includes('localhost')) {
-    return 'Không kết nối được Supabase (ECONNREFUSED). Nếu đang dùng local: chạy npx supabase start. Nếu deploy: kiểm tra URL không còn trỏ 127.0.0.1.';
+    return 'Cannot connect to Supabase (ECONNREFUSED). Local dev: run npx supabase start. Production: verify URL does not point to 127.0.0.1.';
   }
-  return 'Không kết nối được Supabase Auth — kiểm tra mạng, firewall, hoặc chứng chỉ TLS trên server.';
+  return 'Cannot connect to Supabase Auth — check network, firewall, or TLS certificate on the server.';
 }
 
 function logLoginRejected(
@@ -91,10 +91,10 @@ async function createDurableSession(response: NextResponse, input: {
 }
 
 /**
- * Audit không được làm thất bại đăng nhập.
+ * Audit must not cause login to fail.
  *
- * Không log IP, User-Agent hoặc lỗi database ra browser/server console để
- * tránh vô tình lộ dữ liệu truy vết của người dùng.
+ * Do not log IP, User-Agent, or database errors to the browser/server console
+ * to avoid accidentally leaking user tracking data.
  */
 async function recordSuccessfulLoginSafely(input: {
   userId: string | null;
@@ -121,14 +121,14 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
   async (request, _context, { logger }) => {
   if (!hasTrustedRequestOrigin(request)) {
     logLoginRejected(logger, 403, 'origin_invalid');
-    return fail(403, 'Origin không hợp lệ.');
+    return fail(403, 'Invalid origin.');
   }
 
   const ip = getClientIp(request);
   const rate = await checkLoginRateLimit(ip);
   if (!rate.ok) {
     logLoginRejected(logger, 429, 'rate_limited');
-    return fail(429, 'Quá nhiều lần đăng nhập thất bại. Thử lại sau 1 phút.', {
+    return fail(429, 'Too many failed login attempts. Try again in 1 minute.', {
       'Retry-After': String(rate.retryAfterSec),
     });
   }
@@ -146,7 +146,7 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
   if (!identity || !password) {
     await recordLoginFailure(ip);
     logLoginRejected(logger, 400, 'missing_credentials');
-    return fail(400, 'Vui lòng nhập tài khoản và mật khẩu.');
+    return fail(400, 'Please enter your account and password.');
   }
 
   // Break-glass first (timing-safe compare). Debug metadata is boolean-only and
@@ -172,7 +172,7 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
           { event: 'auth.break_glass_login_unavailable' },
           'Break-glass login unavailable',
         );
-        return fail(503, 'Không thể tạo Supabase session. Vui lòng thử lại.');
+        return fail(503, 'Unable to create Supabase session. Please try again.');
       }
       const response = NextResponse.json({ ok: true, mode: 'break_glass' });
       await createDurableSession(response, {
@@ -209,7 +209,7 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
   if (!identity.includes('@')) {
     await recordLoginFailure(ip);
     logLoginRejected(logger, 401, 'identity_format', 'password');
-    return fail(401, 'Tài khoản hoặc mật khẩu không đúng.');
+    return fail(401, 'Invalid email or password.');
   }
 
   const response = NextResponse.json({ ok: true, mode: 'crm' });
@@ -219,7 +219,7 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
   } catch (error) {
     logger.error({ event: 'auth.supabase_client_create_failed', err: error }, 'Supabase Auth client creation failed');
     await recordLoginFailure(ip);
-    return fail(503, 'Supabase Auth chưa được cấu hình.');
+    return fail(503, 'Supabase Auth is not configured.');
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -236,13 +236,13 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
       logger.error({ event: 'auth.login.unavailable', authMethod: 'password', err: error }, 'Login unavailable');
       return fail(503, authConnectivityMessage(error.message));
     }
-    let message = error.message || 'Đăng nhập thất bại.';
+    let message = error.message || 'Login failed.';
     if (lower.includes('invalid login credentials')) {
-      message = 'Tài khoản hoặc mật khẩu không đúng.';
+      message = 'Invalid email or password.';
     } else if (lower.includes('email not confirmed')) {
-      message = 'Email chưa được xác nhận. Kiểm tra hộp thư hoặc liên hệ quản trị viên.';
+      message = 'Email not confirmed. Check your inbox or contact an administrator.';
     } else if (lower.includes('captcha')) {
-      message = 'Xác minh CAPTCHA thất bại. Vui lòng thử lại.';
+      message = 'CAPTCHA verification failed. Please try again.';
     }
     logLoginRejected(logger, 401, lower.includes('invalid login credentials')
       ? 'invalid_credentials'
@@ -258,7 +258,7 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
 
   if (!data.user || !data.session) {
     logLoginRejected(logger, 401, 'missing_session', 'password');
-    return fail(401, 'Không thể tạo phiên đăng nhập.');
+    return fail(401, 'Unable to create login session.');
   }
 
   try {
@@ -270,11 +270,11 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
     });
   } catch (error) {
     logger.error({ event: 'auth.crm_session_create_failed', err: error }, 'CRM session creation failed');
-    return fail(503, 'Dịch vụ session tạm thời không khả dụng.');
+    return fail(503, 'Session service temporarily unavailable.');
   }
   clearSupabaseAuthCookies(response, request.headers.get('cookie'));
 
-  // Chạy ngầm ghi lịch sử để không chặn luồng trả về kết quả cho người dùng
+  // Record login history in background to avoid blocking the response
   void recordSuccessfulLoginSafely({
     userId: data.user.id,
     authMethod: 'password',

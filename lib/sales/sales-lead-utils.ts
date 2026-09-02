@@ -1,9 +1,10 @@
 import { STAGE_ORDER, STAGE_PROB_V22 } from '../constants';
 import { mondayWeekRange } from '../core/date-utils';
 import { getCustomerName } from '../core/crm-utils';
+import { formatTravelMonth } from '../core/travel-month';
 import type { Customer, Lead } from '../types';
 
-const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
 
 const MONTH_MAP: Record<string, number> = {
   Jan: 0,
@@ -46,40 +47,25 @@ export interface ListSortState {
 /** Default visible cards per stage before “show more”; the column then grows with the page. */
 export const PIPELINE_CARDS_LIMIT = 6;
 
-/** Normalize legacy month strings to `Mon YYYY` or `TBD`. */
-export function normalizeLeadMonth(month: string, year = new Date().getFullYear()): string {
+/** Normalize ISO travel months for display without assigning a year to legacy values. */
+export function normalizeLeadMonth(month: string): string {
   const trimmed = (month || '').trim();
   if (!trimmed || trimmed === 'TBD') return 'TBD';
-
-  const monYear = trimmed.match(/^([A-Za-z]{3})\s+(\d{4})$/);
-  if (monYear && MONTH_MAP[monYear[1]] !== undefined) return `${monYear[1]} ${monYear[2]}`;
-
-  if (/^[A-Za-z]{3}$/.test(trimmed) && MONTH_MAP[trimmed] !== undefined) {
-    return `${trimmed} ${year}`;
-  }
-
-  const isoMonth = trimmed.match(/^(\d{4})-(\d{2})$/);
-  if (isoMonth) {
-    const mIdx = parseInt(isoMonth[2], 10) - 1;
-    if (mIdx >= 0 && mIdx < 12) return `${MONTH_ABBR[mIdx]} ${isoMonth[1]}`;
-  }
-
-  return trimmed;
+  return formatTravelMonth(trimmed);
 }
 
 /** Build a lead `month` field from brief/form inputs. */
 export function formatLeadTravelMonth(
   travelMonth?: string,
-  startDate?: string,
-  year = new Date().getFullYear()
+  startDate?: string
 ): string {
   const fromMonth = (travelMonth || '').trim();
-  if (fromMonth) return normalizeLeadMonth(fromMonth, year);
+  if (fromMonth) return normalizeLeadMonth(fromMonth);
 
   const fromStart = (startDate || '').trim();
   if (fromStart.length >= 7) {
     const iso = fromStart.slice(0, 7);
-    if (/^\d{4}-\d{2}$/.test(iso)) return normalizeLeadMonth(iso, year);
+    if (/^\d{4}-\d{2}$/.test(iso)) return normalizeLeadMonth(iso);
   }
 
   return 'TBD';

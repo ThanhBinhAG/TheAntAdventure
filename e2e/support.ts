@@ -14,6 +14,8 @@ export type E2eState = {
   unassigned: { id: string; email: string; password: string };
   customerId: string;
   leadId: string;
+  legacyScopeRoleCode: string;
+  legacyScopeRoleLabel: string;
 };
 
 type ApiResult = { status: number; body: unknown };
@@ -71,8 +73,8 @@ export async function login(page: Page, credentials: E2eState['admin']): Promise
 }
 
 export async function logoutViaUi(page: Page): Promise<void> {
-  await page.getByRole('button', { name: /Mở công cụ hệ thống/ }).click();
-  await page.getByTitle('Đăng xuất').click();
+  await page.getByRole('button', { name: /(Mở công cụ hệ thống|Open system tools)/ }).click();
+  await page.getByTitle(/(Đăng xuất|Log out)/).click();
   await expect
     .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === CRM_SESSION_COOKIE))
     .toBe(false);

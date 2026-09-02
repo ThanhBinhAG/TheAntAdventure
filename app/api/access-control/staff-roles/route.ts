@@ -64,7 +64,7 @@ function errorResponse(error: unknown) {
     return NextResponse.json(
         accessControlError(
             'STAFF_ROLE_OPERATION_FAILED',
-            'Không thể xử lý yêu cầu role nhân viên.',
+            'Unable to complete the staff role operation.',
         ),
         { status: 500 },
     );
@@ -138,7 +138,7 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
         return NextResponse.json(
             accessControlError(
                 'INVALID_STAFF_ROLE_REQUEST',
-                'Dữ liệu role không hợp lệ.',
+                'Invalid role data.',
             ),
             { status: 400 },
         );
@@ -179,7 +179,7 @@ export const PATCH = withHttpRequestLogging<{ params: Promise<Record<string, nev
         return NextResponse.json(
             accessControlError(
                 'INVALID_STAFF_ROLE_UPDATE_REQUEST',
-                'Dữ liệu cập nhật role không hợp lệ.',
+                'Invalid role update data.',
             ),
             { status: 400 },
         );
@@ -248,7 +248,7 @@ export const DELETE = withHttpRequestLogging<{ params: Promise<Record<string, ne
         return NextResponse.json(
             accessControlError(
                 'INVALID_STAFF_ROLE_CODE',
-                'Mã role không hợp lệ.',
+                'Invalid role code.',
             ),
             { status: 400 },
         );

@@ -3197,5 +3197,243 @@ end;
 $core_resource_rls$;
 
 -- ============================================================
+--  RETIRED ASSIGNED DATA SCOPE (mirrors 20260901130630)
+-- ============================================================
+
+create or replace function public.list_access_control_staff_role_resource_scopes()
+returns table (role_code text, resource_code text, action text, scope text)
+language plpgsql stable security definer
+set search_path = pg_catalog, public
+as $function$
+begin
+  if not public.has_permission('users.manage') then
+    raise exception 'Bạn không có quyền xem phạm vi dữ liệu của role.' using errcode = '42501';
+  end if;
+
+  return query
+  select rrs.role_code, rrs.resource_code, rrs.action, rrs.scope
+  from public.role_resource_scopes rrs
+  join public.roles r on r.code = rrs.role_code
+  where r.is_system = false
+    and rrs.scope in ('own', 'all')
+  order by rrs.role_code, rrs.resource_code, rrs.action;
+end;
+$function$;
+
+create or replace function public.replace_access_control_staff_role_resource_scopes(
+  target_role_code text,
+  requested_scopes jsonb
+)
+returns void
+language plpgsql security definer
+set search_path = pg_catalog, public
+as $function$
+declare
+  old_scopes jsonb;
+  normalized_scopes jsonb;
+  resulting_scopes jsonb;
+begin
+  if not public.has_permission('users.manage') then
+    raise exception 'Bạn không có quyền cập nhật phạm vi dữ liệu của role.' using errcode = '42501';
+  end if;
+  if not exists (
+    select 1 from public.roles where code = target_role_code and is_system = false
+  ) then
+    raise exception 'Chỉ được chỉnh role nhân viên động.' using errcode = '22023';
+  end if;
+  if jsonb_typeof(coalesce(requested_scopes, '[]'::jsonb)) <> 'array' then
+    raise exception 'Danh sách phạm vi dữ liệu không hợp lệ.' using errcode = '22023';
+  end if;
+
+  if exists (
+    with requested as (
+      select lower(trim(input.resource_code)) as resource_code,
+        lower(trim(input.action)) as action,
+        lower(trim(input.scope)) as scope
+      from jsonb_to_recordset(coalesce(requested_scopes, '[]'::jsonb))
+        as input(resource_code text, action text, scope text)
+    )
+    select 1 from requested
+    where resource_code is null or action is null or scope is null
+      or resource_code not in ('customers', 'leads', 'tour_drafts', 'bookings', 'tasks', 'comms')
+      or action not in ('read', 'write', 'delete')
+      or scope not in ('own', 'all')
+  ) then
+    raise exception 'Danh sách phạm vi dữ liệu không hợp lệ.' using errcode = '22023';
+  end if;
+  if exists (
+    select 1
+    from jsonb_to_recordset(coalesce(requested_scopes, '[]'::jsonb))
+      as input(resource_code text, action text, scope text)
+    group by lower(trim(resource_code)), lower(trim(action))
+    having count(*) > 1
+  ) then
+    raise exception 'Mỗi resource chỉ có một scope cho mỗi action.' using errcode = '22023';
+  end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'resource_code', resource_code, 'action', action, 'scope', scope
+  ) order by resource_code, action), '[]'::jsonb)
+  into old_scopes
+  from public.role_resource_scopes where role_code = target_role_code;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'resource_code', resource_code, 'action', action, 'scope', scope
+  ) order by resource_code, action), '[]'::jsonb)
+  into normalized_scopes
+  from (
+    select lower(trim(input.resource_code)) as resource_code,
+      lower(trim(input.action)) as action,
+      lower(trim(input.scope)) as scope
+    from jsonb_to_recordset(coalesce(requested_scopes, '[]'::jsonb))
+      as input(resource_code text, action text, scope text)
+  ) requested;
+
+  delete from public.role_resource_scopes where role_code = target_role_code;
+  insert into public.role_resource_scopes (role_code, resource_code, action, scope)
+  select target_role_code, replacement.resource_code, replacement.action, replacement.scope
+  from (
+    select legacy.resource_code, legacy.action, legacy.scope
+    from jsonb_to_recordset(old_scopes)
+      as legacy(resource_code text, action text, scope text)
+    where legacy.scope = 'assigned'
+      and not exists (
+        select 1
+        from jsonb_to_recordset(normalized_scopes)
+          as requested(resource_code text, action text, scope text)
+        where requested.resource_code = legacy.resource_code
+          and requested.action = legacy.action
+      )
+    union all
+    select requested.resource_code, requested.action, requested.scope
+    from jsonb_to_recordset(normalized_scopes)
+      as requested(resource_code text, action text, scope text)
+  ) replacement;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'resource_code', resource_code, 'action', action, 'scope', scope
+  ) order by resource_code, action), '[]'::jsonb)
+  into resulting_scopes
+  from public.role_resource_scopes where role_code = target_role_code;
+  insert into public.access_control_audit_logs (actor_user_id, action, before_value, after_value)
+  values (
+    auth.uid(), 'staff_role_resource_scopes_replaced',
+    jsonb_build_object('role_code', target_role_code, 'scopes', old_scopes),
+    jsonb_build_object('role_code', target_role_code, 'scopes', resulting_scopes)
+  );
+end;
+$function$;
+
+drop function if exists public.set_core_record_assignee(text, text, uuid);
+
+create or replace function private.can_access_booking_record(
+  target_booking_id text,
+  requested_action text
+)
+returns boolean
+language sql stable security definer
+set search_path = pg_catalog, public
+as $function$
+  select
+    (select private.can_access_core_resource('bookings', requested_action, array['all']))
+    or exists (
+      select 1
+      from public.bookings b
+      where b.id = target_booking_id
+        and b.owner_user_id = (select auth.uid())
+        and (select private.can_access_core_resource('bookings', requested_action, array['own']))
+    );
+$function$;
+
+do $retire_assigned_scope_policies$
+declare
+  resource record;
+  action_name text;
+  predicate text;
+begin
+  for resource in
+    select * from (values
+      ('bookings', 'bookings', 'owner_user_id'),
+      ('tasks', 'tasks', 'creator_user_id')
+    ) as resources(table_name, resource_code, owner_column)
+  loop
+    foreach action_name in array array['select', 'insert', 'update', 'delete'] loop
+      execute format(
+        'drop policy if exists %I on public.%I',
+        'rls_' || resource.table_name || '_' || action_name,
+        resource.table_name
+      );
+    end loop;
+
+    predicate := format(
+      '(select private.can_access_core_resource(%L, %L, array[''all''])) or (%I = (select auth.uid()) and (select private.can_access_core_resource(%L, %L, array[''own''])))',
+      resource.resource_code, 'read', resource.owner_column, resource.resource_code, 'read'
+    );
+    execute format(
+      'create policy %I on public.%I for select to authenticated using (%s)',
+      'rls_' || resource.table_name || '_select', resource.table_name, predicate
+    );
+    predicate := replace(predicate, '''read''', '''write''');
+    execute format(
+      'create policy %I on public.%I for insert to authenticated with check (%s)',
+      'rls_' || resource.table_name || '_insert', resource.table_name, predicate
+    );
+    execute format(
+      'create policy %I on public.%I for update to authenticated using (%s) with check (%s)',
+      'rls_' || resource.table_name || '_update', resource.table_name, predicate, predicate
+    );
+    predicate := replace(predicate, '''write''', '''delete''');
+    execute format(
+      'create policy %I on public.%I for delete to authenticated using (%s)',
+      'rls_' || resource.table_name || '_delete', resource.table_name, predicate
+    );
+  end loop;
+end;
+$retire_assigned_scope_policies$;
+
+-- Travel Style catalog for the Customer form. Records are retained (deactivated
+-- instead of deleted) so existing customer preferences remain meaningful.
+create table if not exists public.travel_styles (
+  code text primary key check (code ~ '^[a-z0-9][a-z0-9-]{0,79}$'),
+  label text not null check (length(trim(label)) between 1 and 100),
+  sort_order integer not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists travel_styles_label_unique on public.travel_styles (lower(label));
+insert into public.travel_styles (code, label, sort_order, is_active) values
+  ('luxury', 'Luxury', 10, true), ('premium-cultural', 'Premium Cultural', 20, true),
+  ('cultural', 'Cultural', 30, true), ('adventure', 'Adventure', 40, true),
+  ('family', 'Family', 50, true), ('culinary', 'Culinary', 60, true),
+  ('photography', 'Photography', 70, true), ('honeymoon', 'Honeymoon', 80, true)
+on conflict (code) do nothing;
+alter table public.travel_styles enable row level security;
+revoke all on table public.travel_styles from anon, authenticated;
+grant select, insert, update, delete on table public.travel_styles to authenticated;
+drop policy if exists rls_travel_styles_select on public.travel_styles;
+drop policy if exists rls_travel_styles_insert on public.travel_styles;
+drop policy if exists rls_travel_styles_update on public.travel_styles;
+drop policy if exists rls_travel_styles_delete on public.travel_styles;
+create policy rls_travel_styles_select on public.travel_styles for select to authenticated using (public.has_permission('customers.write') or public.has_permission('tour_design.read'));
+create policy rls_travel_styles_insert on public.travel_styles for insert to authenticated with check (public.has_permission('customers.write'));
+create policy rls_travel_styles_update on public.travel_styles for update to authenticated using (public.has_permission('customers.write')) with check (public.has_permission('customers.write'));
+create policy rls_travel_styles_delete on public.travel_styles for delete to authenticated using (public.has_permission('customers.write'));
+create or replace function private.prevent_used_travel_style_delete()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public
+as $function$
+begin
+  if exists (select 1 from public.customers where travel_style = old.label) then
+    raise exception 'Không thể xóa Travel Style "%" vì đang được khách hàng sử dụng.', old.label using errcode = '23503';
+  end if;
+  return old;
+end;
+$function$;
+drop trigger if exists prevent_used_travel_style_delete on public.travel_styles;
+create trigger prevent_used_travel_style_delete before delete on public.travel_styles
+  for each row execute function private.prevent_used_travel_style_delete();
+
+-- ============================================================
 --  END OF SCHEMA v5.0
 -- ============================================================

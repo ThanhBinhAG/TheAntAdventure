@@ -25,7 +25,7 @@ function isRejectedSupabaseSession(error: unknown): boolean {
 
 function unauthenticatedResponse(request: Request, ip: string): NextResponse {
   const failure = NextResponse.json(
-    { ok: false, error: 'Phiên đăng nhập đã hết hạn.' },
+    { ok: false, error: 'Session has expired.' },
     { status: 401 },
   );
   clearRefreshCredentials(failure, request.headers.get('cookie'));
@@ -47,13 +47,13 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
   { scope: 'auth/refresh', route: '/api/auth/refresh' },
   async (request, _context, { logger }) => {
   if (!hasTrustedRequestOrigin(request)) {
-    return NextResponse.json({ ok: false, error: 'Origin không hợp lệ.' }, { status: 403 });
+    return NextResponse.json({ ok: false, error: 'Invalid origin.' }, { status: 403 });
   }
 
   const rate = await consumeRefreshRateLimit(getClientIp(request));
   if (!rate.ok) {
     return NextResponse.json(
-      { ok: false, error: 'Quá nhiều yêu cầu làm mới session. Vui lòng thử lại sau.' },
+      { ok: false, error: 'Too many session refresh requests. Please try again later.' },
       { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec) } },
     );
   }
@@ -102,7 +102,7 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
       'Supabase session refresh temporarily unavailable',
     );
     const failure = NextResponse.json(
-      { ok: false, error: 'Dịch vụ xác thực tạm thời không khả dụng.' },
+      { ok: false, error: 'Authentication service temporarily unavailable.' },
       { status: 503, headers: { 'Retry-After': '60' } },
     );
     void recordAuthSecurityEvent({ eventType: 'refresh_failed', ip });

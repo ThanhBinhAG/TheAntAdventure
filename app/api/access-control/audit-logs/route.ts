@@ -36,7 +36,7 @@ function errorResponse(error: unknown) {
         return NextResponse.json(
             accessControlError(
                 'ACCESS_DENIED',
-                'Bạn không có quyền xem lịch sử phân quyền.',
+                'You do not have permission to view the change history.',
             ),
             { status: 403 },
         );
@@ -45,7 +45,7 @@ function errorResponse(error: unknown) {
     return NextResponse.json(
         accessControlError(
             'AUDIT_LOG_LOAD_FAILED',
-            'Không thể tải lịch sử phân quyền.',
+            'Unable to load change history.',
         ),
         { status: 500 },
     );
@@ -77,7 +77,7 @@ export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never
         return NextResponse.json(
             accessControlError(
                 'INVALID_AUDIT_LOG_QUERY',
-                'Tham số phân trang không hợp lệ.',
+                'Invalid pagination parameters.',
             ),
             { status: 400 },
         );

@@ -78,7 +78,7 @@ export type AccessControlStaffRole = {
 export type AccessControlResourceScope = {
     resource_code: 'customers' | 'leads' | 'tour_drafts' | 'bookings' | 'tasks' | 'comms';
     action: 'read' | 'write' | 'delete';
-    scope: 'own' | 'assigned' | 'all';
+    scope: 'own' | 'all';
 };
 
 /** Dữ liệu tạo role nhân viên mới. */
@@ -266,7 +266,7 @@ async function readApiResponse<T>(
         throw new AccessControlApiError(
             'error' in body && body.error
                 ? body.error
-                : 'Không thể xử lý yêu cầu phân quyền.',
+                : 'Unable to process the access-control request.',
             'errorCode' in body ? body.errorCode : undefined,
             response.status,
         );

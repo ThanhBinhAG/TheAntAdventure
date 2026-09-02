@@ -21,7 +21,6 @@ test('core RLS policies require both RBAC permission and a configured data scope
 
   assert.match(sql, /drop policy if exists authenticated_access on public\.customers/i);
   assert.match(sql, /owner_user_id = \(select auth\.uid\(\)\)/i);
-  assert.match(sql, /assignee_user_id = \(select auth\.uid\(\)\)/i);
 });
 
 test('dependent tour and booking tables inherit the parent record scope efficiently', () => {

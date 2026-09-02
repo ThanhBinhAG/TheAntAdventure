@@ -28,6 +28,7 @@ CLI migrations (`db:push`). Incremental SQL dated; do not paste bootstrap copies
 - `20260827104813_durable_crm_sessions_v2.sql` — opaque CRM session token hash and encrypted Supabase credential persistence
 - `20260824043803_add_authz_version_and_security_audit.sql` — per-user authz version + server-only auth audit
 - `20260901134051_seed_attraction_schedule.sql` — seed 38 attractions (idempotent `ON CONFLICT`; no `attraction_photos`)
+- `20260902184500_ensure_photos_storage_bucket.sql` — idempotent `photos` Storage bucket + RLS policies (MODULE 14)
 
 ## Boundaries
 - Role helpers / gán user: `supabase/snippets/`.

@@ -20,6 +20,7 @@ import {
   isKnownNationality,
   normalizeNationality,
 } from '@/lib/customers/nationalities';
+import { isIsoTravelMonth, travelMonthInputValue } from '@/lib/core/travel-month';
 import type { Customer } from '@/lib/types';
 import type { CustomerSaveOutcome } from '@/hooks/useRegisterCustomer';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
@@ -593,14 +594,14 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
             </div>
             <div className="fg">
               <label className="lbl">{tp('customers', 'formTravelMonth')}</label>
-              <select value={form.travelMonth} onChange={(e) => set('travelMonth', e.target.value)}>
-                <option value="">{tp('customers', 'formNotDecided')}</option>
-                {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+              <input
+                type="month"
+                value={travelMonthInputValue(form.travelMonth)}
+                onChange={(e) => set('travelMonth', e.target.value)}
+              />
+              {form.travelMonth && !isIsoTravelMonth(form.travelMonth) && (
+                <div className="nc-form-hint">Legacy value kept: {form.travelMonth}</div>
+              )}
             </div>
             <div className="fg">
               <label className="lbl">{tp('customers', 'formNumGuests')}</label>

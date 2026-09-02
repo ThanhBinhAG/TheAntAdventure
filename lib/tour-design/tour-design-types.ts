@@ -65,7 +65,7 @@ export const DEFAULT_TOUR_BRIEF: TourBrief = {
   specialRequests: '',
   agentRef: '',
   language: 'English',
-  travelMonth: 'Oct',
+  travelMonth: '',
   hotelTier: 'Boutique 4★',
   budgetRange: '$2,000–$3,500/pax',
   flights: 'yes',

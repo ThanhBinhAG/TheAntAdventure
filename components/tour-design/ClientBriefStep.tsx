@@ -11,6 +11,7 @@ import {
   isKnownNationality,
   normalizeNationality,
 } from '@/lib/customers/nationalities';
+import { isIsoTravelMonth, travelMonthInputValue } from '@/lib/core/travel-month';
 import { buildBriefSummaryHtml } from '@/lib/tour-design/tour-brief-summary';
 import { DURATION_PRESETS } from '@/lib/tour-design/tour-durations';
 import type { TourBrief } from '@/lib/tour-design/tour-design-types';
@@ -226,11 +227,14 @@ export default function ClientBriefStep({
             </div>
             <div className="fg">
               <label className="lbl">{tp('tour-design', 'briefTravelMonth')}</label>
-              <select value={brief.travelMonth} onChange={(e) => setBrief({ ...brief, travelMonth: e.target.value })}>
-                {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
-              </select>
+              <input
+                type="month"
+                value={travelMonthInputValue(brief.travelMonth)}
+                onChange={(e) => setBrief({ ...brief, travelMonth: e.target.value })}
+              />
+              {brief.travelMonth && !isIsoTravelMonth(brief.travelMonth) && (
+                <div className="nc-form-hint">Legacy value kept: {brief.travelMonth}</div>
+              )}
             </div>
             <div className="fg">
               <label className="lbl">{tp('tour-design', 'briefHotelTier')}</label>

@@ -9,6 +9,7 @@ import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useCustomerProfileMutations } from '@/hooks/useCustomerProfileMutations';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
 import { useLanguage } from '@/hooks/useLanguage';
+import { formatTravelMonth } from '@/lib/core/travel-month';
 import { useStore } from '@/hooks/useStore';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import type { Customer, Lead } from '@/lib/types';
@@ -195,7 +196,7 @@ export default function CustomerProfileModal({
   function aiDraftEmail() {
     const draft = `Dear ${customer.name.split(' ')[0] || customer.name},
 
-Thank you for your interest in traveling with The Ant Adventures. Based on your ${customer.style || 'travel'} preferences${customer.travelMonth ? ` for ${customer.travelMonth}` : ''}, we would love to craft a personalised Vietnam itinerary for you.
+Thank you for your interest in traveling with The Ant Adventures. Based on your ${customer.style || 'travel'} preferences${customer.travelMonth ? ` for ${formatTravelMonth(customer.travelMonth)}` : ''}, we would love to craft a personalised Vietnam itinerary for you.
 
 ${customer.interests ? `We noted your interests in: ${customer.interests}. ` : ''}Our team will follow up shortly with tailored recommendations.
 
@@ -278,7 +279,7 @@ The Ant Adventures`;
                   [tp('customers', 'profileSource'), customer.source],
                   [tp('customers', 'profileHotelTier'), customer.hotelTier || '—'],
                   [tp('customers', 'profileBudget'), customer.budget || '—'],
-                  [tp('customers', 'profileTravelMonth'), customer.travelMonth || '—'],
+                  [tp('customers', 'profileTravelMonth'), formatTravelMonth(customer.travelMonth) || '—'],
                   [tp('customers', 'profileSalesPerson'), customer.salesperson || '—'],
                   [tp('customers', 'profileAgent'), customer.agentName || '—'],
                   [tp('customers', 'profilePhone'), customer.phone || '—'],

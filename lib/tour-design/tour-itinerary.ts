@@ -1,19 +1,5 @@
 import type { ExperienceOverride, Product } from '@/lib/types';
-
-const MONTH_MAP: Record<string, number> = {
-  Jan: 0,
-  Feb: 1,
-  Mar: 2,
-  Apr: 3,
-  May: 4,
-  Jun: 5,
-  Jul: 6,
-  Aug: 7,
-  Sep: 8,
-  Oct: 9,
-  Nov: 10,
-  Dec: 11,
-};
+import { travelMonthToDate } from '@/lib/core/travel-month';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -159,13 +145,8 @@ export function resolveTravelStart(startDate: string, travelMonth: string): { da
     const ts = new Date(startDate + 'T00:00:00');
     if (!isNaN(ts.getTime())) return { date: ts, isEstimate: false };
   }
-  if (travelMonth && MONTH_MAP[travelMonth] !== undefined) {
-    const now = new Date();
-    let yr = now.getFullYear();
-    const mIdx = MONTH_MAP[travelMonth];
-    if (mIdx < now.getMonth()) yr++;
-    return { date: new Date(yr, mIdx, 1), isEstimate: true };
-  }
+  const monthDate = travelMonthToDate(travelMonth);
+  if (monthDate) return { date: monthDate, isEstimate: true };
   return { date: null, isEstimate: false };
 }
 

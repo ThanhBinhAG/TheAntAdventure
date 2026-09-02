@@ -24,6 +24,8 @@ import type { Customer } from '@/lib/types';
 import type { CustomerSaveOutcome } from '@/hooks/useRegisterCustomer';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
 import { useLanguage } from '@/hooks/useLanguage';
+import TravelStyleManagerModal from '@/components/customers/TravelStyleManagerModal';
+import { DEFAULT_TRAVEL_STYLES, type TravelStyle } from '@/lib/customers/travel-styles';
 
 const CHILD_TAGS = ['Infant 0–2', 'Toddler 3–5', 'Child 6–9', 'Pre-teen 10–12', 'Teen 13–17'];
 const EMAIL_CHECK_DEBOUNCE_MS = 400;
@@ -51,6 +53,7 @@ interface CustomerFormModalProps {
   onSave: (
     payload: CustomerFormSavePayload,
   ) => CustomerFormSaveResult | Promise<CustomerFormSaveResult>;
+  canManageTravelStyles?: boolean;
 }
 
 function initialForm(mode: CustomerFormModalProps['mode'], customer: CustomerFormModalProps['customer']) {
@@ -72,7 +75,7 @@ function revealField(field: FormErrorField) {
   });
 }
 
-export default function CustomerFormModal({ open, mode, customer, customers, onClose, onSave }: CustomerFormModalProps) {
+export default function CustomerFormModal({ open, mode, customer, customers, onClose, onSave, canManageTravelStyles = false }: CustomerFormModalProps) {
   const formKey = `${open}-${mode}-${customer ? JSON.stringify(customer) : ''}`;
   const [previousFormKey, setPreviousFormKey] = useState(formKey);
   const [form, setForm] = useState<CustomerFormData>(() => initialForm(mode, customer));
@@ -82,6 +85,9 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
   const [formError, setFormError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<FormErrorField | null>(null);
   const [previousEmail, setPreviousEmail] = useState(form.email);
+  const [travelStyles, setTravelStyles] = useState<TravelStyle[]>(DEFAULT_TRAVEL_STYLES);
+  const [travelStyleManagerOpen, setTravelStyleManagerOpen] = useState(false);
+  const [travelStylesSaving, setTravelStylesSaving] = useState(false);
 
   if (formKey !== previousFormKey) {
     setPreviousFormKey(formKey);
@@ -165,6 +171,24 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     };
   }, [emailTrimmed, excludeId, localDuplicate, open]);
 
+  useEffect(() => {
+    if (!open || !canManageTravelStyles) return;
+    const controller = new AbortController();
+    void fetch('/api/customers/travel-styles', { credentials: 'same-origin', signal: controller.signal })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: TravelStyle[] };
+        if (response.ok && body.ok && Array.isArray(body.data) && body.data.length) setTravelStyles(body.data);
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) setTravelStyles(DEFAULT_TRAVEL_STYLES);
+      });
+    return () => controller.abort();
+  }, [canManageTravelStyles, open]);
+
+  const selectableTravelStyles = useMemo(() => {
+    return travelStyles.filter((style) => style.isActive);
+  }, [travelStyles]);
+
   if (!open) return null;
 
   const showChildren = Number(form.numChildren) > 0;
@@ -173,6 +197,44 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
   const emailBlocked = emailStatus === 'duplicate';
   const saveDisabled = emailBlocked || emailStatus === 'checking';
   const emailInvalid = emailBlocked || errorField === 'email';
+  async function saveTravelStyles(styles: TravelStyle[]) {
+    setTravelStylesSaving(true);
+    try {
+      const response = await fetch('/api/customers/travel-styles', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ styles }),
+      });
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: TravelStyle[]; error?: string };
+      if (!response.ok || !body.ok || !Array.isArray(body.data)) throw new Error(body.error ?? 'Không thể lưu Travel Style.');
+      applyTravelStyles(body.data);
+    } finally {
+      setTravelStylesSaving(false);
+    }
+  }
+
+  function applyTravelStyles(styles: TravelStyle[]) {
+    setTravelStyles(styles);
+    setForm((current) => current.style && styles.some((style) => style.isActive && style.label === current.style)
+      ? current
+      : { ...current, style: styles.find((style) => style.isActive)?.label ?? current.style });
+  }
+
+  async function deleteTravelStyle(style: TravelStyle) {
+    setTravelStylesSaving(true);
+    try {
+      const response = await fetch(`/api/customers/travel-styles?${new URLSearchParams({ code: style.code }).toString()}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: TravelStyle[]; error?: string };
+      if (!response.ok || !body.ok || !Array.isArray(body.data)) throw new Error(body.error ?? 'Không thể xóa Travel Style.');
+      applyTravelStyles(body.data);
+    } finally {
+      setTravelStylesSaving(false);
+    }
+  }
 
   function clearErrors() {
     setFormError(null);
@@ -472,10 +534,13 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
           <div className="nc-section-title">{tp('customers', 'formSectionTravelProfile')}</div>
           <div className="nc-grid-3" style={{ marginBottom: 16 }}>
             <div className="fg">
-              <label className="lbl">{tp('customers', 'formTravelStyle')}</label>
+              <label className="lbl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                {tp('customers', 'formTravelStyle')}
+                {canManageTravelStyles && <button type="button" className="btn btn-sm" style={{ minWidth: 30, padding: '1px 6px' }} onClick={() => setTravelStyleManagerOpen(true)} aria-label="Manage Travel Styles" title="Manage Travel Styles">✎</button>}
+              </label>
               <select value={form.style} onChange={(e) => set('style', e.target.value)}>
-                {['Luxury', 'Premium Cultural', 'Cultural', 'Adventure', 'Family', 'Culinary', 'Photography', 'Honeymoon'].map((s) => (
-                  <option key={s}>{s}</option>
+                {selectableTravelStyles.map((style) => (
+                  <option key={style.code} value={style.label}>{style.label}</option>
                 ))}
               </select>
             </div>
@@ -643,6 +708,14 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
           </div>
         </div>
       </div>
+      <TravelStyleManagerModal
+        open={travelStyleManagerOpen}
+        styles={travelStyles}
+        saving={travelStylesSaving}
+        onClose={() => setTravelStyleManagerOpen(false)}
+        onSave={saveTravelStyles}
+        onDelete={deleteTravelStyle}
+      />
     </div>
   );
 }

@@ -82,7 +82,6 @@ export default function ClientBriefStep({
   const todayIso = todayIsoLocal();
   const firstTimeValue = brief.firstTime === 'unknown' ? '' : brief.firstTime;
   const travelStyles = clientPreferences?.travelStyles ?? DEFAULT_TRAVEL_STYLES;
-  const hotelTiers = clientPreferences?.hotelTiers ?? [];
   const clientPreferencesLoading = clientPreferences === null && clientPreferencesError === null;
   const calculatedDuration = calculateTourDuration(brief.startDate, brief.endDate);
 
@@ -112,9 +111,10 @@ export default function ClientBriefStep({
   }, [brief.style, travelStyles]);
 
   const selectableHotelTiers = useMemo(() => {
-    if (brief.hotelTier && !hotelTiers.includes(brief.hotelTier)) return [brief.hotelTier, ...hotelTiers];
-    return hotelTiers;
-  }, [brief.hotelTier, hotelTiers]);
+    const tiers = clientPreferences?.hotelTiers ?? [];
+    if (brief.hotelTier && !tiers.includes(brief.hotelTier)) return [brief.hotelTier, ...tiers];
+    return tiers;
+  }, [brief.hotelTier, clientPreferences?.hotelTiers]);
 
   function setPax(n: number) {
     setBrief((b) => ({ ...b, pax: n, adults: n }));

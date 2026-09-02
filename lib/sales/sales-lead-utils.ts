@@ -4,7 +4,7 @@ import { getCustomerName } from '../core/crm-utils';
 import { formatTravelMonth } from '../core/travel-month';
 import type { Customer, Lead } from '../types';
 
-const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
 
 const MONTH_MAP: Record<string, number> = {
   Jan: 0,

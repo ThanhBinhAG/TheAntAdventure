@@ -23,6 +23,7 @@ export default function SearchableSelect({ id, value, options, onChange, placeho
 
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveIndex(filtered.findIndex((option) => option === value));
   }, [filtered, open, value]);
 

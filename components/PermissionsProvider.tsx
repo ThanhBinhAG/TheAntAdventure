@@ -72,7 +72,7 @@ export function PermissionsProvider({
             setError(
                 error instanceof Error
                     ? error.message
-                    : 'Không thể tải quyền người dùng.',
+                    : 'Unable to load user permissions.',
             );
         } finally {
             setLoading(false);

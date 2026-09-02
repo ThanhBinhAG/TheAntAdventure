@@ -24,7 +24,7 @@ function errorResponse(error: unknown) {
         return NextResponse.json(
             accessControlError(
                 'LOGIN_HISTORY_FORBIDDEN',
-                'Bạn không có quyền xem lịch sử đăng nhập.',
+                'You do not have permission to view login history.',
             ),
             { status: 403 },
         );
@@ -46,7 +46,7 @@ function errorResponse(error: unknown) {
     return NextResponse.json(
         accessControlError(
             'LOGIN_HISTORY_LOAD_FAILED',
-            'Không thể tải lịch sử đăng nhập.',
+            'Unable to load login history.',
         ),
         { status: 500 },
     );
@@ -88,7 +88,7 @@ export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never
         return NextResponse.json(
             accessControlError(
                 'INVALID_LOGIN_HISTORY_FILTER',
-                'Bộ lọc lịch sử đăng nhập không hợp lệ.',
+                'Invalid login history filter.',
             ),
             { status: 400 },
         );

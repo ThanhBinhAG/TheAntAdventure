@@ -82,7 +82,7 @@ function errorResponse(error: unknown) {
     return NextResponse.json(
         accessControlError(
             'USER_OPERATION_FAILED',
-            'Không thể xử lý thao tác người dùng.',
+            'Unable to complete the user operation.',
         ),
         { status: 500 },
     );
@@ -119,7 +119,7 @@ export const POST = withHttpRequestLogging<{ params: Promise<Record<string, neve
         return NextResponse.json(
             accessControlError(
                 'INVALID_USER_CREATE_REQUEST',
-                'Dữ liệu tạo tài khoản không hợp lệ.',
+                'Invalid user creation data.',
             ),
             { status: 400 },
         );
@@ -197,7 +197,7 @@ export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never
         return NextResponse.json(
             accessControlError(
                 'INVALID_USER_LIST_FILTER',
-                'Bộ lọc danh sách user không hợp lệ.',
+                'Invalid user list filter.',
             ),
             { status: 400 },
         );
@@ -264,7 +264,7 @@ export const PATCH = withHttpRequestLogging<{ params: Promise<Record<string, nev
         return NextResponse.json(
             accessControlError(
                 'INVALID_USER_UPDATE_REQUEST',
-                'Dữ liệu cập nhật user không hợp lệ.',
+                'Invalid user update data.',
             ),
             { status: 400 },
         );

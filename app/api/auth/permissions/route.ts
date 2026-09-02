@@ -29,7 +29,7 @@ export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never
   } catch (error) {
     logger.error({ event: 'auth.permissions.failed', err: error }, 'Permission lookup failed');
     const message =
-      error instanceof Error ? error.message : 'Không thể tải quyền người dùng';
+      error instanceof Error ? error.message : 'Unable to load user permissions';
 
     return NextResponse.json(
       { ok: false, error: message },

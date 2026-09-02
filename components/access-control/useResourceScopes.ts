@@ -133,9 +133,7 @@ export function useResourceScopes({
             refreshAuditLogs();
             discardScopeChanges();
             toast.success(
-                language === 'vi'
-                    ? 'Đã lưu phạm vi dữ liệu.'
-                    : 'Data scopes saved.',
+                tac('auditStaffRoleResourceScopesReplaced', language),
             );
         } catch (error) {
             toast.error(getAccessControlErrorMessage(

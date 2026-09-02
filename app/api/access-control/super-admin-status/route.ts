@@ -54,7 +54,7 @@ export const GET = withHttpRequestLogging<{ params: Promise<Record<string, never
         return NextResponse.json(
             accessControlError(
                 'SUPER_ADMIN_STATUS_FAILED',
-                'Không thể xác nhận quyền Super Admin.',
+                'Unable to confirm Super Admin access.',
             ),
             { status },
         );

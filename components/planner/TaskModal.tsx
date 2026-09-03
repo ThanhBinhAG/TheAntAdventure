@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import TaskStatusSelect from '@/components/planner/TaskStatusSelect';
 import {
   getTaskDisplayText,
@@ -47,14 +47,14 @@ export default function TaskModal({
     text: display,
     status: (task.status as TaskStatusValue) || 'todo',
   };
+  const formKey = `${task.id}:${mode}:${display}:${task.status ?? ''}`;
+  const [previousFormKey, setPreviousFormKey] = useState(formKey);
   const [form, setForm] = useState<FormState>(baseline);
 
-  useEffect(() => {
-    setForm({
-      text: getTaskDisplayText(task),
-      status: (task.status as TaskStatusValue) || 'todo',
-    });
-  }, [task, mode]);
+  if (formKey !== previousFormKey) {
+    setPreviousFormKey(formKey);
+    setForm(baseline);
+  }
 
   const dirty = useFormDirty(mode === 'edit', baseline, form, undefined, `${task.id}:${mode}`);
   const { requestClose } = useConfirmClose({

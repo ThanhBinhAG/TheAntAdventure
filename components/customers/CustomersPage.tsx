@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
 import { SALES_PEOPLE, customerListActiveValue } from '@/lib/customers/customer-form';
 import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
@@ -65,7 +65,7 @@ export default function Customers() {
   const [profileInitialTab, setProfileInitialTab] = useState<'overview' | 'pipeline'>('overview');
   const [editId, setEditId] = useState<string | null>(null);
   const [draftStorageId, setDraftStorageId] = useState<string | null>(null);
-  const [formDrafts, setFormDrafts] = useState<FormDraftListItem[]>([]);
+  const [formDrafts, setFormDrafts] = useState<FormDraftListItem[]>(() => listFormDrafts('customers'));
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { pageSize, setPageSize } = usePageSize();
@@ -74,10 +74,6 @@ export default function Customers() {
   const refreshFormDrafts = useCallback(() => {
     setFormDrafts(listFormDrafts('customers'));
   }, []);
-
-  useEffect(() => {
-    refreshFormDrafts();
-  }, [refreshFormDrafts]);
 
   function openNewCustomer() {
     setEditId(null);

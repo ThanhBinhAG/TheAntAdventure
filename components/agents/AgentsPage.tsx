@@ -49,7 +49,7 @@ export default function Agents() {
   const [formMode, setFormMode] = useState<'add' | 'edit' | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [draftStorageId, setDraftStorageId] = useState<string | null>(null);
-  const [formDrafts, setFormDrafts] = useState<FormDraftListItem[]>([]);
+  const [formDrafts, setFormDrafts] = useState<FormDraftListItem[]>(() => listFormDrafts('agents'));
 
   const { pageSize, setPageSize } = usePageSize();
   const pageSizeOption = pageSize as PageSizeOption;
@@ -57,10 +57,6 @@ export default function Agents() {
   const refreshFormDrafts = useCallback(() => {
     setFormDrafts(listFormDrafts('agents'));
   }, []);
-
-  useEffect(() => {
-    refreshFormDrafts();
-  }, [refreshFormDrafts]);
 
   function openNewAgent() {
     setEditId(null);

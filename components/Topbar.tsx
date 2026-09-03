@@ -31,9 +31,6 @@ export default function Topbar({
   const importBackup = useStore((s) => s.importBackup);
   const setLastBackup = useStore((s) => s.setLastBackup);
   const lastBackup = useStore((s) => s.lastBackup);
-  const customers = useStore((s) => s.customers);
-  const leads = useStore((s) => s.leads);
-  const bookings = useStore((s) => s.bookings);
   const fileRef = useRef<HTMLInputElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -118,37 +115,6 @@ export default function Topbar({
         ) : null}
       </div>
       <div style={{ flex: 1 }} />
-      <div id="gsearch-wrap" style={{ position: 'relative', maxWidth: 280, flex: 1 }}>
-        <input
-          id="gsearch-input"
-          type="text"
-          placeholder={tp('chrome', 'searchPlaceholder')}
-          style={{
-            width: '100%',
-            padding: '6px 12px',
-            border: '1.5px solid var(--b)',
-            borderRadius: 8,
-            fontFamily: 'inherit',
-            fontSize: 12,
-            background: 'var(--bg)',
-            color: 'var(--t)',
-            boxSizing: 'border-box',
-            outline: 'none',
-          }}
-          onChange={(e) => {
-            const q = e.target.value.toLowerCase();
-            if (q.length < 2) return;
-            const results = [
-              ...customers.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 3),
-              ...leads.filter((l) => l.tour.toLowerCase().includes(q)).slice(0, 3),
-              ...bookings.filter((b) => b.tour.toLowerCase().includes(q)).slice(0, 3),
-            ];
-            if (results.length === 0 && q.length >= 2) {
-              /* dropdown could be expanded later */
-            }
-          }}
-        />
-      </div>
       <AiCopilotTrigger />
       <div
         className="tb-lang"

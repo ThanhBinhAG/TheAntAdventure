@@ -4,7 +4,7 @@
 React UI: CRM chrome at root, page shells in `pages/`, and domain widgets in sibling folders. Domain logic belongs in `lib/<domain>/`.
 
 ## Contents
-- Root: `Sidebar`, `Topbar`, `CRMShell`, `StoreProvider` (passthrough), `ToastHost`, `ConfirmHost`, `EmptyState` (shared empty lists; `access` variant for PermissionGate), `PermissionGate`, `AiCopilot*`, `PaginationBar`, …
+- Root: `Sidebar`, `Topbar`, `CRMShell`, `StoreProvider` (passthrough), `ToastHost`, `ConfirmHost`, `EmptyState` (shared empty lists; `access` variant for PermissionGate), `FormDraftsBar` (Clients/Agents local draft chips), `PermissionGate`, `AiCopilot*`, `PaginationBar`, …
 - `Sidebar` — `useSidebarBadges` (deferred `/api/sidebar/badges` or store counts; `prefetch={false}` on nav links)
 - `sidebar/` — company logo editor (gallery pick + crop)
 - `pages/` — slug → page components for `(crm)/[page]`

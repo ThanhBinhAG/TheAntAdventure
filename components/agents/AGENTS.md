@@ -5,7 +5,7 @@ B2B Agents page and form modal UI.
 
 ## Contents
 - `AgentsPage.tsx` — list/search via `useAgentPage`; create/edit/delete via register/delete hooks (BFF)
-- `AgentFormModal.tsx` — add/edit form; server allocates `AGT-NNN` on create
+- `AgentFormModal.tsx` — add/edit form; server allocates `AGT-NNN` on create; drafts via `lib/form-drafts` + toolbar `FormDraftsBar` (`+ Add` always blank)
 
 ## Boundaries
 - Commission math lives in `lib/sales`; page shell in `components/pages`.

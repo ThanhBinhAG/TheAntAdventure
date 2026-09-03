@@ -102,6 +102,17 @@ export function truncateTaskText(text: string, max = 40): string {
   return `${trimmed.slice(0, max - 1)}…`;
 }
 
+/** Long notes collapse to 3 lines until the user expands. */
+export const TASK_TEXT_COLLAPSE_CHARS = 160;
+export const TASK_TEXT_COLLAPSE_LINES = 3;
+
+export function isTaskTextCollapsible(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (trimmed.length > TASK_TEXT_COLLAPSE_CHARS) return true;
+  return trimmed.split(/\r?\n/).length > TASK_TEXT_COLLAPSE_LINES;
+}
+
 export function buildNoteTask(notes: string, today: string, status: TaskStatusValue = 'todo'): Task {
   const trimmed = notes.trim();
   return {

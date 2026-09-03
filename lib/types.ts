@@ -28,6 +28,12 @@ export interface Customer {
   whatsapp?: string;
   hotelTier?: string;
   budget?: string;
+  /** Optional deal revenue (USD). */
+  revenue?: number;
+  /** Optional deal cost (USD). */
+  cost?: number;
+  /** Optional deal profit (USD); typically revenue − cost. */
+  profit?: number;
   travelMonth?: string;
   children?: number;
   adults?: number;

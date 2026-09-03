@@ -8,7 +8,7 @@ function source(path: string) {
 }
 
 test('Dev A screens expose loading failures and update local state only after successful API responses', () => {
-  const planner = source('components/pages/Planner.tsx');
+  const planner = source('components/planner/PlannerPage.tsx');
   const attractions = source('components/pages/Attractions.tsx');
   const tourDesign = source('components/tour-design/TourDesignPage.tsx');
 
@@ -19,6 +19,7 @@ test('Dev A screens expose loading failures and update local state only after su
   }
   assert.ok(planner.indexOf('addTask(newTask') > planner.indexOf('if (!json.ok)'));
   assert.ok(planner.indexOf('updateTask(id, { status })') > planner.indexOf('if (!json.ok)'));
+  assert.ok(planner.indexOf('removeTask(id)') > planner.indexOf("method: 'DELETE'"));
   assert.ok(attractions.indexOf('addAttraction(payload)') > attractions.indexOf('if (!json.ok)'));
   assert.ok(attractions.indexOf('updateAttraction(payload.id, payload)') > attractions.indexOf('if (!json.ok)'));
 

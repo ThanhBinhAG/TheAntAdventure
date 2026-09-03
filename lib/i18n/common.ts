@@ -60,6 +60,18 @@ export const COMMON = {
     unsavedChangesMessage: 'You have unsaved changes. Are you sure you want to leave?',
     unsavedChangesStay: 'Stay',
     unsavedChangesLeave: 'Leave',
+    leaveWithDraftTitle: 'Unsaved changes',
+    leaveWithDraftMessage:
+      'You have unsaved changes. Discard them, or save a draft and leave so you can continue later?',
+    leaveWithDraftStay: 'Stay',
+    leaveWithDraftDiscard: 'Discard',
+    leaveWithDraftSave: 'Save draft & leave',
+    formDraftRestored: 'Continuing from your saved draft.',
+    formDraftsLabel: 'Drafts',
+    formDraftUntitled: 'Untitled',
+    formDraftAddPrefix: 'New: ',
+    formDraftEditPrefix: 'Edit: ',
+    formDraftDismiss: 'Discard draft',
   },
   vi: {
     add: 'Thêm',
@@ -120,6 +132,18 @@ export const COMMON = {
     unsavedChangesMessage: 'Các thay đổi thực hiện chưa được lưu. Có chắc chắn là muốn thoát ra?',
     unsavedChangesStay: 'Ở lại',
     unsavedChangesLeave: 'Thoát',
+    leaveWithDraftTitle: 'Thay đổi chưa lưu',
+    leaveWithDraftMessage:
+      'Các thay đổi chưa được lưu. Bạn có thể bỏ hết, hoặc lưu bản thảo rồi thoát để tiếp tục sau.',
+    leaveWithDraftStay: 'Ở lại',
+    leaveWithDraftDiscard: 'Bỏ hết',
+    leaveWithDraftSave: 'Lưu bản thảo rồi thoát',
+    formDraftRestored: 'Đang tiếp tục từ bản thảo đã lưu.',
+    formDraftsLabel: 'Bản thảo',
+    formDraftUntitled: 'Chưa đặt tên',
+    formDraftAddPrefix: 'Mới: ',
+    formDraftEditPrefix: 'Sửa: ',
+    formDraftDismiss: 'Xóa bản thảo',
   },
 } as const;
 

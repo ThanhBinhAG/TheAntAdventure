@@ -279,13 +279,35 @@ The Ant Adventures`;
                   [tp('customers', 'profileSource'), customer.source],
                   [tp('customers', 'profileHotelTier'), customer.hotelTier || '—'],
                   [tp('customers', 'profileBudget'), customer.budget || '—'],
+                  [
+                    tp('customers', 'profileRevenue'),
+                    customer.revenue != null && customer.revenue > 0 ? `$${fmt(customer.revenue)}` : '—',
+                  ],
+                  [
+                    tp('customers', 'profileCost'),
+                    customer.cost != null && customer.cost > 0 ? `$${fmt(customer.cost)}` : '—',
+                  ],
+                  [
+                    tp('customers', 'profileProfit'),
+                    customer.profit != null && Number.isFinite(customer.profit)
+                      ? `$${fmt(customer.profit)}`
+                      : '—',
+                  ],
                   [tp('customers', 'profileTravelMonth'), formatTravelMonth(customer.travelMonth) || '—'],
                   [tp('customers', 'profileSalesPerson'), customer.salesperson || '—'],
                   [tp('customers', 'profileAgent'), customer.agentName || '—'],
                   [tp('customers', 'profilePhone'), customer.phone || '—'],
                   [tp('customers', 'profileWhatsapp'), customer.whatsapp || '—'],
                 ].map(([l, v]) => (
-                  <div key={l} className="prof-kv-row">
+                  <div
+                    key={l}
+                    className="prof-kv-row"
+                    style={
+                      l === tp('customers', 'profileProfit')
+                        ? { fontWeight: 700, color: 'var(--g)' }
+                        : undefined
+                    }
+                  >
                     <span>{l}</span>
                     <span>{v}</span>
                   </div>

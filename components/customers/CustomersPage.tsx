@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SRC_COLORS, STAGE_COLORS, fmt } from '@/lib/constants';
-import { SALES_PEOPLE } from '@/lib/customers/customer-form';
+import { SALES_PEOPLE, customerListActiveValue } from '@/lib/customers/customer-form';
 import { npsBadgeClass, npsIcon } from '@/lib/core/page-helpers';
 import { usePageSize, type PageSizeOption } from '@/hooks/usePageSize';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
+import FormDraftsBar from '@/components/FormDraftsBar';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import CustomerFormModal from '@/components/customers/CustomerFormModal';
 import CustomerProfileModal from '@/components/customers/CustomerProfileModal';
@@ -15,6 +16,11 @@ import { useDeleteCustomer } from '@/hooks/useDeleteCustomer';
 import { useCustomerPage } from '@/hooks/useCustomerPage';
 import type { CustomerListItem } from '@/lib/customers/customer-list-input';
 import type { CustomerPipelineStageFilter } from '@/lib/customers/customer-list-input';
+import {
+  clearFormDraft,
+  listFormDrafts,
+  type FormDraftListItem,
+} from '@/lib/form-drafts/storage';
 import { toast } from '@/lib/toast';
 import { confirmDialog } from '@/lib/confirm';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -58,10 +64,49 @@ export default function Customers() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profileInitialTab, setProfileInitialTab] = useState<'overview' | 'pipeline'>('overview');
   const [editId, setEditId] = useState<string | null>(null);
+  const [draftStorageId, setDraftStorageId] = useState<string | null>(null);
+  const [formDrafts, setFormDrafts] = useState<FormDraftListItem[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { pageSize, setPageSize } = usePageSize();
   const pageSizeOption = pageSize as PageSizeOption;
+
+  const refreshFormDrafts = useCallback(() => {
+    setFormDrafts(listFormDrafts('customers'));
+  }, []);
+
+  useEffect(() => {
+    refreshFormDrafts();
+  }, [refreshFormDrafts]);
+
+  function openNewCustomer() {
+    setEditId(null);
+    setDraftStorageId(null);
+    setFormMode('add');
+  }
+
+  function openCustomerDraft(draft: FormDraftListItem) {
+    if (draft.mode === 'edit') {
+      setEditId(draft.id);
+      setDraftStorageId(draft.id);
+      setFormMode('edit');
+      return;
+    }
+    setEditId(null);
+    setDraftStorageId(draft.id);
+    setFormMode('add');
+  }
+
+  function dismissCustomerDraft(draft: FormDraftListItem) {
+    clearFormDraft('customers', draft.mode, draft.id);
+    refreshFormDrafts();
+  }
+
+  function closeCustomerForm() {
+    setFormMode(null);
+    setEditId(null);
+    setDraftStorageId(null);
+  }
 
   function goToFirstPage() {
     setPage(1);
@@ -128,8 +173,7 @@ export default function Customers() {
         return result;
       }
       if (result.message) toast.success(result.message);
-      setFormMode(null);
-      setEditId(null);
+      closeCustomerForm();
       refresh();
       return result;
     } catch (err) {
@@ -222,11 +266,21 @@ export default function Customers() {
             </option>
           ))}
         </select>
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-end', margin: '0 8px' }}>
+          <FormDraftsBar
+            drafts={formDrafts}
+            label={tc('formDraftsLabel')}
+            addPrefix={tc('formDraftAddPrefix')}
+            editPrefix={tc('formDraftEditPrefix')}
+            dismissTitle={tc('formDraftDismiss')}
+            onOpen={openCustomerDraft}
+            onDismiss={dismissCustomerDraft}
+          />
+        </div>
         <button
           className="btn btn-p btn-sm"
           type="button"
-          onClick={() => setFormMode('add')}
+          onClick={openNewCustomer}
           disabled={!canWrite}
           title={!canWrite ? tp('customers', 'addCustomerDisabledTitle') : undefined}
         >
@@ -318,7 +372,7 @@ export default function Customers() {
                   <button
                     type="button"
                     className="btn btn-p btn-sm"
-                    onClick={() => setFormMode('add')}
+                    onClick={openNewCustomer}
                     disabled={!canWrite}
                     title={!canWrite ? tp('customers', 'addCustomerDisabledTitle') : undefined}
                   >
@@ -393,7 +447,14 @@ export default function Customers() {
                           )}
                         </td>
                         <td style={{ fontWeight: 600, color: 'var(--g)' }}>
-                          {c.pipelineValue > 0 ? `$${fmt(c.pipelineValue)}` : <span style={{ color: 'var(--m)' }}>—</span>}
+                          {(() => {
+                            const active = customerListActiveValue(c.revenue, c.pipelineValue);
+                            return active > 0 ? (
+                              `$${fmt(active)}`
+                            ) : (
+                              <span style={{ color: 'var(--m)' }}>—</span>
+                            );
+                          })()}
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           {c.pipelineLeadCount ? (
@@ -429,6 +490,7 @@ export default function Customers() {
                             disabled={!canWrite}
                             onClick={() => {
                               setEditId(c.id);
+                              setDraftStorageId(null);
                               setFormMode('edit');
                             }}
                           >
@@ -476,10 +538,10 @@ export default function Customers() {
         customer={editCustomer}
         customers={[]}
         canManageTravelStyles={canWrite}
-        onClose={() => {
-          setFormMode(null);
-          setEditId(null);
-        }}
+        draftStorageId={draftStorageId}
+        onDraftStorageIdChange={setDraftStorageId}
+        onDraftsChanged={refreshFormDrafts}
+        onClose={closeCustomerForm}
         onSave={handleSave}
       />
 
@@ -491,6 +553,7 @@ export default function Customers() {
           onEdit={() => {
             closeProfile();
             setEditId(profileCustomer.id);
+            setDraftStorageId(null);
             setFormMode('edit');
           }}
           onDelete={() => {

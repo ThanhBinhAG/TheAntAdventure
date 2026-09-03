@@ -1,9 +1,15 @@
+export type ConfirmChoice = 'cancel' | 'confirm' | 'tertiary';
+
 export type ConfirmOptions = {
   title?: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  /** Red primary button for destructive actions (default true). */
+  /** Optional third action (e.g. discard while save-draft is confirm). */
+  tertiaryLabel?: string;
+  /** Red style for the confirm (primary) button — default true for destructive confirms. */
   danger?: boolean;
+  /** Red style for the tertiary button (e.g. discard). */
+  tertiaryDanger?: boolean;
 };
 
 export type ConfirmRequest = {
@@ -12,8 +18,10 @@ export type ConfirmRequest = {
   title: string;
   confirmLabel: string;
   cancelLabel: string;
+  tertiaryLabel?: string;
   danger: boolean;
-  resolve: (ok: boolean) => void;
+  tertiaryDanger: boolean;
+  resolve: (choice: ConfirmChoice) => void;
 };
 
 type Listener = (req: ConfirmRequest | null) => void;
@@ -44,13 +52,41 @@ export function subscribeConfirm(listener: Listener): () => void {
   };
 }
 
-export function resolveConfirm(id: string, ok: boolean) {
+export function resolveConfirm(id: string, choice: ConfirmChoice) {
   if (!current || current.id !== id) return;
   const { resolve } = current;
   current = null;
   emit();
-  resolve(ok);
+  resolve(choice);
   flushQueue();
+}
+
+/**
+ * In-app confirm with optional tertiary action.
+ * Escape / overlay → cancel.
+ */
+export function confirmChoice(
+  message: string,
+  options: ConfirmOptions = {},
+): Promise<ConfirmChoice> {
+  return new Promise((resolve) => {
+    const run = () => {
+      current = {
+        id: uid(),
+        message,
+        title: options.title ?? 'Confirm',
+        confirmLabel: options.confirmLabel ?? 'Delete',
+        cancelLabel: options.cancelLabel ?? 'Cancel',
+        tertiaryLabel: options.tertiaryLabel,
+        danger: options.danger !== false,
+        tertiaryDanger: options.tertiaryDanger === true,
+        resolve,
+      };
+      emit();
+    };
+    if (current) queue.push(run);
+    else run();
+  });
 }
 
 /**
@@ -61,20 +97,5 @@ export function confirmDialog(
   message: string,
   options: ConfirmOptions = {},
 ): Promise<boolean> {
-  return new Promise((resolve) => {
-    const run = () => {
-      current = {
-        id: uid(),
-        message,
-        title: options.title ?? 'Confirm',
-        confirmLabel: options.confirmLabel ?? 'Delete',
-        cancelLabel: options.cancelLabel ?? 'Cancel',
-        danger: options.danger !== false,
-        resolve,
-      };
-      emit();
-    };
-    if (current) queue.push(run);
-    else run();
-  });
+  return confirmChoice(message, options).then((choice) => choice === 'confirm');
 }

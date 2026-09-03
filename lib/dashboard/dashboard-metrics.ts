@@ -90,6 +90,25 @@ export function filterDashboardLeads(
   return list;
 }
 
+/** Customers matching dashboard clientType / market filters (for form-entered revenue). */
+export function filterDashboardCustomers(
+  customers: Customer[],
+  filters: DashboardFilters,
+): Customer[] {
+  let list = customers;
+  if (filters.clientType) {
+    list = list.filter((c) => (c.clientType || 'b2c') === filters.clientType);
+  }
+  if (filters.market) {
+    list = list.filter((c) => c.country === filters.market);
+  }
+  return list;
+}
+
+export function sumCustomerRevenue(customers: Customer[]): number {
+  return customers.reduce((sum, c) => sum + (c.revenue && c.revenue > 0 ? c.revenue : 0), 0);
+}
+
 export function leadMatchesTravelMonth(lead: Lead, monthAbbr: string, year: number): boolean {
   const normalized = normalizeLeadMonth(lead.month || '');
   return normalized === `${monthAbbr} ${year}`;
@@ -165,7 +184,10 @@ export function computeDashboardMetrics(
         !completedLeadsBkIds.some((lid) => b.id.includes(lid.replace('LD-', '')))
     )
     .reduce((s, b) => s + (b.total || 0), 0);
-  const realized = realizedFromLeads + realizedFromBk;
+  const realizedFromCustomers = sumCustomerRevenue(
+    filterDashboardCustomers(customers, filters),
+  );
+  const realized = realizedFromLeads + realizedFromBk + realizedFromCustomers;
 
   const weightedForecast = filteredLeads
     .filter((l) => l.stage !== 'Lost' && l.stage !== 'Completed')

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo } from 'react';
 import { confirmDiscardChanges } from '@/lib/confirm-discard';
+import { confirmLeaveWithDraft } from '@/lib/confirm-leave-draft';
 import type { AppLanguage } from '@/lib/i18n/stages';
 
 export function defaultFormSerialize<T>(value: T): string {
@@ -39,6 +40,9 @@ type UseConfirmCloseOptions = {
   onClose: () => void;
   disabled?: boolean;
   language: AppLanguage;
+  /** When set, dirty leave uses 3-way Stay / Discard / Save draft. */
+  onSaveDraft?: () => void;
+  onDiscard?: () => void;
 };
 
 /**
@@ -50,15 +54,24 @@ export function useConfirmClose({
   onClose,
   disabled = false,
   language,
+  onSaveDraft,
+  onDiscard,
 }: UseConfirmCloseOptions) {
   const requestClose = useCallback(async () => {
     if (disabled) return;
     if (dirty) {
-      const leave = await confirmDiscardChanges(language);
-      if (!leave) return;
+      if (onSaveDraft) {
+        const action = await confirmLeaveWithDraft(language);
+        if (action === 'stay') return;
+        if (action === 'discard') onDiscard?.();
+        if (action === 'saveDraft') onSaveDraft();
+      } else {
+        const leave = await confirmDiscardChanges(language);
+        if (!leave) return;
+      }
     }
     onClose();
-  }, [dirty, disabled, language, onClose]);
+  }, [dirty, disabled, language, onClose, onDiscard, onSaveDraft]);
 
   useEffect(() => {
     if (!open) return;

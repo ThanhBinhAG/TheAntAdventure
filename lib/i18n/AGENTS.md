@@ -4,7 +4,7 @@
 EN/VI UI strings for CRM chrome and page-scoped copy. **UI labels only** — never translate Supabase record content (names, notes, tour text, user-entered data).
 
 ## Contents
-- `common.ts` — cross-page buttons, pagination, unsaved-changes dialog (`tc()`)
+- `common.ts` — cross-page buttons, pagination, unsaved-changes / leave-with-draft dialog (`tc()`)
 - `stages.ts` — pipeline stage labels (`tStage()`)
 - `enums.ts` — display labels for coded fields (e.g. attraction region/type)
 - `language-storage.ts` — `localStorage` key `crm.language`

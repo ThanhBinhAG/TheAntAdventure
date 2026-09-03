@@ -9,7 +9,7 @@ function source(path: string): string {
 
 test('Dev A read screens use BFF APIs (no browser hydrate helpers)', () => {
   const products = source('components/products/ProductsPage.tsx');
-  const planner = source('components/pages/Planner.tsx');
+  const planner = source('components/planner/PlannerPage.tsx');
   const attractions = source('components/pages/Attractions.tsx');
   const gallery = source('components/gallery/GalleryWorkspace.tsx');
   const pricing = source('components/pricing/PricingPage.tsx');

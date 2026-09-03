@@ -136,6 +136,9 @@ create table if not exists customers (
   salesperson     text,
   hotel_tier      text,
   budget          text,
+  revenue         numeric,                           -- optional deal revenue USD
+  cost            numeric,                           -- optional deal cost USD
+  profit          numeric,                           -- optional deal profit USD (revenue - cost)
   travel_month    text,
   children        smallint    default 0,
   adults          smallint    default 2,

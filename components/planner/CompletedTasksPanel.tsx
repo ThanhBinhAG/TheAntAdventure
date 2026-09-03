@@ -6,45 +6,17 @@ import {
   filterCompletedTasksByTime,
   getCompletedTasks,
   getTaskDisplayText,
-  TASK_STATUSES,
   type CompletedTimeFilter,
   type CustomDateRange,
   type TaskStatusValue,
 } from '@/lib/planner/planner-task-utils';
 import type { Task } from '@/lib/types';
 import EmptyState from '@/components/EmptyState';
+import TaskStatusSelect from '@/components/planner/TaskStatusSelect';
+import TaskExpandableText from '@/components/planner/TaskExpandableText';
 import { localTodayIso } from '@/lib/core/date-utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { PLANNER_STATUS_KEYS, PLANNER_TIME_FILTER_KEYS } from '@/lib/i18n/pages/planner';
-
-function TaskStatusSelect({
-  value,
-  onChange,
-  disabled = false,
-}: {
-  value: string;
-  onChange: (status: TaskStatusValue) => void;
-  disabled?: boolean;
-}) {
-  const { tp } = useLanguage();
-
-  return (
-    <select
-      className="planner-status-select planner-status-select-sm"
-      value={value || 'todo'}
-      onChange={(e) => onChange(e.target.value as TaskStatusValue)}
-      aria-label={tp('planner', 'taskProgressAria')}
-      disabled={disabled}
-      title={disabled ? tp('planner', 'readOnlyUpdate') : undefined}
-    >
-      {TASK_STATUSES.map((s) => (
-        <option key={s.value} value={s.value}>
-          {tp('planner', PLANNER_STATUS_KEYS[s.value] || 'statusTodo')}
-        </option>
-      ))}
-    </select>
-  );
-}
 
 function formatGroupDate(dateStr: string, locale: string): string {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString(locale, {
@@ -81,10 +53,78 @@ function formatShortDate(dateStr: string, locale: string): string {
 interface CompletedTasksPanelProps {
   tasks: Task[];
   onStatusChange: (id: string, status: TaskStatusValue) => void;
+  onEdit: (task: Task) => void;
+  onOpen: (task: Task) => void;
+  onDelete: (id: string) => void | Promise<void>;
   canWrite: boolean;
 }
 
-export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }: CompletedTasksPanelProps) {
+function CompletedTaskItem({
+  task,
+  canWrite,
+  onStatusChange,
+  onEdit,
+  onOpen,
+  onDelete,
+  statusLabel,
+}: {
+  task: Task;
+  canWrite: boolean;
+  onStatusChange: (id: string, status: TaskStatusValue) => void;
+  onEdit: (task: Task) => void;
+  onOpen: (task: Task) => void;
+  onDelete: (id: string) => void | Promise<void>;
+  statusLabel: string;
+}) {
+  const { tc } = useLanguage();
+  const display = getTaskDisplayText(task);
+
+  if (!task.id) return null;
+
+  return (
+    <div className={`planner-completed-item planner-priority-${task.priority || 'medium'}`}>
+      <TaskExpandableText
+        text={display}
+        className="planner-completed-item-text"
+        onExpandRequest={() => onOpen(task)}
+      />
+      <div className="planner-completed-item-footer">
+        <div className="planner-completed-meta">
+          <span className="planner-completed-status-pill">{statusLabel}</span>
+          {task.assignee && <span>{task.assignee}</span>}
+          {task.dept && <span>{task.dept}</span>}
+        </div>
+        <div className="planner-task-row-actions">
+          <TaskStatusSelect
+            value={task.status || 'done'}
+            onChange={(s) => onStatusChange(task.id!, s)}
+            compact
+            disabled={!canWrite}
+          />
+          {canWrite && (
+            <>
+              <button className="btn btn-s btn-sm" type="button" onClick={() => onEdit(task)}>
+                {tc('edit')}
+              </button>
+              <button className="btn btn-danger btn-sm" type="button" onClick={() => void onDelete(task.id!)}>
+                {tc('delete')}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function CompletedTasksPanel({
+  tasks,
+  onStatusChange,
+  onEdit,
+  onOpen,
+  onDelete,
+  canWrite,
+}: CompletedTasksPanelProps) {
   const { tp, tpl, language } = useLanguage();
   const dateLocale = language === 'vi' ? 'vi-VN' : 'en-US';
   const [open, setOpen] = useState(false);
@@ -253,28 +293,16 @@ export default function CompletedTasksPanel({ tasks, onStatusChange, canWrite }:
                   {date === 'unknown' ? tp('planner', 'noDate') : formatGroupDate(date, dateLocale)}
                 </div>
                 {dateTasks.map((t, i) => (
-                  <div
+                  <CompletedTaskItem
                     key={t.id || i}
-                    className={`planner-completed-item planner-priority-${t.priority || 'medium'}`}
-                  >
-                    <div className="planner-completed-item-text">{getTaskDisplayText(t)}</div>
-                    <div className="planner-completed-item-footer">
-                      <div className="planner-completed-meta">
-                        <span className="planner-completed-status-pill">
-                          {taskStatusLabel(t.status)}
-                        </span>
-                        {t.assignee && <span>{t.assignee}</span>}
-                        {t.dept && <span>{t.dept}</span>}
-                      </div>
-                      {t.id && (
-                        <TaskStatusSelect
-                          value={t.status || 'done'}
-                          onChange={(s) => onStatusChange(t.id!, s)}
-                          disabled={!canWrite}
-                        />
-                      )}
-                    </div>
-                  </div>
+                    task={t}
+                    canWrite={canWrite}
+                    onStatusChange={onStatusChange}
+                    onEdit={onEdit}
+                    onOpen={onOpen}
+                    onDelete={onDelete}
+                    statusLabel={taskStatusLabel(t.status)}
+                  />
                 ))}
               </div>
             ))

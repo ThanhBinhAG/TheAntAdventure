@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fmt } from '@/lib/constants';
 import {
   isActivePipelineLead,
@@ -18,6 +18,7 @@ import { useEnsureAgentsCatalogLoaded } from '@/hooks/useEnsureAgentsCatalogLoad
 import { PROTECTED_AGENT_ID } from '@/lib/agents/agent-ids';
 import PaginationBar from '@/components/PaginationBar';
 import EmptyState from '@/components/EmptyState';
+import FormDraftsBar from '@/components/FormDraftsBar';
 import type { Agent } from '@/lib/types';
 import AgentFormModal from '@/components/agents/AgentFormModal';
 import { toast } from '@/lib/toast';
@@ -25,6 +26,11 @@ import { toast } from '@/lib/toast';
 import { confirmDialog } from '@/lib/confirm';
 import { usePagePermission } from '@/hooks/usePagePermission';
 import { useLanguage } from '@/hooks/useLanguage';
+import {
+  clearFormDraft,
+  listFormDrafts,
+  type FormDraftListItem,
+} from '@/lib/form-drafts/storage';
 
 export default function Agents() {
   const { tp, tpl, tc, tStage } = useLanguage();
@@ -42,9 +48,48 @@ export default function Agents() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<'add' | 'edit' | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const [draftStorageId, setDraftStorageId] = useState<string | null>(null);
+  const [formDrafts, setFormDrafts] = useState<FormDraftListItem[]>([]);
 
   const { pageSize, setPageSize } = usePageSize();
   const pageSizeOption = pageSize as PageSizeOption;
+
+  const refreshFormDrafts = useCallback(() => {
+    setFormDrafts(listFormDrafts('agents'));
+  }, []);
+
+  useEffect(() => {
+    refreshFormDrafts();
+  }, [refreshFormDrafts]);
+
+  function openNewAgent() {
+    setEditId(null);
+    setDraftStorageId(null);
+    setFormMode('add');
+  }
+
+  function openAgentDraft(draft: FormDraftListItem) {
+    if (draft.mode === 'edit') {
+      setEditId(draft.id);
+      setDraftStorageId(draft.id);
+      setFormMode('edit');
+      return;
+    }
+    setEditId(null);
+    setDraftStorageId(draft.id);
+    setFormMode('add');
+  }
+
+  function dismissAgentDraft(draft: FormDraftListItem) {
+    clearFormDraft('agents', draft.mode, draft.id);
+    refreshFormDrafts();
+  }
+
+  function closeAgentForm() {
+    setFormMode(null);
+    setEditId(null);
+    setDraftStorageId(null);
+  }
 
   function goToFirstPage() {
     setPage(1);
@@ -134,8 +179,7 @@ export default function Agents() {
     }
     if (result.message) toast.success(result.message);
     else toast.success(mode === 'edit' ? tp('agents', 'toastUpdated') : tp('agents', 'toastCreated'));
-    setEditId(null);
-    setFormMode(null);
+    closeAgentForm();
     refresh();
     void reloadCatalog();
   }
@@ -143,6 +187,7 @@ export default function Agents() {
   function openEdit(id: string) {
     setProfileId(null);
     setEditId(id);
+    setDraftStorageId(null);
     setFormMode('edit');
   }
 
@@ -402,11 +447,22 @@ export default function Agents() {
           }}
           style={{ padding: '6px 11px', border: '1.5px solid var(--b)', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, width: 170 }}
         />
+        <div className="agents-drafts-wrap">
+          <FormDraftsBar
+            drafts={formDrafts}
+            label={tc('formDraftsLabel')}
+            addPrefix={tc('formDraftAddPrefix')}
+            editPrefix={tc('formDraftEditPrefix')}
+            dismissTitle={tc('formDraftDismiss')}
+            onOpen={openAgentDraft}
+            onDismiss={dismissAgentDraft}
+          />
+        </div>
         <button
           className="btn btn-p btn-sm"
           type="button"
           disabled={!canWrite}
-          onClick={() => setFormMode('add')}
+          onClick={openNewAgent}
         >
           {tp('agents', 'addAgent')}
         </button>
@@ -471,7 +527,7 @@ export default function Agents() {
                 type="button"
                 className="btn btn-p btn-sm"
                 disabled={!canWrite}
-                onClick={() => setFormMode('add')}
+                onClick={openNewAgent}
               >
                 {tp('agents', 'addAgent')}
               </button>
@@ -647,10 +703,10 @@ export default function Agents() {
         mode={formMode === 'edit' ? 'edit' : 'add'}
         agent={editAgent}
         agents={storeAgents}
-        onClose={() => {
-          setFormMode(null);
-          setEditId(null);
-        }}
+        draftStorageId={draftStorageId}
+        onDraftStorageIdChange={setDraftStorageId}
+        onDraftsChanged={refreshFormDrafts}
+        onClose={closeAgentForm}
         onSave={handleSave}
       />
     </div>

@@ -1,4 +1,5 @@
 import { bookingDateForDb } from '@/lib/bookings/booking-dates';
+import { normalizeMoneyUSD } from '@/lib/core/money';
 import type {
   Agent,
   Booking,
@@ -9,6 +10,13 @@ import type {
   Lead,
 } from '../../types';
 import { fkOrNull, money, moneyAbs, type Row } from './shared';
+
+function optionalMoneyField(v: unknown, opts?: { allowNegative?: boolean }): number | undefined {
+  if (v == null || v === '') return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return undefined;
+  return normalizeMoneyUSD(n, { allowNegative: opts?.allowNegative === true });
+}
 
 export function rowToCustomer(r: Row): Customer {
   return {
@@ -29,6 +37,9 @@ export function rowToCustomer(r: Row): Customer {
     whatsapp: r.whatsapp ? String(r.whatsapp) : undefined,
     hotelTier: r.hotel_tier ? String(r.hotel_tier) : undefined,
     budget: r.budget ? String(r.budget) : undefined,
+    revenue: optionalMoneyField(r.revenue),
+    cost: optionalMoneyField(r.cost),
+    profit: optionalMoneyField(r.profit, { allowNegative: true }),
     travelMonth: r.travel_month ? String(r.travel_month) : undefined,
     children: r.children != null ? Number(r.children) : undefined,
     adults: r.adults != null ? Number(r.adults) : undefined,
@@ -61,6 +72,9 @@ export function customerToRow(c: Customer): Row {
     salesperson: c.salesperson ?? null,
     hotel_tier: c.hotelTier ?? null,
     budget: c.budget ?? null,
+    revenue: c.revenue ?? null,
+    cost: c.cost ?? null,
+    profit: c.profit ?? null,
     travel_month: c.travelMonth ?? null,
     children: c.children ?? 0,
     adults: c.adults ?? 2,

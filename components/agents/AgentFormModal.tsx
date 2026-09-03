@@ -2,6 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import type { Agent } from '@/lib/types';
+import {
+  clearFormDraft,
+  createFormDraftId,
+  readFormDraft,
+  writeFormDraft,
+} from '@/lib/form-drafts/storage';
 import { toast } from '@/lib/toast';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -41,6 +47,9 @@ interface AgentFormModalProps {
   agents: Agent[];
   onClose: () => void;
   onSave: (agent: Agent) => void | Promise<void>;
+  draftStorageId?: string | null;
+  onDraftStorageIdChange?: (id: string | null) => void;
+  onDraftsChanged?: () => void;
 }
 
 function nextAgentId(agents: Agent[]): string {
@@ -68,20 +77,96 @@ function initialForm(mode: AgentFormModalProps['mode'], agent: AgentFormModalPro
   return { ...EMPTY, id: nextAgentId(agents) };
 }
 
-export default function AgentFormModal({ open, mode, agent, agents, onClose, onSave }: AgentFormModalProps) {
-  const formKey = `${open}-${mode}-${agent ? JSON.stringify(agent) : agents.map((item) => item.id).join(',')}`;
+function agentDraftLabel(form: AgentFormData, untitled: string): string {
+  return form.name.trim() || form.email.trim() || untitled;
+}
+
+function isAgentDraftPayload(value: unknown): value is AgentFormData {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Partial<AgentFormData>;
+  return typeof v.name === 'string' && typeof v.id === 'string';
+}
+
+function loadAgentFormSession(
+  mode: AgentFormModalProps['mode'],
+  agent: AgentFormModalProps['agent'],
+  agents: Agent[],
+  draftStorageId: string | null | undefined,
+): { form: AgentFormData; fromDraft: boolean } {
+  if (draftStorageId) {
+    const draft = readFormDraft<AgentFormData>('agents', mode, draftStorageId);
+    if (draft && isAgentDraftPayload(draft.payload)) {
+      return { form: { ...EMPTY, ...draft.payload }, fromDraft: true };
+    }
+  }
+  return { form: initialForm(mode, agent, agents), fromDraft: false };
+}
+
+export default function AgentFormModal({
+  open,
+  mode,
+  agent,
+  agents,
+  onClose,
+  onSave,
+  draftStorageId = null,
+  onDraftStorageIdChange,
+  onDraftsChanged,
+}: AgentFormModalProps) {
+  const formKey = `${open}-${mode}-${draftStorageId ?? ''}-${agent ? JSON.stringify(agent) : agents.map((item) => item.id).join(',')}`;
   const [previousFormKey, setPreviousFormKey] = useState(formKey);
-  const [form, setForm] = useState<AgentFormData>(() => initialForm(mode, agent, agents));
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(draftStorageId);
+  const [form, setForm] = useState<AgentFormData>(
+    () => loadAgentFormSession(mode, agent, agents, draftStorageId).form,
+  );
 
   if (formKey !== previousFormKey) {
     setPreviousFormKey(formKey);
-    setForm(initialForm(mode, agent, agents));
+    const session = loadAgentFormSession(mode, agent, agents, draftStorageId);
+    setForm(session.form);
+    setActiveDraftId(draftStorageId);
   }
 
   const { language, tp, tc } = useLanguage();
-  const baselineForm = useMemo(() => initialForm(mode, agent, agents), [formKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const baselineForm = useMemo(
+    () => loadAgentFormSession(mode, agent, agents, draftStorageId).form,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- session tied to formKey
+    [formKey],
+  );
   const dirty = useFormDirty(open, baselineForm, form, undefined, formKey);
-  const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
+
+  function resolveDraftWriteId(): string | null {
+    if (mode === 'edit') return agent?.id ?? null;
+    if (activeDraftId) return activeDraftId;
+    return createFormDraftId();
+  }
+
+  const { requestClose } = useConfirmClose({
+    open,
+    dirty,
+    onClose: () => {
+      onDraftsChanged?.();
+      onClose();
+    },
+    language,
+    onSaveDraft: () => {
+      const id = resolveDraftWriteId();
+      if (!id) return;
+      writeFormDraft('agents', mode, id, form, agentDraftLabel(form, tc('formDraftUntitled')));
+      if (mode === 'add' && id !== activeDraftId) {
+        setActiveDraftId(id);
+        onDraftStorageIdChange?.(id);
+      }
+      onDraftsChanged?.();
+    },
+    onDiscard: () => {
+      const id = mode === 'edit' ? agent?.id ?? null : activeDraftId;
+      if (id) clearFormDraft('agents', mode, id);
+      setActiveDraftId(null);
+      onDraftStorageIdChange?.(null);
+      onDraftsChanged?.();
+    },
+  });
 
   if (!open) return null;
 
@@ -109,6 +194,9 @@ export default function AgentFormModal({ open, mode, agent, agents, onClose, onS
     };
     try {
       await onSave(saved);
+      const id = mode === 'edit' ? agent?.id ?? null : activeDraftId;
+      if (id) clearFormDraft('agents', mode, id);
+      onDraftsChanged?.();
       onClose();
     } catch {
       // Parent already toasted; keep modal open for retry.

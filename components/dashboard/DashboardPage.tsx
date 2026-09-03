@@ -425,7 +425,15 @@ export default function DashboardPage() {
                       },
                     },
                   },
-                  scales: { x: { grid: { display: false } }, y: { grid: { display: false } } },
+                  datasets: {
+                    bar: {
+                      minBarLength: 0,
+                    },
+                  },
+                  scales: {
+                    x: { beginAtZero: true, grid: { display: false } },
+                    y: { grid: { display: false } },
+                  },
                 }}
               />
               </div>
@@ -441,28 +449,21 @@ export default function DashboardPage() {
             <div className="card-hd">
               <span className="card-title">{tp('dashboard', 'pipelineByStage')}</span>
             </div>
-            <div className="card-body" style={{ padding: 12 }}>
-              {metrics.stageNames.map((s, i) => (
-                <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 12 }}>
-                  <span style={{ width: 90, color: 'var(--m)' }}>{s}</span>
-                  <div style={{ flex: 1, background: 'var(--bg)', borderRadius: 4, height: 18, overflow: 'hidden' }}>
-                    <div
-                      style={{
-                        width: `${Math.max(8, (metrics.stageCounts[i] / Math.max(...metrics.stageCounts, 1)) * 100)}%`,
-                        height: '100%',
-                        background: 'var(--g)',
-                        borderRadius: 4,
-                      }}
-                    />
+            <div className="card-body dash-stage-list">
+              {metrics.stageNames.map((s, i) => {
+                const count = metrics.stageCounts[i] ?? 0;
+                const maxCount = Math.max(...metrics.stageCounts, 1);
+                const widthPct = count <= 0 ? 0 : (count / maxCount) * 100;
+                return (
+                  <div key={s} className="dash-stage-row">
+                    <span className="dash-stage-lbl">{s}</span>
+                    <div className="dash-stage-track">
+                      <div className="dash-stage-fill" style={{ width: `${widthPct}%` }} />
+                    </div>
+                    <span className="dash-stage-count">{count}</span>
                   </div>
-                  <span style={{ fontWeight: 600, width: 24, textAlign: 'right' }}>{metrics.stageCounts[i]}</span>
-                  {metrics.conversionPct[i] !== null && (
-                    <span style={{ fontSize: 10, color: 'var(--m)', width: 32, textAlign: 'right' }}>
-                      {metrics.conversionPct[i]}%
-                    </span>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

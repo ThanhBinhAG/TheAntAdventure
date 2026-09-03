@@ -1,3 +1,4 @@
+import { normalizeMoneyUSD, parseMoneyInput } from '@/lib/core/money';
 import type { Customer } from '../types';
 
 export type CustomerFormData = {
@@ -16,6 +17,11 @@ export type CustomerFormData = {
   whatsapp: string;
   hotelTier: string;
   budget: string;
+  /** Optional USD amount as typed string (empty = unset). */
+  revenue: string;
+  cost: string;
+  /** Auto-derived from revenue − cost; empty when both unset. */
+  profit: string;
   travelMonth: string;
   adults: string;
   firstTime: string;
@@ -46,6 +52,9 @@ export const EMPTY_CUSTOMER_FORM: CustomerFormData = {
   whatsapp: '',
   hotelTier: '',
   budget: '$2,000–$3,500/pax',
+  revenue: '',
+  cost: '',
+  profit: '',
   travelMonth: '',
   adults: '2',
   firstTime: '',
@@ -79,8 +88,44 @@ export const AGENT_DATALIST = [
 
 export const SALES_PEOPLE = ['Tai Pham', 'Linh N.', 'Minh T.', 'Huong L.', 'Khoa V.'];
 
+function moneyToFormField(value: number | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '';
+  return String(value);
+}
+
+/** Empty string → undefined; otherwise parsed USD (non-negative). */
+export function parseOptionalFormMoney(raw: string): number | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  return parseMoneyInput(trimmed);
+}
+
+/** Recompute profit from revenue/cost; empty when both unset. */
+export function withAutoProfit(form: CustomerFormData): CustomerFormData {
+  const revRaw = form.revenue.trim();
+  const costRaw = form.cost.trim();
+  if (!revRaw && !costRaw) {
+    return { ...form, profit: '' };
+  }
+  const revenue = parseMoneyInput(revRaw);
+  const cost = parseMoneyInput(costRaw);
+  const profit = normalizeMoneyUSD(revenue - cost, { allowNegative: true });
+  return { ...form, profit: String(profit) };
+}
+
+/**
+ * Active Value for Clients table: customer revenue when set, else lead pipeline value.
+ */
+export function customerListActiveValue(
+  revenue: number | undefined | null,
+  pipelineValue: number,
+): number {
+  if (revenue != null && revenue > 0) return revenue;
+  return pipelineValue > 0 ? pipelineValue : 0;
+}
+
 export function customerToForm(c: Customer): CustomerFormData {
-  return {
+  return withAutoProfit({
     name: c.name,
     email: c.email,
     phone: c.phone || '',
@@ -96,6 +141,9 @@ export function customerToForm(c: Customer): CustomerFormData {
     whatsapp: c.whatsapp || '',
     hotelTier: c.hotelTier || '',
     budget: c.budget || '$2,000–$3,500/pax',
+    revenue: moneyToFormField(c.revenue),
+    cost: moneyToFormField(c.cost),
+    profit: moneyToFormField(c.profit),
     travelMonth: c.travelMonth || '',
     adults: String(c.adults ?? 2),
     firstTime: !c.firstTime || c.firstTime === 'unknown' ? '' : c.firstTime,
@@ -108,7 +156,7 @@ export function customerToForm(c: Customer): CustomerFormData {
     childAges: c.childAges || '',
     childDiet: c.childDiet || '',
     childPrefs: c.childPrefs || '',
-  };
+  });
 }
 
 export function formToCustomer(
@@ -122,6 +170,13 @@ export function formToCustomer(
       ? `\nChildren: ${form.numChildren}`
       : '';
   const notes = [form.notes, childNote].filter(Boolean).join('').trim();
+  const synced = withAutoProfit(form);
+  const revenue = parseOptionalFormMoney(synced.revenue);
+  const cost = parseOptionalFormMoney(synced.cost);
+  const profit =
+    synced.profit.trim() === ''
+      ? undefined
+      : normalizeMoneyUSD(parseMoneyInput(synced.profit), { allowNegative: true });
 
   return {
     id,
@@ -142,6 +197,9 @@ export function formToCustomer(
     whatsapp: form.whatsapp.trim() || undefined,
     hotelTier: form.hotelTier,
     budget: form.budget,
+    revenue,
+    cost,
+    profit,
     travelMonth: form.travelMonth || undefined,
     children: Number(form.numChildren) || 0,
     adults: Number(form.adults) || 2,

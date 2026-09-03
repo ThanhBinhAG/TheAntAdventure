@@ -7,6 +7,7 @@ import {
   EMPTY_CUSTOMER_FORM,
   SALES_PEOPLE,
   customerToForm,
+  withAutoProfit,
   type CustomerFormData,
 } from '@/lib/customers/customer-form';
 import {
@@ -22,6 +23,12 @@ import {
   normalizeNationality,
 } from '@/lib/customers/nationalities';
 import { isIsoTravelMonth, travelMonthInputValue } from '@/lib/core/travel-month';
+import {
+  clearFormDraft,
+  createFormDraftId,
+  readFormDraft,
+  writeFormDraft,
+} from '@/lib/form-drafts/storage';
 import type { Customer } from '@/lib/types';
 import type { CustomerSaveOutcome } from '@/hooks/useRegisterCustomer';
 import { useFormDirty, useConfirmClose } from '@/hooks/useConfirmClose';
@@ -29,6 +36,44 @@ import { useLanguage } from '@/hooks/useLanguage';
 import SearchableSelect from '@/components/SearchableSelect';
 import TravelStyleManagerModal from '@/components/customers/TravelStyleManagerModal';
 import { DEFAULT_TRAVEL_STYLES, type TravelStyle } from '@/lib/customers/travel-styles';
+
+type CustomerFormDraftPayload = {
+  form: CustomerFormData;
+  logInquiry: boolean;
+};
+
+function customerDraftLabel(form: CustomerFormData, untitled: string): string {
+  return form.name.trim() || form.email.trim() || untitled;
+}
+
+function isCustomerDraftPayload(value: unknown): value is CustomerFormDraftPayload {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Partial<CustomerFormDraftPayload>;
+  return Boolean(v.form && typeof v.form === 'object' && typeof v.logInquiry === 'boolean');
+}
+
+function loadCustomerFormSession(
+  mode: 'add' | 'edit',
+  customer: Customer | null | undefined,
+  draftStorageId: string | null | undefined,
+): { form: CustomerFormData; logInquiry: boolean; fromDraft: boolean } {
+  // Only hydrate from localStorage when explicitly resuming a draft (toolbar chip).
+  if (draftStorageId) {
+    const draft = readFormDraft<CustomerFormDraftPayload>('customers', mode, draftStorageId);
+    if (draft && isCustomerDraftPayload(draft.payload)) {
+      return {
+        form: { ...EMPTY_CUSTOMER_FORM, ...draft.payload.form },
+        logInquiry: draft.payload.logInquiry,
+        fromDraft: true,
+      };
+    }
+  }
+  return {
+    form: initialForm(mode, customer),
+    logInquiry: true,
+    fromDraft: false,
+  };
+}
 
 const CHILD_TAGS = ['Infant 0–2', 'Toddler 3–5', 'Child 6–9', 'Pre-teen 10–12', 'Teen 13–17'];
 const EMAIL_CHECK_DEBOUNCE_MS = 400;
@@ -57,6 +102,10 @@ interface CustomerFormModalProps {
     payload: CustomerFormSavePayload,
   ) => CustomerFormSaveResult | Promise<CustomerFormSaveResult>;
   canManageTravelStyles?: boolean;
+  /** When set, load this draft (`add.{id}` or `edit.{id}`). Add without id = blank form. */
+  draftStorageId?: string | null;
+  onDraftStorageIdChange?: (id: string | null) => void;
+  onDraftsChanged?: () => void;
 }
 
 function initialForm(mode: CustomerFormModalProps['mode'], customer: CustomerFormModalProps['customer']) {
@@ -78,16 +127,32 @@ function revealField(field: FormErrorField) {
   });
 }
 
-export default function CustomerFormModal({ open, mode, customer, customers, onClose, onSave, canManageTravelStyles = false }: CustomerFormModalProps) {
-  const formKey = `${open}-${mode}-${customer ? JSON.stringify(customer) : ''}`;
+export default function CustomerFormModal({
+  open,
+  mode,
+  customer,
+  customers,
+  onClose,
+  onSave,
+  canManageTravelStyles = false,
+  draftStorageId = null,
+  onDraftStorageIdChange,
+  onDraftsChanged,
+}: CustomerFormModalProps) {
+  const formKey = `${open}-${mode}-${draftStorageId ?? ''}-${customer ? JSON.stringify(customer) : ''}`;
   const [previousFormKey, setPreviousFormKey] = useState(formKey);
-  const [form, setForm] = useState<CustomerFormData>(() => initialForm(mode, customer));
-  const [logInquiry, setLogInquiry] = useState(true);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(draftStorageId);
+  const [form, setForm] = useState<CustomerFormData>(() => loadCustomerFormSession(mode, customer, draftStorageId).form);
+  const [logInquiry, setLogInquiry] = useState(
+    () => loadCustomerFormSession(mode, customer, draftStorageId).logInquiry,
+  );
   const [emailCheck, setEmailCheck] = useState<EmailCheckStatus>('idle');
   const [duplicateCustomer, setDuplicateCustomer] = useState<Customer | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<FormErrorField | null>(null);
-  const [previousEmail, setPreviousEmail] = useState(form.email);
+  const [previousEmail, setPreviousEmail] = useState(
+    () => loadCustomerFormSession(mode, customer, draftStorageId).form.email,
+  );
   const [travelStyles, setTravelStyles] = useState<TravelStyle[]>(DEFAULT_TRAVEL_STYLES);
   const [travelStyleManagerOpen, setTravelStyleManagerOpen] = useState(false);
   const [travelStylesSaving, setTravelStylesSaving] = useState(false);
@@ -97,8 +162,10 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
 
   if (formKey !== previousFormKey) {
     setPreviousFormKey(formKey);
-    setForm(initialForm(mode, customer));
-    setLogInquiry(true);
+    const session = loadCustomerFormSession(mode, customer, draftStorageId);
+    setForm(session.form);
+    setLogInquiry(session.logInquiry);
+    setActiveDraftId(draftStorageId);
     setEmailCheck('idle');
     setDuplicateCustomer(null);
     setFormError(null);
@@ -112,15 +179,57 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
   }
 
   const { language, tp, tpl, tc } = useLanguage();
-  const baselineForm = useMemo(() => initialForm(mode, customer), [formKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const baselineSession = useMemo(
+    () => loadCustomerFormSession(mode, customer, draftStorageId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- session tied to formKey
+    [formKey],
+  );
   const dirty = useFormDirty(
     open,
-    { form: baselineForm, logInquiry: true },
+    { form: baselineSession.form, logInquiry: baselineSession.logInquiry },
     { form, logInquiry },
     undefined,
     formKey,
   );
-  const { requestClose } = useConfirmClose({ open, dirty, onClose, language });
+
+  function resolveDraftWriteId(): string | null {
+    if (mode === 'edit') return customer?.id ?? null;
+    if (activeDraftId) return activeDraftId;
+    return createFormDraftId();
+  }
+
+  const { requestClose } = useConfirmClose({
+    open,
+    dirty,
+    onClose: () => {
+      onDraftsChanged?.();
+      onClose();
+    },
+    language,
+    onSaveDraft: () => {
+      const id = resolveDraftWriteId();
+      if (!id) return;
+      writeFormDraft(
+        'customers',
+        mode,
+        id,
+        { form, logInquiry },
+        customerDraftLabel(form, tc('formDraftUntitled')),
+      );
+      if (mode === 'add' && id !== activeDraftId) {
+        setActiveDraftId(id);
+        onDraftStorageIdChange?.(id);
+      }
+      onDraftsChanged?.();
+    },
+    onDiscard: () => {
+      const id = mode === 'edit' ? customer?.id ?? null : activeDraftId;
+      if (id) clearFormDraft('customers', mode, id);
+      setActiveDraftId(null);
+      onDraftStorageIdChange?.(null);
+      onDraftsChanged?.();
+    },
+  });
 
   const excludeId = mode === 'edit' && customer ? customer.id : undefined;
   const emailTrimmed = form.email.trim();
@@ -282,7 +391,13 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
 
   function set<K extends keyof CustomerFormData>(key: K, value: CustomerFormData[K]) {
     clearErrors();
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((f) => {
+      const next = { ...f, [key]: value };
+      if (key === 'revenue' || key === 'cost') {
+        return withAutoProfit(next);
+      }
+      return next;
+    });
   }
 
   function addChildTag(tag: string) {
@@ -352,11 +467,17 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
     });
 
     if (saved === true) {
+      const id = mode === 'edit' ? customer?.id ?? null : activeDraftId;
+      if (id) clearFormDraft('customers', mode, id);
+      onDraftsChanged?.();
       onClose();
       return;
     }
 
     if (saved && typeof saved === 'object' && saved.ok === true) {
+      const id = mode === 'edit' ? customer?.id ?? null : activeDraftId;
+      if (id) clearFormDraft('customers', mode, id);
+      onDraftsChanged?.();
       onClose();
       return;
     }
@@ -710,6 +831,41 @@ export default function CustomerFormModal({ open, mode, customer, customers, onC
           <div className="nc-section-title">{tp('customers', 'formSectionNotes')}</div>
           <div className="fg" style={{ marginBottom: 8 }}>
             <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} style={{ minHeight: 80 }} placeholder={tp('customers', 'formNotesPlaceholder')} />
+          </div>
+
+          <div className="nc-section-title">{tp('customers', 'formSectionDealValue')}</div>
+          <div className="nc-grid-3" style={{ marginBottom: 10 }}>
+            <div className="fg">
+              <label className="lbl">{tp('customers', 'formRevenue')}</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={form.revenue}
+                onChange={(e) => set('revenue', e.target.value)}
+                placeholder={tp('customers', 'formMoneyPlaceholder')}
+              />
+            </div>
+            <div className="fg">
+              <label className="lbl">{tp('customers', 'formCost')}</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={form.cost}
+                onChange={(e) => set('cost', e.target.value)}
+                placeholder={tp('customers', 'formMoneyPlaceholder')}
+              />
+            </div>
+            <div className="fg">
+              <label className="lbl">{tp('customers', 'formProfit')}</label>
+              <input
+                type="text"
+                value={form.profit}
+                readOnly
+                tabIndex={-1}
+                placeholder={tp('customers', 'formProfitPlaceholder')}
+                style={{ background: 'var(--bg)', color: 'var(--m)' }}
+              />
+            </div>
           </div>
 
           {mode === 'add' && (

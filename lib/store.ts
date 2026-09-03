@@ -148,6 +148,7 @@ interface CRMState {
   addTask: (task: Record<string, unknown>) => void;
   setTasks: (tasks: Task[]) => void;
   updateTask: (id: string, data: Record<string, unknown>) => void;
+  removeTask: (id: string) => void;
   rolloverIncompleteTasks: () => void;
 
   /** Local JSON backup/restore for dev support — not a Supabase sync path (D2.13). */
@@ -402,6 +403,10 @@ const crmStateCreator: StateCreator<CRMState> = (set, get) => ({
             const row = t as { id?: string };
             return row.id === id ? { ...row, ...data } : t;
           }),
+        })),
+      removeTask: (id) =>
+        set((s) => ({
+          tasks: s.tasks.filter((t) => (t as { id?: string }).id !== id),
         })),
       rolloverIncompleteTasks: () =>
         set((s) => {

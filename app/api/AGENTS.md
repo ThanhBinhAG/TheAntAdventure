@@ -32,6 +32,7 @@ Next.js Route Handlers for server-side auth, media, exports, weather, and diagno
 - `proposals/` — proposal PDF export (`export/`) + company templates (`templates/`)
 - `weather/` — boot, weekly, refresh, destination(s), featured
 - `sidebar/` — badge counts (`badges/`)
+- `settings/` — CRM Settings catalogs BFF (`catalogs`)
 - `system/` — diagnostics, log, logs
 - `health/` — health check
 

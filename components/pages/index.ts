@@ -38,4 +38,5 @@ export const PAGE_COMPONENTS: Record<PageSlug, ComponentType> = {
   devnotes: loadPage(() => import('./DevNotes')),
   teamchat: loadPage(() => import('./TeamChat')),
   'access-control': loadPage(() => import('./AccessControl')),
+  settings: loadPage(() => import('./Settings')),
 };

@@ -471,4 +471,5 @@ export type PageSlug =
   | 'ai'
   | 'devnotes'
   | 'teamchat'
-  | 'access-control';
+  | 'access-control'
+  | 'settings';

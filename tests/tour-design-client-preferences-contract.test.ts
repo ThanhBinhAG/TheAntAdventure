@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
-test('Tour Design gets Travel Style and Hotel Tier from the same active catalogs as Clients', () => {
+test('Tour Design gets Hotel Tier from client-preferences and catalogs from Settings API', () => {
   const root = process.cwd();
   const brief = readFileSync(join(root, 'components/tour-design/ClientBriefStep.tsx'), 'utf8');
   const page = readFileSync(join(root, 'components/tour-design/TourDesignPage.tsx'), 'utf8');
@@ -15,12 +15,11 @@ test('Tour Design gets Travel Style and Hotel Tier from the same active catalogs
   assert.match(route, /listTravelStylesServer/);
   assert.match(route, /listActiveHotelTiersServer/);
   assert.match(brief, /\/api\/tour-design\/client-preferences/);
-  assert.match(brief, /travelStyles\.filter\(\(style\) => style\.isActive\)/);
+  assert.match(brief, /\/api\/settings\/catalogs/);
   assert.match(brief, /selectableHotelTiers\.map/);
-  assert.match(brief, /TravelStyleManagerModal/);
-  assert.match(brief, /Manage Travel Styles/);
-  assert.match(brief, /canManageTravelStyles/);
-  assert.match(page, /usePagePermission\('customers'\)/);
+  assert.doesNotMatch(brief, /TravelStyleManagerModal/);
+  assert.doesNotMatch(brief, /canManageTravelStyles/);
+  assert.match(page, /usePagePermission\('tourdesign'\)/);
   assert.doesNotMatch(brief, /<option>Boutique 4★<\/option>/);
   assert.doesNotMatch(brief, /\['Luxury', 'Premium Cultural'/);
 });

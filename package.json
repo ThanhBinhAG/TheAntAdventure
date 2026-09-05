@@ -53,6 +53,7 @@
     "antd": "^6.6.1",
     "browser-image-compression": "^2.0.2",
     "chart.js": "^4.5.1",
+    "dayjs": "^1.11.23",
     "jose": "^6.2.10",
     "next": "^16.3.1",
     "pino": "^10.3.1",

@@ -25,6 +25,7 @@ const EXTRA_TITLES: Partial<Record<PageSlug, { en: string; vi: string }>> = {
   devnotes: { en: 'Dev Notes 📝', vi: 'Ghi chú kỹ thuật 📝' },
   teamchat: { en: 'Team Chat 💬', vi: 'Chat nội bộ 💬' },
   'access-control': { en: 'Access Control', vi: 'Kiểm soát truy cập' },
+  settings: { en: 'Settings', vi: 'Cài đặt' },
   about: { en: 'About Us', vi: 'Về chúng tôi' },
   culture: { en: 'Culture', vi: 'Văn hóa' },
   regulations: { en: 'Regulations', vi: 'Quy định' },

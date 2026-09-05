@@ -533,7 +533,6 @@ export default function Customers() {
         mode={formMode === 'edit' ? 'edit' : 'add'}
         customer={editCustomer}
         customers={[]}
-        canManageTravelStyles={canWrite}
         draftStorageId={draftStorageId}
         onDraftStorageIdChange={setDraftStorageId}
         onDraftsChanged={refreshFormDrafts}

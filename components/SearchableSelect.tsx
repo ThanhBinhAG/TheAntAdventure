@@ -10,9 +10,21 @@ type Props = {
   onChange: (value: string) => void;
   placeholder: string;
   invalid?: boolean;
+  /** When true, typed text can be committed on Enter/blur even if it is not in options. */
+  allowCustom?: boolean;
+  disabled?: boolean;
 };
 
-export default function SearchableSelect({ id, value, options, onChange, placeholder, invalid = false }: Props) {
+export default function SearchableSelect({
+  id,
+  value,
+  options,
+  onChange,
+  placeholder,
+  invalid = false,
+  allowCustom = false,
+  disabled = false,
+}: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listId = `${id}-options`;
@@ -40,6 +52,21 @@ export default function SearchableSelect({ id, value, options, onChange, placeho
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
+  function commitCustom() {
+    if (!allowCustom) return;
+    const next = query.trim();
+    if (next !== value) onChange(next);
+    setQuery('');
+    setOpen(false);
+    setActiveIndex(-1);
+  }
+
+  function closeWithoutCommit() {
+    setOpen(false);
+    setActiveIndex(-1);
+    setQuery('');
+  }
+
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
@@ -57,12 +84,15 @@ export default function SearchableSelect({ id, value, options, onChange, placeho
       if (!open) return;
       event.preventDefault();
       setActiveIndex(Math.max(filtered.length - 1, 0));
-    } else if (event.key === 'Enter' && open && activeIndex >= 0) {
+    } else if (event.key === 'Enter' && open) {
       event.preventDefault();
-      select(filtered[activeIndex]);
+      if (activeIndex >= 0 && filtered[activeIndex]) {
+        select(filtered[activeIndex]);
+      } else if (allowCustom && query.trim()) {
+        commitCustom();
+      }
     } else if (event.key === 'Escape') {
-      setOpen(false);
-      setActiveIndex(-1);
+      closeWithoutCommit();
     }
   }
 
@@ -71,7 +101,12 @@ export default function SearchableSelect({ id, value, options, onChange, placeho
       ref={rootRef}
       className="searchable-select"
       onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        if (allowCustom && open) {
+          commitCustom();
+          return;
+        }
+        closeWithoutCommit();
       }}
     >
       <div className={`searchable-select__control${invalid ? ' nc-field-invalid' : ''}`}>
@@ -85,9 +120,10 @@ export default function SearchableSelect({ id, value, options, onChange, placeho
           aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
           aria-invalid={invalid}
           autoComplete="off"
+          disabled={disabled}
           value={open ? query : value}
           onFocus={() => {
-            setQuery('');
+            setQuery(allowCustom ? value : '');
             setOpen(true);
           }}
           onChange={(event) => {
@@ -97,10 +133,17 @@ export default function SearchableSelect({ id, value, options, onChange, placeho
           onKeyDown={onKeyDown}
           placeholder={placeholder}
         />
-        <button type="button" className="searchable-select__toggle" aria-label="Show options" onMouseDown={(event) => event.preventDefault()} onClick={() => {
-          setQuery('');
-          setOpen((shown) => !shown);
-        }}>
+        <button
+          type="button"
+          className="searchable-select__toggle"
+          aria-label="Show options"
+          disabled={disabled}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            setQuery(allowCustom ? value : '');
+            setOpen((shown) => !shown);
+          }}
+        >
           ▾
         </button>
       </div>
@@ -118,7 +161,13 @@ export default function SearchableSelect({ id, value, options, onChange, placeho
             >
               {option}
             </div>
-          )) : <div className="searchable-select__empty" role="status">No matching options</div>}
+          )) : (
+            <div className="searchable-select__empty" role="status">
+              {allowCustom && query.trim()
+                ? `Use “${query.trim()}”`
+                : 'No matching options'}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -47,6 +47,7 @@ export const PAGE_READ_PERMISSION: Record<PageSlug, PermissionCode> = {
   devnotes: 'devnotes.read',
   teamchat: 'teamchat.read',
   'access-control': 'access_control.read',
+  settings: 'settings.read',
 };
 
 /**
@@ -82,6 +83,7 @@ export const PAGE_WRITE_PERMISSION: Record<PageSlug, PermissionCode> = {
   devnotes: 'devnotes.write',
   teamchat: 'teamchat.write',
   'access-control': 'access_control.write',
+  settings: 'settings.write',
 };
 
 /**

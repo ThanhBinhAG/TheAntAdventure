@@ -608,6 +608,7 @@ const PERMISSION_GROUP_LABELS: Record<AppLanguage, Record<string, string>> = {
         devnotes: 'Dev Notes',
         teamchat: 'Team Chat',
         access_control: 'Access Control',
+        settings: 'Settings',
     },
     vi: {
         dashboard: 'Bảng điều hành',
@@ -639,6 +640,7 @@ const PERMISSION_GROUP_LABELS: Record<AppLanguage, Record<string, string>> = {
         devnotes: 'Ghi chú kỹ thuật',
         teamchat: 'Chat nội bộ',
         access_control: 'Quản lý quyền',
+        settings: 'Cài đặt',
     },
 };
 

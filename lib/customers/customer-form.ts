@@ -88,6 +88,27 @@ export const AGENT_DATALIST = [
 
 export const SALES_PEOPLE = ['Tai Pham', 'Linh N.', 'Minh T.', 'Huong L.', 'Khoa V.'];
 
+export const CUSTOMER_SOURCES = [
+  'Referral',
+  'Website',
+  'Agent',
+  'Virtuoso',
+  'Abercrombie',
+  'Social Media',
+  'Walk-in',
+  'Direct',
+] as const;
+
+export const CUSTOMER_LANGUAGES = ['English', 'French', 'German', 'Spanish', 'Italian'] as const;
+
+export const CUSTOMER_BUDGET_RANGES = [
+  'Under $1,000/pax',
+  '$1,000–$2,000/pax',
+  '$2,000–$3,500/pax',
+  '$3,500–$6,000/pax',
+  '$6,000+/pax',
+] as const;
+
 function moneyToFormField(value: number | undefined): string {
   if (value == null || !Number.isFinite(value)) return '';
   return String(value);

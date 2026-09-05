@@ -109,6 +109,7 @@ export const PAGE_TITLES: Record<PageSlug, string> = {
   devnotes: 'Dev Notes 📝',
   teamchat: 'Team Chat 💬',
   'access-control': 'Access Control',
+  settings: 'Settings',
 };
 
 export const VI_LABELS: Record<string, string> = {
@@ -220,6 +221,12 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: '🛡',
         en: 'Access Control',
         vi: 'Quản lý quyền',
+      },
+      {
+        page: 'settings',
+        icon: '⚙',
+        en: 'Settings',
+        vi: 'Cài đặt',
       },
     ],
   },

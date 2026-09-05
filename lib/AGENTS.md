@@ -5,7 +5,7 @@ Domain logic, Zustand store, shared types, Supabase sync, and seeds. UI stays in
 
 ## Contents
 - Root: `store.ts`, `types.ts`, `constants.ts`, `env.ts`, `toast.ts` (toast bus), `confirm.ts` (in-app confirm dialog), `confirm-discard.ts` (unsaved-form leave prompt), `confirm-leave-draft.ts` (Stay / Discard / Save draft)
-- Domains: `customers/`, `agents/`, `sales/`, `bookings/`, `feedback/`, `finance/`, `tax/`, `hr/`, `salary/`, `dev-notes/`, `cal-events/`, `tour-design/`, `proposals/`, `outline/`, `pricing/`, `products/`, `form-drafts/`, …
+- Domains: `customers/`, `agents/`, `sales/`, `bookings/`, `feedback/`, `finance/`, `tax/`, `hr/`, `salary/`, `dev-notes/`, `cal-events/`, `tour-design/`, `proposals/`, `outline/`, `pricing/`, `products/`, `form-drafts/`, `settings/`, `theme/`, …
 - Infra: `db/` (sync-config, mappers, sync-guard), `supabase/` (server-only), `auth/`, `storage/`, `image-pipeline/`, `system/`, `i18n/`, `seeds/`
 - Cross-cutting: `core/`, `dashboard/`, `contracts/`, `planner/`, `gallery/`, `weather/`, `attractions/`, `suppliers/`, `sidebar/`, `form-drafts/`
 

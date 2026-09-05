@@ -1,5 +1,5 @@
 import type { ExperienceOverride, Product } from '@/lib/types';
-import { travelMonthToDate } from '@/lib/core/travel-month';
+import { isIsoTravelDate, travelMonthToDate } from '@/lib/core/travel-month';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -146,7 +146,7 @@ export function resolveTravelStart(startDate: string, travelMonth: string): { da
     if (!isNaN(ts.getTime())) return { date: ts, isEstimate: false };
   }
   const monthDate = travelMonthToDate(travelMonth);
-  if (monthDate) return { date: monthDate, isEstimate: true };
+  if (monthDate) return { date: monthDate, isEstimate: !isIsoTravelDate(travelMonth) };
   return { date: null, isEstimate: false };
 }
 

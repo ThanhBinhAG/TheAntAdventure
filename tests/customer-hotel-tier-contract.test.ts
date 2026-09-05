@@ -14,7 +14,8 @@ test('Customer Hotel Tier is sourced from active Hotels through a permissioned B
   assert.match(customerForm, /\/api\/customers\/hotel-tiers/);
   assert.match(customerForm, /cache: 'no-store'/);
   assert.match(customerForm, /const selectableHotelTiers = useMemo/);
-  assert.match(customerForm, /selectableHotelTiers\.map/);
+  assert.match(customerForm, /options=\{selectableHotelTiers\}/);
+  assert.match(customerForm, /allowCustom/);
   assert.match(hotelForm, /value={hotelTierChoice}/);
   assert.match(hotelForm, /value="__custom"/);
   assert.doesNotMatch(customerForm, /<option>Boutique 4★<\/option>/);

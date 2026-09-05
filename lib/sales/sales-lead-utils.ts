@@ -1,7 +1,7 @@
 import { STAGE_ORDER, STAGE_PROB_V22 } from '../constants';
 import { mondayWeekRange } from '../core/date-utils';
 import { getCustomerName } from '../core/crm-utils';
-import { formatTravelMonth } from '../core/travel-month';
+import { formatTravelMonth, isIsoTravelDate, isIsoTravelMonth } from '../core/travel-month';
 import type { Customer, Lead } from '../types';
 
 
@@ -60,7 +60,12 @@ export function formatLeadTravelMonth(
   startDate?: string
 ): string {
   const fromMonth = (travelMonth || '').trim();
-  if (fromMonth) return normalizeLeadMonth(fromMonth);
+  if (fromMonth) {
+    // Pipeline groups by month — collapse full dates to YYYY-MM labels.
+    if (isIsoTravelDate(fromMonth)) return normalizeLeadMonth(fromMonth.slice(0, 7));
+    if (isIsoTravelMonth(fromMonth)) return normalizeLeadMonth(fromMonth);
+    return normalizeLeadMonth(fromMonth);
+  }
 
   const fromStart = (startDate || '').trim();
   if (fromStart.length >= 7) {

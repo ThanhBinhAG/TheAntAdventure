@@ -25,6 +25,8 @@ Every meaningful code/docs folder has an `AGENTS.md` describing **what that fold
 | [`tests/`](tests/AGENTS.md) | Unit tests (`tsx --test`) |
 | [`Personal/`](Personal/AGENTS.md) | Gitignored local notes, changelog, legacy |
 | [`.cursor/`](.cursor/AGENTS.md) | Cursor rules for this repo |
+| [`components/settings/`](components/settings/AGENTS.md) | CRM Settings hub (catalogs + theme) |
+| [`lib/theme/`](lib/theme/AGENTS.md) | Per-user CRM UI theme presets (localStorage) |
 | [`Dockerfile`](Dockerfile) / [`docker-compose.yml`](docker-compose.yml) | Production image (standalone) + local/VM compose |
 
 Template for new folders:

@@ -19,9 +19,13 @@ test('Customer form uses keyboard-accessible searchable comboboxes instead of ta
 
   assert.match(form, /<SearchableSelect/);
   assert.doesNotMatch(form, /nc-country-list|nc-nationality-list/);
+  assert.match(form, /allowCustom/);
+  assert.doesNotMatch(form, /isKnownCountry|isKnownNationality/);
   assert.match(combobox, /role="combobox"/);
   assert.match(combobox, /role="listbox"/);
   assert.match(combobox, /searchable-select__control/);
+  assert.match(combobox, /allowCustom\?: boolean/);
+  assert.match(combobox, /function commitCustom/);
   assert.match(combobox, /const \[query, setQuery\] = useState\(''\)/);
   assert.match(combobox, /filterSearchableOptions\(options, query\)/);
   assert.match(combobox, /filtered\.findIndex\(\(option\) => option === value\)/);

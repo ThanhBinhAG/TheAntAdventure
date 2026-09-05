@@ -46,7 +46,8 @@ import {
   RobotOutlined,
   CodeOutlined,
   MessageOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 
 const DEFAULT_LOGO = '/Logo-3.svg';
@@ -111,6 +112,8 @@ function getSidebarIcon(page: string) {
       return <MessageOutlined style={{ color: '#60a5fa' }} />; // Blue
     case 'access-control':
       return <SafetyCertificateOutlined style={{ color: '#fbbf24' }} />; // Amber / Access Control
+    case 'settings':
+      return <SettingOutlined style={{ color: '#94a3b8' }} />; // Slate
     default:
       return null;
   }

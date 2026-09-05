@@ -2,16 +2,12 @@
 
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { AGENT_DATALIST, SALES_PEOPLE } from '@/lib/customers/customer-form';
-import { DEFAULT_TRAVEL_STYLES, type TravelStyle } from '@/lib/customers/travel-styles';
+import { DEFAULT_TRAVEL_STYLES } from '@/lib/customers/travel-styles';
 import {
   isTravelDateNotPast,
   todayIsoLocal,
 } from '@/lib/customers/customer-validation';
-import {
-  NATIONALITIES,
-  isKnownNationality,
-  normalizeNationality,
-} from '@/lib/customers/nationalities';
+import { normalizeNationality } from '@/lib/customers/nationalities';
 import { isIsoTravelMonth, travelMonthInputValue } from '@/lib/core/travel-month';
 import { buildBriefSummaryHtml } from '@/lib/tour-design/tour-brief-summary';
 import { calculateTourDuration } from '@/lib/tour-design/tour-durations';
@@ -21,8 +17,9 @@ import { toast } from '@/lib/toast';
 import { useLanguage } from '@/hooks/useLanguage';
 import { getBffData } from '@/lib/bff/client';
 import type { TourDesignClientPreferences } from '@/lib/tour-design/tour-design-types';
-import TravelStyleManagerModal from '@/components/customers/TravelStyleManagerModal';
 import SearchableSelect from '@/components/SearchableSelect';
+import { DEFAULT_CATALOG_LABELS } from '@/lib/settings/catalog-defaults';
+import type { CatalogItem } from '@/lib/settings/catalog-kinds';
 
 const CHILD_TAGS = ['Infant 0-2', 'Toddler 3-5', 'Child 6-9', 'Pre-teen 10-12', 'Teen 13-17'];
 const PAX_PRESETS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
@@ -49,7 +46,6 @@ interface Props {
   onCloseAi: () => void;
   onNext: () => void;
   canWrite?: boolean;
-  canManageTravelStyles?: boolean;
 }
 
 export default function ClientBriefStep({
@@ -66,7 +62,6 @@ export default function ClientBriefStep({
   onCloseAi,
   onNext,
   canWrite = true,
-  canManageTravelStyles = false,
 }: Props) {
   const { tp, tpl } = useLanguage();
   const custName = customers.find((c) => c.id === custId)?.name;
@@ -77,11 +72,14 @@ export default function ClientBriefStep({
   const [customPaxInput, setCustomPaxInput] = useState(String(isCustomPax ? brief.pax : 12));
   const [clientPreferences, setClientPreferences] = useState<TourDesignClientPreferences | null>(null);
   const [clientPreferencesError, setClientPreferencesError] = useState<string | null>(null);
-  const [travelStyleManagerOpen, setTravelStyleManagerOpen] = useState(false);
-  const [travelStylesSaving, setTravelStylesSaving] = useState(false);
+  const [catalogLabels, setCatalogLabels] = useState({
+    nationality: [...DEFAULT_CATALOG_LABELS.nationality],
+    customer_language: [...DEFAULT_CATALOG_LABELS.customer_language],
+    customer_budget: [...DEFAULT_CATALOG_LABELS.customer_budget],
+    travel_style: [...DEFAULT_CATALOG_LABELS.travel_style],
+  });
   const todayIso = todayIsoLocal();
   const firstTimeValue = brief.firstTime === 'unknown' ? '' : brief.firstTime;
-  const travelStyles = clientPreferences?.travelStyles ?? DEFAULT_TRAVEL_STYLES;
   const clientPreferencesLoading = clientPreferences === null && clientPreferencesError === null;
   const calculatedDuration = calculateTourDuration(brief.startDate, brief.endDate);
 
@@ -102,19 +100,61 @@ export default function ClientBriefStep({
     };
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch(
+      '/api/settings/catalogs?kinds=nationality,customer_language,customer_budget,travel_style&activeOnly=1',
+      { credentials: 'same-origin', signal: controller.signal },
+    )
+      .then(async (response) => {
+        const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: CatalogItem[] };
+        if (!response.ok || !body.ok || !Array.isArray(body.data)) return;
+        const next = {
+          nationality: [] as string[],
+          customer_language: [] as string[],
+          customer_budget: [] as string[],
+          travel_style: [] as string[],
+        };
+        for (const item of body.data) {
+          if (item.kind === 'nationality') next.nationality.push(item.label);
+          if (item.kind === 'customer_language') next.customer_language.push(item.label);
+          if (item.kind === 'customer_budget') next.customer_budget.push(item.label);
+          if (item.kind === 'travel_style') next.travel_style.push(item.label);
+        }
+        setCatalogLabels({
+          nationality: next.nationality.length ? next.nationality : [...DEFAULT_CATALOG_LABELS.nationality],
+          customer_language: next.customer_language.length
+            ? next.customer_language
+            : [...DEFAULT_CATALOG_LABELS.customer_language],
+          customer_budget: next.customer_budget.length ? next.customer_budget : [...DEFAULT_CATALOG_LABELS.customer_budget],
+          travel_style: next.travel_style.length
+            ? next.travel_style
+            : DEFAULT_TRAVEL_STYLES.filter((s) => s.isActive).map((s) => s.label),
+        });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      });
+    return () => controller.abort();
+  }, []);
+
   const selectableTravelStyles = useMemo(() => {
-    const activeStyles = travelStyles.filter((style) => style.isActive);
-    if (brief.style && !activeStyles.some((style) => style.label === brief.style)) {
-      return [{ code: 'current-style', label: brief.style, sortOrder: -1, isActive: false } satisfies TravelStyle, ...activeStyles];
-    }
-    return activeStyles;
-  }, [brief.style, travelStyles]);
+    const labels = catalogLabels.travel_style;
+    if (brief.style && !labels.includes(brief.style)) return [brief.style, ...labels];
+    return labels;
+  }, [brief.style, catalogLabels.travel_style]);
 
   const selectableHotelTiers = useMemo(() => {
     const tiers = clientPreferences?.hotelTiers ?? [];
     if (brief.hotelTier && !tiers.includes(brief.hotelTier)) return [brief.hotelTier, ...tiers];
     return tiers;
   }, [brief.hotelTier, clientPreferences?.hotelTiers]);
+
+  const nationalityOptions = useMemo(() => {
+    const labels = catalogLabels.nationality;
+    if (brief.nationality && !labels.includes(brief.nationality)) return [brief.nationality, ...labels];
+    return labels;
+  }, [brief.nationality, catalogLabels.nationality]);
 
   function setPax(n: number) {
     setBrief((b) => ({ ...b, pax: n, adults: n }));
@@ -135,48 +175,6 @@ export default function ClientBriefStep({
     const n = Number(raw);
     if (!Number.isFinite(n) || n < 11) return;
     setPax(Math.floor(n));
-  }
-
-  function applyTravelStyles(styles: TravelStyle[]) {
-    setClientPreferences((current) => ({
-      travelStyles: styles,
-      hotelTiers: current?.hotelTiers ?? [],
-    }));
-    setBrief((current) => current.style && styles.some((style) => style.isActive && style.label === current.style)
-      ? current
-      : { ...current, style: styles.find((style) => style.isActive)?.label ?? current.style });
-  }
-
-  async function saveTravelStyles(styles: TravelStyle[]) {
-    setTravelStylesSaving(true);
-    try {
-      const response = await fetch('/api/customers/travel-styles', {
-        method: 'PATCH',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ styles }),
-      });
-      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: TravelStyle[]; error?: string };
-      if (!response.ok || !body.ok || !Array.isArray(body.data)) throw new Error(body.error ?? 'Không thể lưu Travel Style.');
-      applyTravelStyles(body.data);
-    } finally {
-      setTravelStylesSaving(false);
-    }
-  }
-
-  async function deleteTravelStyle(style: TravelStyle) {
-    setTravelStylesSaving(true);
-    try {
-      const response = await fetch(`/api/customers/travel-styles?${new URLSearchParams({ code: style.code }).toString()}`, {
-        method: 'DELETE',
-        credentials: 'same-origin',
-      });
-      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; data?: TravelStyle[]; error?: string };
-      if (!response.ok || !body.ok || !Array.isArray(body.data)) throw new Error(body.error ?? 'Không thể xóa Travel Style.');
-      applyTravelStyles(body.data);
-    } finally {
-      setTravelStylesSaving(false);
-    }
   }
 
   function addChildTag(tag: string) {
@@ -221,10 +219,6 @@ export default function ClientBriefStep({
   function handleNext() {
     if (brief.startDate && !isTravelDateNotPast(brief.startDate)) {
       toast.warning(tp('tour-design', 'briefDatePastWarning'));
-      return;
-    }
-    if (brief.nationality.trim() && !isKnownNationality(brief.nationality)) {
-      toast.warning(tp('tour-design', 'briefNationalityWarning'));
       return;
     }
     if (brief.nationality.trim()) {
@@ -328,13 +322,10 @@ export default function ClientBriefStep({
               )}
             </div>
             <div className="fg">
-              <label className="lbl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                {tp('tour-design', 'briefTravelStyle')}
-                {canManageTravelStyles && <button type="button" className="btn btn-sm" style={{ minWidth: 30, padding: '1px 6px' }} onClick={() => setTravelStyleManagerOpen(true)} disabled={clientPreferencesLoading || Boolean(clientPreferencesError) || travelStylesSaving} aria-label="Manage Travel Styles" title="Manage Travel Styles">✎</button>}
-              </label>
+              <label className="lbl">{tp('tour-design', 'briefTravelStyle')}</label>
               <select value={brief.style} onChange={(e) => setBrief({ ...brief, style: e.target.value })}>
-                {selectableTravelStyles.map((style) => (
-                  <option key={style.code} value={style.label}>{style.label}</option>
+                {selectableTravelStyles.map((label) => (
+                  <option key={label} value={label}>{label}</option>
                 ))}
               </select>
             </div>
@@ -363,7 +354,7 @@ export default function ClientBriefStep({
             <div className="fg">
               <label className="lbl">{tp('tour-design', 'briefGuideLanguage')}</label>
               <select value={brief.language} onChange={(e) => setBrief({ ...brief, language: e.target.value })}>
-                {['English', 'French', 'German', 'Spanish', 'Italian'].map((l) => (
+                {catalogLabels.customer_language.map((l) => (
                   <option key={l}>{l}</option>
                 ))}
               </select>
@@ -395,7 +386,7 @@ export default function ClientBriefStep({
             <div className="fg">
               <label className="lbl">{tp('tour-design', 'briefBudgetRange')}</label>
               <select value={brief.budgetRange} onChange={(e) => setBrief({ ...brief, budgetRange: e.target.value })}>
-                {['Under $1,000/pax', '$1,000–$2,000/pax', '$2,000–$3,500/pax', '$3,500–$6,000/pax', '$6,000+/pax'].map((b) => (
+                {catalogLabels.customer_budget.map((b) => (
                   <option key={b}>{b}</option>
                 ))}
               </select>
@@ -425,9 +416,10 @@ export default function ClientBriefStep({
                 <SearchableSelect
                   id="td-nationality"
                   value={brief.nationality}
-                  options={NATIONALITIES}
+                  options={nationalityOptions}
                   onChange={(value) => setBrief({ ...brief, nationality: value })}
                   placeholder={tp('tour-design', 'briefNationalityPlaceholder')}
+                  allowCustom
                 />
               </div>
               <div className="fg">
@@ -573,14 +565,6 @@ export default function ClientBriefStep({
           </button>
         </div>
       </div>
-      <TravelStyleManagerModal
-        open={travelStyleManagerOpen}
-        styles={travelStyles}
-        saving={travelStylesSaving}
-        onClose={() => setTravelStyleManagerOpen(false)}
-        onSave={saveTravelStyles}
-        onDelete={deleteTravelStyle}
-      />
     </div>
   );
 }

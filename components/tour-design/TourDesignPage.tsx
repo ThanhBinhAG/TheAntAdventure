@@ -76,7 +76,6 @@ type OutlineWorkflowResponse = {
 export default function TourDesignPage() {
   const { tp } = useLanguage();
   const { canWrite } = usePagePermission('tourdesign');
-  const { canWrite: canManageTravelStyles } = usePagePermission('customers');
   const [step, setStep] = useState(0);
   useTourDesignCrmContext();
   const { error: referenceDataError } = useTourDesignReferenceData(step === 4);
@@ -827,7 +826,6 @@ export default function TourDesignPage() {
           onCloseAi={() => setAiPanel(null)}
           onNext={() => goToStep(1)}
           canWrite={canWrite}
-          canManageTravelStyles={canManageTravelStyles}
         />
       )}
 
